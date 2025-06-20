@@ -17,7 +17,13 @@ const getCurrentUserProfile = async (req, res) => {
 
 const updateCurrentUserProfile = async (req, res) => {
   const update = req.body;
-  const allowedFields = ["name", "age", "gender", "preference", "bio", "photos"];
+  const allowedFields = [
+    "name", "age", "gender", "preference", "bio", "photos",
+    "interests", "profilePrompts", "audioBioUrl", "videoBioUrl",
+    "personalityQuizResults", "socialMediaLinks",
+    "education", "relationshipGoals", "location",
+    "lastActiveAt" // Ideally, lastActiveAt is updated by middleware on user activity
+  ];
   const sanitizedUpdate = {};
 
   for (const key of allowedFields) {
@@ -111,4 +117,56 @@ module.exports = {
   updateCurrentUserProfile,
   unblockUser,
   blockUser,
+  uploadAudioBio,
+  uploadVideoBioSnippet,
+};
+
+const fs = require("fs");
+const path = require("path");
+const { uploadToS3 } = require("../services/awsS3"); // Corrected path
+
+// Generic file upload handler to S3
+const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded." });
+    }
+
+    const fileContent = fs.readFileSync(req.file.path);
+    const ext = path.extname(req.file.originalname);
+    // Ensure filename uniqueness and appropriate folder structure in S3
+    const s3Filename = `${fileTypePrefix}/${req.user.uid}-${Date.now()}${ext}`;
+
+    const result = await uploadToS3(fileContent, s3Filename, req.file.mimetype);
+
+    // Clean up temp upload from server's 'uploads/' directory
+    fs.unlinkSync(req.file.path);
+
+    // IMPORTANT: Only return the URL, do not save to User model here.
+    res.json({ success: true, fileUrl: result.Location });
+    console.log(`${fileTypePrefix} uploaded successfully for UID: ${req.user.uid}, URL: ${result.Location}`);
+
+  } catch (error) {
+    console.error(`Error in ${fileTypePrefix} upload for UID ${req.user.uid}:`, error);
+    if (req.file && req.file.path) {
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (cleanupError) {
+        console.error(`Failed to cleanup temporary ${fileTypePrefix} file:`, cleanupError);
+      }
+    }
+    res.status(500).json({ error: `An unexpected error occurred during ${fileTypePrefix} upload.` });
+  }
+};
+
+// Controller for audio bio upload
+const uploadAudioBio = async (req, res) => {
+  await handleFileUploadToS3(req, res, "audio-bios");
+};
+
+// Controller for video bio snippet upload
+const uploadVideoBioSnippet = async (req, res) => {
+  await handleFileUploadToS3(req, res, "video-bio-snippets");
 };

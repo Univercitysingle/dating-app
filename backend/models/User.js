@@ -15,6 +15,28 @@ const userSchema = new mongoose.Schema({
   faceVerified: { type: Boolean, default: false },
   videoProfile: { type: String, default: null },
   stripeCustomerId: { type: String, default: null },
+  interests: { type: [String], default: [] },
+  profilePrompts: { type: [{ prompt: String, answer: String }], default: [] },
+  audioBioUrl: { type: String, default: "" },
+  videoBioUrl: { type: String, default: "" },
+  personalityQuizResults: { type: mongoose.Schema.Types.Mixed, default: {} },
+  socialMediaLinks: { type: Map, of: String, default: new Map() },
+  education: { type: String, default: "" },
+  relationshipGoals: { type: String, default: "" },
+  lastActiveAt: { type: Date, default: Date.now },
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      default: [0, 0],
+    },
+  },
 }, { timestamps: true });
+
+userSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model("User", userSchema);

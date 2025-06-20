@@ -6,17 +6,49 @@ const getPotentialMatches = async (req, res) => {
     const currentUser = await User.findOne({ uid: req.user.uid });
     if (!currentUser) return res.status(404).json({ error: "User not found" });
 
-    const potentialMatches = await User.find({
+    // Build the query object dynamically
+    let query = {
       uid: {
         $ne: currentUser.uid,
         $nin: currentUser.blocked || []
       },
       gender: currentUser.preference,
       blocked: { $ne: currentUser.uid }
-    }).limit(20).select('uid email name age gender bio photos videoProfile isVerified');
+      // Note: location-based filtering would be added here too if it were part of this subtask's scope for filtering
+    };
+
+    // Add filters from query parameters if they exist
+    const { education, relationshipGoals, interests, personalityType } = req.query;
+
+    if (education) {
+      query.education = education; // Assumes exact match. Case-insensitivity can be added with $regex if needed.
+    }
+
+    if (relationshipGoals) {
+      query.relationshipGoals = relationshipGoals; // Assumes exact match.
+    }
+
+    if (interests) {
+      const interestsArray = interests.split(',').map(interest => interest.trim()).filter(interest => interest);
+      if (interestsArray.length > 0) {
+        query.interests = { $in: interestsArray }; // Match if user has any of the specified interests
+      }
+    }
+
+    if (personalityType) {
+      query['personalityQuizResults.type'] = personalityType; // Exact match for personality type
+    }
+
+    // TODO: Implement age range filter if provided in req.query (e.g., minAge, maxAge)
+    // TODO: Implement distance filter using $nearSphere for location if provided in req.query
+
+    const selection = 'uid email name age gender bio photos videoProfile isVerified education relationshipGoals location lastActiveAt interests personalityQuizResults';
+    const potentialMatches = await User.find(query)
+      .limit(20) // Consider making limit configurable or based on subscription tier
+      .select(selection);
 
     res.json(potentialMatches);
-    console.log(`Successfully retrieved potential matches for UID: ${currentUser.uid}`);
+    console.log(`Successfully retrieved potential matches for UID: ${currentUser.uid} with filters: ${JSON.stringify(req.query)}`);
   } catch (error) {
     console.error(`Error in getPotentialMatches for UID ${req.user.uid}:`, error);
     res.status(500).json({ error: "An unexpected error occurred while fetching potential matches." });
