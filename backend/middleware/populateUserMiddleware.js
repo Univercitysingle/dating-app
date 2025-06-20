@@ -1,7 +1,9 @@
 const User = require('../models/User'); // Adjust path if necessary
+const Subscription = require('../models/Subscription'); // Import Subscription model
 
 /**
- * Middleware to populate req.user with the full user document from the database.
+ * Middleware to populate req.user with the full user document from the database,
+ * and add an 'isPremium' flag based on their subscription status.
  * This middleware should run AFTER a Firebase authentication middleware that populates
  * req.user with the decoded Firebase token (specifically req.user.uid).
  */
@@ -20,20 +22,40 @@ const populateUser = async (req, res, next) => {
     const userFromDb = await User.findOne({ uid: req.user.uid });
 
     if (!userFromDb) {
-      // A valid Firebase token was provided, but the user doesn't exist in our application's database.
-      // This could be a user who completed Firebase auth but not app-specific signup steps,
-      // or a deleted user whose token is still valid for a short period.
       console.log(`populateUserMiddleware: No user found in DB for Firebase UID: ${req.user.uid}`);
       return res.status(403).json({ message: "Forbidden: User profile not found in application database." });
     }
 
-    // Replace the minimal req.user (from Firebase token) with the full user document from our database.
-    // This makes fields like 'role', 'isProfileVisible', etc., available to subsequent middleware/handlers.
-    req.user = userFromDb;
+    // Convert Mongoose document to a plain JavaScript object to add non-schema properties
+    const userObject = userFromDb.toObject();
+
+    // Check for active subscription
+    let isPremium = false;
+    try {
+      const activeSubscription = await Subscription.findOne({
+        userId: userObject._id, // Assuming Subscription links via User's MongoDB _id
+        status: 'active',
+        // Optionally, add endDate check if relevant:
+        // endDate: { $gte: new Date() }
+      });
+
+      if (activeSubscription) {
+        isPremium = true;
+      }
+    } catch (subError) {
+      // Log error fetching subscription, but don't fail the request, just assume not premium.
+      console.error(`populateUserMiddleware: Error fetching subscription for user UID ${userObject.uid}:`, subError);
+      // isPremium remains false
+    }
+
+    userObject.isPremium = isPremium;
+
+    // Replace req.user with the augmented user object
+    req.user = userObject;
 
     next();
   } catch (error) {
-    console.error("populateUserMiddleware: Error fetching user from database:", error);
+    console.error("populateUserMiddleware: Error processing user data:", error);
     return res.status(500).json({ message: "Internal Server Error: Could not retrieve user profile." });
   }
 };
