@@ -1,56 +1,88 @@
 const User = require("../models/User");
 const Match = require('../models/Match');
+const { getRankedMatches } = require('../../services/matchAI'); // Corrected path
 
 const getPotentialMatches = async (req, res) => {
   try {
-    const currentUser = await User.findOne({ uid: req.user.uid });
-    if (!currentUser) return res.status(404).json({ error: "User not found" });
+    // req.user is populated by populateUserMiddleware and is the full Mongoose document
+    const currentUser = req.user;
+    if (!currentUser) {
+      // This should technically be caught by auth middlewares, but as a safeguard:
+      return res.status(401).json({ error: "Current user not available." });
+    }
 
-    // Build the query object dynamically
-    let query = {
+    // Build the query object dynamically for filtering candidates
+    let queryOptions = {
       uid: {
-        $ne: currentUser.uid,
-        $nin: currentUser.blocked || []
+        $ne: currentUser.uid, // Exclude current user
+        $nin: currentUser.blocked || [] // Exclude users blocked by current user
       },
-      gender: currentUser.preference,
-      blocked: { $ne: currentUser.uid }
-      // Note: location-based filtering would be added here too if it were part of this subtask's scope for filtering
+      gender: currentUser.preference, // Filter by current user's preference
+      blocked: { $ne: currentUser.uid }, // Exclude users who have blocked current user
+      isProfileVisible: true, // Only match with users whose profiles are visible
+      // TODO: Add filter for users who have not been 'unmatched' or 'passed' by currentUser
     };
 
-    // Add filters from query parameters if they exist
+    // Add explicit filters from query parameters
     const { education, relationshipGoals, interests, personalityType } = req.query;
 
     if (education) {
-      query.education = education; // Assumes exact match. Case-insensitivity can be added with $regex if needed.
+      queryOptions.education = education;
     }
-
     if (relationshipGoals) {
-      query.relationshipGoals = relationshipGoals; // Assumes exact match.
+      queryOptions.relationshipGoals = relationshipGoals;
     }
-
     if (interests) {
       const interestsArray = interests.split(',').map(interest => interest.trim()).filter(interest => interest);
       if (interestsArray.length > 0) {
-        query.interests = { $in: interestsArray }; // Match if user has any of the specified interests
+        queryOptions.interests = { $in: interestsArray };
       }
     }
-
     if (personalityType) {
-      query['personalityQuizResults.type'] = personalityType; // Exact match for personality type
+      queryOptions['personalityQuizResults.type'] = personalityType;
     }
 
-    // TODO: Implement age range filter if provided in req.query (e.g., minAge, maxAge)
-    // TODO: Implement distance filter using $nearSphere for location if provided in req.query
-
+    // Fields to select for candidate profiles
     const selection = 'uid email name age gender bio photos videoProfile isVerified education relationshipGoals location lastActiveAt interests personalityQuizResults';
-    const potentialMatches = await User.find(query)
-      .limit(20) // Consider making limit configurable or based on subscription tier
-      .select(selection);
 
-    res.json(potentialMatches);
-    console.log(`Successfully retrieved potential matches for UID: ${currentUser.uid} with filters: ${JSON.stringify(req.query)}`);
+    // Fetch all potential candidates matching the explicit filters
+    // Do not limit here; ranking and pagination will be done on the full filtered set.
+    const potentialCandidates = await User.find(queryOptions).select(selection).lean(); // Use .lean() for performance
+
+    if (!potentialCandidates || potentialCandidates.length === 0) {
+      return res.json({
+        matches: [],
+        currentPage: 1,
+        totalPages: 0,
+        totalMatches: 0,
+      });
+    }
+
+    // Rank the filtered candidates using matchAI service
+    // currentUser (req.user) is a Mongoose document. getRankedMatches expects plain objects or Mongoose docs.
+    // potentialCandidates are now plain objects due to .lean()
+    const rankedMatches = getRankedMatches(currentUser.toObject(), potentialCandidates); // Convert currentUser to plain object for matchAI
+
+    // Paginate the ranked matches
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10; // Default limit to 10
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
+    const paginatedResults = rankedMatches.slice(startIndex, endIndex);
+    const totalMatches = rankedMatches.length;
+    const totalPages = Math.ceil(totalMatches / limit);
+
+    res.json({
+      matches: paginatedResults, // Array of { user: UserProfile, matchScore: Number }
+      currentPage: page,
+      totalPages: totalPages,
+      totalMatches: totalMatches,
+    });
+    console.log(`Successfully retrieved and ranked potential matches for UID: ${currentUser.uid} with filters: ${JSON.stringify(req.query)}`);
+
   } catch (error) {
-    console.error(`Error in getPotentialMatches for UID ${req.user.uid}:`, error);
+    console.error(`Error in getPotentialMatches for UID ${req.user ? req.user.uid : 'N/A'}:`, error);
     res.status(500).json({ error: "An unexpected error occurred while fetching potential matches." });
   }
 };
