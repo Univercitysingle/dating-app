@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import MatchFilters from '../components/MatchFilters'; // Assuming MatchFilters.js is in components
-// You'll likely need a component to display individual user cards, e.g., UserCard.js
-// For now, we'll just display basic info.
+import MatchFilters from '../components/MatchFilters';
+import InterstitialAd from '../components/InterstitialAd'; // Import the ad component
+import { useAuth } from '../context/AuthContext'; // Import useAuth
 
-// Placeholder UserCard component
-const UserCard = ({ user }) => (
+// Placeholder UserCard component - expanded slightly for interaction
+const UserCard = ({ user, onSwipe }) => (
   <div className="bg-white shadow-lg rounded-lg p-4 m-2 w-full md:w-1/2 lg:w-1/3 xl:w-1/4 flex flex-col">
     <h3 className="text-xl font-semibold text-gray-800">{user.name}, {user.age}</h3>
     {user.photos && user.photos.length > 0 && (
@@ -22,24 +22,44 @@ const UserCard = ({ user }) => (
         <p>Personality: {user.personalityQuizResults.type}</p>
       )}
       {user.lastActiveAt && <p>Last Active: {new Date(user.lastActiveAt).toLocaleDateString()}</p>}
-       {/* Consider adding location display if available and appropriate */}
+    </div>
+    {/* Placeholder swipe buttons */}
+    <div className="mt-auto pt-3 flex justify-around">
+      <button
+        onClick={() => onSwipe('dislike', user.uid)}
+        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+      >
+        Dislike
+      </button>
+      <button
+        onClick={() => onSwipe('like', user.uid)}
+        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+      >
+        Like
+      </button>
     </div>
   </div>
 );
 
 
 function MatchesPage() {
+  const { user: currentUser } = useAuth(); // Get current user from AuthContext
   const [matches, setMatches] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0); // To show one match at a time
   const [isLoading, setIsLoading] = useState(false);
   const [filterParams, setFilterParams] = useState({});
   const [error, setError] = useState(null);
 
+  // Ad-related state
+  const [swipeCountSinceLastAd, setSwipeCountSinceLastAd] = useState(0);
+  const [isAdVisible, setIsAdVisible] = useState(false);
+  const SWIPES_PER_AD = 10; // Show ad every 10 swipes for free users
+
   const fetchMatches = useCallback(async (currentFilters) => {
     setIsLoading(true);
     setError(null);
-    const user = JSON.parse(localStorage.getItem("user"));
-
-    if (!user || !user.token) {
+    // currentUser is from useAuth(), which should have the token if user is logged in
+    if (!currentUser || !currentUser.token) {
       setError("User not authenticated. Please log in.");
       setIsLoading(false);
       setMatches([]);
@@ -52,7 +72,7 @@ function MatchesPage() {
     try {
       const response = await fetch(apiUrl, {
         headers: {
-          Authorization: `Bearer ${user.token}`,
+          Authorization: `Bearer ${currentUser.token}`, // Use token from currentUser
         },
       });
 
@@ -61,8 +81,9 @@ function MatchesPage() {
         throw new Error(errorData.error || `Failed to fetch matches. Status: ${response.status}`);
       }
 
-      const data = await response.json();
-      setMatches(data);
+      const data = await response.json(); // Expecting { matches: [], ... }
+      setMatches(data.matches || []); // Assuming backend returns { matches: [...] }
+      setCurrentIndex(0); // Reset to the first card on new fetch/filter
     } catch (err) {
       console.error("Error fetching matches:", err);
       setError(err.message);
@@ -70,36 +91,73 @@ function MatchesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentUser]); // Add currentUser to dependencies
 
   useEffect(() => {
-    fetchMatches(filterParams); // Fetch initial matches (with empty filters)
-  }, [fetchMatches, filterParams]); // filterParams in dependency array to refetch when filters change
+    // Fetch matches when currentUser is available or filterParams change
+    if (currentUser) {
+      fetchMatches(filterParams);
+    }
+  }, [fetchMatches, filterParams, currentUser]);
 
   const handleApplyFilters = (newFilters) => {
     setFilterParams(newFilters);
-    // fetchMatches will be called by the useEffect hook due to filterParams changing
+    // fetchMatches is called by useEffect due to filterParams change
   };
 
+  const handleSwipeAction = (swipeType, swipedUserId) => {
+    console.log(`Swiped ${swipeType} on user ${swipedUserId}`);
+
+    // Ad logic for non-premium users
+    if (currentUser && !currentUser.isPremium) {
+      const newSwipeCount = swipeCountSinceLastAd + 1;
+      if (newSwipeCount >= SWIPES_PER_AD) {
+        setIsAdVisible(true);
+        setSwipeCountSinceLastAd(0);
+      } else {
+        setSwipeCountSinceLastAd(newSwipeCount);
+      }
+    }
+
+    // Advance to the next card
+    setCurrentIndex(prevIndex => prevIndex + 1);
+  };
+
+  const handleAdClose = () => {
+    setIsAdVisible(false);
+  };
+
+  const currentMatch = matches && matches.length > currentIndex ? matches[currentIndex] : null;
+
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 flex flex-col items-center">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Discover Matches</h1>
 
       <MatchFilters onApplyFilters={handleApplyFilters} initialFilters={filterParams} />
+
+      {isAdVisible && (
+        <InterstitialAd
+          isVisible={isAdVisible}
+          onClose={handleAdClose}
+        />
+      )}
 
       {isLoading && <p className="text-center text-gray-600 py-4">Loading matches...</p>}
 
       {error && <p className="text-center text-red-500 py-4">Error: {error}</p>}
 
-      {!isLoading && !error && matches.length === 0 && (
+      {!isLoading && !error && !currentMatch && matches.length > 0 && currentIndex >= matches.length && (
+         <p className="text-center text-gray-600 py-4">No more profiles in this batch. Try different filters or check back later!</p>
+      )}
+
+      {!isLoading && !error && !currentMatch && matches.length === 0 && (
         <p className="text-center text-gray-600 py-4">No matches found. Try adjusting your filters or preferences!</p>
       )}
 
-      {!isLoading && !error && matches.length > 0 && (
-        <div className="flex flex-wrap -m-2">
-          {matches.map(user => (
-            <UserCard key={user.uid || user._id} user={user} />
-          ))}
+      {!isLoading && !error && currentMatch && (
+        <div className="mt-6 w-full flex justify-center">
+           {/* User object from rankedMatches is actually { user: UserProfile, matchScore: Number } */}
+          <UserCard user={currentMatch.user} onSwipe={handleSwipeAction} />
         </div>
       )}
     </div>
