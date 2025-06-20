@@ -40,6 +40,11 @@ app.use("/api/matches", authMiddleware, require("./routes/matches"));
 app.use("/api/chat", authMiddleware, require("./routes/chat").router);
 app.use("/api/video", authMiddleware, require("./routes/video"));
 app.use("/api/reports", authMiddleware, require("./routes/reports")); // Add this line
+
+// Admin routes
+const adminUsersRouter = require('./routes/adminUsers');
+app.use('/api/admin/users', adminUsersRouter); // adminUsersRouter already includes its own specific auth chain
+
 app.use("/api/stripe-webhook", stripeWebhook); // Stripe webhook without auth (special handling)
 
 // Error handling middleware

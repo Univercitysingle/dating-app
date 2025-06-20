@@ -35,6 +35,23 @@ const userSchema = new mongoose.Schema({
       default: [0, 0],
     },
   },
+  role: {
+    type: String,
+    enum: ['user', 'contributor', 'admin', 'superadmin'],
+    default: 'user',
+  },
+  isProfileVisible: {
+    type: Boolean,
+    default: true,
+  },
+  mustSetPassword: {
+    type: Boolean,
+    default: false,
+  },
+  password: { // For locally managed passwords, e.g., for sadmin
+    type: String,
+    required: false, // Not all users (e.g., Firebase-only users) will have this
+  },
 }, { timestamps: true });
 
 userSchema.index({ location: '2dsphere' });

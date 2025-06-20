@@ -14,26 +14,115 @@ const auth = getAuth();
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null); // Will store full user profile from our backend
+  const [isLoading, setIsLoading] = useState(true); // For initial auth state check
+  const [tempAuthInfo, setTempAuthInfo] = useState(null); // For password setup flow
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        firebaseUser.getIdToken().then(token => {
-          setUser({ uid: firebaseUser.uid, token, email: firebaseUser.email });
-          localStorage.setItem("user", JSON.stringify({ uid: firebaseUser.uid, token, email: firebaseUser.email }));
-        });
+        try {
+          const idToken = await firebaseUser.getIdToken();
+          // At this point, we have a Firebase user.
+          // We need to fetch our backend's user profile.
+          // This is usually done after login or on app load.
+          // For now, we'll assume login flow populates our backend user.
+          // If a user is already logged into Firebase but we don't have their full profile,
+          // we might need a mechanism to fetch it here or prompt re-login.
+
+          // Let's try to get user from localStorage first, assuming login flow has put it there.
+          const storedUser = localStorage.getItem('appUser');
+          if (storedUser) {
+            const appUser = JSON.parse(storedUser);
+            // Verify token if necessary or refresh it
+            if (appUser.uid === firebaseUser.uid) {
+               // The token in localStorage might be our backend's JWT, not Firebase's.
+               // For this flow, let's assume 'token' in localStorage is the one for our backend API.
+              setUser({ ...appUser, firebaseIdToken: idToken });
+            } else {
+              // Mismatch, clear stored user
+              localStorage.removeItem('appUser');
+              setUser(null); // Or trigger a re-fetch of appUser from backend
+            }
+          } else {
+            // No appUser in localStorage, but Firebase user exists.
+            // This state might occur if user refreshed on set-initial-password page
+            // or if login flow needs adjustment.
+            // For now, we only set basic Firebase info. The main login flow should populate fully.
+             setUser({ uid: firebaseUser.uid, email: firebaseUser.email, firebaseIdToken: idToken, isFirebaseOnly: true });
+          }
+        } catch (error) {
+          console.error("Error getting ID token:", error);
+          setUser(null);
+          localStorage.removeItem('appUser');
+        }
       } else {
         setUser(null);
-        localStorage.removeItem("user");
+        localStorage.removeItem('appUser');
+        setTempAuthInfo(null); // Clear temp info on logout
       }
+      setIsLoading(false);
     });
+    return () => unsubscribe();
   }, []);
 
-  const loginWithCustomToken = (token) => signInWithCustomToken(auth, token);
+  // Called from Login.js after /api/auth/login returns
+  // backendUser: user object from our DB
+  // firebaseTokenForSignIn: custom token from our backend to sign into Firebase client
+  // backendApiToken: token to communicate with our protected backend routes (could be same as firebaseTokenForSignIn if it's a Firebase ID token)
+  const handleLoginSuccess = (backendUser, firebaseTokenForSignIn, backendApiToken) => {
+    localStorage.setItem('appUser', JSON.stringify({ ...backendUser, token: backendApiToken }));
+    setUser({ ...backendUser, token: backendApiToken }); // Store full user profile + our API token
+
+    // If Firebase client sign-in is needed with a custom token
+    if (firebaseTokenForSignIn) {
+      return signInWithCustomToken(auth, firebaseTokenForSignIn)
+        .catch(error => {
+          console.error("Firebase signInWithCustomToken error:", error);
+          // Handle failed Firebase sign-in (e.g., clear appUser, setUser(null))
+          localStorage.removeItem('appUser');
+          setUser(null);
+          throw error; // Re-throw to be caught by Login.js
+        });
+    }
+    return Promise.resolve();
+  };
+
+  // Stores user data and token temporarily when password setup is required
+  const setPendingPasswordSetup = (userInfo, apiToken) => {
+    setTempAuthInfo({ user: userInfo, token: apiToken });
+    // Optionally, persist to localStorage if user might refresh on SetInitialPasswordPage
+    localStorage.setItem('tempAuthInfo', JSON.stringify({ user: userInfo, token: apiToken }));
+  };
+
+  // Called from SetInitialPasswordPage after successful password set
+  const completePasswordSetupAndLogin = (backendUser, backendApiToken) => {
+    setTempAuthInfo(null);
+    localStorage.removeItem('tempAuthInfo');
+    // Now proceed with full login using the (potentially updated) user info and token
+    // This assumes the backendApiToken is what's needed for Firebase client sign-in *if* it's a custom token.
+    // Or, if Firebase sign-in already happened, just update app state.
+    handleLoginSuccess(backendUser, null, backendApiToken); // Pass null if Firebase sign-in not needed again
+  };
+
+  const logout = async () => {
+    await auth.signOut(); // Firebase sign out
+    setUser(null);
+    localStorage.removeItem('appUser');
+    localStorage.removeItem('tempAuthInfo');
+    // any other cleanup
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loginWithCustomToken }}>
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      handleLoginSuccess,
+      setPendingPasswordSetup,
+      tempAuthInfo,
+      completePasswordSetupAndLogin,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
