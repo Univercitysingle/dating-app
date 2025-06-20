@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000" # Assuming backend PORT is 5000 from .env
+    volumes:
+      - ./backend:/app # Map local backend directory to /app in container (WORKDIR in backend/Dockerfile)
+      - /app/node_modules # Anonymous volume to prevent local node_modules from overwriting container's
+    env_file:
+      - ./backend/.env # Loads environment variables from .env file in backend directory
+    command: npm run dev # Override default CMD to use nodemon for development
+    depends_on: [] # No explicit 'mongo' service as MongoDB is cloud-hosted
+
+  frontend:
+    build:
+      context: ./frontend # We'll use the Dockerfile to install deps, but override command
+      dockerfile: Dockerfile
+      target: build # Use only the 'build' stage from the multi-stage Dockerfile
+    ports:
+      - "3000:3000" # Standard React development port
+    volumes:
+      - ./frontend:/app # Map local frontend directory to /app in container (WORKDIR in frontend/Dockerfile's build stage)
+      - /app/node_modules # Anonymous volume for node_modules
+    environment:
+      - NODE_ENV=development # Ensures create-react-app runs in development mode
+      - REACT_APP_API_BASE_URL=http://localhost:5000 # For frontend to call backend; 'localhost' from browser's perspective
+      # Add any other REACT_APP_* environment variables needed by the frontend here
+    command: npm start # Override CMD to run React dev server
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend # Optional: ensures backend starts before frontend, though not strictly necessary for API calls
+
+networks:
+  default:
+    driver: bridge
