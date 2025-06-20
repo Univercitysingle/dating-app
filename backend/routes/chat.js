@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const http = require("http");
 const socketIo = require("socket.io");
-const ChatMessage = require('../models/ChatMessage');
+const ChatMessage = require('../models/ChatMessage'); // Keep for socket logic if needed, or remove if only controller uses it.
+const { getChatHistory } = require('../controllers/chatController');
 
 let io;
 
@@ -83,37 +84,6 @@ router.get("/init-socket", (req, res) => {
   res.json({ message: "Socket endpoint placeholder" });
 });
 
-router.get("/history/:roomId", async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    if (!roomId) {
-      return res.status(400).json({ error: "Room ID is required" });
-    }
-
-    // Basic pagination
-    const limit = parseInt(req.query.limit) || 50;
-    const skip = parseInt(req.query.skip) || 0;
-
-    const messages = await ChatMessage.find({ roomId })
-      .sort({ timestamp: 1 }) // Sort by oldest first
-      .skip(skip)
-      .limit(limit)
-      .exec(); // .exec() is good practice for mongoose queries
-
-    // Could also return total message count for better pagination UI on client
-    // const totalMessages = await ChatMessage.countDocuments({ roomId });
-
-    res.json({
-      messages,
-      // totalMessages,
-      // limit,
-      // skip
-    });
-
-  } catch (error) {
-    console.error("Error fetching chat history:", error);
-    res.status(500).json({ error: "Failed to retrieve chat history" });
-  }
-});
+router.get("/history/:roomId", getChatHistory);
 
 module.exports = { router, initSocket };
