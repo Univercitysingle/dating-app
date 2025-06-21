@@ -1,17 +1,18 @@
 const User = require("../models/User");
 const Match = require('../models/Match');
-const { getRankedMatches } = require('../../services/matchAI'); // Corrected path
+const { getRankedMatches } = require('../services/matchAI'); // Corrected path (controllers and services are siblings)
 
+/**
+ * Get potential matches for the current user, applying filters and ranking logic.
+ */
 const getPotentialMatches = async (req, res) => {
   try {
-    // req.user is populated by populateUserMiddleware and is the full Mongoose document
     const currentUser = req.user;
     if (!currentUser) {
-      // This should technically be caught by auth middlewares, but as a safeguard:
       return res.status(401).json({ error: "Current user not available." });
     }
 
-    // Build the query object dynamically for filtering candidates
+    // Build the query object for filtering candidates
     let queryOptions = {
       uid: {
         $ne: currentUser.uid, // Exclude current user
@@ -19,11 +20,11 @@ const getPotentialMatches = async (req, res) => {
       },
       gender: currentUser.preference, // Filter by current user's preference
       blocked: { $ne: currentUser.uid }, // Exclude users who have blocked current user
-      isProfileVisible: true, // Only match with users whose profiles are visible
+      isProfileVisible: true // Only match with users whose profiles are visible
       // TODO: Add filter for users who have not been 'unmatched' or 'passed' by currentUser
     };
 
-    // Add explicit filters from query parameters
+    // Additional filters from query parameters
     const { education, relationshipGoals, interests, personalityType } = req.query;
 
     if (education) {
@@ -46,8 +47,7 @@ const getPotentialMatches = async (req, res) => {
     const selection = 'uid email name age gender bio photos videoProfile isVerified education relationshipGoals location lastActiveAt interests personalityQuizResults';
 
     // Fetch all potential candidates matching the explicit filters
-    // Do not limit here; ranking and pagination will be done on the full filtered set.
-    const potentialCandidates = await User.find(queryOptions).select(selection).lean(); // Use .lean() for performance
+    const potentialCandidates = await User.find(queryOptions).select(selection).lean();
 
     if (!potentialCandidates || potentialCandidates.length === 0) {
       return res.json({
@@ -59,13 +59,11 @@ const getPotentialMatches = async (req, res) => {
     }
 
     // Rank the filtered candidates using matchAI service
-    // currentUser (req.user) is a Mongoose document. getRankedMatches expects plain objects or Mongoose docs.
-    // potentialCandidates are now plain objects due to .lean()
-    const rankedMatches = getRankedMatches(currentUser.toObject(), potentialCandidates); // Convert currentUser to plain object for matchAI
+    const rankedMatches = getRankedMatches(currentUser.toObject ? currentUser.toObject() : currentUser, potentialCandidates);
 
     // Paginate the ranked matches
     const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10; // Default limit to 10
+    const limit = parseInt(req.query.limit, 10) || 10;
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
 
@@ -80,13 +78,15 @@ const getPotentialMatches = async (req, res) => {
       totalMatches: totalMatches,
     });
     console.log(`Successfully retrieved and ranked potential matches for UID: ${currentUser.uid} with filters: ${JSON.stringify(req.query)}`);
-
   } catch (error) {
     console.error(`Error in getPotentialMatches for UID ${req.user ? req.user.uid : 'N/A'}:`, error);
     res.status(500).json({ error: "An unexpected error occurred while fetching potential matches." });
   }
 };
 
+/**
+ * Like another user and update match status if both have liked each other.
+ */
 const likeUser = async (req, res) => {
   const currentUserUid = req.user.uid;
   const { targetUserId } = req.params;
@@ -128,13 +128,7 @@ const likeUser = async (req, res) => {
     const u1InLikedBy = match.likedBy.includes(user1Uid);
     const u2InLikedBy = match.likedBy.includes(user2Uid);
 
-    let finalStatus = match.status;
-
-    if (u1InLikedBy && u2InLikedBy) {
-      finalStatus = 'matched';
-    } else {
-      finalStatus = 'pending';
-    }
+    let finalStatus = (u1InLikedBy && u2InLikedBy) ? 'matched' : 'pending';
 
     if (match.status !== finalStatus) {
       match.status = finalStatus;
@@ -149,7 +143,6 @@ const likeUser = async (req, res) => {
       user2Uid: match.user2Uid
     });
     console.log(`Like action processed for currentUser: ${currentUserUid}, targetUser: ${targetUserId}, match status: ${match.status}`);
-
   } catch (error) {
     console.error(`Error in likeUser (currentUser: ${currentUserUid}, targetUser: ${targetUserId}):`, error);
     if (error.name === 'ValidationError') {
@@ -159,6 +152,9 @@ const likeUser = async (req, res) => {
   }
 };
 
+/**
+ * Get confirmed (mutual) matches for the current user.
+ */
 const getConfirmedMatches = async (req, res) => {
   const currentUserUid = req.user.uid;
 
@@ -177,7 +173,7 @@ const getConfirmedMatches = async (req, res) => {
     });
 
     if (matchedUserUids.length === 0) {
-        return res.status(200).json([]);
+      return res.status(200).json([]);
     }
 
     const matchedUsersProfiles = await User.find({
@@ -186,7 +182,6 @@ const getConfirmedMatches = async (req, res) => {
 
     res.status(200).json(matchedUsersProfiles);
     console.log(`Successfully retrieved confirmed matches for UID: ${currentUserUid}`);
-
   } catch (error) {
     console.error(`Error in getConfirmedMatches for UID ${currentUserUid}:`, error);
     res.status(500).json({ error: "An unexpected error occurred while fetching confirmed matches." });
