@@ -1,29 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // Adjust as needed
-import { PREDEFINED_PERSONALITY_TYPES } from '../../utils/constants'; // For role enum if needed, or define roles here
+// Remove the next line if you don’t use it
+// import { PREDEFINED_PERSONALITY_TYPES } from '../../utils/constants';
 
-// Define roles available for selection
 const AVAILABLE_ROLES = ['user', 'contributor', 'admin', 'superadmin'];
 
 const AdminUserEditPage = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { user: adminUser } = useAuth(); // Current admin user performing the edits
+  const { user: adminUser } = useAuth();
 
   const isNewUser = !userId;
   const [userData, setUserData] = useState({
     name: '',
     email: '',
-    password: '', // Only for new user creation
+    password: '',
     role: 'user',
     isProfileVisible: true,
     education: '',
     relationshipGoals: '',
     bio: '',
-    // Add other fields as necessary: interests, profilePrompts, etc.
-    // For complex fields like profilePrompts (array of objects) or socialMediaLinks (Map),
-    // you might need more complex input handling than simple text fields.
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -49,7 +46,6 @@ const AdminUserEditPage = () => {
         education: data.education || '',
         relationshipGoals: data.relationshipGoals || '',
         bio: data.bio || '',
-        // Ensure all relevant fields fetched are set
       });
     } catch (err) {
       setError(err.message);
@@ -87,17 +83,13 @@ const AdminUserEditPage = () => {
     const url = isNewUser ? '/api/admin/users' : `/api/admin/users/${userId}`;
     const method = isNewUser ? 'POST' : 'PUT';
 
-    // Prepare payload, remove password if it's empty (for updates or if not set for new user)
     const payload = { ...userData };
     if (!isNewUser || (isNewUser && !payload.password)) {
       delete payload.password;
     }
-
-    // Ensure role is not empty if creating user
     if (isNewUser && !payload.role) {
-        payload.role = 'user'; // Default role if not set
+      payload.role = 'user';
     }
-
 
     try {
       const response = await fetch(url, {
@@ -113,15 +105,9 @@ const AdminUserEditPage = () => {
         throw new Error(responseData.message || `Failed to ${isNewUser ? 'create' : 'update'} user`);
       }
       setSuccessMessage(`User ${isNewUser ? 'created' : 'updated'} successfully!`);
-      if (isNewUser && responseData._id) { // If new user created, redirect to its edit page or list
-        navigate(`/admin/users/${responseData._id}/edit`); // Or navigate('/admin/users')
-      } else if (!isNewUser) {
-        // Optionally re-fetch data after update if backend doesn't return full updated object
-        // or if there are computed fields. For now, assume backend returns updated user.
-        // If backend returns the updated user, we can update state:
-        // setUserData(responseData); // Assuming responseData is the updated user
+      if (isNewUser && responseData._id) {
+        navigate(`/admin/users/${responseData._id}/edit`);
       }
-      // No automatic redirect from edit page unless desired
     } catch (err) {
       setError(err.message);
       console.error("Save user error:", err);
@@ -130,7 +116,6 @@ const AdminUserEditPage = () => {
     }
   };
 
-  // Determine which roles the current admin can assign
   const getAssignableRoles = () => {
     if (adminUser && adminUser.role === 'superadmin') {
       return AVAILABLE_ROLES;
@@ -138,15 +123,12 @@ const AdminUserEditPage = () => {
     if (adminUser && adminUser.role === 'admin') {
       return AVAILABLE_ROLES.filter(r => r !== 'superadmin');
     }
-    return []; // Should not happen if page is protected by AdminLayout
+    return [];
   };
   const assignableRoles = getAssignableRoles();
 
-
   if (isLoading && !isNewUser) return <p className="p-4 text-center">Loading user data...</p>;
-  // Error for data fetching (edit mode)
   if (error && !isNewUser && !userData.email) return <p className="p-4 text-red-500 text-center">Error loading user: {error}</p>;
-
 
   return (
     <div className="container mx-auto p-4">
@@ -192,7 +174,6 @@ const AdminUserEditPage = () => {
           <label htmlFor="isProfileVisible" className="ml-2 block text-sm text-gray-900">Profile Visible</label>
         </div>
 
-        {/* Display general form error or success messages */}
         {error && <p className="text-red-500 text-sm">{error}</p>}
         {successMessage && <p className="text-green-500 text-sm">{successMessage}</p>}
 
