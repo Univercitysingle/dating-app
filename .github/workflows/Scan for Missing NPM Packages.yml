@@ -1,17 +1,20 @@
-name: Scan for Missing NPM Packages
+name: Scan for Missing NPM Packages in Backend
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - '**/*.js'
-      - '**/*.ts'
-      - 'package.json'
-      - 'package-lock.json'
+      - 'backend/**/*.js'
+      - 'backend/**/*.ts'
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
 
 jobs:
   depcheck:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
