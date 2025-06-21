@@ -35,19 +35,13 @@ jobs:
       - name: Print depcheck-output.json to console
         run: cat depcheck-output.json
 
-      - name: Fail if there are missing dependencies
+      - name: Print missing dependencies (if any) and fail if present
         run: |
-          MISSING=$(jq '.missing | length' depcheck-output.json)
-          if [ "$MISSING" -gt 0 ]; then
-            echo "❌ There are missing dependencies!"
+          MISSING=$(jq -r '.missing | keys | @sh' depcheck-output.json)
+          if [ "$MISSING" != "" ]; then
+            echo "❌ Missing dependencies:"
+            jq -r '.missing | to_entries[] | .key' depcheck-output.json
             exit 1
           else
             echo "✅ No missing dependencies!"
           fi
-
-      - name: Upload depcheck output as artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: depcheck-output
-          path: depcheck-output.json
