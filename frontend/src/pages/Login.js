@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom";
 
 function Login() {
-  const [email, setEmail] = useState(""); // Still useful for demo, or if Firebase email/pass is used
-  const [password, setPassword] = useState(""); // Still useful for demo
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { handleLoginSuccess, setPendingPasswordSetup } = useAuth();
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -24,24 +24,23 @@ function Login() {
         body: JSON.stringify({ token: firebaseIdToken }),
       });
 
-      const data = await res.json();
+      // Defensive: Only parse JSON if content is present and content-type is application/json
+      let data = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || "Login failed");
+        throw new Error((data && data.error) || res.statusText || "Login failed");
       }
 
       if (data.requiresPasswordSetup) {
-        // Pass the backend user object and the token needed for API calls
         setPendingPasswordSetup(data.user, data.token);
-        navigate("/set-initial-password"); // Redirect to set password page
+        navigate("/set-initial-password");
       } else {
-        // The backend `data.token` is the one for our API.
-        // `data.user` is the full user profile from our DB.
-        // If Firebase client sign-in is needed with a custom token, backend should provide it.
-        // Assuming `data.token` from backend /api/auth/login IS the Firebase ID token (or a custom token for Firebase)
-        // AND our backend API uses this same token for its own auth.
         await handleLoginSuccess(data.user, data.token, data.token);
-        navigate("/"); // Redirect to home or dashboard
+        navigate("/");
       }
     } catch (err) {
       setError(err.message);
