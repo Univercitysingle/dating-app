@@ -81,8 +81,7 @@ const getRankedMatches = (currentUser, potentialCandidatesArray) => {
     // though direct field access should work. If issues arise, use candidate.toObject().
     const score = calculateMatchScore(currentUser, candidate);
     return {
-      // user: candidate.toObject ? candidate.toObject() : candidate, // Convert Mongoose doc to plain object
-      user: candidate, // Keep as Mongoose doc for now, controller can convert if needed before sending response
+      user: candidate,
       matchScore: score,
     };
   });
