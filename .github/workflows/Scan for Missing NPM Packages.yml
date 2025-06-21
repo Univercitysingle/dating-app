@@ -1,0 +1,53 @@
+name: Scan for Missing NPM Packages
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**/*.js'
+      - '**/*.ts'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  depcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install depcheck
+        run: npm install -g depcheck
+
+      - name: Run depcheck to find missing and unused packages
+        run: depcheck
+
+      - name: Fail if there are missing dependencies
+        run: |
+          depcheck --json > depcheck-output.json
+          MISSING=$(jq '.missing | length' depcheck-output.json)
+          if [ "$MISSING" -gt 0 ]; then
+            echo "❌ There are missing dependencies!"
+            cat depcheck-output.json
+            exit 1
+          else
+            echo "✅ No missing dependencies found."
+          fi
+        env:
+          NODE_OPTIONS: --experimental-json-modules
+        shell: bash
+
+      - name: Upload depcheck output as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: depcheck-output
+          path: depcheck-output.json
