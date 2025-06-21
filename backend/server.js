@@ -49,8 +49,28 @@ app.use("/api/stripe-webhook", stripeWebhook); // Stripe webhook without auth (s
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
+  console.error(err.stack); // Log stack trace to server console regardless of environment
+
+  const statusCode = err.status || 500;
+  let responseErrorMessage = "An internal server error occurred. Please try again later."; // Default generic message for production
+
+  if (process.env.NODE_ENV !== 'production') {
+    responseErrorMessage = err.message || "Internal Server Error";
+    // In non-production, we could also add err.stack to the response if desired for easier debugging by API consumers,
+    // but for now, keeping the response structure simple with just a message.
+    // e.g., responseError.stack = err.stack; (if responseError was an object)
+  }
+
+  // Ensure response is only sent if headers haven't already been sent
+  if (!res.headersSent) {
+    res.status(statusCode).json({
+      error: responseErrorMessage
+    });
+  } else {
+    // If headers already sent, delegate to the default Express error handler
+    // which will close the connection and fail the request.
+    next(err);
+  }
 });
 
 const PORT = process.env.PORT || 5000;

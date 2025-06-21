@@ -1,13 +1,13 @@
 const User = require("../models/User");
-const { uploadToS3 } = require("../services/s3");
+const { uploadToS3 } = require("../services/awsS3"); // Corrected path to S3 service
 const fs = require("fs");
 const path = require("path");
-const ffmpeg = require("fluent-ffmpeg");
-const ffmpegPath = require("ffmpeg-static");
-ffmpeg.setFfmpegPath(ffmpegPath);
+const multer = require("multer"); // Import multer
 
 const getJitsiToken = (req, res) => {
   try {
+    // The subscriptionCheck middleware already validated the user.
+    // req.user.uid is available from the auth middleware (assumed to be run before subscriptionCheck).
     const roomName = `dating-room-${req.user.uid}-${Date.now()}`;
     const jitsiURL = `https://meet.jit.si/${roomName}`;
     res.json({ url: jitsiURL });
@@ -20,68 +20,57 @@ const getJitsiToken = (req, res) => {
 
 const uploadProfileVideo = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    // Accept only video files
-    if (!req.file.mimetype.startsWith("video/")) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: "Only video files are allowed." });
+    // Check for validation errors from multer's fileFilter
+    if (req.fileValidationError) {
+      return res.status(400).json({ message: req.fileValidationError });
+    }
+    // Check if a file was actually uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: "No profile video uploaded or file was rejected by filter." });
     }
 
-    const inputPath = req.file.path;
-    const outputPath = inputPath + "-converted.mp4";
+    const fileContent = fs.readFileSync(req.file.path);
+    const ext = path.extname(req.file.originalname);
+    const s3Filename = `videos/${req.user.uid}-${Date.now()}${ext}`;
 
-    // Get video duration
-    const getDuration = () =>
-      new Promise((resolve, reject) => {
-        ffmpeg.ffprobe(inputPath, (err, metadata) => {
-          if (err) reject(err);
-          else resolve(metadata.format.duration);
-        });
-      });
-    const duration = await getDuration();
-    if (duration > 30) {
-      fs.unlinkSync(inputPath);
-      return res.status(400).json({ error: "Video must be 30 seconds or less." });
-    }
+    const result = await uploadToS3(fileContent, s3Filename, req.file.mimetype);
 
-    // Convert to mp4 (H.264/AAC)
-    await new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
-        .videoCodec("libx264")
-        .audioCodec("aac")
-        .outputOptions([
-          "-t 30", // enforce max duration
-          "-preset veryfast",
-          "-movflags faststart"
-        ])
-        .toFormat("mp4")
-        .on("end", resolve)
-        .on("error", reject)
-        .save(outputPath);
-    });
-
-    // Upload the mp4 to S3
-    const fileContent = fs.readFileSync(outputPath);
-    const s3Filename = `videos/${req.user.uid}-${Date.now()}.mp4`;
-    const result = await uploadToS3(fileContent, s3Filename, "video/mp4");
-
-    // Clean up temp files
-    fs.unlinkSync(inputPath);
-    fs.unlinkSync(outputPath);
+    // Clean up temp upload
+    fs.unlinkSync(req.file.path);
 
     await User.findOneAndUpdate({ uid: req.user.uid }, { videoProfile: result.Location });
 
     res.json({ success: true, url: result.Location });
-    console.log(`Profile video uploaded and converted for UID: ${req.user.uid}, URL: ${result.Location}`);
+    console.log(`Profile video uploaded successfully for UID: ${req.user.uid}, URL: ${result.Location}`);
   } catch (error) {
-    // Cleanup
-    try {
-      if (req.file && req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      if (req.file && fs.existsSync(req.file.path + "-converted.mp4")) fs.unlinkSync(req.file.path + "-converted.mp4");
-    } catch (cleanupErr) {
-      console.error("Failed to cleanup temporary video file:", cleanupErr);
+    console.error(`Error in uploadProfileVideo for UID ${req.user ? req.user.uid : 'N/A'}:`, error);
+
+    // Specific Multer error handling
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        // Consider making the message more dynamic if MAX_PROFILE_VIDEO_SIZE is accessible here
+        return res.status(400).json({ message: "Profile video file is too large." });
+      }
+      return res.status(400).json({ message: `Profile video upload error: ${error.message}` });
     }
-    res.status(500).json({ error: "An unexpected error occurred during video upload." });
+
+    // Cleanup temp file if it exists, even on other errors
+    if (req.file && req.file.path) {
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (cleanupError) {
+        console.error("Failed to cleanup temporary profile video file:", cleanupError);
+      }
+    }
+
+    // For non-multer errors (e.g., S3 upload, DB update)
+    if (error.message && !res.headersSent) {
+        return res.status(500).json({ message: error.message });
+    } else if (!res.headersSent) {
+        res.status(500).json({ message: "An unexpected error occurred during profile video upload." });
+    }
   }
 };
 
