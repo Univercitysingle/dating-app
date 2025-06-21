@@ -13,6 +13,7 @@ import PersonalityQuizDisplay from "../components/PersonalityQuizDisplay";
 import PersonalityQuizEditor from "../components/PersonalityQuizEditor";
 import SocialMediaLinksDisplay from "../components/SocialMediaLinksDisplay";
 import SocialMediaLinksEditor from "../components/SocialMediaLinksEditor";
+import apiClient from '../api/apiClient'; // Import apiClient
 
 function Profile() {
   const [profile, setProfile] = useState(null);
@@ -28,31 +29,19 @@ function Profile() {
   const [detailsSaveStatus, setDetailsSaveStatus] = useState('');
 
   const fetchProfile = useCallback(() => {
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.token) {
-      setFetchError("User not authenticated. Please log in.");
-      setProfile(null); // Clear profile if auth is missing
-      return;
-    }
-    fetch("/api/users/me", {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch profile. Status: ' + res.status);
-        }
-        return res.json();
-      })
+    // apiClient handles token internally from localStorage if available
+    // No need to manually get user from localStorage here for the token
+    apiClient.get("/api/users/me")
       .then(data => {
         setProfile(data);
         setEditableEducation(data.education || '');
         setEditableRelationshipGoals(data.relationshipGoals || '');
-        setFetchError(null); // Clear any previous errors
+        setFetchError(null);
       })
       .catch(error => {
         console.error("Error fetching profile:", error);
-        setFetchError(error.message);
-        setProfile(null); // Clear profile on error
+        setFetchError(error.data?.message || error.message);
+        setProfile(null);
       });
   }, []);
 
@@ -76,140 +65,59 @@ function Profile() {
 
   const handleMediaUploadComplete = async (fileUrl, fieldName) => {
     setMediaSaveStatus('Saving URL to profile...');
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.token) {
-      setMediaSaveStatus("Error: Not authenticated to save URL.");
-      return;
-    }
-
+    // apiClient handles token, but a general check for app readiness/auth context might still be useful
+    // For now, we assume apiClient handles absence of token gracefully (it does, by not sending Auth header)
     try {
-      const response = await fetch("/api/users/me", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ [fieldName]: fileUrl }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to save ${fieldName} URL.`);
-      }
-
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile); // Update profile with the full response from backend
+      const updatedProfile = await apiClient.put("/api/users/me", { [fieldName]: fileUrl });
+      setProfile(updatedProfile);
       setMediaSaveStatus(`${fieldName} saved successfully!`);
       setTimeout(() => setMediaSaveStatus(''), 3000);
     } catch (error) {
       console.error(`Error saving ${fieldName} URL:`, error);
-      setMediaSaveStatus(`Error: ${error.message}`);
+      setMediaSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
   const handlePersonalityQuizSave = async (newQuizResults) => {
     setQuizSaveStatus('Saving personality type...');
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.token) {
-      setQuizSaveStatus("Error: Not authenticated to save personality type.");
-      return;
-    }
-
     try {
-      const response = await fetch("/api/users/me", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ personalityQuizResults: newQuizResults }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save personality type.');
-      }
-
-      const updatedProfile = await response.json();
+      const updatedProfile = await apiClient.put("/api/users/me", { personalityQuizResults: newQuizResults });
       setProfile(updatedProfile);
       setQuizSaveStatus('Personality type saved successfully!');
       setTimeout(() => setQuizSaveStatus(''), 3000);
     } catch (error) {
       console.error('Error saving personality type:', error);
-      setQuizSaveStatus(`Error: ${error.message}`);
+      setQuizSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
   const handleSocialMediaLinksSave = async (newLinksData) => {
     setSocialLinksSaveStatus('Saving social media links...');
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.token) {
-      setSocialLinksSaveStatus("Error: Not authenticated to save social media links.");
-      return;
-    }
-
     try {
-      const response = await fetch("/api/users/me", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        // Send the plain object as discussed. Mongoose should handle conversion to Map.
-        body: JSON.stringify({ socialMediaLinks: newLinksData }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save social media links.');
-      }
-
-      const updatedProfile = await response.json();
+      const updatedProfile = await apiClient.put("/api/users/me", { socialMediaLinks: newLinksData });
       setProfile(updatedProfile);
       setSocialLinksSaveStatus('Social media links saved successfully!');
       setTimeout(() => setSocialLinksSaveStatus(''), 3000);
     } catch (error) {
       console.error('Error saving social media links:', error);
-      setSocialLinksSaveStatus(`Error: ${error.message}`);
+      setSocialLinksSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
   const handleDetailsSave = async () => {
     setDetailsSaveStatus('Saving details...');
-    const user = JSON.parse(localStorage.getItem("user"));
-    if (!user || !user.token) {
-      setDetailsSaveStatus("Error: Not authenticated.");
-      return;
-    }
-
     const detailsToUpdate = {
       education: editableEducation,
       relationshipGoals: editableRelationshipGoals,
-      // Potentially include other direct fields like name, age, bio if they were managed similarly
     };
-
     try {
-      const response = await fetch("/api/users/me", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(detailsToUpdate),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save details.');
-      }
-
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile); // Update main profile state
+      const updatedProfile = await apiClient.put("/api/users/me", detailsToUpdate);
+      setProfile(updatedProfile);
       setDetailsSaveStatus('Details saved successfully!');
       setTimeout(() => setDetailsSaveStatus(''), 3000);
     } catch (error) {
       console.error('Error saving details:', error);
-      setDetailsSaveStatus(`Error: ${error.message}`);
+      setDetailsSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
