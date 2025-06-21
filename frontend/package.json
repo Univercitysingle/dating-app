@@ -11,5 +11,9 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build"
+  },
+  "devDependencies": {
+    "postcss": "^8.4.38",
+    "autoprefixer": "^10.4.19"
   }
 }
