@@ -9,7 +9,7 @@ const http = require('http'); // Import http module
 const { initSocket } = require('./routes/chat'); // Import initSocket
 const authMiddleware = require("./middleware/authMiddleware");
 const subscriptionCheck = require("./middleware/subscriptionCheck");
-const stripeWebhook = require("./routes/stripeWebhook");
+// const stripeWebhook = require("./routes/stripeWebhook"); // COMMENTED OUT
 const admin = require("./services/firebaseAdmin");
 
 const app = express();
@@ -45,7 +45,7 @@ app.use("/api/reports", authMiddleware, require("./routes/reports")); // Add thi
 const adminUsersRouter = require('./routes/adminUsers');
 app.use('/api/admin/users', adminUsersRouter); // adminUsersRouter already includes its own specific auth chain
 
-app.use("/api/stripe-webhook", stripeWebhook); // Stripe webhook without auth (special handling)
+// app.use("/api/stripe-webhook", stripeWebhook); // Stripe webhook without auth (special handling) -- COMMENTED OUT
 
 // Error handling middleware
 app.use((err, req, res, next) => {
