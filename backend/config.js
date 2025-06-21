@@ -4,8 +4,10 @@ module.exports = {
   port: process.env.PORT || 5000,
   mongoURI: process.env.MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  },
   aws: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -17,5 +19,4 @@ module.exports = {
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY,
   },
-  // Add other global config values as needed
 };
