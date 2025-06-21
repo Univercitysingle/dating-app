@@ -24,26 +24,26 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install depcheck
-        run: npm install -g depcheck
+      - name: Install depcheck and jq
+        run: |
+          npm install -g depcheck
+          sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Run depcheck to find missing and unused packages
-        run: depcheck
+      - name: Run depcheck and save output
+        run: depcheck --json > depcheck-output.json
+
+      - name: Print depcheck-output.json to console
+        run: cat depcheck-output.json
 
       - name: Fail if there are missing dependencies
         run: |
-          depcheck --json > depcheck-output.json
           MISSING=$(jq '.missing | length' depcheck-output.json)
           if [ "$MISSING" -gt 0 ]; then
             echo "❌ There are missing dependencies!"
-            cat depcheck-output.json
             exit 1
           else
-            echo "✅ No missing dependencies found."
+            echo "✅ No missing dependencies!"
           fi
-        env:
-          NODE_OPTIONS: --experimental-json-modules
-        shell: bash
 
       - name: Upload depcheck output as artifact
         if: always()
