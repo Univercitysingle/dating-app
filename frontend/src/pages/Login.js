@@ -14,17 +14,12 @@ function Login() {
     setIsLoading(true);
     setError("");
     try {
-      // In a real app, here you would get the Firebase ID token after Firebase client-side login
-      // For example: const firebaseIdToken = await auth.currentUser.getIdToken();
-      const firebaseIdToken = "FAKE_FIREBASE_ID_TOKEN"; // Replace with actual Firebase ID token retrieval
-
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: firebaseIdToken }),
+        body: JSON.stringify({ email, password }),
       });
 
-      // Defensive: Only parse JSON if content is present and content-type is application/json
       let data = {};
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
@@ -43,7 +38,7 @@ function Login() {
         navigate("/");
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Login failed");
       console.error("Login page error:", err);
     } finally {
       setIsLoading(false);
@@ -53,7 +48,7 @@ function Login() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-700">Login (Mock)</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-700">Login</h2>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
@@ -64,7 +59,7 @@ function Login() {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="Email (demo only)"
+            placeholder="Email"
             className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
@@ -75,7 +70,7 @@ function Login() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Password (demo only)"
+            placeholder="Password"
             className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
@@ -87,7 +82,7 @@ function Login() {
         >
           {isLoading ? "Logging in..." : "Login"}
         </button>
-        <p className="text-xs text-center text-gray-500">This is a mock login. Replace with real Firebase client-side auth flow.</p>
+        <p className="text-xs text-center text-gray-500">Use your email and password to log in.</p>
       </div>
     </div>
   );
