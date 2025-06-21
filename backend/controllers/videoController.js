@@ -1,7 +1,8 @@
 const User = require("../models/User");
-const { uploadToS3 } = require("../services/s3");
+const { uploadToS3 } = require("../services/awsS3"); // Corrected path to S3 service
 const fs = require("fs");
 const path = require("path");
+const multer = require("multer"); // Import multer
 
 const getJitsiToken = (req, res) => {
   try {
@@ -19,8 +20,13 @@ const getJitsiToken = (req, res) => {
 
 const uploadProfileVideo = async (req, res) => {
   try {
+    // Check for validation errors from multer's fileFilter
+    if (req.fileValidationError) {
+      return res.status(400).json({ message: req.fileValidationError });
+    }
+    // Check if a file was actually uploaded
     if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+      return res.status(400).json({ message: "No profile video uploaded or file was rejected by filter." });
     }
 
     const fileContent = fs.readFileSync(req.file.path);
@@ -37,20 +43,34 @@ const uploadProfileVideo = async (req, res) => {
     res.json({ success: true, url: result.Location });
     console.log(`Profile video uploaded successfully for UID: ${req.user.uid}, URL: ${result.Location}`);
   } catch (error) {
-    console.error(`Error in uploadProfileVideo for UID ${req.user.uid}:`, error);
-    // It's good practice to ensure the temporary file is deleted even if an error occurs after it's read.
-    // However, if fs.readFileSync fails, req.file.path might not be valid or the file might not exist.
-    // If uploadToS3 or User.findOneAndUpdate fails, then fs.unlinkSync should be called.
+    console.error(`Error in uploadProfileVideo for UID ${req.user ? req.user.uid : 'N/A'}:`, error);
+
+    // Specific Multer error handling
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        // Consider making the message more dynamic if MAX_PROFILE_VIDEO_SIZE is accessible here
+        return res.status(400).json({ message: "Profile video file is too large." });
+      }
+      return res.status(400).json({ message: `Profile video upload error: ${error.message}` });
+    }
+
+    // Cleanup temp file if it exists, even on other errors
     if (req.file && req.file.path) {
       try {
-        if (fs.existsSync(req.file.path)) { // Check if file exists before trying to delete
+        if (fs.existsSync(req.file.path)) {
           fs.unlinkSync(req.file.path);
         }
       } catch (cleanupError) {
-        console.error("Failed to cleanup temporary video file:", cleanupError);
+        console.error("Failed to cleanup temporary profile video file:", cleanupError);
       }
     }
-    res.status(500).json({ error: "An unexpected error occurred during video upload." });
+
+    // For non-multer errors (e.g., S3 upload, DB update)
+    if (error.message && !res.headersSent) {
+        return res.status(500).json({ message: error.message });
+    } else if (!res.headersSent) {
+        res.status(500).json({ message: "An unexpected error occurred during profile video upload." });
+    }
   }
 };
 

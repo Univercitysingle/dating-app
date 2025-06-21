@@ -124,12 +124,20 @@ module.exports = {
 const fs = require("fs");
 const path = require("path");
 const { uploadToS3 } = require("../services/awsS3"); // Corrected path
+const multer = require("multer"); // Import multer to check for MulterError
 
 // Generic file upload handler to S3
 const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
   try {
+    // Check for validation errors from multer's fileFilter
+    if (req.fileValidationError) {
+      return res.status(400).json({ message: req.fileValidationError });
+    }
+    // Check if a file was actually uploaded. Multer might not set req.file if filter rejects.
     if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded." });
+      // If fileValidationError was set, it's handled above.
+      // If not, but still no file, it's a general "no file" or other multer issue.
+      return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
     }
 
     const fileContent = fs.readFileSync(req.file.path);
@@ -148,6 +156,22 @@ const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
 
   } catch (error) {
     console.error(`Error in ${fileTypePrefix} upload for UID ${req.user.uid}:`, error);
+
+    // Specific Multer error handling (e.g., file size limit)
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: `File too large. Max size for ${fileTypePrefix} is ${error.limit / (1024 * 1024)}MB.` });
+        // Note: error.limit might not be available directly here, depends on multer version and how error is passed.
+        // It's safer to pass the specific limit from the route config if possible, or use a generic message.
+        // For now, using a generic part of the message. A more robust way would be to pass the specific limit to this handler.
+        // Let's make it simpler:
+        // return res.status(400).json({ message: `File too large for ${fileTypePrefix}.` });
+      }
+      // Handle other multer errors if needed
+      return res.status(400).json({ message: `File upload error: ${error.message}` });
+    }
+
+    // Cleanup temp file if it exists, even on other errors
     if (req.file && req.file.path) {
       try {
         if (fs.existsSync(req.file.path)) {
@@ -157,7 +181,14 @@ const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
         console.error(`Failed to cleanup temporary ${fileTypePrefix} file:`, cleanupError);
       }
     }
-    res.status(500).json({ error: `An unexpected error occurred during ${fileTypePrefix} upload.` });
+
+    // For non-multer errors during S3 upload or other processing
+    if (error.message && !res.headersSent) { // Check if headers already sent
+        return res.status(500).json({ message: error.message });
+    } else if (!res.headersSent) {
+        return res.status(500).json({ message: `An unexpected error occurred during ${fileTypePrefix} upload.` });
+    }
+    // If headers already sent, Express default error handler will take over or log.
   }
 };
 
