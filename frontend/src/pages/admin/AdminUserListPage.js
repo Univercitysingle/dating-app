@@ -1,29 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
+import { useAuth } from '../../context/AuthContext';
 
 const AdminUserListPage = () => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  // TODO: Add pagination state: const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, limit: 10 });
-  const { user: adminUser } = useAuth(); // Get the admin user object
+  // Pagination can be added here if needed
+  const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
   const fetchUsers = useCallback(async () => {
-    // const { currentPage, limit } = pagination; // For pagination
     setIsLoading(true);
     setError(null);
-    if (!adminUser || !adminUser.token) { // Check for adminUser and its token
+    if (!adminUser || !adminUser.token) {
       setError("Authentication token not found or user not available.");
       setIsLoading(false);
       return;
     }
     try {
-      // const response = await fetch(`/api/admin/users?page=${currentPage}&limit=${limit}`, {
-      const response = await fetch(`/api/admin/users`, { // Simplified without frontend pagination controls for now
+      const response = await fetch(`/api/admin/users`, {
         headers: {
-          'Authorization': `Bearer ${adminUser.token}`, // Use token from adminUser object
+          'Authorization': `Bearer ${adminUser.token}`,
         },
       });
       if (!response.ok) {
@@ -31,34 +29,33 @@ const AdminUserListPage = () => {
         throw new Error(errData.message || 'Failed to fetch users');
       }
       const data = await response.json();
-      setUsers(data.users || []); // Assuming backend returns { users: [], ... }
-      // setPagination({ currentPage: data.currentPage, totalPages: data.totalPages, limit });
+      setUsers(data.users || []);
     } catch (err) {
       setError(err.message);
       console.error("Fetch users error:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [adminUser]); // Dependency on adminUser (which includes token)
+  }, [adminUser]);
 
   useEffect(() => {
-    if (adminUser) { // Fetch users only if adminUser (and thus token) is available
-        fetchUsers();
+    if (adminUser) {
+      fetchUsers();
     }
   }, [fetchUsers, adminUser]);
 
   const handleToggleVisibility = async (userId, currentVisibility) => {
-    if (!confirm(`Are you sure you want to ${currentVisibility ? 'hide' : 'show'} this user's profile?`)) return;
+    if (!window.confirm(`Are you sure you want to ${currentVisibility ? 'hide' : 'show'} this user's profile?`)) return;
     if (!adminUser || !adminUser.token) {
-        alert("Authentication error. Cannot perform action.");
-        return;
+      alert("Authentication error. Cannot perform action.");
+      return;
     }
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminUser.token}`, // Use token from adminUser object
+          'Authorization': `Bearer ${adminUser.token}`,
         },
         body: JSON.stringify({ isProfileVisible: !currentVisibility }),
       });
@@ -66,36 +63,33 @@ const AdminUserListPage = () => {
         const errData = await response.json();
         throw new Error(errData.message || 'Failed to update visibility');
       }
-      // Refresh user list or update locally
       fetchUsers();
       alert('User visibility updated successfully.');
     } catch (err) {
-      // setError(err.message); // Setting error state here might be too disruptive for a single action failing
       alert(`Error updating visibility: ${err.message}`);
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) return;
+    if (!window.confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) return;
     if (!adminUser || !adminUser.token) {
-        alert("Authentication error. Cannot perform action.");
-        return;
+      alert("Authentication error. Cannot perform action.");
+      return;
     }
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${adminUser.token}`, // Use token from adminUser object
+          'Authorization': `Bearer ${adminUser.token}`,
         },
       });
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.message || 'Failed to delete user');
       }
-      fetchUsers(); // Refresh user list
+      fetchUsers();
       alert('User deleted successfully.');
     } catch (err) {
-      // setError(err.message);
       alert(`Error deleting user: ${err.message}`);
     }
   };
