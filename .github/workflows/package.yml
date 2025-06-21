@@ -1,0 +1,51 @@
+name: Rebuild package-lock.json
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Check if package-lock.json is missing or empty
+        id: check_lockfile
+        run: |
+          if [ ! -s package-lock.json ]; then
+            echo "needs_rebuild=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_rebuild=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Remove broken lockfile (if needed)
+        if: steps.check_lockfile.outputs.needs_rebuild == 'true'
+        run: rm -f package-lock.json
+
+      - name: Install dependencies & regenerate lockfile
+        run: npm install
+
+      - name: Commit and push new package-lock.json
+        if: steps.check_lockfile.outputs.needs_rebuild == 'true'
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions[bot]"
+          git add package-lock.json
+          git commit -m "ci: regenerate package-lock.json" || echo "No changes to commit"
+          git push
