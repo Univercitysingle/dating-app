@@ -24,8 +24,17 @@ const apiClient = {
       headers.append('Authorization', `Bearer ${token}`);
     }
 
-    // Use REACT_APP_API_BASE_URL if set, otherwise default to relative path for same-origin or proxy
-    const baseUrl = process.env.REACT_APP_API_BASE_URL || '';
+    // Debug: Log the API base URL to the browser console
+    console.log("API Base URL:", process.env.REACT_APP_API_BASE_URL);
+
+    // Use REACT_APP_API_BASE_URL if set, otherwise default to production backend for debugging
+    let baseUrl = process.env.REACT_APP_API_BASE_URL || "";
+    if (!baseUrl) {
+      // Optionally set your production backend as a fallback (remove this after debugging)
+      baseUrl = "https://graceful-youth-production.up.railway.app";
+      console.warn("REACT_APP_API_BASE_URL not set! Using fallback:", baseUrl);
+    }
+
     const url = `${baseUrl}${path}`;
 
     const config = {
