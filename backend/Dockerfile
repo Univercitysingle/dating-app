@@ -5,8 +5,8 @@ RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
-# Copy both package.json and package-lock.json first for caching
-COPY package*.json ./
+# Copy dependency files first for better docker layer caching
+COPY package.json package-lock.json ./
 
 # Install ALL dependencies (including socket.io)
 RUN npm ci
