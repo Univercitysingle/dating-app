@@ -1,31 +1,78 @@
-name: Create Superadmin
+name: Create & Commit Superadmin Script
 
 on:
   workflow_dispatch: # Manual trigger
 
 jobs:
-  create-superadmin:
+  commit-superadmin-script:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run createSuperAdmin script
-        env:
-          MONGO_URI: ${{ secrets.MONGO_URI }} # Set your MongoDB connection string as a GitHub secret
+      - name: Create scripts folder and createSuperAdmin.js
         run: |
-          if [ -f scripts/createSuperAdmin.js ]; then
-            node scripts/createSuperAdmin.js
+          mkdir -p scripts
+          cat > scripts/createSuperAdmin.js <<'EOF'
+          const mongoose = require('mongoose');
+          const bcrypt = require('bcryptjs');
+
+          const userSchema = new mongoose.Schema({
+            name: String,
+            email: { type: String, unique: true },
+            password: String,
+            role: String,
+            isProfileVisible: Boolean
+          }, { collection: 'users' });
+
+          const User = mongoose.model('User', userSchema);
+
+          async function createSuperAdmin() {
+            await mongoose.connect(process.env.MONGO_URI);
+
+            const email = 'enadoctemp@gmail.com';
+            const password = 'Abc@1234';
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const exists = await User.findOne({ email, role: 'superadmin' });
+            if (exists) {
+              console.log('Superadmin already exists.');
+              await mongoose.disconnect();
+              return;
+            }
+
+            const superadmin = new User({
+              name: 'Super Admin',
+              email,
+              password: hashedPassword,
+              role: 'superadmin',
+              isProfileVisible: true
+            });
+
+            await superadmin.save();
+            console.log('Superadmin created successfully!');
+            await mongoose.disconnect();
+          }
+
+          createSuperAdmin().catch(err => {
+            console.error(err);
+            mongoose.disconnect();
+          });
+          EOF
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push changes
+        run: |
+          git add scripts/createSuperAdmin.js
+          git add scripts/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
           else
-            echo "scripts/createSuperAdmin.js not found"
-            exit 1
+            git commit -m "Add createSuperAdmin.js script to create superadmin in MongoDB"
+            git push
           fi
