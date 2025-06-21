@@ -1,4 +1,4 @@
-name: Rebuild package-lock.json
+name: Rebuild backend/package-lock.json
 
 on:
   workflow_dispatch:
@@ -47,5 +47,10 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "github-actions[bot]"
           git add package-lock.json
-          git commit -m "ci: regenerate package-lock.json" || echo "No changes to commit"
+          git commit -m "ci: regenerate backend/package-lock.json" || echo "No changes to commit"
           git push
+
+      - name: Print file paths in backend directory
+        run: |
+          echo "Files in backend directory:"
+          find . -type f
