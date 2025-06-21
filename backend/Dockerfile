@@ -3,20 +3,16 @@ FROM node:18-alpine
 # Install ffmpeg
 RUN apk add --no-cache ffmpeg
 
-# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy both package.json and package-lock.json
 COPY package*.json ./
 
-# Install ALL dependencies (not just production, so socket.io/dev tools are included)
-RUN npm install
+# Always do a full install, not --production, to ensure all required packages (including socket.io) are included
+RUN npm ci
 
-# Copy the rest of your code
 COPY . .
 
-# Expose the port your app runs on
 EXPOSE 5000
 
-# Start your server
 CMD ["npm", "start"]
