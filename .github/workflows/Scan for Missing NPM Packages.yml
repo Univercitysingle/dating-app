@@ -2,7 +2,7 @@ name: Scan for Missing NPM Packages in Backend
 
 on:
   workflow_dispatch:
-  workflow_call:        # <-- This enables calling from another workflow (composite/dispatch)
+  workflow_call:
   push:
     paths:
       - 'backend/**/*.js'
