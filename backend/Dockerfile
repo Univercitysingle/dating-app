@@ -5,12 +5,13 @@ RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
-# Copy both package.json and package-lock.json
+# Copy both package.json and package-lock.json first for caching
 COPY package*.json ./
 
-# Always do a full install, not --production, to ensure all required packages (including socket.io) are included
+# Install ALL dependencies (including socket.io)
 RUN npm ci
 
+# Copy the rest of your code
 COPY . .
 
 EXPOSE 5000
