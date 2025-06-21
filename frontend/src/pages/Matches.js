@@ -4,8 +4,22 @@ import InterstitialAd from '../components/InterstitialAd'; // Import the ad comp
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 // Placeholder UserCard component - expanded slightly for interaction
-const UserCard = ({ user, onSwipe }) => (
-  <div className="bg-white shadow-lg rounded-lg p-4 m-2 w-full md:w-1/2 lg:w-1/3 xl:w-1/4 flex flex-col">
+const UserCard = ({ user, onSwipe }) => {
+  const [swipeFeedback, setSwipeFeedback] = useState(''); // '', 'liked', 'disliked'
+
+  const handleButtonClick = (swipeType) => {
+    setSwipeFeedback(swipeType);
+    setTimeout(() => {
+      onSwipe(swipeType, user.uid);
+      // swipeFeedback will reset on next card render because this instance is replaced
+    }, 300); // 300ms for visual feedback
+  };
+
+  return (
+  <div className={`bg-white shadow-lg rounded-lg p-4 m-2 w-full md:w-1/2 lg:w-1/3 xl:w-1/4 flex flex-col transition-all duration-150 ease-in-out
+                  ${swipeFeedback === 'liked' ? 'border-4 border-green-500 transform scale-105' : ''}
+                  ${swipeFeedback === 'disliked' ? 'border-4 border-red-500 transform scale-105' : ''}
+                  `}>
     <h3 className="text-xl font-semibold text-gray-800">{user.name}, {user.age}</h3>
     {user.photos && user.photos.length > 0 && (
       <img src={user.photos[0]} alt={user.name} className="w-full h-48 object-cover rounded-md my-2"/>
@@ -26,20 +40,23 @@ const UserCard = ({ user, onSwipe }) => (
     {/* Placeholder swipe buttons */}
     <div className="mt-auto pt-3 flex justify-around">
       <button
-        onClick={() => onSwipe('dislike', user.uid)}
-        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+        onClick={() => handleButtonClick('dislike')}
+        disabled={swipeFeedback !== ''} // Disable buttons after click until card advances
+        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
       >
         Dislike
       </button>
       <button
-        onClick={() => onSwipe('like', user.uid)}
-        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+        onClick={() => handleButtonClick('like')}
+        disabled={swipeFeedback !== ''} // Disable buttons after click until card advances
+        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
       >
         Like
       </button>
     </div>
   </div>
-);
+  );
+};
 
 
 function MatchesPage() {

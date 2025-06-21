@@ -58,12 +58,11 @@ function Profile() {
 
   useEffect(() => {
     fetchProfile();
-    // When profile data is fetched or isEditing changes, update editable fields
-    if (profile) {
-        setEditableEducation(profile.education || '');
-        setEditableRelationshipGoals(profile.relationshipGoals || '');
-    }
-  }, [fetchProfile, profile?.education, profile?.relationshipGoals]); // Added dependencies
+    // The editable fields (editableEducation, editableRelationshipGoals) are now primarily set
+    // in two places:
+    // 1. Directly within fetchProfile's .then() block after initial data load.
+    // 2. In the useEffect hook that depends on [isEditing, profile] for subsequent syncs.
+  }, [fetchProfile]); // fetchProfile is stable due to useCallback with empty deps.
 
   const handleInterestsSaved = (updatedInterests) => {
     setProfile(prevProfile => ({ ...prevProfile, interests: updatedInterests }));

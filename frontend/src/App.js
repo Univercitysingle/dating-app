@@ -15,7 +15,34 @@ function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth(); // Include isLoading from useAuth
 
   if (isLoading) {
-    return <div>Loading application...</div>; // Or a global spinner
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh', // Full viewport height
+        backgroundColor: '#f8f9fa', // A light, neutral background
+        fontFamily: 'Arial, sans-serif', // A common, clean font
+        textAlign: 'center'
+      }}>
+        <h1 style={{
+          fontSize: '2.5em', // Larger font for the app name
+          color: '#e91e63', // A thematic pink/magenta color, adjust as needed
+          marginBottom: '10px'
+        }}>
+          Single
+        </h1>
+        <p style={{
+          fontSize: '1.2em',
+          color: '#555',
+          marginTop: '0px'
+        }}>
+          Specially built for singles to mingle
+        </p>
+        {/* Optional: Consider adding a subtle loading spinner animation here later */}
+      </div>
+    );
   }
   return user ? children : <Navigate to="/login" replace />;
 }
@@ -26,7 +53,22 @@ function AdminRoute({ children }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div>Loading admin route...</div>; // Or a spinner
+    // Using a similar themed loading for AdminRoute as well, or could be a simpler one
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f8f9fa',
+        fontFamily: 'Arial, sans-serif',
+        textAlign: 'center'
+      }}>
+        <h1 style={{fontSize: '2em', color: '#333'}}>Loading Admin Section...</h1>
+        <p style={{color: '#e91e63', fontWeight: 'bold'}}>Single</p>
+      </div>
+    );
   }
 
   if (!user) {
