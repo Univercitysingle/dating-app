@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-# Optional: install other system dependencies if needed
+# Install ffmpeg (and other system dependencies if needed)
 RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY package.json package-lock.json ./
 # Fail fast if package-lock.json is missing (optional, but recommended)
 RUN [ -f package-lock.json ] || (echo "Error: package-lock.json not found!" && false)
 
-# Install dependencies (using lockfile for reproducibility)
+# Install dependencies via lockfile for reproducible builds
 RUN npm ci
 
 # Copy the rest of your backend source code
