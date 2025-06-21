@@ -1,0 +1,64 @@
+name: Scan for Missing NPM Packages in Frontend
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  push:
+    paths:
+      - 'frontend/**/*.js'
+      - 'frontend/**/*.ts'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+
+jobs:
+  depcheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show working directory and files
+        run: |
+          pwd
+          ls -la
+          cat package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install depcheck and jq
+        run: |
+          npm install -g depcheck
+          sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run depcheck and save output (print errors if any)
+        run: |
+          set -o pipefail
+          depcheck --json > depcheck-output.json 2>depcheck-error.log || true
+          cat depcheck-error.log
+          cat depcheck-output.json || true
+
+      - name: Print missing dependencies (if any) and fail if present
+        run: |
+          if [ -f depcheck-output.json ]; then
+            MISSING=$(jq -r '.missing | keys | @sh' depcheck-output.json)
+            if [ "$MISSING" != "" ]; then
+              echo "❌ Missing dependencies:"
+              jq -r '.missing | to_entries[] | .key' depcheck-output.json
+              exit 1
+            else
+              echo "✅ No missing dependencies!"
+            fi
+          else
+            echo "depcheck-output.json not generated. Please check error log above."
+            cat depcheck-error.log || true
+            exit 1
+          fi
