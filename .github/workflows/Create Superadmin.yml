@@ -1,0 +1,31 @@
+name: Create Superadmin
+
+on:
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  create-superadmin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run createSuperAdmin script
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }} # Set your MongoDB connection string as a GitHub secret
+        run: |
+          if [ -f scripts/createSuperAdmin.js ]; then
+            node scripts/createSuperAdmin.js
+          else
+            echo "scripts/createSuperAdmin.js not found"
+            exit 1
+          fi
