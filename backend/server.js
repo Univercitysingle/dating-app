@@ -4,25 +4,25 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const morgan = require("morgan");
+const morgan = require("morgan"); // For request logging
 const http = require('http');
-const { initSocket } = require('./routes/chat');
+const { initSocket } = require('./routes/chat'); // Assuming this is correctly set up
 const authMiddleware = require("./middleware/authMiddleware");
-// const subscriptionCheck = require("./middleware/subscriptionCheck"); // Uncomment if you use it
-// const stripeWebhook = require("./routes/stripeWebhook"); // Uncomment if you use it
-const admin = require("./services/firebaseAdmin");
+const admin = require("./services/firebaseAdmin"); // Firebase Admin SDK
 
 const app = express();
 const server = http.createServer(app);
 
-// Security, CORS, JSON, logging, rate limiting
+// Security, CORS, JSON, basic logging, rate limiting
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(morgan("combined"));
+
+// Morgan for HTTP request logging - 'dev' is concise, 'combined' is more detailed
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
-// ---- MONGO_URI is the only supported variable ----
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
   console.error("MongoDB connection string is missing! Set MONGO_URI in your environment.");
@@ -32,54 +32,77 @@ mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log("MongoDB connected"))
+.then(() => console.log("MongoDB connected successfully."))
 .catch(err => {
-  console.error("MongoDB connection error", err);
+  console.error("MongoDB connection error:", err);
   process.exit(1);
 });
 
-// Initialize Socket.IO and pass the server instance
-initSocket(server);
+// Initialize Socket.IO (if used)
+if (initSocket) { // Check if initSocket is defined, in case chat.js is complex
+    try {
+        initSocket(server);
+        console.log("Socket.IO initialized.");
+    } catch (socketError) {
+        console.error("Failed to initialize Socket.IO:", socketError);
+    }
+}
+
 
 // Routes
+app.get('/', (req, res) => res.send('API is running...')); // Basic health check route
+
 app.use("/api/auth", require("./routes/auth"));
-app.use("/api/users", authMiddleware, require("./routes/users"));
+app.use("/api/users", authMiddleware, require("./routes/users")); // authMiddleware applied here
 app.use("/api/matches", authMiddleware, require("./routes/matches"));
-app.use("/api/chat", authMiddleware, require("./routes/chat").router);
+app.use("/api/chat", authMiddleware, require("./routes/chat").router); // Ensure chat.js exports router
 app.use("/api/video", authMiddleware, require("./routes/video"));
 app.use("/api/reports", authMiddleware, require("./routes/reports"));
 
 // Admin routes
-const adminUsersRouter = require('./routes/adminUsers');
-app.use('/api/admin/users', adminUsersRouter);
+const adminUsersRouter = require('./routes/adminUsers'); // Ensure this file exists and exports a router
+app.use('/api/admin/users', adminUsersRouter); // Consider adding admin-specific auth here
 
-// app.use("/api/stripe-webhook", stripeWebhook); // Stripe webhook without auth (special handling) -- Uncomment if needed
-
-// Error handling middleware
+// Global Error Handling Middleware (must be the last app.use call)
 app.use((err, req, res, next) => {
-  console.error(err.stack);
   const statusCode = err.status || 500;
   let responseErrorMessage = "An internal server error occurred. Please try again later.";
-  if (process.env.NODE_ENV !== 'production') {
-    responseErrorMessage = err.message || "Internal Server Error";
-  }
-  const errorPayload = { error: responseErrorMessage };
 
+  // For non-production, use the actual error message.
+  // For production, use a generic message unless it's a specific, safe-to-expose error.
   if (process.env.NODE_ENV !== 'production') {
-    console.error("Global Error Handler: Responding with:", errorPayload, "Original error stack:", err.stack);
+    responseErrorMessage = err.message || "Internal Server Error (No specific message)";
   } else {
-    console.error("Global Error Handler: An error occurred. Status:", statusCode, "Responding with basic error message.");
+    // You might have specific error types you want to expose in production
+    if (err.isOperational) { // Hypothetical property for operational errors
+        responseErrorMessage = err.message;
+    }
+  }
+
+  const errorPayload = { error: responseErrorMessage };
+  if (process.env.NODE_ENV !== 'production' && err.details) { // Add details if present (e.g. validation errors)
+    errorPayload.details = err.details;
+  }
+
+  // Detailed logging
+  console.error(`Global Error Handler Caught: Status ${statusCode}, Message: ${err.message || 'N/A'}`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error("Responding with payload:", JSON.stringify(errorPayload, null, 2));
+    console.error("Error Stack:", err.stack || 'N/A');
+  } else {
+    // In production, log essential info without overwhelming logs; full stack might go to a dedicated logging service
+    console.error(`Prod Error: Status ${statusCode}, Path: ${req.path}, UID: ${req.user ? req.user.uid : 'N/A'}, Error: ${err.message}`);
   }
 
   if (!res.headersSent) {
     res.status(statusCode).json(errorPayload);
   } else {
-    // If headers already sent, delegate to the default Express error handler
-    // but still log that we couldn't send our JSON response.
-    console.error("Global Error Handler: Headers already sent, could not send JSON response. Delegating.");
-    next(err);
+    console.error("Global Error Handler: Headers already sent. Delegating to default Express error handler.");
+    next(err); // Essential for Express to handle if headers are sent
   }
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT} and Sockets initialized`));
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}. NODE_ENV=${process.env.NODE_ENV || 'development'}`);
+});
