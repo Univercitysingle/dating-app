@@ -1,12 +1,20 @@
 const express = require("express");
 const router = express.Router();
-const { login, setInitialPassword } = require("../controllers/authController");
-const authMiddleware = require("../middleware/authMiddleware"); // Assuming this is the correct path
 
-// Login endpoint to verify Firebase token and create user if not exists
+// Import controller functions
+const { login, setInitialPassword } = require("../controllers/authController");
+
+// Import middleware to protect routes
+const authMiddleware = require("../middleware/authMiddleware");
+
+// @route   POST /api/auth/login
+// @desc    Verify Firebase token and create user if not exists
+// @access  Public
 router.post("/login", login);
 
-// Set initial password after first login for users with mustSetPassword = true
+// @route   POST /api/auth/set-initial-password
+// @desc    Set initial password for users flagged with mustSetPassword = true
+// @access  Private (requires Firebase token)
 router.post("/set-initial-password", authMiddleware, setInitialPassword);
 
 module.exports = router;
