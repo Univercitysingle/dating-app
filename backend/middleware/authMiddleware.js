@@ -2,13 +2,13 @@ const admin = require("../services/firebaseAdmin");
 
 /**
  * Middleware to verify Firebase ID token and attach user info to req.user.
- * Expects Authorization: Bearer <token> header.
+ * Expects header: Authorization: Bearer <token>
  */
 module.exports = async function (req, res, next) {
   try {
     const authHeader = req.headers.authorization;
 
-    // Check for Bearer token in Authorization header
+    // Validate presence and format of Authorization header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "No auth token provided" });
     }
@@ -18,18 +18,23 @@ module.exports = async function (req, res, next) {
       return res.status(401).json({ error: "Invalid auth header format" });
     }
 
-    // Verify the token with Firebase Admin
-    const decoded = await admin.auth().verifyIdToken(token);
+    // Verify the Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(token);
 
-    // Optional: Add additional checks here (e.g., custom claims)
+    // Attach user information to the request object
+    req.user = decodedToken;
 
-    req.user = decoded; // Attach user info to request for downstream use
+    // Proceed to next middleware or route
     next();
   } catch (error) {
-    // Improved error logging for debugging (only in non-production)
+    // Log error in development
     if (process.env.NODE_ENV !== "production") {
-      console.error("Firebase Auth Middleware Error:", error);
+      console.error("Firebase Auth Middleware Error:", error.message || error);
     }
-    return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
+
+    // Respond with unauthorized error
+    return res.status(401).json({
+      error: "Unauthorized: Invalid or expired token",
+    });
   }
 };
