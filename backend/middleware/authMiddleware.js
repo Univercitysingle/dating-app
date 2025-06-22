@@ -10,11 +10,17 @@ module.exports = async function (req, res, next) {
 
     // Validate presence and format of Authorization header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("No or malformed Authorization header");
+      }
       return res.status(401).json({ error: "No auth token provided" });
     }
 
     const token = authHeader.split(" ")[1];
     if (!token) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Bearer token missing after split");
+      }
       return res.status(401).json({ error: "Invalid auth header format" });
     }
 
@@ -24,7 +30,7 @@ module.exports = async function (req, res, next) {
     // Attach user information to the request object
     req.user = decodedToken;
 
-    // Proceed to next middleware or route
+    // Continue to next middleware or route
     next();
   } catch (error) {
     // Log error in development
