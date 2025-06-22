@@ -4,6 +4,7 @@ import { auth } from "../firebase";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification, // Import sendEmailVerification
   signInWithPopup,
   GoogleAuthProvider,
   sendPasswordResetEmail,
@@ -44,13 +45,24 @@ function Login() {
       let userCredential;
       if (isSignUp) {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // After successful user creation, send verification email
+        if (userCredential && userCredential.user) {
+          await sendEmailVerification(userCredential.user);
+          setError("Registration successful! Please check your email to verify your account before logging in."); // Update message
+          // Do not navigate immediately, user needs to verify first.
+          // Optionally, you can clear form or redirect to a "please verify" page.
+          // For now, we'll just show the message. User can try to login after verification.
+          setIsSignUp(false); // Switch back to login mode
+          setEmail(""); // Clear email
+          setPassword(""); // Clear password
+        }
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // On successful login: redirect to homepage
+        navigate("/");
       }
-      // On success: redirect to homepage (or wherever you want)
-      navigate("/");
     } catch (err) {
-      setError((err.code ? `${err.code}: ` : "") + (err.message || "Login failed"));
+      setError((err.code ? `${err.code}: ` : "") + (err.message || (isSignUp ? "Sign up failed" : "Login failed")));
     } finally {
       setIsLoading(false);
     }
