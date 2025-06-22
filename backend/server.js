@@ -63,11 +63,20 @@ app.use((err, req, res, next) => {
   if (process.env.NODE_ENV !== 'production') {
     responseErrorMessage = err.message || "Internal Server Error";
   }
-  if (!res.headersSent) {
-    res.status(statusCode).json({
-      error: responseErrorMessage
-    });
+  const errorPayload = { error: responseErrorMessage };
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.error("Global Error Handler: Responding with:", errorPayload, "Original error stack:", err.stack);
   } else {
+    console.error("Global Error Handler: An error occurred. Status:", statusCode, "Responding with basic error message.");
+  }
+
+  if (!res.headersSent) {
+    res.status(statusCode).json(errorPayload);
+  } else {
+    // If headers already sent, delegate to the default Express error handler
+    // but still log that we couldn't send our JSON response.
+    console.error("Global Error Handler: Headers already sent, could not send JSON response. Delegating.");
     next(err);
   }
 });
