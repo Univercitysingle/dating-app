@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
 import {
@@ -9,15 +8,21 @@ import {
   GoogleAuthProvider,
 } from "firebase/auth";
 
+/**
+ * Login page supporting:
+ * - New user self sign-up with email/password
+ * - Existing user login with email/password
+ * - SSO login with Google (add more providers as needed)
+ */
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { handleLoginSuccess } = useAuth();
   const navigate = useNavigate();
 
+  // Handle email/password authentication (signup or login)
   const handleEmailAuth = async () => {
     setIsLoading(true);
     setError("");
@@ -28,8 +33,7 @@ function Login() {
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
       }
-      const user = userCredential.user;
-      await handleLoginSuccess(user, null, null);
+      // On success: redirect to homepage (or wherever you want)
       navigate("/");
     } catch (err) {
       setError((err.code ? `${err.code}: ` : "") + (err.message || "Login failed"));
@@ -38,17 +42,16 @@ function Login() {
     }
   };
 
+  // Handle Google SSO login
   const handleGoogleSSO = async () => {
     setIsLoading(true);
     setError("");
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
-      const user = userCredential.user;
-      await handleLoginSuccess(user, null, null);
+      await signInWithPopup(auth, provider);
       navigate("/");
     } catch (err) {
-      setError((err.code ? `${err.code}: ` : "") + (err.message || "Login failed"));
+      setError((err.code ? `${err.code}: ` : "") + (err.message || "SSO login failed"));
     } finally {
       setIsLoading(false);
     }
@@ -62,28 +65,24 @@ function Login() {
         </h2>
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         <div>
-          <label htmlFor="email" className="text-sm font-medium text-gray-700 sr-only">
-            Email
-          </label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="Email"
+            autoComplete="email"
             className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
         <div>
-          <label htmlFor="password_login" className="text-sm font-medium text-gray-700 sr-only">
-            Password
-          </label>
           <input
             id="password_login"
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Password"
+            autoComplete={isSignUp ? "new-password" : "current-password"}
             className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
