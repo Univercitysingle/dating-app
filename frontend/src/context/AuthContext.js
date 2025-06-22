@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
           // we might need a mechanism to fetch it here or prompt re-login.
 
           // Let's try to get user from localStorage first, assuming login flow has put it there.
-          const idToken = await firebaseUser.getIdToken(); // This is the fresh Firebase ID token
+          // const idToken = await firebaseUser.getIdToken(); // This was the duplicate declaration, idToken is already available from line 26
 
           // Try to get existing app user details from localStorage to preserve them
           const storedAppUserString = localStorage.getItem('appUser');
