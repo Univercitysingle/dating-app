@@ -17,10 +17,14 @@ function Login() {
     setError("");
     try {
       // 1. Use Firebase Auth to sign in
+      console.log("Attempting Firebase signInWithEmailAndPassword:", email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      console.log("Firebase sign in success", user);
+
       // 2. Get Firebase ID token to send to backend (optional, for backend auth)
       const idToken = await user.getIdToken();
+      console.log("Got Firebase ID token", idToken);
 
       // 3. (Optional) Send the ID token to your backend for custom handling
       const res = await fetch("/api/auth/login", {
@@ -28,14 +32,17 @@ function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: idToken }),
       });
+      console.log("Backend /api/auth/login response:", res);
 
       let data = {};
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         data = await res.json();
+        console.log("Backend JSON:", data);
       }
 
       if (!res.ok) {
+        console.error("Backend login failed", data);
         throw new Error((data && data.error) || res.statusText || "Login failed");
       }
 
@@ -47,7 +54,10 @@ function Login() {
         navigate("/");
       }
     } catch (err) {
-      setError(err.message || "Login failed");
+      setError(
+        (err.code ? `${err.code}: ` : "") +
+        (err.message || "Login failed")
+      );
       console.error("Login page error:", err);
     } finally {
       setIsLoading(false);
