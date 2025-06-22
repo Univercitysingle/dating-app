@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 
+// Ensure required env variables are set
 if (
   !process.env.FIREBASE_PROJECT_ID ||
   !process.env.FIREBASE_CLIENT_EMAIL ||
@@ -10,6 +11,7 @@ if (
   );
 }
 
+// Construct the service account object from env
 const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID,
@@ -20,8 +22,11 @@ const serviceAccount = {
   auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
 };
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+// Avoid re-initialization in dev/hot-reload environments
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
 
 module.exports = admin;
