@@ -5,43 +5,41 @@ const admin = require("../services/firebaseAdmin");
  * Expects header: Authorization: Bearer <token>
  */
 module.exports = async function (req, res, next) {
+  console.log("Auth Middleware: Entered."); // General entry log
   try {
     const authHeader = req.headers.authorization;
+    console.log("Auth Middleware: Received Authorization Header:", authHeader); // Log the raw header
 
-    // Validate presence and format of Authorization header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      const errorPayload = { error: "No auth token provided" };
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("Auth Middleware: No or malformed Authorization header. Responding with:", errorPayload);
-      }
+      const errorPayload = { error: "No auth token provided or malformed header" };
+      console.warn("Auth Middleware: No or malformed Authorization header. Responding with:", errorPayload, "Header was:", authHeader);
       return res.status(401).json(errorPayload);
     }
 
     const token = authHeader.split(" ")[1];
-    if (!token) {
-      const errorPayload = { error: "Invalid auth header format" };
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("Auth Middleware: Bearer token missing after split. Responding with:", errorPayload);
-      }
+    console.log("Auth Middleware: Extracted Token:", token); // Log the extracted token
+
+    if (!token || token === 'null' || token === 'undefined') { // More robust check for empty/nullish tokens
+      const errorPayload = { error: "Invalid auth header format: Token is missing or null/undefined" };
+      console.warn("Auth Middleware: Bearer token missing, null, or undefined after split. Responding with:", errorPayload, "Original Header:", authHeader);
       return res.status(401).json(errorPayload);
     }
 
-    // Verify the Firebase ID token
+    console.log("Auth Middleware: Attempting to verify token with Firebase Admin SDK...");
     const decodedToken = await admin.auth().verifyIdToken(token);
+    console.log("Auth Middleware: Token verified successfully. Decoded token UID:", decodedToken.uid); // Log successful verification
 
-    // Attach user information to the request object
-    req.user = decodedToken;
+    req.user = decodedToken; // Attach user information to the request object
+    console.log("Auth Middleware: req.user populated. Proceeding to next middleware/handler.");
+    next(); // Continue to next middleware or route
 
-    // Continue to next middleware or route
-    next();
   } catch (error) {
-    // Log error in development
     const errorPayload = { error: "Unauthorized: Invalid or expired token" };
-    if (process.env.NODE_ENV !== "production") {
-      console.error("Firebase Auth Middleware Error:", error.message || error, "Responding with:", errorPayload);
+    console.error("Firebase Auth Middleware Error during token verification:", error.message || error, "Responding with:", errorPayload, "Token that failed:", req.headers.authorization ? req.headers.authorization.split(" ")[1] : 'N/A');
+    // Log the stack trace in non-production for more details
+    if (process.env.NODE_ENV !== "production" && error.stack) {
+      console.error("Firebase Auth Middleware Error Stack:", error.stack);
     }
-
-    // Respond with unauthorized error
     return res.status(401).json(errorPayload);
   }
 };
