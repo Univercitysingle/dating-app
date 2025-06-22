@@ -9,7 +9,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { handleLoginSuccess, setPendingPasswordSetup } = useAuth();
+  const { handleLoginSuccess } = useAuth();
   const navigate = useNavigate();
 
   const handleLogin = async () => {
@@ -22,37 +22,13 @@ function Login() {
       const user = userCredential.user;
       console.log("Firebase sign in success", user);
 
-      // 2. Get Firebase ID token to send to backend (optional, for backend auth)
-      const idToken = await user.getIdToken();
-      console.log("Got Firebase ID token", idToken);
+      // 2. (Optional) You can get the ID token if you ever need it
+      // const idToken = await user.getIdToken();
+      // console.log("Got Firebase ID token", idToken);
 
-      // 3. (Optional) Send the ID token to your backend for custom handling
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: idToken }),
-      });
-      console.log("Backend /api/auth/login response:", res);
-
-      let data = {};
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-        console.log("Backend JSON:", data);
-      }
-
-      if (!res.ok) {
-        console.error("Backend login failed", data);
-        throw new Error((data && data.error) || res.statusText || "Login failed");
-      }
-
-      if (data.requiresPasswordSetup) {
-        setPendingPasswordSetup(data.user, data.token);
-        navigate("/set-initial-password");
-      } else {
-        await handleLoginSuccess(data.user, data.token, data.token);
-        navigate("/");
-      }
+      // 3. Handle login success in your context
+      await handleLoginSuccess(user, null, null); // Adjust as needed
+      navigate("/");
     } catch (err) {
       setError(
         (err.code ? `${err.code}: ` : "") +
