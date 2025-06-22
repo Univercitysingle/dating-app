@@ -1,6 +1,11 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
+// DEBUG: Log your env variables
+console.log("FIREBASE API KEY:", process.env.REACT_APP_FIREBASE_API_KEY);
+console.log("FIREBASE MESSAGING SENDER ID:", process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID);
+console.log("FIREBASE APP ID:", process.env.REACT_APP_FIREBASE_APP_ID);
+
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
   authDomain: "it-services-1841e.firebaseapp.com",
