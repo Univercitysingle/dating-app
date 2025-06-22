@@ -10,21 +10,26 @@ module.exports = async function (req, res, next) {
 
     // Check for Bearer token in Authorization header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "No auth token" });
+      return res.status(401).json({ error: "No auth token provided" });
     }
 
     const token = authHeader.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Invalid auth header" });
+    if (!token) {
+      return res.status(401).json({ error: "Invalid auth header format" });
+    }
 
     // Verify the token with Firebase Admin
     const decoded = await admin.auth().verifyIdToken(token);
-    req.user = decoded;
+
+    // Optional: Add additional checks here (e.g., custom claims)
+
+    req.user = decoded; // Attach user info to request for downstream use
     next();
   } catch (error) {
-    // Improved error logging for debugging (remove in production if sensitive)
+    // Improved error logging for debugging (only in non-production)
     if (process.env.NODE_ENV !== "production") {
-      console.error("Auth Middleware Error:", error);
+      console.error("Firebase Auth Middleware Error:", error);
     }
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
   }
 };
