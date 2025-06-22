@@ -12,22 +12,6 @@ const getStoredAppUser = () => {
 
 const apiClient = {
   async request(method, path, data = null, options = {}) {
-    // Ensure path is relative (starts with /), warn if full URL passed
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      console.warn(
-        '⚠️ apiClient.request received a full URL as path. ' +
-        'Please pass only the relative path starting with "/" (e.g. "/api/users/me"). ' +
-        'Full URL received:', path
-      );
-      // Strip base URL if accidentally included (optional)
-      try {
-        const urlObj = new URL(path);
-        path = urlObj.pathname + urlObj.search; // keep query params if any
-      } catch {
-        // fallback: do nothing
-      }
-    }
-
     const appUser = getStoredAppUser();
     const token = appUser ? appUser.token : null;
 
@@ -57,7 +41,7 @@ const apiClient = {
       config.body = JSON.stringify(data);
     }
 
-    // Log request details
+    // 🔍 Log request details
     console.groupCollapsed(`📡 API Request - ${config.method} ${url}`);
     console.log("➡️ Headers:", Object.fromEntries(headers.entries()));
     if (data) console.log("➡️ Body:", data);
@@ -66,7 +50,7 @@ const apiClient = {
     try {
       const response = await fetch(url, config);
 
-      // Log raw response
+      // 🔍 Log raw response
       console.groupCollapsed(`📬 API Response - ${config.method} ${url}`);
       console.log("Status:", response.status);
       console.log("Headers:", Array.from(response.headers.entries()));

@@ -7,37 +7,82 @@ const multer = require("multer");
 
 const getCurrentUserProfile = async (req, res) => {
   console.log("UsersController: getCurrentUserProfile entered.");
-  // Log the entire req.user object if it exists, otherwise indicate it's missing
-  if (req.user) {
-    console.log("UsersController: req.user object received:", JSON.stringify(req.user, null, 2));
-  } else {
-    console.warn("UsersController: req.user object is MISSING when getCurrentUserProfile was called. This should not happen if authMiddleware ran successfully.");
-    // This case should ideally be caught by authMiddleware not calling next() or by it erroring out.
-    // If it reaches here without req.user, it's a logic flaw somewhere or authMiddleware didn't run.
-    return res.status(500).json({ error: "User information missing in request processing." });
+  // authMiddleware should have populated req.user with the full DB user profile.
+  // If req.user is not present, authMiddleware likely failed and already sent a response.
+  // However, as a safeguard:
+  if (!req.user) {
+    console.error("UsersController: getCurrentUserProfile - req.user is not populated. This indicates an issue upstream from the controller, possibly in authMiddleware not sending a response on failure or not populating req.user correctly.");
+    return res.status(500).json({ error: "User profile not available in request." });
   }
 
-  const userUid = req.user.uid; // Get UID from the populated req.user
-  console.log(`UsersController: Attempting to find user by UID: ${userUid}`);
-
-  try {
-    const user = await User.findOne({ uid: userUid });
-    if (!user) {
-      console.warn(`UsersController: User not found in database for UID: ${userUid}`);
-      return res.status(404).json({ error: "User not found" });
-    }
-    console.log(`UsersController: Successfully retrieved profile for UID: ${userUid}. Sending user data as JSON.`);
-    res.json(user);
-  } catch (error) {
-    console.error(`UsersController: Error fetching user profile for UID ${userUid}:`, error.message || error);
-    if (process.env.NODE_ENV !== "production" && error.stack) {
-      console.error("UsersController: Error stack:", error.stack);
-    }
-    res.status(500).json({ error: "An unexpected error occurred while fetching user profile." });
-  }
+  // The req.user object is now the full user profile from our database.
+  console.log(`UsersController: Sending user profile for UID: ${req.user.uid} (already fetched by authMiddleware).`);
+  res.json(req.user);
 };
 
+// New function to find/update/create user based on Firebase decoded token
+const findAndUpdateUserByTokenDetails = async (decodedToken) => {
+  console.log("UsersController: findAndUpdateUserByTokenDetails entered for UID from token:", decodedToken.uid, "Email from token:", decodedToken.email);
+
+  // Step 1: Try to find user by Firebase UID
+  let user = await User.findOne({ uid: decodedToken.uid });
+
+  if (user) {
+    console.log(`UsersController: User found by UID: ${decodedToken.uid}.`);
+    // Optionally, update email or other details if they can change in Firebase and you want to sync them
+    // For example, if user.email !== decodedToken.email && decodedToken.email_verified
+    // await User.updateOne({ uid: decodedToken.uid }, { $set: { email: decodedToken.email } });
+    return user;
+  }
+
+  console.log(`UsersController: User not found by UID ${decodedToken.uid}. Trying by email: ${decodedToken.email}`);
+
+  // Step 2: If not found by UID, try to find by email, but only if email is verified
+  if (!decodedToken.email) {
+    console.warn(`UsersController: Firebase token for UID ${decodedToken.uid} does not contain an email. Cannot find by email or create new user based on email.`);
+    return null; // Or throw an error indicating inability to provision
+  }
+
+  if (!decodedToken.email_verified) {
+    console.warn(`UsersController: Email ${decodedToken.email} from Firebase token (UID: ${decodedToken.uid}) is not verified. Will not link to existing email or create new user based on this unverified email.`);
+    // Check if an account with this UID exists but maybe with a different (old/unverified) email from token - already handled by findOne by UID above
+    // If we strictly require email verification for account linking/creation based on email:
+    return null; // Indicate user cannot be provisioned due to unverified email
+  }
+
+  user = await User.findOne({ email: decodedToken.email });
+
+  if (user) {
+    // User found by email. Link Firebase UID to this existing account.
+    console.log(`UsersController: User found by email ${decodedToken.email}. Current UID in DB: ${user.uid}. Linking to Firebase UID: ${decodedToken.uid}.`);
+    user.uid = decodedToken.uid;
+    // Potentially update other fields from token if necessary, e.g., name
+    if (decodedToken.name && !user.name) { // Example: set name if not already set
+        user.name = decodedToken.name;
+    }
+    await user.save();
+    console.log(`UsersController: User UID updated for email ${decodedToken.email} to ${decodedToken.uid}.`);
+    return user;
+  }
+
+  // Step 3: If not found by UID or email, and email is verified, create a new user
+  console.log(`UsersController: No user found by UID or email. Creating new user with UID: ${decodedToken.uid} and Email: ${decodedToken.email}.`);
+
+  const newUser = new User({
+    uid: decodedToken.uid,
+    email: decodedToken.email,
+    name: decodedToken.name || '', // Use name from token if available, else empty string or default
+    // Set other default fields as necessary based on your User model
+    // e.g., photos: [], interests: [], bio: '', etc.
+  });
+  await newUser.save();
+  console.log(`UsersController: New user created successfully with UID: ${decodedToken.uid}.`);
+  return newUser;
+};
+
+
 const updateCurrentUserProfile = async (req, res) => {
+  // req.user here will be the full user profile from DB after authMiddleware changes
   console.log("UsersController: updateCurrentUserProfile entered for UID:", req.user ? req.user.uid : "UNKNOWN_UID");
   const update = req.body;
   const allowedFields = [
@@ -227,4 +272,5 @@ module.exports = {
   blockUser,
   uploadAudioBio,
   uploadVideoBioSnippet,
+  findAndUpdateUserByTokenDetails, // Export the new function
 };

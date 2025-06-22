@@ -1,7 +1,9 @@
 const admin = require("../services/firebaseAdmin");
+const { findAndUpdateUserByTokenDetails } = require("../controllers/usersController");
 
 /**
- * Middleware to verify Firebase ID token and attach user info to req.user.
+ * Middleware to verify Firebase ID token, find/create/update user in DB,
+ * and attach DB user profile to req.user.
  * Expects header: Authorization: Bearer <token>
  */
 module.exports = async function (req, res, next) {
@@ -27,15 +29,40 @@ module.exports = async function (req, res, next) {
 
     console.log("Auth Middleware: Attempting to verify token with Firebase Admin SDK...");
     const decodedToken = await admin.auth().verifyIdToken(token);
-    console.log("Auth Middleware: Token verified successfully. Decoded token UID:", decodedToken.uid); // Log successful verification
+    console.log("Auth Middleware: Firebase token verified successfully. Decoded token UID:", decodedToken.uid, "Email:", decodedToken.email, "Email Verified:", decodedToken.email_verified);
 
-    req.user = decodedToken; // Attach user information to the request object
-    console.log("Auth Middleware: req.user populated. Proceeding to next middleware/handler.");
-    next(); // Continue to next middleware or route
+    // Now, find/update/create user in our database
+    const dbUser = await findAndUpdateUserByTokenDetails(decodedToken);
+
+    if (!dbUser) {
+      // This case handles when findAndUpdateUserByTokenDetails returns null
+      // (e.g., email not verified and no existing UID match, or token has no email)
+      console.warn("Auth Middleware: Could not provision user from token details (e.g., email not verified or missing, and no existing UID). Denying access.");
+      const errorPayload = { error: "User provisioning failed. Email may not be verified or token details are insufficient." };
+      return res.status(403).json(errorPayload); // 403 Forbidden as user is authenticated by Firebase but not authorized in our app
+    }
+
+    req.user = dbUser; // Attach our database user profile to req.user
+    console.log("Auth Middleware: Database user profile attached to req.user. Proceeding.");
+    next();
 
   } catch (error) {
-    const errorPayload = { error: "Unauthorized: Invalid or expired token" };
-    console.error("Firebase Auth Middleware Error during token verification:", error.message || error, "Responding with:", errorPayload, "Token that failed:", req.headers.authorization ? req.headers.authorization.split(" ")[1] : 'N/A');
+    // Handle errors from Firebase token verification OR from findAndUpdateUserByTokenDetails if it throws
+    console.error("Auth Middleware: Error during token verification or user provisioning:", error.message || error, "Token that potentially failed:", token);
+    if (process.env.NODE_ENV !== "production" && error.stack) {
+      console.error("Auth Middleware Error Stack:", error.stack);
+    }
+
+    // Determine if the error is specifically a Firebase token verification error
+    // Firebase errors often have a 'code' property like 'auth/id-token-expired'
+    if (error.code && error.code.startsWith('auth/')) {
+      const errorPayload = { error: "Unauthorized: Invalid or expired Firebase token.", details: error.message };
+      return res.status(401).json(errorPayload);
+    }
+
+    // For other errors (e.g., database issues from findAndUpdateUserByTokenDetails)
+    const errorPayload = { error: "Server error during authentication." };
+    return res.status(500).json(errorPayload);
     // Log the stack trace in non-production for more details
     if (process.env.NODE_ENV !== "production" && error.stack) {
       console.error("Firebase Auth Middleware Error Stack:", error.stack);
