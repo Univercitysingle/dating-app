@@ -1,27 +1,27 @@
 import admin from "../../services/firebaseAdmin";
 
 /**
- * API route to return the current user's decoded Firebase token info.
+ * Debug-friendly API route to return the current user's decoded Firebase token info.
  * Expects Authorization: Bearer <token> header.
- * Includes debug logging for troubleshooting.
  */
 export default async function handler(req, res) {
-  try {
-    // Debug: Log incoming headers
-    if (process.env.NODE_ENV !== "production") {
-      console.log("DEBUG /api/users/me headers:", req.headers);
-    }
+  // Debug: Log incoming request method and headers
+  if (process.env.NODE_ENV !== "production") {
+    console.log("DEBUG [me.js] Request method:", req.method);
+    console.log("DEBUG [me.js] Request headers:", req.headers);
+  }
 
+  try {
     const authHeader = req.headers.authorization;
 
     // Debug: Log the Authorization header
     if (process.env.NODE_ENV !== "production") {
-      console.log("DEBUG Authorization header:", authHeader);
+      console.log("DEBUG [me.js] Authorization header:", authHeader);
     }
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("DEBUG No (or malformed) auth header received");
+        console.log("DEBUG [me.js] Missing or malformed Authorization header");
       }
       return res.status(401).json({ error: "No auth token provided in Authorization header" });
     }
@@ -29,14 +29,14 @@ export default async function handler(req, res) {
     const token = authHeader.split(" ")[1];
     if (!token) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("DEBUG Token not found after Bearer");
+        console.log("DEBUG [me.js] Token not found after Bearer");
       }
       return res.status(401).json({ error: "Invalid Authorization header format" });
     }
 
-    // Debug: Log the extracted token (do not log in production)
+    // Debug: Log the extracted token (do NOT log in production)
     if (process.env.NODE_ENV !== "production") {
-      console.log("DEBUG Extracted token:", token);
+      console.log("DEBUG [me.js] Extracted token:", token);
     }
 
     // Verify the token with Firebase Admin SDK
@@ -44,11 +44,11 @@ export default async function handler(req, res) {
     try {
       decoded = await admin.auth().verifyIdToken(token);
       if (process.env.NODE_ENV !== "production") {
-        console.log("DEBUG Decoded token:", decoded);
+        console.log("DEBUG [me.js] Decoded token:", decoded);
       }
     } catch (verifyError) {
       if (process.env.NODE_ENV !== "production") {
-        console.error("DEBUG Firebase token verification failed:", verifyError);
+        console.error("DEBUG [me.js] Firebase token verification failed:", verifyError);
       }
       return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
     }
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
     res.status(200).json({ user: decoded });
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
-      console.error("DEBUG Auth API error:", error);
+      console.error("DEBUG [me.js] Unexpected error:", error);
     }
     return res.status(401).json({ error: "Unauthorized" });
   }
