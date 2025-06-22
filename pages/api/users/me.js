@@ -1,64 +1,55 @@
 import admin from "../../services/firebaseAdmin";
 
 /**
- * Debug-friendly API route to return the current user's decoded Firebase token info.
+ * API route to return the current user's decoded Firebase token info.
  * Expects Authorization: Bearer <token> header.
  */
 export default async function handler(req, res) {
-  // Debug: Log incoming request method and headers
+  // Allow only GET requests
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Optional: Set CORS headers if called from browser
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
   if (process.env.NODE_ENV !== "production") {
     console.log("DEBUG [me.js] Request method:", req.method);
     console.log("DEBUG [me.js] Request headers:", req.headers);
   }
 
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || "";
 
-    // Debug: Log the Authorization header
-    if (process.env.NODE_ENV !== "production") {
-      console.log("DEBUG [me.js] Authorization header:", authHeader);
-    }
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader.startsWith("Bearer ")) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("DEBUG [me.js] Missing or malformed Authorization header");
+        console.warn("DEBUG [me.js] Missing or malformed Authorization header");
       }
-      return res.status(401).json({ error: "No auth token provided in Authorization header" });
+      return res.status(401).json({ error: "No valid Authorization token provided" });
     }
 
     const token = authHeader.split(" ")[1];
+
     if (!token) {
       if (process.env.NODE_ENV !== "production") {
-        console.log("DEBUG [me.js] Token not found after Bearer");
+        console.warn("DEBUG [me.js] Token not found after Bearer");
       }
-      return res.status(401).json({ error: "Invalid Authorization header format" });
+      return res.status(401).json({ error: "Authorization token format invalid" });
     }
 
-    // Debug: Log the extracted token (do NOT log in production)
+    // Verify the token using Firebase Admin
+    const decoded = await admin.auth().verifyIdToken(token);
+
     if (process.env.NODE_ENV !== "production") {
-      console.log("DEBUG [me.js] Extracted token:", token);
+      console.log("DEBUG [me.js] Firebase token decoded:", decoded);
     }
 
-    // Verify the token with Firebase Admin SDK
-    let decoded;
-    try {
-      decoded = await admin.auth().verifyIdToken(token);
-      if (process.env.NODE_ENV !== "production") {
-        console.log("DEBUG [me.js] Decoded token:", decoded);
-      }
-    } catch (verifyError) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("DEBUG [me.js] Firebase token verification failed:", verifyError);
-      }
-      return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
-    }
-
-    // Respond with user info from the decoded token
-    res.status(200).json({ user: decoded });
+    return res.status(200).json({ user: decoded });
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
-      console.error("DEBUG [me.js] Unexpected error:", error);
+      console.error("DEBUG [me.js] Firebase verification failed or unexpected error:", error);
     }
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
   }
 }
