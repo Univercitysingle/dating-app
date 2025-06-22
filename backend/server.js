@@ -21,6 +21,11 @@ app.use(express.json());
 // Morgan for HTTP request logging - 'dev' is concise, 'combined' is more detailed
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+// Before rateLimit, tell Express it's behind a proxy.
+// This is important for express-rate-limit to get the correct client IP.
+// Adjust '1' if you have more than one layer of proxy.
+app.set('trust proxy', 1);
+
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 const mongoUri = process.env.MONGO_URI;

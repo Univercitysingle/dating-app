@@ -31,32 +31,48 @@ export function AuthProvider({ children }) {
           // we might need a mechanism to fetch it here or prompt re-login.
 
           // Let's try to get user from localStorage first, assuming login flow has put it there.
-          const storedUser = localStorage.getItem('appUser');
-          if (storedUser) {
-            const appUser = JSON.parse(storedUser);
-            // Verify token if necessary or refresh it
-            if (appUser.uid === firebaseUser.uid) {
-               // The token in localStorage might be our backend's JWT, not Firebase's.
-               // For this flow, let's assume 'token' in localStorage is the one for our backend API.
-              setUser({ ...appUser, firebaseIdToken: idToken });
-            } else {
-              // Mismatch, clear stored user
+          const idToken = await firebaseUser.getIdToken(); // This is the fresh Firebase ID token
+
+          // Try to get existing app user details from localStorage to preserve them
+          const storedAppUserString = localStorage.getItem('appUser');
+          let otherUserDetails = {};
+          if (storedAppUserString) {
+            try {
+              const parsedStoredAppUser = JSON.parse(storedAppUserString);
+              if (parsedStoredAppUser.uid === firebaseUser.uid) {
+                // Only keep other details if UID matches, exclude old tokens
+                const { token, firebaseIdToken, ...rest } = parsedStoredAppUser;
+                otherUserDetails = rest;
+              }
+            } catch (e) {
+              console.error("Error parsing stored appUser during onAuthStateChanged:", e);
+              // Potentially corrupted data, clear it
               localStorage.removeItem('appUser');
-              setUser(null); // Or trigger a re-fetch of appUser from backend
             }
-          } else {
-            // No appUser in localStorage, but Firebase user exists.
-            // This state might occur if user refreshed on set-initial-password page
-            // or if login flow needs adjustment.
-            // For now, we only set basic Firebase info. The main login flow should populate fully.
-             setUser({ uid: firebaseUser.uid, email: firebaseUser.email, firebaseIdToken: idToken, isFirebaseOnly: true });
           }
+
+          // Construct the user object for context and localStorage
+          const appUserToStore = {
+            ...otherUserDetails, // Persist other details like name, backend-specific roles etc.
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            token: idToken, // THIS IS THE KEY CHANGE: Use fresh Firebase ID token for backend auth
+            firebaseIdToken: idToken // Explicitly store firebase ID token if needed elsewhere
+          };
+
+          // Update localStorage so apiClient can pick up the fresh token
+          localStorage.setItem('appUser', JSON.stringify(appUserToStore));
+
+          // Update React context state
+          setUser(appUserToStore);
+
         } catch (error) {
-          console.error("Error getting ID token:", error);
+          console.error("Error in onAuthStateChanged processing:", error);
           setUser(null);
           localStorage.removeItem('appUser');
         }
       } else {
+        // User is signed out from Firebase
         setUser(null);
         localStorage.removeItem('appUser');
         setTempAuthInfo(null); // Clear temp info on logout
