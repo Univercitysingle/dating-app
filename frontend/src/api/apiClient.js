@@ -5,7 +5,7 @@ const getStoredAppUser = () => {
       return JSON.parse(appUserString);
     }
   } catch (e) {
-    console.error("Error parsing appUser from localStorage", e);
+    console.error("❌ Error parsing appUser from localStorage:", e);
   }
   return null;
 };
@@ -24,57 +24,65 @@ const apiClient = {
       headers.append('Authorization', `Bearer ${token}`);
     }
 
-    // Debug: Log the API base URL to the browser console
-    console.log("API Base URL:", process.env.REACT_APP_API_BASE_URL);
-
-    // Use REACT_APP_API_BASE_URL if set, otherwise default to production backend for debugging
     let baseUrl = process.env.REACT_APP_API_BASE_URL || "";
     if (!baseUrl) {
-      // Optionally set your production backend as a fallback (remove this after debugging)
       baseUrl = "https://graceful-youth-production.up.railway.app";
-      console.warn("REACT_APP_API_BASE_URL not set! Using fallback:", baseUrl);
+      console.warn("⚠️ REACT_APP_API_BASE_URL not set! Using fallback:", baseUrl);
     }
 
     const url = `${baseUrl}${path}`;
-
     const config = {
       method: method.toUpperCase(),
       headers,
       ...options,
     };
 
-    if (data && (method.toUpperCase() === 'POST' || method.toUpperCase() === 'PUT' || method.toUpperCase() === 'PATCH')) {
+    if (data && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
       config.body = JSON.stringify(data);
     }
+
+    // 🔍 Log request details
+    console.groupCollapsed(`📡 API Request - ${config.method} ${url}`);
+    console.log("➡️ Headers:", Object.fromEntries(headers.entries()));
+    if (data) console.log("➡️ Body:", data);
+    console.groupEnd();
 
     try {
       const response = await fetch(url, config);
 
+      // 🔍 Log raw response
+      console.groupCollapsed(`📬 API Response - ${config.method} ${url}`);
+      console.log("Status:", response.status);
+      console.log("Headers:", Array.from(response.headers.entries()));
+      console.groupEnd();
+
       if (!response.ok) {
-        // Attempt to parse error from backend if available
         let errorData;
         try {
           errorData = await response.json();
         } catch (e) {
-          // If response is not JSON or other error
           errorData = { message: response.statusText || 'An error occurred' };
         }
-        // Throw an error object that includes status and backend message
+
         const error = new Error(errorData.message || 'Network response was not ok.');
         error.status = response.status;
-        error.data = errorData; // Attach full error data from backend
+        error.data = errorData;
+
+        console.error(`❌ API Error (${config.method} ${url}):`, errorData);
         throw error;
       }
 
-      // Handle cases where response might be empty (e.g., 204 No Content)
       if (response.status === 204) {
+        console.info(`ℹ️ ${config.method} ${url} - No Content`);
         return null;
       }
 
-      return await response.json(); // Assuming most responses are JSON
+      const jsonData = await response.json();
+      console.log(`✅ API Success (${config.method} ${url}):`, jsonData);
+      return jsonData;
     } catch (error) {
-      console.error(`API Client Error (${method} ${path}):`, error);
-      throw error; // Re-throw the error to be caught by the calling function
+      console.error(`🚨 API Client Caught Error (${config.method} ${url}):`, error);
+      throw error;
     }
   },
 
@@ -94,7 +102,7 @@ const apiClient = {
     return this.request('DELETE', path, null, options);
   },
 
-  patch(path, data, options = {}) { // Added PATCH for completeness
+  patch(path, data, options = {}) {
     return this.request('PATCH', path, data, options);
   }
 };
