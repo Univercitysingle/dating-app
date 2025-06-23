@@ -48,10 +48,9 @@ function Login() {
         // After successful user creation, send verification email
         if (userCredential && userCredential.user) {
           await sendEmailVerification(userCredential.user);
-          setError("Registration successful! Please check your email to verify your account before logging in."); // Update message
+          await auth.signOut(); // Sign out the user client-side
+          setError("Registration successful! A verification email has been sent. Please verify your email and then log in.");
           // Do not navigate immediately, user needs to verify first.
-          // Optionally, you can clear form or redirect to a "please verify" page.
-          // For now, we'll just show the message. User can try to login after verification.
           setIsSignUp(false); // Switch back to login mode
           setEmail(""); // Clear email
           setPassword(""); // Clear password
@@ -171,7 +170,15 @@ function Login() {
             ? "Sign Up"
             : "Login"}
         </h2>
-        {error && <p className={`text-sm text-center ${error.includes("sent") ? "text-green-600" : "text-red-500"}`}>{error}</p>}
+        {error && (
+          <p
+            className={`text-sm text-center ${
+              error.includes("sent!") || error.includes("successful!") ? "text-green-600" : "text-red-500"
+            }`}
+          >
+            {error}
+          </p>
+        )}
 
         {/* Email/Password Login or Signup */}
         {!showPhone && !showReset && (
@@ -184,17 +191,19 @@ function Login() {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="Email"
                 autoComplete="email"
+                aria-label="Email Address"
                 className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <div>
               <input
-                id="password_login"
+                id="password"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Password"
                 autoComplete={isSignUp ? "new-password" : "current-password"}
+                aria-label="Password"
                 className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -216,7 +225,7 @@ function Login() {
               disabled={isLoading}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400 disabled:bg-gray-400 mt-2"
             >
-              {isLoading ? "Please wait..." : "Sign in with Google"}
+              {isLoading ? "Signing in with Google..." : "Sign in with Google"}
             </button>
           </>
         )}
@@ -234,10 +243,11 @@ function Login() {
                     onChange={e => setPhone(e.target.value)}
                     placeholder="+1234567890"
                     autoComplete="tel"
+                    aria-label="Phone Number"
                     className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
-                <div id="recaptcha-container" />
+                {showPhone && <div id="recaptcha-container" />}
                 <button
                   onClick={handleSendOTP}
                   disabled={isLoading}
@@ -256,6 +266,7 @@ function Login() {
                     onChange={e => setOtp(e.target.value)}
                     placeholder="Enter OTP"
                     autoComplete="one-time-code"
+                    aria-label="One-Time Password"
                     className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
@@ -282,6 +293,7 @@ function Login() {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="Email"
                 autoComplete="email"
+                aria-label="Email for password reset"
                 className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -297,7 +309,7 @@ function Login() {
 
         {/* Switch links */}
         <div className="text-xs text-center text-gray-500 mt-2 space-y-1">
-          {!showPhone && !showReset && (
+          {!showPhone && !showReset && !isSignUp && (
             <>
               <button
                 className="text-green-600 hover:underline mr-2"

@@ -22,7 +22,8 @@ export function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const idToken = await firebaseUser.getIdToken();
+          // Force refresh token and user profile to get latest emailVerified status
+          const idToken = await firebaseUser.getIdToken(true);
           // At this point, we have a Firebase user.
           // We need to fetch our backend's user profile.
           // This is usually done after login or on app load.
@@ -56,6 +57,7 @@ export function AuthProvider({ children }) {
             ...otherUserDetails, // Persist other details like name, backend-specific roles etc.
             uid: firebaseUser.uid,
             email: firebaseUser.email,
+            emailVerified: firebaseUser.emailVerified, // Include emailVerified status
             token: idToken, // THIS IS THE KEY CHANGE: Use fresh Firebase ID token for backend auth
             firebaseIdToken: idToken // Explicitly store firebase ID token if needed elsewhere
           };
