@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../firebase";
 import {
   signInWithEmailAndPassword,
@@ -27,6 +27,7 @@ function Login() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState(""); // For email verification success message
 
   // Phone auth states
   const [showPhone, setShowPhone] = useState(false);
@@ -36,6 +37,28 @@ function Login() {
   const [confirmationResult, setConfirmationResult] = useState(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    if (queryParams.get('email_verified') === 'true') {
+      // Set message only if it's not already set, to avoid loops if component re-renders
+      if (!verificationMessage) {
+        setVerificationMessage("Your email has been successfully verified. Please log in.");
+      }
+      // Clean up the URL query parameter immediately after detecting it
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [location, verificationMessage]); // Depend on location to check query param, and verificationMessage to avoid re-setting
+
+  useEffect(() => {
+    // Clear error messages when the form mode changes (e.g., switching from login to signup).
+    // The `verificationMessage` (for "email verified") is sticky once set by the URL param for the current page view,
+    // but will clear if the user navigates away and back without the param.
+    // Other messages like "OTP Sent" are typically part of the `error` state variable which is already styled for success/error.
+    setError("");
+  }, [isSignUp, showPhone, showReset]); // Trigger only when these state variables change
+
 
   // Handle email/password authentication (signup or login)
   const handleEmailAuth = async () => {
@@ -170,6 +193,9 @@ function Login() {
             ? "Sign Up"
             : "Login"}
         </h2>
+        {verificationMessage && (
+          <p className="text-sm text-center text-green-600">{verificationMessage}</p>
+        )}
         {error && (
           <p
             className={`text-sm text-center ${
