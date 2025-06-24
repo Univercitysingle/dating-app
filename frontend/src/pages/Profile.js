@@ -152,7 +152,10 @@ function Profile() {
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">{profile.name}</h1>
+        <div> {/* Container for Name and Age */}
+          <h1 className="text-3xl font-bold inline">{profile.name}</h1>
+          {profile.age && <span className="text-2xl ml-2">({profile.age})</span>}
+        </div>
         <div> {/* Container for buttons */}
           <button
             onClick={() => {
@@ -175,8 +178,25 @@ function Profile() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 space-y-4">
+      {/* Single column layout for all profile content */}
+      <div className="flex flex-col space-y-6"> {/* Replaced grid with flex column */}
+
+        {/* Primary Media Section (Video Bio Snippet) */}
+        <div>
+          <h2 className="text-xl font-semibold mb-2">Profile Snippet</h2>
+          {isEditing ? (
+            <VideoBioSnippetUpload
+              currentVideoUrl={profile.videoBioUrl || ''}
+              onUploadComplete={handleMediaUploadComplete}
+            />
+          ) : (
+            <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />
+          )}
+          {/* mediaSaveStatus for this specific upload can be shown here or consolidated */}
+        </div>
+
+        {/* Section 1: Details, Interests, Prompts, Other Media, Quiz, Social - formerly md:col-span-1 */}
+        <div className="space-y-4">
           <div>
             <h2 className="text-xl font-semibold">Details</h2>
             {isEditing ? (
@@ -216,14 +236,28 @@ function Profile() {
                 {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
               </>
             ) : (
-              <>
-                <p>Age: {profile.age || "N/A"}</p>
-                <p>Gender: {profile.gender || "N/A"}</p>
-                <p>Preference: {profile.preference || "N/A"}</p>
-                <p>Email: {profile.email}</p>
-                <p>Education: {profile.education || "N/A"}</p>
-                <p>Relationship Goals: {profile.relationshipGoals || "N/A"}</p>
-              </>
+              <div className="mt-2 space-y-2">
+                <div>
+                  <span className="font-medium text-gray-600">Gender: </span>
+                  <span>{profile.gender || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Preference: </span>
+                  <span>{profile.preference || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Email: </span>
+                  <span>{profile.email}</span> {/* Assuming email is always present for a logged-in user */}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Education: </span>
+                  <span>{profile.education || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Relationship Goals: </span>
+                  <span>{profile.relationshipGoals || "N/A"}</span>
+                </div>
+              </div>
             )}
           </div>
            {/* Keep other editors separate as they are more complex */}
@@ -245,24 +279,18 @@ function Profile() {
             <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
           )}
 
-          {/* Media Players and Uploaders */}
-          {isEditing ? (
-            <>
+          {/* Other Media Players and Uploaders (Audio Bio) */}
+          <div>
+            <h2 className="text-xl font-semibold mb-2 mt-4">Audio Bio</h2> {/* Consistent title styling */}
+            {isEditing ? (
               <AudioBioUpload
                 currentAudioUrl={profile.audioBioUrl || ''}
                 onUploadComplete={handleMediaUploadComplete}
               />
-              <VideoBioSnippetUpload
-                currentVideoUrl={profile.videoBioUrl || ''}
-                onUploadComplete={handleMediaUploadComplete}
-              />
-            </>
-          ) : (
-            <>
+            ) : (
               <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
-              <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />
-            </>
-          )}
+            )}
+          </div>
           {mediaSaveStatus && <p className="text-sm text-gray-600 mt-2">{mediaSaveStatus}</p>}
 
           {/* Personality Quiz Display and Editor */}
@@ -290,7 +318,8 @@ function Profile() {
           )}
         </div>
 
-        <div className="md:col-span-2 space-y-6">
+        {/* Section 2: Profile Video, Premium Features - formerly md:col-span-2 */}
+        <div className="space-y-6"> {/* This div can maintain its own internal spacing if needed */}
           <div>
             <h2 className="text-xl font-semibold">Profile Video</h2>
             <VideoProfileUpload />
