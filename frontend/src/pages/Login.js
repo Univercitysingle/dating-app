@@ -25,6 +25,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState(""); // For success messages like OTP sent, etc.
   const [isLoading, setIsLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState(""); // For email verification success message
@@ -57,6 +58,7 @@ function Login() {
     // but will clear if the user navigates away and back without the param.
     // Other messages like "OTP Sent" are typically part of the `error` state variable which is already styled for success/error.
     setError("");
+    setSuccessMessage(""); // Clear success messages too
   }, [isSignUp, showPhone, showReset]); // Trigger only when these state variables change
 
 
@@ -64,6 +66,7 @@ function Login() {
   const handleEmailAuth = async () => {
     setIsLoading(true);
     setError("");
+    setSuccessMessage("");
     try {
       let userCredential;
       if (isSignUp) {
@@ -72,7 +75,7 @@ function Login() {
         if (userCredential && userCredential.user) {
           await sendEmailVerification(userCredential.user);
           await auth.signOut(); // Sign out the user client-side
-          setError("Registration successful! A verification email has been sent. Please verify your email and then log in.");
+          setSuccessMessage("Registration successful! A verification email has been sent. Please verify your email and then log in.");
           // Do not navigate immediately, user needs to verify first.
           setIsSignUp(false); // Switch back to login mode
           setEmail(""); // Clear email
@@ -94,6 +97,7 @@ function Login() {
   const handleGoogleSSO = async () => {
     setIsLoading(true);
     setError("");
+    setSuccessMessage("");
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
@@ -109,6 +113,7 @@ function Login() {
   const handleResetPassword = async () => {
     setIsLoading(true);
     setError("");
+    setSuccessMessage("");
     try {
       if (!email) {
         setError("Please enter your email for password reset.");
@@ -116,7 +121,7 @@ function Login() {
         return;
       }
       await sendPasswordResetEmail(auth, email);
-      setError("Password reset email sent! Please check your inbox.");
+      setSuccessMessage("Password reset email sent! Please check your inbox.");
       setShowReset(false);
     } catch (err) {
       setError((err.code ? `${err.code}: ` : "") + (err.message || "Reset failed"));
@@ -144,6 +149,7 @@ function Login() {
   const handleSendOTP = async () => {
     setIsLoading(true);
     setError("");
+    setSuccessMessage("");
     try {
       if (!phone) {
         setError("Please enter your phone number.");
@@ -154,7 +160,7 @@ function Login() {
       const confirmation = await signInWithPhoneNumber(auth, phone, verifier);
       setConfirmationResult(confirmation);
       setOtpSent(true);
-      setError("OTP sent! Please check your phone.");
+      setSuccessMessage("OTP sent! Please check your phone.");
     } catch (err) {
       setError((err.code ? `${err.code}: ` : "") + (err.message || "Failed to send OTP"));
     } finally {
@@ -166,6 +172,7 @@ function Login() {
   const handleVerifyOTP = async () => {
     setIsLoading(true);
     setError("");
+    setSuccessMessage("");
     try {
       if (!otp) {
         setError("Enter the OTP sent to your phone.");
@@ -183,8 +190,9 @@ function Login() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-700">
+      {/* Consider adding a background image or gradient to the parent div for better transparent effect */}
+      <div className="w-full max-w-md p-8 space-y-6 bg-black bg-opacity-25 rounded-lg shadow-xl backdrop-blur-sm">
+        <h2 className="text-2xl font-bold text-center text-white">
           {showPhone
             ? "Phone Login"
             : showReset
@@ -194,16 +202,13 @@ function Login() {
             : "Login"}
         </h2>
         {verificationMessage && (
-          <p className="text-sm text-center text-green-600">{verificationMessage}</p>
+          <p className="text-sm text-center text-green-300 py-2">{verificationMessage}</p>
+        )}
+        {successMessage && (
+          <p className="text-sm text-center text-green-300 py-2">{successMessage}</p>
         )}
         {error && (
-          <p
-            className={`text-sm text-center ${
-              error.includes("sent!") || error.includes("successful!") ? "text-green-600" : "text-red-500"
-            }`}
-          >
-            {error}
-          </p>
+          <p className="text-sm text-center text-red-400 py-2">{error}</p>
         )}
 
         {/* Email/Password Login or Signup */}
@@ -218,7 +223,7 @@ function Login() {
                 placeholder="Email"
                 autoComplete="email"
                 aria-label="Email Address"
-                className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <div>
@@ -230,13 +235,13 @@ function Login() {
                 placeholder="Password"
                 autoComplete={isSignUp ? "new-password" : "current-password"}
                 aria-label="Password"
-                className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <button
               onClick={handleEmailAuth}
               disabled={isLoading}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-500 bg-opacity-75 rounded-md hover:bg-indigo-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 disabled:bg-gray-500 disabled:bg-opacity-50"
             >
               {isLoading
                 ? isSignUp
@@ -249,7 +254,7 @@ function Login() {
             <button
               onClick={handleGoogleSSO}
               disabled={isLoading}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400 disabled:bg-gray-400 mt-2"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-red-500 bg-opacity-75 rounded-md hover:bg-red-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-400 disabled:bg-gray-500 disabled:bg-opacity-50 mt-2"
             >
               {isLoading ? "Signing in with Google..." : "Sign in with Google"}
             </button>
@@ -270,14 +275,14 @@ function Login() {
                     placeholder="+1234567890"
                     autoComplete="tel"
                     aria-label="Phone Number"
-                    className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 {showPhone && <div id="recaptcha-container" />}
                 <button
                   onClick={handleSendOTP}
                   disabled={isLoading}
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 mt-2"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-green-500 bg-opacity-75 rounded-md hover:bg-green-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:bg-gray-500 disabled:bg-opacity-50 mt-2"
                 >
                   {isLoading ? "Sending OTP..." : "Send OTP"}
                 </button>
@@ -293,13 +298,13 @@ function Login() {
                     placeholder="Enter OTP"
                     autoComplete="one-time-code"
                     aria-label="One-Time Password"
-                    className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
                 <button
                   onClick={handleVerifyOTP}
                   disabled={isLoading}
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 mt-2"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-green-500 bg-opacity-75 rounded-md hover:bg-green-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:bg-gray-500 disabled:bg-opacity-50 mt-2"
                 >
                   {isLoading ? "Verifying..." : "Verify OTP"}
                 </button>
@@ -320,13 +325,13 @@ function Login() {
                 placeholder="Email"
                 autoComplete="email"
                 aria-label="Email for password reset"
-                className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
             <button
               onClick={handleResetPassword}
               disabled={isLoading}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-yellow-500 rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 disabled:bg-gray-400 mt-2"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-yellow-500 bg-opacity-75 rounded-md hover:bg-yellow-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-400 disabled:bg-gray-500 disabled:bg-opacity-50 mt-2"
             >
               {isLoading ? "Sending..." : "Send Reset Email"}
             </button>
@@ -334,18 +339,18 @@ function Login() {
         )}
 
         {/* Switch links */}
-        <div className="text-xs text-center text-gray-500 mt-2 space-y-1">
+        <div className="text-xs text-center text-gray-300 mt-2 space-y-1"> {/* Changed text-gray-500 to text-gray-300 */}
           {!showPhone && !showReset && !isSignUp && (
             <>
               <button
-                className="text-green-600 hover:underline mr-2"
+                className="text-green-400 hover:text-green-300 hover:underline mr-2" // Adjusted green
                 onClick={() => setShowPhone(true)}
                 disabled={isLoading}
               >
                 Sign in with Phone
               </button>
               <button
-                className="text-yellow-600 hover:underline"
+                className="text-yellow-400 hover:text-yellow-300 hover:underline" // Adjusted yellow
                 onClick={() => setShowReset(true)}
                 disabled={isLoading}
               >
@@ -355,13 +360,14 @@ function Login() {
           )}
           {(showPhone || showReset) && (
             <button
-              className="text-indigo-600 hover:underline"
+              className="text-indigo-400 hover:text-indigo-300 hover:underline" // Adjusted indigo
               onClick={() => {
                 setShowPhone(false);
                 setShowReset(false);
                 setOtpSent(false);
                 setOtp("");
                 setError("");
+                setSuccessMessage("");
               }}
               disabled={isLoading}
             >
@@ -370,9 +376,9 @@ function Login() {
           )}
           {!showPhone && !showReset && (
             <div>
-              {isSignUp ? "Already have an account?" : "New user?"}{" "}
+              {isSignUp ? "Already have an account?" : "New user?"}{" "} {/* This text will inherit text-gray-300 from parent */}
               <button
-                className="text-indigo-600 hover:underline"
+                className="text-indigo-400 hover:text-indigo-300 hover:underline" // Adjusted indigo
                 onClick={() => setIsSignUp(s => !s)}
                 disabled={isLoading}
               >
