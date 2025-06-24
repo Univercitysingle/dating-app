@@ -5,6 +5,8 @@ import InterestsDisplay from "../components/InterestsDisplay";
 import InterestsEditor from "../components/InterestsEditor";
 import ProfilePromptsDisplay from "../components/ProfilePromptsDisplay";
 import ProfilePromptsEditor from "../components/ProfilePromptsEditor";
+import { useAuth } from '../context/AuthContext'; // Import useAuth
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import AudioBioPlayer from "../components/AudioBioPlayer";
 import AudioBioUpload from "../components/AudioBioUpload";
 import VideoBioSnippetPlayer from "../components/VideoBioSnippetPlayer";
@@ -27,6 +29,19 @@ function Profile() {
   const [editableEducation, setEditableEducation] = useState('');
   const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
   const [detailsSaveStatus, setDetailsSaveStatus] = useState('');
+
+  const { logout, user } = useAuth(); // Get logout function and user from context
+  const navigate = useNavigate(); // Initialize navigate
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login'); // Redirect to login page after logout
+    } catch (error) {
+      console.error("Failed to logout:", error);
+      // Optionally, display an error message to the user
+    }
+  };
 
   const fetchProfile = useCallback(() => {
     // apiClient handles token internally from localStorage if available
@@ -138,18 +153,26 @@ function Profile() {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">{profile.name}</h1>
-        <button
-          onClick={() => {
-            setIsEditing(!isEditing);
-            if (!isEditing && profile) { // Entering edit mode
-              setEditableEducation(profile.education || '');
-              setEditableRelationshipGoals(profile.relationshipGoals || '');
-            }
-          }}
-          className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md"
-        >
-          {isEditing ? "View Profile" : "Edit Profile"}
-        </button>
+        <div> {/* Container for buttons */}
+          <button
+            onClick={() => {
+              setIsEditing(!isEditing);
+              if (!isEditing && profile) { // Entering edit mode
+                setEditableEducation(profile.education || '');
+                setEditableRelationshipGoals(profile.relationshipGoals || '');
+              }
+            }}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md mr-2" // Added mr-2 for spacing
+          >
+            {isEditing ? "View Profile" : "Edit Profile"}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
