@@ -5,8 +5,8 @@ import InterestsDisplay from "../components/InterestsDisplay";
 import InterestsEditor from "../components/InterestsEditor";
 import ProfilePromptsDisplay from "../components/ProfilePromptsDisplay";
 import ProfilePromptsEditor from "../components/ProfilePromptsEditor";
-import { useAuth } from '../context/AuthContext'; // Import useAuth
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import AudioBioPlayer from "../components/AudioBioPlayer";
 import AudioBioUpload from "../components/AudioBioUpload";
 import VideoBioSnippetPlayer from "../components/VideoBioSnippetPlayer";
@@ -15,100 +15,99 @@ import PersonalityQuizDisplay from "../components/PersonalityQuizDisplay";
 import PersonalityQuizEditor from "../components/PersonalityQuizEditor";
 import SocialMediaLinksDisplay from "../components/SocialMediaLinksDisplay";
 import SocialMediaLinksEditor from "../components/SocialMediaLinksEditor";
-import apiClient from '../api/apiClient'; // Import apiClient
+import apiClient from '../api/apiClient';
 
 function Profile() {
   const [profile, setProfile] = useState(null);
-  const [mediaSaveStatus, setMediaSaveStatus] = useState(''); // For saving URL to profile
-  const [quizSaveStatus, setQuizSaveStatus] = useState(''); // For saving personality quiz
-  const [socialLinksSaveStatus, setSocialLinksSaveStatus] = useState(''); // For social media links
+  const [mediaSaveStatus, setMediaSaveStatus] = useState('');
+  const [quizSaveStatus, setQuizSaveStatus] = useState('');
+  const [socialLinksSaveStatus, setSocialLinksSaveStatus] = useState('');
+  const [detailsSaveStatus, setDetailsSaveStatus] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // States for directly editable fields
+  // Editable fields for inputs
   const [editableEducation, setEditableEducation] = useState('');
   const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
-  const [detailsSaveStatus, setDetailsSaveStatus] = useState('');
   const [editableAboutMe, setEditableAboutMe] = useState('');
-  const [aboutMeSaveStatus, setAboutMeSaveStatus] = useState('');
 
-  const { logout, user } = useAuth(); // Get logout function and user from context
-  const navigate = useNavigate(); // Initialize navigate
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
 
+  // Logout handler with redirect
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login'); // Redirect to login page after logout
+      navigate('/login');
     } catch (error) {
       console.error("Failed to logout:", error);
-      // Optionally, display an error message to the user
     }
   };
 
+  // Fetch user profile data
   const fetchProfile = useCallback(() => {
-    // apiClient handles token internally from localStorage if available
-    // No need to manually get user from localStorage here for the token
     apiClient.get("/api/users/me")
       .then(data => {
         setProfile(data);
         setEditableEducation(data.education || '');
         setEditableRelationshipGoals(data.relationshipGoals || '');
-        setEditableAboutMe(data.aboutMe || ''); // Initialize editableAboutMe
+        setEditableAboutMe(data.aboutMe || '');
         setFetchError(null);
       })
       .catch(error => {
         console.error("Error fetching profile:", error);
-        setFetchError(error.data?.message || error.message);
+        setFetchError(error.data?.message || error.message || "Failed to load profile");
         setProfile(null);
       });
   }, []);
 
+  // Initial fetch on mount
   useEffect(() => {
     fetchProfile();
-    // The editable fields (editableEducation, editableRelationshipGoals) are now primarily set
-    // in two places:
-    // 1. Directly within fetchProfile's .then() block after initial data load.
-    // 2. In the useEffect hook that depends on [isEditing, profile] for subsequent syncs.
-  }, [fetchProfile]); // fetchProfile is stable due to useCallback with empty deps.
+  }, [fetchProfile]);
 
-  const handleInterestsSaved = (updatedInterests) => {
-    setProfile(prevProfile => ({ ...prevProfile, interests: updatedInterests }));
-    // setIsEditing(false); // Keep editing mode if user wants to edit multiple sections
-  };
+  // Sync editable fields when entering edit mode or profile updates
+  useEffect(() => {
+    if (isEditing && profile) {
+      setEditableEducation(profile.education || '');
+      setEditableRelationshipGoals(profile.relationshipGoals || '');
+      setEditableAboutMe(profile.aboutMe || '');
+    }
+  }, [isEditing, profile]);
 
-  const handlePromptsSaved = (updatedPrompts) => {
-    setProfile(prevProfile => ({ ...prevProfile, profilePrompts: updatedPrompts }));
-    // setIsEditing(false);
-  };
-
-  const handleMediaUploadComplete = async (fileUrl, fieldName) => {
-    setMediaSaveStatus('Saving URL to profile...');
-    // apiClient handles token, but a general check for app readiness/auth context might still be useful
-    // For now, we assume apiClient handles absence of token gracefully (it does, by not sending Auth header)
+  // Save profile details (Education, Relationship Goals, About Me)
+  const handleDetailsSave = async () => {
+    setDetailsSaveStatus('Saving details...');
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", { [fieldName]: fileUrl });
+      const updatedProfile = await apiClient.put("/api/users/me", {
+        education: editableEducation,
+        relationshipGoals: editableRelationshipGoals,
+        aboutMe: editableAboutMe,
+      });
       setProfile(updatedProfile);
-      setMediaSaveStatus(`${fieldName} saved successfully!`);
-      setTimeout(() => setMediaSaveStatus(''), 3000);
+      setDetailsSaveStatus('Details saved successfully!');
+      setTimeout(() => setDetailsSaveStatus(''), 3000);
     } catch (error) {
-      console.error(`Error saving ${fieldName} URL:`, error);
-      setMediaSaveStatus(`Error: ${error.data?.message || error.message}`);
+      console.error('Error saving details:', error);
+      setDetailsSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
+  // Save personality quiz results
   const handlePersonalityQuizSave = async (newQuizResults) => {
-    setQuizSaveStatus('Saving personality type...');
+    setQuizSaveStatus('Saving personality quiz...');
     try {
       const updatedProfile = await apiClient.put("/api/users/me", { personalityQuizResults: newQuizResults });
       setProfile(updatedProfile);
-      setQuizSaveStatus('Personality type saved successfully!');
+      setQuizSaveStatus('Personality quiz saved successfully!');
       setTimeout(() => setQuizSaveStatus(''), 3000);
     } catch (error) {
-      console.error('Error saving personality type:', error);
+      console.error('Error saving personality quiz:', error);
       setQuizSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
+  // Save social media links
   const handleSocialMediaLinksSave = async (newLinksData) => {
     setSocialLinksSaveStatus('Saving social media links...');
     try {
@@ -122,59 +121,49 @@ function Profile() {
     }
   };
 
-  const handleDetailsSave = async () => {
-    setDetailsSaveStatus('Saving details...');
-    const detailsToUpdate = {
-      education: editableEducation,
-      relationshipGoals: editableRelationshipGoals,
-      aboutMe: editableAboutMe, // Add aboutMe to the payload
-    };
+  // Save media URLs (audio/video uploads)
+  const handleMediaUploadComplete = async (fileUrl, fieldName) => {
+    setMediaSaveStatus(`Saving ${fieldName}...`);
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", detailsToUpdate);
-      setProfile(updatedProfile); // Update local profile state with the full response
-      // Ensure editable fields are also updated if the backend modifies/confirms them
-      setEditableEducation(updatedProfile.education || '');
-      setEditableRelationshipGoals(updatedProfile.relationshipGoals || '');
-      setEditableAboutMe(updatedProfile.aboutMe || '');
-      setDetailsSaveStatus('Details and About Me saved successfully!');
-      setTimeout(() => setDetailsSaveStatus(''), 3000);
+      const updatedProfile = await apiClient.put("/api/users/me", { [fieldName]: fileUrl });
+      setProfile(updatedProfile);
+      setMediaSaveStatus(`${fieldName} saved successfully!`);
+      setTimeout(() => setMediaSaveStatus(''), 3000);
     } catch (error) {
-      console.error('Error saving details & About Me:', error);
-      setDetailsSaveStatus(`Error: ${error.data?.message || error.message}`);
+      console.error(`Error saving ${fieldName}:`, error);
+      setMediaSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
 
-  useEffect(() => {
-    if (isEditing && profile) {
-      setEditableEducation(profile.education || '');
-      setEditableRelationshipGoals(profile.relationshipGoals || '');
-       setEditableAboutMe(profile.aboutMe || ''); // Sync editableAboutMe when entering edit mode
-    }
-  }, [isEditing, profile]);
+  // Update profile interests after editing
+  const handleInterestsSaved = (updatedInterests) => {
+    setProfile(prev => ({ ...prev, interests: updatedInterests }));
+  };
 
+  // Update profile prompts after editing
+  const handlePromptsSaved = (updatedPrompts) => {
+    setProfile(prev => ({ ...prev, profilePrompts: updatedPrompts }));
+  };
 
+  // Handle fetch error display
   if (fetchError) {
     return <p className="text-red-500 p-4">Error: {fetchError}</p>;
   }
+  // Loading state
   if (!profile) return <p className="p-4">Loading profile...</p>;
 
   return (
     <div className="container mx-auto p-4">
+      {/* Header: Name, Age, Buttons */}
       <div className="flex justify-between items-center mb-6">
-        <div> {/* Container for Name and Age */}
+        <div>
           <h1 className="text-3xl font-bold inline">{profile.name}</h1>
           {profile.age && <span className="text-2xl ml-2">({profile.age})</span>}
         </div>
-        <div> {/* Container for buttons */}
+        <div>
           <button
-            onClick={() => {
-              setIsEditing(!isEditing);
-              if (!isEditing && profile) { // Entering edit mode
-                setEditableEducation(profile.education || '');
-                setEditableRelationshipGoals(profile.relationshipGoals || '');
-              }
-            }}
-            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md mr-2" // Added mr-2 for spacing
+            onClick={() => setIsEditing(!isEditing)}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md mr-2"
           >
             {isEditing ? "View Profile" : "Edit Profile"}
           </button>
@@ -187,11 +176,9 @@ function Profile() {
         </div>
       </div>
 
-      {/* Single column layout for all profile content */}
-      <div className="flex flex-col space-y-6"> {/* Replaced grid with flex column */}
-
-        {/* Primary Media Section (Video Bio Snippet) */}
-        <div>
+      <div className="flex flex-col space-y-6">
+        {/* Video Bio Snippet Section */}
+        <section>
           <h2 className="text-xl font-semibold mb-2">Profile Snippet</h2>
           {isEditing ? (
             <VideoBioSnippetUpload
@@ -201,108 +188,85 @@ function Profile() {
           ) : (
             <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />
           )}
-          {/* mediaSaveStatus for this specific upload can be shown here or consolidated */}
-        </div>
+        </section>
 
-        {/* About Me Section - View Mode */}
+        {/* About Me - View only */}
         {!isEditing && profile.aboutMe && (
-          <div>
+          <section>
             <h2 className="text-xl font-semibold mb-2">About Me</h2>
             <p className="text-gray-700 whitespace-pre-wrap">{profile.aboutMe}</p>
-          </div>
+          </section>
         )}
 
-        {/* Section 1: Details, Interests, Prompts, Other Media, Quiz, Social - formerly md:col-span-1 */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold">Details</h2>
-            {isEditing ? (
-              <>
-                <p>Name: {profile.name} (Display only for now)</p>
-                <p>Age: {profile.age || "N/A"} (Display only for now)</p>
-                {/* Education Input */}
-                <div className="my-2">
-                  <label htmlFor="education" className="block text-sm font-medium text-gray-700">Education</label>
-                  <input
-                    type="text"
-                    name="education"
-                    id="education"
-                    value={editableEducation}
-                    onChange={(e) => setEditableEducation(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                {/* Relationship Goals Input */}
-                <div className="my-2">
-                  <label htmlFor="relationshipGoals" className="block text-sm font-medium text-gray-700">Relationship Goals</label>
-                  <input
-                    type="text"
-                    name="relationshipGoals"
-                    id="relationshipGoals"
-                    value={editableRelationshipGoals}
-                    onChange={(e) => setEditableRelationshipGoals(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                {/* About Me Input */}
-                <div className="my-2">
-                  <label htmlFor="aboutMe" className="block text-sm font-medium text-gray-700">About Me (Max 200 words)</label>
-                  <textarea
-                    name="aboutMe"
-                    id="aboutMe"
-                    rows="5"
-                    value={editableAboutMe}
-                    onChange={(e) => {
-                      const newText = e.target.value;
-                      const words = newText.split(/\s+/).filter(Boolean);
-                      if (words.length > 200) {
-                        const truncatedText = words.slice(0, 200).join(" ");
-                        setEditableAboutMe(truncatedText);
-                      } else {
-                        setEditableAboutMe(newText);
-                      }
-                    }}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Words: {editableAboutMe.split(/\s+/).filter(Boolean).length} / 200
-                  </p>
-                </div>
-                <button
-                  onClick={handleDetailsSave} // This button now effectively saves Education, Relationship Goals, and About Me if we combine save logic
-                  className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm"
-                >
-                  Save Details & About Me
-                </button>
-                {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
-                {/* We will need a separate save status for aboutMe or combine them */}
-              </>
-            ) : (
-              <div className="mt-2 space-y-2">
-                <div>
-                  <span className="font-medium text-gray-600">Gender: </span>
-                  <span>{profile.gender || "N/A"}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Preference: </span>
-                  <span>{profile.preference || "N/A"}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Email: </span>
-                  <span>{profile.email}</span> {/* Assuming email is always present for a logged-in user */}
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Education: </span>
-                  <span>{profile.education || "N/A"}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-600">Relationship Goals: </span>
-                  <span>{profile.relationshipGoals || "N/A"}</span>
-                </div>
+        {/* Details Section */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">Details</h2>
+          {isEditing ? (
+            <>
+              <p>Name: {profile.name} (readonly)</p>
+              <p>Age: {profile.age || "N/A"} (readonly)</p>
+              <div className="my-2">
+                <label htmlFor="education" className="block text-sm font-medium text-gray-700">Education</label>
+                <input
+                  id="education"
+                  type="text"
+                  value={editableEducation}
+                  onChange={e => setEditableEducation(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
               </div>
-            )}
-          </div>
-           {/* Keep other editors separate as they are more complex */}
+              <div className="my-2">
+                <label htmlFor="relationshipGoals" className="block text-sm font-medium text-gray-700">Relationship Goals</label>
+                <input
+                  id="relationshipGoals"
+                  type="text"
+                  value={editableRelationshipGoals}
+                  onChange={e => setEditableRelationshipGoals(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="my-2">
+                <label htmlFor="aboutMe" className="block text-sm font-medium text-gray-700">About Me (Max 200 words)</label>
+                <textarea
+                  id="aboutMe"
+                  rows={5}
+                  value={editableAboutMe}
+                  onChange={e => {
+                    const newText = e.target.value;
+                    const words = newText.trim().split(/\s+/);
+                    if (words.length > 200) {
+                      setEditableAboutMe(words.slice(0, 200).join(' '));
+                    } else {
+                      setEditableAboutMe(newText);
+                    }
+                  }}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Words: {editableAboutMe.trim().split(/\s+/).filter(Boolean).length} / 200
+                </p>
+              </div>
+              <button
+                onClick={handleDetailsSave}
+                className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm"
+              >
+                Save Details & About Me
+              </button>
+              {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
+            </>
+          ) : (
+            <div className="mt-2 space-y-2">
+              <div><strong>Gender:</strong> {profile.gender || "N/A"}</div>
+              <div><strong>Preference:</strong> {profile.preference || "N/A"}</div>
+              <div><strong>Email:</strong> {profile.email}</div>
+              <div><strong>Education:</strong> {profile.education || "N/A"}</div>
+              <div><strong>Relationship Goals:</strong> {profile.relationshipGoals || "N/A"}</div>
+            </div>
+          )}
+        </section>
+
+        {/* Interests */}
+        <section>
           {isEditing ? (
             <InterestsEditor
               initialInterests={profile.interests || []}
@@ -311,7 +275,10 @@ function Profile() {
           ) : (
             <InterestsDisplay interests={profile.interests || []} />
           )}
+        </section>
 
+        {/* Profile Prompts */}
+        <section>
           {isEditing ? (
             <ProfilePromptsEditor
               initialPrompts={profile.profilePrompts || []}
@@ -320,22 +287,24 @@ function Profile() {
           ) : (
             <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
           )}
+        </section>
 
-          {/* Other Media Players and Uploaders (Audio Bio) */}
-          <div>
-            <h2 className="text-xl font-semibold mb-2 mt-4">Audio Bio</h2> {/* Consistent title styling */}
-            {isEditing ? (
-              <AudioBioUpload
-                currentAudioUrl={profile.audioBioUrl || ''}
-                onUploadComplete={handleMediaUploadComplete}
-              />
-            ) : (
-              <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
-            )}
-          </div>
+        {/* Audio Bio */}
+        <section>
+          <h2 className="text-xl font-semibold mb-2 mt-4">Audio Bio</h2>
+          {isEditing ? (
+            <AudioBioUpload
+              currentAudioUrl={profile.audioBioUrl || ''}
+              onUploadComplete={handleMediaUploadComplete}
+            />
+          ) : (
+            <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
+          )}
           {mediaSaveStatus && <p className="text-sm text-gray-600 mt-2">{mediaSaveStatus}</p>}
+        </section>
 
-          {/* Personality Quiz Display and Editor */}
+        {/* Personality Quiz */}
+        <section>
           {isEditing ? (
             <PersonalityQuizEditor
               currentQuizResults={profile.personalityQuizResults || {}}
@@ -346,34 +315,35 @@ function Profile() {
           ) : (
             <PersonalityQuizDisplay quizResults={profile.personalityQuizResults || {}} />
           )}
+        </section>
 
-          {/* Social Media Links Display and Editor */}
+        {/* Social Media Links */}
+        <section>
           {isEditing ? (
             <SocialMediaLinksEditor
-              currentLinks={profile.socialMediaLinks || {}} // Pass as object, editor handles Map conversion
+              initialLinks={profile.socialMediaLinks || {}}
               onSave={handleSocialMediaLinksSave}
-              statusMessage={socialLinksSaveStatus}
-              setStatusMessage={setSocialLinksSaveStatus}
+              saveStatus={socialLinksSaveStatus}
+              setSaveStatus={setSocialLinksSaveStatus}
             />
           ) : (
             <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />
           )}
-        </div>
+        </section>
 
-        {/* Section 2: Profile Video, Premium Features - formerly md:col-span-2 */}
-        <div className="space-y-6"> {/* This div can maintain its own internal spacing if needed */}
-          <div>
-            <h2 className="text-xl font-semibold">Profile Video</h2>
-            <VideoProfileUpload />
-          </div>
-          {profile.plan === "premium" && (
-            <div>
-              <h2 className="text-xl font-semibold">Premium Feature</h2>
-              <VideoCall />
-            </div>
-          )}
-          {/* Other new profile sections will go here */}
-        </div>
+        {/* Video Profile Upload */}
+        <section className="mt-4">
+          <h2 className="text-xl font-semibold mb-2">Video Profile</h2>
+          <VideoProfileUpload
+            currentVideoUrl={profile.videoProfileUrl || ''}
+            onUploadComplete={handleMediaUploadComplete}
+          />
+        </section>
+
+        {/* Video Call - Optional */}
+        <section className="mt-4">
+          <VideoCall />
+        </section>
       </div>
     </div>
   );
