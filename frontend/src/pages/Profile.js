@@ -29,6 +29,8 @@ function Profile() {
   const [editableEducation, setEditableEducation] = useState('');
   const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
   const [detailsSaveStatus, setDetailsSaveStatus] = useState('');
+  const [editableAboutMe, setEditableAboutMe] = useState('');
+  const [aboutMeSaveStatus, setAboutMeSaveStatus] = useState('');
 
   const { logout, user } = useAuth(); // Get logout function and user from context
   const navigate = useNavigate(); // Initialize navigate
@@ -51,6 +53,7 @@ function Profile() {
         setProfile(data);
         setEditableEducation(data.education || '');
         setEditableRelationshipGoals(data.relationshipGoals || '');
+        setEditableAboutMe(data.aboutMe || ''); // Initialize editableAboutMe
         setFetchError(null);
       })
       .catch(error => {
@@ -124,14 +127,19 @@ function Profile() {
     const detailsToUpdate = {
       education: editableEducation,
       relationshipGoals: editableRelationshipGoals,
+      aboutMe: editableAboutMe, // Add aboutMe to the payload
     };
     try {
       const updatedProfile = await apiClient.put("/api/users/me", detailsToUpdate);
-      setProfile(updatedProfile);
-      setDetailsSaveStatus('Details saved successfully!');
+      setProfile(updatedProfile); // Update local profile state with the full response
+      // Ensure editable fields are also updated if the backend modifies/confirms them
+      setEditableEducation(updatedProfile.education || '');
+      setEditableRelationshipGoals(updatedProfile.relationshipGoals || '');
+      setEditableAboutMe(updatedProfile.aboutMe || '');
+      setDetailsSaveStatus('Details and About Me saved successfully!');
       setTimeout(() => setDetailsSaveStatus(''), 3000);
     } catch (error) {
-      console.error('Error saving details:', error);
+      console.error('Error saving details & About Me:', error);
       setDetailsSaveStatus(`Error: ${error.data?.message || error.message}`);
     }
   };
@@ -140,6 +148,7 @@ function Profile() {
     if (isEditing && profile) {
       setEditableEducation(profile.education || '');
       setEditableRelationshipGoals(profile.relationshipGoals || '');
+       setEditableAboutMe(profile.aboutMe || ''); // Sync editableAboutMe when entering edit mode
     }
   }, [isEditing, profile]);
 
@@ -195,6 +204,14 @@ function Profile() {
           {/* mediaSaveStatus for this specific upload can be shown here or consolidated */}
         </div>
 
+        {/* About Me Section - View Mode */}
+        {!isEditing && profile.aboutMe && (
+          <div>
+            <h2 className="text-xl font-semibold mb-2">About Me</h2>
+            <p className="text-gray-700 whitespace-pre-wrap">{profile.aboutMe}</p>
+          </div>
+        )}
+
         {/* Section 1: Details, Interests, Prompts, Other Media, Quiz, Social - formerly md:col-span-1 */}
         <div className="space-y-4">
           <div>
@@ -227,13 +244,38 @@ function Profile() {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   />
                 </div>
+                {/* About Me Input */}
+                <div className="my-2">
+                  <label htmlFor="aboutMe" className="block text-sm font-medium text-gray-700">About Me (Max 200 words)</label>
+                  <textarea
+                    name="aboutMe"
+                    id="aboutMe"
+                    rows="5"
+                    value={editableAboutMe}
+                    onChange={(e) => {
+                      const newText = e.target.value;
+                      const words = newText.split(/\s+/).filter(Boolean);
+                      if (words.length > 200) {
+                        const truncatedText = words.slice(0, 200).join(" ");
+                        setEditableAboutMe(truncatedText);
+                      } else {
+                        setEditableAboutMe(newText);
+                      }
+                    }}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Words: {editableAboutMe.split(/\s+/).filter(Boolean).length} / 200
+                  </p>
+                </div>
                 <button
-                  onClick={handleDetailsSave}
+                  onClick={handleDetailsSave} // This button now effectively saves Education, Relationship Goals, and About Me if we combine save logic
                   className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm"
                 >
-                  Save Details
+                  Save Details & About Me
                 </button>
                 {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
+                {/* We will need a separate save status for aboutMe or combine them */}
               </>
             ) : (
               <div className="mt-2 space-y-2">
