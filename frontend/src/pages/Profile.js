@@ -1,3 +1,4 @@
+profile_component_code = """
 import React, { useEffect, useState, useCallback } from "react";
 import VideoProfileUpload from "../components/VideoProfileUpload";
 import VideoCall from "../components/VideoCall";
@@ -17,6 +18,30 @@ import SocialMediaLinksDisplay from "../components/SocialMediaLinksDisplay";
 import SocialMediaLinksEditor from "../components/SocialMediaLinksEditor";
 import apiClient from '../api/apiClient';
 
+// Badge components
+const PremiumBadge = () => (
+  <span className="ml-3 px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-300 rounded-full">
+    Premium
+  </span>
+);
+
+const VerifiedBadge = () => (
+  <span className="ml-3 px-2 py-1 text-xs font-semibold text-green-800 bg-green-300 rounded-full flex items-center">
+    <svg
+      className="w-4 h-4 mr-1"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+    Verified
+  </span>
+);
+
 function Profile() {
   const [profile, setProfile] = useState(null);
   const [mediaSaveStatus, setMediaSaveStatus] = useState('');
@@ -26,7 +51,6 @@ function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Editable fields for inputs
   const [editableEducation, setEditableEducation] = useState('');
   const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
   const [editableAboutMe, setEditableAboutMe] = useState('');
@@ -34,7 +58,6 @@ function Profile() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
 
-  // Logout handler with redirect
   const handleLogout = async () => {
     try {
       await logout();
@@ -44,7 +67,6 @@ function Profile() {
     }
   };
 
-  // Fetch user profile data
   const fetchProfile = useCallback(() => {
     apiClient.get("/api/users/me")
       .then(data => {
@@ -61,12 +83,10 @@ function Profile() {
       });
   }, []);
 
-  // Initial fetch on mount
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
 
-  // Sync editable fields when entering edit mode or profile updates
   useEffect(() => {
     if (isEditing && profile) {
       setEditableEducation(profile.education || '');
@@ -75,7 +95,6 @@ function Profile() {
     }
   }, [isEditing, profile]);
 
-  // Save profile details (Education, Relationship Goals, About Me)
   const handleDetailsSave = async () => {
     setDetailsSaveStatus('Saving details...');
     try {
@@ -93,7 +112,6 @@ function Profile() {
     }
   };
 
-  // Save personality quiz results
   const handlePersonalityQuizSave = async (newQuizResults) => {
     setQuizSaveStatus('Saving personality quiz...');
     try {
@@ -107,7 +125,6 @@ function Profile() {
     }
   };
 
-  // Save social media links
   const handleSocialMediaLinksSave = async (newLinksData) => {
     setSocialLinksSaveStatus('Saving social media links...');
     try {
@@ -121,7 +138,6 @@ function Profile() {
     }
   };
 
-  // Save media URLs (audio/video uploads)
   const handleMediaUploadComplete = async (fileUrl, fieldName) => {
     setMediaSaveStatus(`Saving ${fieldName}...`);
     try {
@@ -135,30 +151,31 @@ function Profile() {
     }
   };
 
-  // Update profile interests after editing
   const handleInterestsSaved = (updatedInterests) => {
     setProfile(prev => ({ ...prev, interests: updatedInterests }));
   };
 
-  // Update profile prompts after editing
   const handlePromptsSaved = (updatedPrompts) => {
     setProfile(prev => ({ ...prev, profilePrompts: updatedPrompts }));
   };
 
-  // Handle fetch error display
   if (fetchError) {
     return <p className="text-red-500 p-4">Error: {fetchError}</p>;
   }
-  // Loading state
   if (!profile) return <p className="p-4">Loading profile...</p>;
+
+  // Determine user tier and verification for badges
+  const isPremium = profile.tier === 'premium';
+  const isVerified = profile.isVerified === true;
 
   return (
     <div className="container mx-auto p-4">
-      {/* Header: Name, Age, Buttons */}
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold inline">{profile.name}</h1>
+        <div className="flex items-center">
+          <h1 className="text-3xl font-bold">{profile.name}</h1>
           {profile.age && <span className="text-2xl ml-2">({profile.age})</span>}
+          {isPremium && <PremiumBadge />}
+          {isVerified && <VerifiedBadge />}
         </div>
         <div>
           <button
@@ -177,7 +194,6 @@ function Profile() {
       </div>
 
       <div className="flex flex-col space-y-6">
-        {/* Video Bio Snippet Section */}
         <section>
           <h2 className="text-xl font-semibold mb-2">Profile Snippet</h2>
           {isEditing ? (
@@ -190,7 +206,6 @@ function Profile() {
           )}
         </section>
 
-        {/* About Me - View only */}
         {!isEditing && profile.aboutMe && (
           <section>
             <h2 className="text-xl font-semibold mb-2">About Me</h2>
@@ -198,7 +213,6 @@ function Profile() {
           </section>
         )}
 
-        {/* Details Section */}
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">Details</h2>
           {isEditing ? (
@@ -233,7 +247,7 @@ function Profile() {
                   value={editableAboutMe}
                   onChange={e => {
                     const newText = e.target.value;
-                    const words = newText.trim().split(/\s+/);
+                    const words = newText.trim().split(/\\s+/);
                     if (words.length > 200) {
                       setEditableAboutMe(words.slice(0, 200).join(' '));
                     } else {
@@ -243,7 +257,7 @@ function Profile() {
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Words: {editableAboutMe.trim().split(/\s+/).filter(Boolean).length} / 200
+                  Words: {editableAboutMe.trim().split(/\\s+/).filter(Boolean).length} / 200
                 </p>
               </div>
               <button
@@ -265,7 +279,6 @@ function Profile() {
           )}
         </section>
 
-        {/* Interests */}
         <section>
           {isEditing ? (
             <InterestsEditor
@@ -277,7 +290,6 @@ function Profile() {
           )}
         </section>
 
-        {/* Profile Prompts */}
         <section>
           {isEditing ? (
             <ProfilePromptsEditor
@@ -289,7 +301,6 @@ function Profile() {
           )}
         </section>
 
-        {/* Audio Bio */}
         <section>
           <h2 className="text-xl font-semibold mb-2 mt-4">Audio Bio</h2>
           {isEditing ? (
@@ -303,7 +314,6 @@ function Profile() {
           {mediaSaveStatus && <p className="text-sm text-gray-600 mt-2">{mediaSaveStatus}</p>}
         </section>
 
-        {/* Personality Quiz */}
         <section>
           {isEditing ? (
             <PersonalityQuizEditor
@@ -317,7 +327,6 @@ function Profile() {
           )}
         </section>
 
-        {/* Social Media Links */}
         <section>
           {isEditing ? (
             <SocialMediaLinksEditor
@@ -331,7 +340,6 @@ function Profile() {
           )}
         </section>
 
-        {/* Video Profile Upload */}
         <section className="mt-4">
           <h2 className="text-xl font-semibold mb-2">Video Profile</h2>
           <VideoProfileUpload
@@ -340,7 +348,6 @@ function Profile() {
           />
         </section>
 
-        {/* Video Call - Optional */}
         <section className="mt-4">
           <VideoCall />
         </section>
@@ -350,3 +357,10 @@ function Profile() {
 }
 
 export default Profile;
+"""
+
+path = "/mnt/data/Profile.jsx"
+with open(path, "w") as file:
+    file.write(profile_component_code)
+
+path
