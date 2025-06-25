@@ -54,8 +54,128 @@ function Profile() {
   const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
   const [editableAboutMe, setEditableAboutMe] = useState('');
 
+  // States for image gallery
+  const [profileImages, setProfileImages] = useState([]); // Stores S3 URLs from profile.images
+  const [selectedFiles, setSelectedFiles] = useState([]); // Files selected for upload
+  const [imagePreviews, setImagePreviews] = useState([]); // ObjectURLs for previewing selectedFiles
+  const [imageUploadStatus, setImageUploadStatus] = useState('');
+
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const MAX_PROFILE_IMAGES = 5; // As per guide: "Upload photos to S3 (max 5)"
+
+  const handleFileSelect = (event) => {
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+
+    const currentTotalImages = profileImages.length + selectedFiles.length;
+    const remainingSlots = MAX_PROFILE_IMAGES - currentTotalImages;
+
+    if (remainingSlots <= 0) {
+      setImageUploadStatus(`You can upload a maximum of ${MAX_PROFILE_IMAGES} images.`);
+      return;
+    }
+
+    const newFiles = files.slice(0, remainingSlots);
+    const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+
+    setSelectedFiles(prev => [...prev, ...newFiles]);
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+    setImageUploadStatus(`${newFiles.length} image(s) selected. ${MAX_PROFILE_IMAGES - (currentTotalImages + newFiles.length)} slots remaining.`);
+    event.target.value = null; // Reset file input
+  };
+
+  const removeSelectedFile = (indexToRemove) => {
+    URL.revokeObjectURL(imagePreviews[indexToRemove]); // Clean up object URL
+    setSelectedFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+    setImagePreviews(prev => prev.filter((_, index) => index !== indexToRemove));
+    const currentTotalImages = profileImages.length + selectedFiles.length -1;
+    setImageUploadStatus(`${MAX_PROFILE_IMAGES - currentTotalImages} slots remaining.`);
+  };
+
+  // This function will modify profileImages state directly.
+  // The actual save/API call will persist this modified list.
+  const removeProfileImage = (indexToRemove) => {
+    setProfileImages(prev => prev.filter((_, index) => index !== indexToRemove));
+    const currentTotalImages = profileImages.length -1 + selectedFiles.length;
+    setImageUploadStatus(`${MAX_PROFILE_IMAGES - currentTotalImages} slots remaining.`);
+     // TODO: Later, when saving, this modified profileImages array will be sent to backend.
+     // Backend would then know which images are kept. S3 object deletion is a separate concern.
+  };
+
+  const getPresignedS3Url = async (file) => {
+    try {
+      const response = await apiClient.post("/api/s3/upload-url", {
+        fileName: file.name,
+        fileType: file.type,
+      });
+      return response.url; // Assuming response is { url: "..." }
+    } catch (error) {
+      console.error("Error getting presigned URL:", error);
+      throw error; // Re-throw to be caught by caller
+    }
+  };
+
+  const handleSaveImages = async () => {
+    if (selectedFiles.length === 0 && profileImages.length === (profile.images ? profile.images.length : 0)) {
+      // No new files to upload and no existing images removed (client-side)
+      setImageUploadStatus("No changes to save.");
+      setTimeout(() => setImageUploadStatus(''), 3000);
+      return;
+    }
+
+    setIsLoading(true); // Consider a specific isLoading for image uploads if needed
+    setImageUploadStatus("Uploading images...");
+
+    const uploadedImageUrls = [];
+    try {
+      for (const file of selectedFiles) {
+        const presignedUrl = await getPresignedS3Url(file);
+        const imageUrl = await uploadFileToS3(presignedUrl, file);
+        uploadedImageUrls.push(imageUrl);
+      }
+
+      // Current profileImages state already reflects any client-side removals.
+      // Combine them with newly uploaded URLs.
+      const finalImageUrls = [...profileImages, ...uploadedImageUrls].slice(0, MAX_PROFILE_IMAGES);
+
+      // Update backend
+      const updatedProfile = await apiClient.put("/api/users/me", { images: finalImageUrls });
+
+      setProfile(updatedProfile); // Update full profile state
+      setProfileImages(updatedProfile.images || []); // Re-sync from backend response
+      setSelectedFiles([]);
+      setImagePreviews(prev => { // Clean up ObjectURLs for previews that were uploaded
+        prev.forEach(url => URL.revokeObjectURL(url));
+        return [];
+      });
+      setImageUploadStatus("Images saved successfully!");
+
+    } catch (error) {
+      console.error("Error saving images:", error);
+      setImageUploadStatus(`Error saving images: ${error.message || 'Please try again.'}`);
+    } finally {
+      setIsLoading(false); // Reset general loading state
+      setTimeout(() => setImageUploadStatus(''), 5000); // Keep status a bit longer for errors
+    }
+  };
+
+  const uploadFileToS3 = async (presignedUrl, file) => {
+    try {
+      await fetch(presignedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+      return presignedUrl.split("?")[0]; // Return the base URL
+    } catch (error) {
+      console.error("Error uploading file to S3:", error);
+      throw error; // Re-throw to be caught by caller
+    }
+  };
+
 
   const handleLogout = async () => {
     try {
@@ -73,6 +193,7 @@ function Profile() {
         setEditableEducation(data.education || '');
         setEditableRelationshipGoals(data.relationshipGoals || '');
         setEditableAboutMe(data.aboutMe || '');
+        setProfileImages(data.images || []); // Initialize profileImages
         setFetchError(null);
       })
       .catch(error => {
@@ -91,8 +212,27 @@ function Profile() {
       setEditableEducation(profile.education || '');
       setEditableRelationshipGoals(profile.relationshipGoals || '');
       setEditableAboutMe(profile.aboutMe || '');
+      // When entering edit mode, ensure profileImages is synced from the latest profile data.
+      // Also clear any pending selections if the user toggles edit mode off and on.
+      setProfileImages(profile.images || []);
+      setSelectedFiles([]);
+      setImagePreviews([]);
+      setImageUploadStatus('');
+    } else {
+      // When exiting edit mode (or on unmount if was in edit mode), clear selections and previews, and revoke ObjectURLs
+      imagePreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke existing previews
+      setSelectedFiles([]);
+      setImagePreviews([]);
+      setImageUploadStatus('');
     }
-  }, [isEditing, profile]);
+
+    // Cleanup function for when the component unmounts or isEditing/profile changes
+    return () => {
+      if (isEditing) { // Only if it was in edit mode, previews might exist
+        imagePreviews.forEach(url => URL.revokeObjectURL(url));
+      }
+    };
+  }, [isEditing, profile]); // imagePreviews is not in dependency array to avoid loop with its own cleanup
 
   const handleDetailsSave = async () => {
     setDetailsSaveStatus('Saving details...');
@@ -189,38 +329,136 @@ function Profile() {
       </div>
 
       <div className="flex flex-col space-y-6">
-        {/* Hero Media Section (Video Bio Snippet) */}
-        <section className="relative w-full bg-gray-800 rounded-lg overflow-hidden shadow-lg" style={{ paddingTop: '56.25%' /* 16:9 Aspect Ratio */ }}>
-          <div className="absolute inset-0">
-            {isEditing ? (
-              <div className="w-full h-full flex items-center justify-center bg-gray-700"> {/* Added bg for uploader contrast */}
-                <VideoBioSnippetUpload
-                  currentVideoUrl={profile.videoBioUrl || ''}
-                  onUploadComplete={handleMediaUploadComplete}
+        {/* Image Gallery / Hero Section */}
+        <section className="relative w-full bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden shadow-lg">
+          {/* Main Image Display */}
+          <div className="relative w-full bg-gray-300 dark:bg-gray-700" style={{ paddingTop: '133.33%' /* 3:4 Aspect Ratio */ }}>
+            <div className="absolute inset-0">
+              {!isEditing && profileImages && profileImages.length > 0 ? (
+                <img
+                  src={profileImages[0]}
+                  alt={`${profile.name}'s primary profile visual`}
+                  className="w-full h-full object-cover"
                 />
-              </div>
-            ) : (
-              profile.videoBioUrl ? (
-                <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl} />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-700">
-                  <p className="text-white text-lg">No video snippet uploaded.</p>
+              ) : !isEditing ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <p className="text-gray-500 dark:text-gray-400">No photos yet.</p>
                 </div>
-              )
-            )}
-          </div>
-          {/* Overlay for Name, Age, and Badges */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-white">{profile.name}</h1> {/* Removed text-shadow for now, gradient should suffice */}
-              {profile.age && <span className="text-xl ml-2 text-gray-200">({profile.age})</span>}
-            </div>
-            <div className="flex items-center mt-1">
-              {isPremium && <PremiumBadge />} {/* Review badge styling for overlay if needed */}
-              {isVerified && <VerifiedBadge />} {/* Review badge styling for overlay if needed */}
+              ) : null /* Placeholder for image upload UI in edit mode */}
             </div>
           </div>
+
+          {/* Thumbnails/Placeholders for other images - View Mode Only */}
+          {!isEditing && (
+            <div className="absolute bottom-16 left-0 right-0 p-2"> {/* Positioned above the Name/Age overlay */}
+              <div className="flex justify-center space-x-2">
+                {Array.from({ length: MAX_PROFILE_IMAGES }).map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-10 h-10 rounded-md overflow-hidden border-2 ${index === 0 && profileImages.length > 0 ? 'border-white' : 'border-transparent'} bg-gray-400 dark:bg-gray-600`}
+                  >
+                    {profileImages && profileImages[index] ? (
+                      <img src={profileImages[index]} alt={`Thumb ${index + 1}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-white"> {/* Placeholder for empty slot */}
+                        {index + 1}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Overlay for Name, Age, and Badges - View Mode Only */}
+          {!isEditing && (
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+              <div className="flex items-center">
+                <h1 className="text-2xl font-bold text-white">{profile.name}</h1>
+                {profile.age && <span className="text-xl ml-2 text-gray-200">({profile.age})</span>}
+              </div>
+              <div className="flex items-center mt-1">
+                {isPremium && <PremiumBadge />}
+                {isVerified && <VerifiedBadge />}
+              </div>
+            </div>
+          )}
+           {/* Image Uploader UI - Edit Mode Only */}
+           {isEditing && (
+            <div className="absolute inset-0 p-4 bg-gray-700 bg-opacity-90 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-4">
+                {/* Display existing profile images with remove button */}
+                {profileImages.map((url, index) => (
+                  <div key={`existing-${index}`} className="relative group">
+                    <img src={url} alt={`Profile ${index + 1}`} className="w-full h-32 object-cover rounded-md" />
+                    <button
+                      onClick={() => removeProfileImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Remove image"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                {/* Display previews of newly selected files with remove button */}
+                {imagePreviews.map((previewUrl, index) => (
+                  <div key={`preview-${index}`} className="relative group">
+                    <img src={previewUrl} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded-md" />
+                    <button
+                      onClick={() => removeSelectedFile(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Remove selected image"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                {/* Placeholder/Add button for remaining slots */}
+                {(profileImages.length + selectedFiles.length) < MAX_PROFILE_IMAGES && ( // Use selectedFiles.length here
+                  <label htmlFor="imageUpload" className="w-full h-32 bg-gray-600 rounded-md flex items-center justify-center cursor-pointer hover:bg-gray-500">
+                    <span className="text-gray-300 text-2xl">+</span>
+                    <input
+                      id="imageUpload"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                  </label>
+                )}
+              </div>
+              {imageUploadStatus && <p className="text-center text-sm text-yellow-400 mt-3">{imageUploadStatus}</p>}
+              {(selectedFiles.length > 0 || profileImages.length !== (profile.images ? profile.images.length : 0)) && (
+                <button
+                  onClick={handleSaveImages}
+                  disabled={isLoading}
+                  className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md disabled:bg-gray-400"
+                >
+                  {isLoading ? "Saving..." : "Save Photos"}
+                </button>
+              )}
+            </div>
+          )}
         </section>
+
+        {/* Conditional rendering for VideoBioSnippet if it's a separate feature now */}
+        {profile.videoBioUrl && !isEditing && (
+          <section>
+            <h2 className="text-xl font-semibold mb-2">Profile Snippet</h2>
+            <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl} />
+          </section>
+        )}
+        {isEditing && ( // Show uploader for video snippet in edit mode if it's a separate field
+           <section>
+             <h2 className="text-xl font-semibold mb-2">Profile Snippet</h2>
+             <VideoBioSnippetUpload
+                currentVideoUrl={profile.videoBioUrl || ''}
+                onUploadComplete={handleMediaUploadComplete}
+             />
+           </section>
+        )}
+
 
         {!isEditing && profile.aboutMe && (
           <section>
