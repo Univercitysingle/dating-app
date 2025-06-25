@@ -54,29 +54,21 @@ function Profile() {
   const [editableEducation, setEditableEducation] = useState('');
   const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
   const [editableAboutMe, setEditableAboutMe] = useState('');
-  const [heroMediaSaveStatus, setHeroMediaSaveStatus] = useState(''); // For the new HeroCaptureSection
+  const [heroMediaSaveStatus, setHeroMediaSaveStatus] = useState('');
 
   const { logout, user } = useAuth();
   const navigate = useNavigate();
 
-  // Note: All states and handlers for the *previous* multi-image gallery concept have been removed.
-  // This component will now rely on HeroCaptureSection for its primary media management.
-
   const handleHeroMediaUploadComplete = async (mediaUrl) => {
     setHeroMediaSaveStatus("Saving hero media...");
-    // Assuming 'isLoading' can be used generally, or add a specific one for hero media
-    // setIsLoading(true);
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", { heroMediaUrl: mediaUrl }); // Assumes backend field is heroMediaUrl
-      setProfile(updatedProfile); // Update full profile
+      const updatedProfile = await apiClient.put("/api/users/me", { heroMediaUrl: mediaUrl });
+      setProfile(updatedProfile);
       setHeroMediaSaveStatus("Hero media saved successfully!");
       setTimeout(() => setHeroMediaSaveStatus(''), 3000);
     } catch (error) {
       console.error("Error saving hero media:", error);
       setHeroMediaSaveStatus(`Error: ${error.data?.message || error.message || "Failed to save hero media."}`);
-      // setTimeout(() => setHeroMediaSaveStatus(''), 5000); // Keep error longer
-    } finally {
-      // setIsLoading(false);
     }
   };
 
@@ -96,7 +88,7 @@ function Profile() {
         setEditableEducation(data.education || '');
         setEditableRelationshipGoals(data.relationshipGoals || '');
         setEditableAboutMe(data.aboutMe || '');
-        setProfileImages(data.images || []); // Initialize profileImages
+        // Corrected: Removed setProfileImages as it's no longer used
         setFetchError(null);
       })
       .catch(error => {
@@ -115,27 +107,18 @@ function Profile() {
       setEditableEducation(profile.education || '');
       setEditableRelationshipGoals(profile.relationshipGoals || '');
       setEditableAboutMe(profile.aboutMe || '');
-      // When entering edit mode, ensure profileImages is synced from the latest profile data.
-      // Also clear any pending selections if the user toggles edit mode off and on.
-      setProfileImages(profile.images || []);
-      setSelectedFiles([]);
-      setImagePreviews([]);
-      setImageUploadStatus('');
+      // Corrected: All references to removed states (profileImages, selectedFiles, imagePreviews, imageUploadStatus)
+      // and their setters are removed from this hook.
+      // HeroCaptureSection manages its own media state.
     } else {
-      // When exiting edit mode (or on unmount if was in edit mode), clear selections and previews, and revoke ObjectURLs
-      imagePreviews.forEach(url => URL.revokeObjectURL(url)); // Revoke existing previews
-      setSelectedFiles([]);
-      setImagePreviews([]);
-      setImageUploadStatus('');
+      // When exiting edit mode. No specific cleanup needed here for HeroCaptureSection's internal state
+      // or for the removed multi-image gallery states.
     }
 
-    // Cleanup function for when the component unmounts or isEditing/profile changes
-    return () => {
-      if (isEditing) { // Only if it was in edit mode, previews might exist
-        imagePreviews.forEach(url => URL.revokeObjectURL(url));
-      }
-    };
-  }, [isEditing, profile]); // imagePreviews is not in dependency array to avoid loop with its own cleanup
+    // Corrected: Cleanup function is now empty as no Profile.js managed states need specific cleanup here.
+    // HeroCaptureSection handles its own internal cleanup (e.g., stopping camera stream).
+    return () => {};
+  }, [isEditing, profile]);
 
   const handleDetailsSave = async () => {
     setDetailsSaveStatus('Saving details...');
@@ -180,6 +163,8 @@ function Profile() {
     }
   };
 
+  // This specific handleMediaUploadComplete is for the secondary media items like audioBioUrl, videoBioUrl, videoProfileUrl
+  // It's different from handleHeroMediaUploadComplete
   const handleMediaUploadComplete = async (fileUrl, fieldName) => {
     setMediaSaveStatus(`Saving ${fieldName}...`);
     try {
@@ -206,15 +191,12 @@ function Profile() {
   }
   if (!profile) return <p className="p-4">Loading profile...</p>;
 
-  // Determine user tier and verification for badges
   const isPremium = profile.tier === 'premium';
   const isVerified = profile.isVerified === true;
 
   return (
     <div className="container mx-auto p-4">
-      {/* Header now only contains Edit/Logout buttons, aligned to the right */}
-      <div className="flex justify-end items-center mb-6 h-10"> {/* Added h-10 for consistent height, adjust as needed */}
-        {/* Name, Age, and Badges are now overlaid on the hero media */}
+      <div className="flex justify-end items-center mb-6 h-10">
         <div>
           <button
             onClick={() => setIsEditing(!isEditing)}
@@ -232,12 +214,10 @@ function Profile() {
       </div>
 
       <div className="flex flex-col space-y-6">
-        {/* New Hero Section with Camera Capture and Upload */}
-        <section className="w-full relative"> {/* Added relative positioning for overlay */}
+        <section className="w-full relative">
           <HeroCaptureSection
             onUploadComplete={handleHeroMediaUploadComplete}
           />
-          {/* Overlay for Name, Age, and Badges - Render only in view mode */}
           {!isEditing && profile && (
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
               <div className="flex items-center">
@@ -250,7 +230,6 @@ function Profile() {
               </div>
             </div>
           )}
-          {/* Display heroMediaSaveStatus directly associated with this section */}
           {heroMediaSaveStatus && (
             <p className={`text-sm text-center py-2 ${heroMediaSaveStatus.startsWith("Error:") ? 'text-red-500' : 'text-green-500'}`}>
               {heroMediaSaveStatus}
@@ -258,16 +237,12 @@ function Profile() {
           )}
         </section>
 
-        {/* VideoBioSnippetPlayer and its uploader are now secondary, if kept.
-            The version of Profile.js you provided had this structure, so I'm retaining it.
-            This assumes `VideoBioSnippet` is different from the main `HeroCaptureSection` media.
-        */}
         <section>
           <h2 className="text-xl font-semibold mb-2">Profile Snippet (Secondary)</h2>
           {isEditing ? (
             <VideoBioSnippetUpload
               currentVideoUrl={profile.videoBioUrl || ''}
-              onUploadComplete={handleMediaUploadComplete} // This updates profile.videoBioUrl
+              onUploadComplete={handleMediaUploadComplete}
             />
           ) : (
             profile.videoBioUrl ?
@@ -339,7 +314,7 @@ function Profile() {
               {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
             </>
           ) : (
-            <div className="mt-2 space-y-3"> {/* Increased spacing slightly */}
+            <div className="mt-2 space-y-3">
               <div>
                 <span className="font-medium text-gray-500 mr-2">Gender:</span>
                 <span className="text-gray-800">{profile.gender || "N/A"}</span>
@@ -417,8 +392,8 @@ function Profile() {
             <SocialMediaLinksEditor
               initialLinks={profile.socialMediaLinks || {}}
               onSave={handleSocialMediaLinksSave}
-              saveStatus={socialLinksSaveStatus} // Changed from statusMessage to saveStatus
-              setSaveStatus={setSocialLinksSaveStatus} // Changed from setStatusMessage to setSaveStatus
+              saveStatus={socialLinksSaveStatus}
+              setSaveStatus={setSocialLinksSaveStatus}
             />
           ) : (
             <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />
