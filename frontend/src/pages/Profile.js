@@ -1,4 +1,3 @@
-profile_component_code = """
 import React, { useEffect, useState, useCallback } from "react";
 import VideoProfileUpload from "../components/VideoProfileUpload";
 import VideoCall from "../components/VideoCall";
@@ -170,13 +169,9 @@ function Profile() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center">
-          <h1 className="text-3xl font-bold">{profile.name}</h1>
-          {profile.age && <span className="text-2xl ml-2">({profile.age})</span>}
-          {isPremium && <PremiumBadge />}
-          {isVerified && <VerifiedBadge />}
-        </div>
+      {/* Header now only contains Edit/Logout buttons, aligned to the right */}
+      <div className="flex justify-end items-center mb-6 h-10"> {/* Added h-10 for consistent height, adjust as needed */}
+        {/* Name, Age, and Badges are now overlaid on the hero media */}
         <div>
           <button
             onClick={() => setIsEditing(!isEditing)}
@@ -194,16 +189,37 @@ function Profile() {
       </div>
 
       <div className="flex flex-col space-y-6">
-        <section>
-          <h2 className="text-xl font-semibold mb-2">Profile Snippet</h2>
-          {isEditing ? (
-            <VideoBioSnippetUpload
-              currentVideoUrl={profile.videoBioUrl || ''}
-              onUploadComplete={handleMediaUploadComplete}
-            />
-          ) : (
-            <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />
-          )}
+        {/* Hero Media Section (Video Bio Snippet) */}
+        <section className="relative w-full bg-gray-800 rounded-lg overflow-hidden shadow-lg" style={{ paddingTop: '56.25%' /* 16:9 Aspect Ratio */ }}>
+          <div className="absolute inset-0">
+            {isEditing ? (
+              <div className="w-full h-full flex items-center justify-center bg-gray-700"> {/* Added bg for uploader contrast */}
+                <VideoBioSnippetUpload
+                  currentVideoUrl={profile.videoBioUrl || ''}
+                  onUploadComplete={handleMediaUploadComplete}
+                />
+              </div>
+            ) : (
+              profile.videoBioUrl ? (
+                <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-700">
+                  <p className="text-white text-lg">No video snippet uploaded.</p>
+                </div>
+              )
+            )}
+          </div>
+          {/* Overlay for Name, Age, and Badges */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-white">{profile.name}</h1> {/* Removed text-shadow for now, gradient should suffice */}
+              {profile.age && <span className="text-xl ml-2 text-gray-200">({profile.age})</span>}
+            </div>
+            <div className="flex items-center mt-1">
+              {isPremium && <PremiumBadge />} {/* Review badge styling for overlay if needed */}
+              {isVerified && <VerifiedBadge />} {/* Review badge styling for overlay if needed */}
+            </div>
+          </div>
         </section>
 
         {!isEditing && profile.aboutMe && (
@@ -269,12 +285,27 @@ function Profile() {
               {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
             </>
           ) : (
-            <div className="mt-2 space-y-2">
-              <div><strong>Gender:</strong> {profile.gender || "N/A"}</div>
-              <div><strong>Preference:</strong> {profile.preference || "N/A"}</div>
-              <div><strong>Email:</strong> {profile.email}</div>
-              <div><strong>Education:</strong> {profile.education || "N/A"}</div>
-              <div><strong>Relationship Goals:</strong> {profile.relationshipGoals || "N/A"}</div>
+            <div className="mt-2 space-y-3"> {/* Increased spacing slightly */}
+              <div>
+                <span className="font-medium text-gray-500 mr-2">Gender:</span>
+                <span className="text-gray-800">{profile.gender || "N/A"}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-500 mr-2">Preference:</span>
+                <span className="text-gray-800">{profile.preference || "N/A"}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-500 mr-2">Email:</span>
+                <span className="text-gray-800">{profile.email}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-500 mr-2">Education:</span>
+                <span className="text-gray-800">{profile.education || "N/A"}</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-500 mr-2">Relationship Goals:</span>
+                <span className="text-gray-800">{profile.relationshipGoals || "N/A"}</span>
+              </div>
             </div>
           )}
         </section>
@@ -332,8 +363,8 @@ function Profile() {
             <SocialMediaLinksEditor
               initialLinks={profile.socialMediaLinks || {}}
               onSave={handleSocialMediaLinksSave}
-              saveStatus={socialLinksSaveStatus}
-              setSaveStatus={setSocialLinksSaveStatus}
+              saveStatus={socialLinksSaveStatus} // Changed from statusMessage to saveStatus
+              setSaveStatus={setSocialLinksSaveStatus} // Changed from setStatusMessage to setSaveStatus
             />
           ) : (
             <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />
@@ -357,10 +388,3 @@ function Profile() {
 }
 
 export default Profile;
-"""
-
-path = "/mnt/data/Profile.jsx"
-with open(path, "w") as file:
-    file.write(profile_component_code)
-
-path
