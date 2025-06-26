@@ -11,6 +11,7 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import AdminUserListPage from "./pages/admin/AdminUserListPage";
 import AdminUserEditPage from "./pages/admin/AdminUserEditPage";
+import SwipeDeck from "./pages/SwipeDeck"; // Import SwipeDeck
 
 function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -93,6 +94,7 @@ function App() {
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
           <Route path="/premium" element={<PrivateRoute><PremiumContent /></PrivateRoute>} />
+          <Route path="/discover" element={<PrivateRoute><SwipeDeck /></PrivateRoute>} /> {/* Add discover route */}
 
           {/* Admin Routes */}
           <Route
