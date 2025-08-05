@@ -26,7 +26,7 @@ export async function fetchUserProfile() {
     console.log("DEBUG [fetchUserProfile] ID token:", token);
   }
 
-  const apiUrl = "https://graceful-youth-production.up.railway.app/api/users/me";
+  const apiUrl = "https://huggingface.co/spaces/enadac/datingapp/api/users/me";
 
   // Debug: Log API URL
   if (process.env.NODE_ENV !== "production") {

@@ -26,7 +26,7 @@ const apiClient = {
 
     let baseUrl = process.env.REACT_APP_API_BASE_URL || "";
     if (!baseUrl) {
-      baseUrl = "https://graceful-youth-production.up.railway.app";
+      baseUrl = "https://huggingface.co/spaces/enadac/datingapp";
       console.warn("⚠️ REACT_APP_API_BASE_URL not set! Using fallback:", baseUrl);
     }
 
