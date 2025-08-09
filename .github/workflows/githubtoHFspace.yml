@@ -3,8 +3,8 @@ name: Deploy to Hugging Face Space
 on:
   push:
     branches:
-      - main   # Auto deploy when pushing to main
-  workflow_dispatch:   # Allow manual trigger from Actions tab
+      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -14,15 +14,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Check package-lock.json exists
+        run: |
+          if [ ! -f backend/package-lock.json ]; then
+            echo "Error: backend/package-lock.json is missing!"
+            exit 1
+          fi
+
       - name: Install Git LFS
         run: |
           sudo apt-get update
           sudo apt-get install -y git-lfs
           git lfs install
 
-      - name: Clone Hugging Face Space
+      - name: Clone Hugging Face Space with authentication
         run: |
-          git clone https://huggingface.co/spaces/Sarangat/jit hf_space
+          git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
           cp -r backend/* hf_space/
           cd hf_space
           git config user.email "actions@github.com"
