@@ -37,12 +37,10 @@ jobs:
 
       - name: Sync FIREBASE_PRIVATE_KEY secret to Hugging Face Space
         run: |
-          # Replace literal \n with real newlines in FIREBASE_PRIVATE_KEY
-          private_key=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | sed $'s/\\\\n/\\\n/g')
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
-            -d "{\"key\": \"FIREBASE_PRIVATE_KEY\", \"value\": \"$private_key\"}"
+            -d "{\"key\": \"FIREBASE_PRIVATE_KEY\", \"value\": \"${{ secrets.FIREBASE_PRIVATE_KEY }}\"}"
 
       - name: Install Git LFS
         run: |
