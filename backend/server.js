@@ -15,7 +15,15 @@ const server = http.createServer(app);
 
 // Security, CORS, JSON, basic logging, rate limiting
 app.use(helmet());
-app.use(cors());
+const corsOptions = {
+  origin: [
+    'https://dating-app-seven-liard.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5000'
+  ],
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Morgan for HTTP request logging - 'dev' is concise, 'combined' is more detailed
