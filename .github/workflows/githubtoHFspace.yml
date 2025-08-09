@@ -47,6 +47,13 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$JSON_PAYLOAD"
 
+      - name: Sync PORT secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"PORT\", \"value\": \"7860\"}"
+
       - name: Install Git LFS
         run: |
           sudo apt-get update
