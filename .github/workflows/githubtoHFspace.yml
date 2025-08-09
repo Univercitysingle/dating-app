@@ -21,20 +21,28 @@ jobs:
             exit 1
           fi
 
-      - name: Sync Firebase secrets to Hugging Face Space
+      - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
         run: |
-          echo "Syncing Firebase secrets to Hugging Face..."
-          for secret_name in FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY; do
-            secret_value="${{ secrets[secret_name] }}"
-            if [ "$secret_name" = "FIREBASE_PRIVATE_KEY" ]; then
-              # Replace literal \n with real newlines
-              secret_value=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | sed $'s/\\\\n/\\\n/g')
-            fi
-            curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-              -H "Authorization: Bearer ${{ secrets.HF }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"key\": \"$secret_name\", \"value\": \"$secret_value\"}"
-          done
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
+
+      - name: Sync FIREBASE_CLIENT_EMAIL secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"FIREBASE_CLIENT_EMAIL\", \"value\": \"${{ secrets.FIREBASE_CLIENT_EMAIL }}\"}"
+
+      - name: Sync FIREBASE_PRIVATE_KEY secret to Hugging Face Space
+        run: |
+          # Replace literal \n with real newlines in FIREBASE_PRIVATE_KEY
+          private_key=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | sed $'s/\\\\n/\\\n/g')
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"FIREBASE_PRIVATE_KEY\", \"value\": \"$private_key\"}"
 
       - name: Install Git LFS
         run: |
