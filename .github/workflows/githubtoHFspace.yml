@@ -26,10 +26,9 @@ jobs:
           echo "Syncing Firebase secrets to Hugging Face..."
           for secret_name in FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY; do
             secret_value="${{ secrets[secret_name] }}"
-            # Replace escaped \n with real newlines for FIREBASE_PRIVATE_KEY
             if [ "$secret_name" = "FIREBASE_PRIVATE_KEY" ]; then
-              secret_value=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | sed 's/\\n/\
-/g')
+              # Replace literal \n with real newlines
+              secret_value=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | sed $'s/\\\\n/\\\n/g')
             fi
             curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
               -H "Authorization: Bearer ${{ secrets.HF }}" \
