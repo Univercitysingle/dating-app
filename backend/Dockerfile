@@ -1,24 +1,21 @@
 FROM node:18-alpine
 
-# Install ffmpeg
+# Install ffmpeg and any other needed OS packages
 RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
-# Copy dependency files
+# Copy dependency files first for build cache
 COPY package.json package-lock.json ./
 
-# Ensure lockfile exists
-RUN [ -f package-lock.json ] || (echo "Error: package-lock.json not found!" && false)
-
-# Install production dependencies
+# Install dependencies using lockfile for reproducible builds
 RUN npm ci --omit=dev
 
-# Copy the rest of your source code
+# Copy the rest of the app
 COPY . .
 
 # Hugging Face requires port 7860
 EXPOSE 7860
 
-# Start your app on 0.0.0.0:7860
+# Start the app
 CMD ["npm", "start"]
