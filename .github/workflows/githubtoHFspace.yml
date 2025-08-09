@@ -14,12 +14,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Check package-lock.json exists
+        run: |
+          if [ ! -f backend/package-lock.json ]; then
+            echo "Error: backend/package-lock.json is missing!"
+            exit 1
+          fi
+
       - name: Sync Firebase secrets to Hugging Face Space
         run: |
           echo "Syncing Firebase secrets to Hugging Face..."
           for secret_name in FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY; do
             secret_value="${{ secrets[secret_name] }}"
-            # For FIREBASE_PRIVATE_KEY, ensure literal newlines if needed:
+            # Replace escaped \n with real newlines for FIREBASE_PRIVATE_KEY
             if [ "$secret_name" = "FIREBASE_PRIVATE_KEY" ]; then
               secret_value=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | sed 's/\\n/\
 /g')
