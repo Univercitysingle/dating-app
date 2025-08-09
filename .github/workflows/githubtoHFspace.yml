@@ -21,12 +21,33 @@ jobs:
             exit 1
           fi
 
-      - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
+      - name: Sync AWS_ACCESS_KEY_ID secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
-            -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
+            -d "{\"key\": \"AWS_ACCESS_KEY_ID\", \"value\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\"}"
+
+      - name: Sync AWS_REGION secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"AWS_REGION\", \"value\": \"${{ secrets.AWS_REGION }}\"}"
+
+      - name: Sync AWS_S3_BUCKET_NAME secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"AWS_S3_BUCKET_NAME\", \"value\": \"${{ secrets.AWS_S3_BUCKET_NAME }}\"}"
+
+      - name: Sync AWS_SECRET_ACCESS_KEY secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"AWS_SECRET_ACCESS_KEY\", \"value\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"}"
 
       - name: Sync FIREBASE_CLIENT_EMAIL secret to Hugging Face Space
         run: |
@@ -37,10 +58,47 @@ jobs:
 
       - name: Sync FIREBASE_PRIVATE_KEY secret to Hugging Face Space
         run: |
+          ESCAPED_KEY=$(echo "${{ secrets.FIREBASE_PRIVATE_KEY }}" | python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))")
+          ESCAPED_KEY=${ESCAPED_KEY:1:-1}
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
-            -d "{\"key\": \"FIREBASE_PRIVATE_KEY\", \"value\": \"${{ secrets.FIREBASE_PRIVATE_KEY }}\"}"
+            -d "{\"key\": \"FIREBASE_PRIVATE_KEY\", \"value\": \"$ESCAPED_KEY\"}"
+
+      - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
+
+      - name: Sync JWT_SECRET secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"JWT_SECRET\", \"value\": \"${{ secrets.JWT_SECRET }}\"}"
+
+      - name: Sync MONGO_URI secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"MONGO_URI\", \"value\": \"${{ secrets.MONGO_URI }}\"}"
+
+      - name: Sync STRIPE_SECRET_KEY secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"STRIPE_SECRET_KEY\", \"value\": \"${{ secrets.STRIPE_SECRET_KEY }}\"}"
+
+      - name: Sync STRIPE_WEBHOOK_SECRET secret to Hugging Face Space
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"STRIPE_WEBHOOK_SECRET\", \"value\": \"${{ secrets.STRIPE_WEBHOOK_SECRET }}\"}"
 
       - name: Install Git LFS
         run: |
