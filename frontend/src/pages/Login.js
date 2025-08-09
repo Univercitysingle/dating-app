@@ -189,7 +189,7 @@ function Login() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-purple-900 via-green-500 to-blue-500 p-4">
       {/* Consider adding a background image or gradient to the parent div for better transparent effect */}
       <div className="w-full max-w-md p-8 space-y-6 bg-black bg-opacity-25 rounded-lg shadow-xl backdrop-blur-sm">
         <h2 className="text-2xl font-bold text-center text-white">
