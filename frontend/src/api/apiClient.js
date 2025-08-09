@@ -26,8 +26,8 @@ const apiClient = {
 
     let baseUrl = process.env.REACT_APP_API_BASE_URL || "";
     if (!baseUrl) {
-      baseUrl = "https://sarangat-jit.hf.space";
-      console.warn("⚠️ REACT_APP_API_BASE_URL not set! Using fallback:", baseUrl);
+      baseUrl = ""; // Fallback to an empty string for relative paths
+      console.warn("⚠️ REACT_APP_API_BASE_URL not set! Using relative paths.");
     }
 
     const url = `${baseUrl}${path}`;
