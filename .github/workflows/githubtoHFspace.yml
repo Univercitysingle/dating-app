@@ -1,0 +1,32 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main   # Auto deploy when pushing to main
+  workflow_dispatch:   # Allow manual trigger from Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
+          git lfs install
+
+      - name: Clone Hugging Face Space
+        run: |
+          git clone https://huggingface.co/spaces/Sarangat/jit hf_space
+          cp -r backend/* hf_space/
+          cd hf_space
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "Deploy from GitHub Actions" || echo "No changes to commit"
+          git push https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit main
