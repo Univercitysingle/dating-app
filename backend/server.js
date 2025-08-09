@@ -57,6 +57,11 @@ if (initSocket) { // Check if initSocket is defined, in case chat.js is complex
 // Routes
 app.get('/', (req, res) => res.send('API is running...')); // Basic health check route
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", authMiddleware, require("./routes/users")); // authMiddleware applied here
 app.use("/api/matches", authMiddleware, require("./routes/matches"));
