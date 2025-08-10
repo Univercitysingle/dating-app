@@ -9,6 +9,7 @@ const http = require('http');
 const { initSocket } = require('./routes/chat'); // Assuming this is correctly set up
 const authMiddleware = require("./middleware/authMiddleware");
 const admin = require("./services/firebaseAdmin"); // Firebase Admin SDK
+const logger = require('./utils/logger'); // Import the new logger
 
 const app = express();
 const server = http.createServer(app);
@@ -26,8 +27,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Morgan for HTTP request logging - 'dev' is concise, 'combined' is more detailed
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+// Morgan for HTTP request logging, integrated with Winston
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
 
 // Before rateLimit, tell Express it's behind a proxy.
 // This is important for express-rate-limit to get the correct client IP.
@@ -38,16 +39,16 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
-  console.error("MongoDB connection string is missing! Set MONGO_URI in your environment.");
+  logger.error("MongoDB connection string is missing! Set MONGO_URI in your environment.");
   process.exit(1);
 }
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log("MongoDB connected successfully."))
+.then(() => logger.info("MongoDB connected successfully."))
 .catch(err => {
-  console.error("MongoDB connection error:", err);
+  logger.error("MongoDB connection error:", err);
   process.exit(1);
 });
 
@@ -55,9 +56,9 @@ mongoose.connect(mongoUri, {
 if (initSocket) { // Check if initSocket is defined, in case chat.js is complex
     try {
         initSocket(server);
-        console.log("Socket.IO initialized.");
+        logger.info("Socket.IO initialized.");
     } catch (socketError) {
-        console.error("Failed to initialize Socket.IO:", socketError);
+        logger.error("Failed to initialize Socket.IO:", socketError);
     }
 }
 
@@ -103,24 +104,24 @@ app.use((err, req, res, next) => {
   }
 
   // Detailed logging
-  console.error(`Global Error Handler Caught: Status ${statusCode}, Message: ${err.message || 'N/A'}`);
+  logger.error(`Global Error Handler Caught: Status ${statusCode}, Message: ${err.message || 'N/A'}`);
   if (process.env.NODE_ENV !== 'production') {
-    console.error("Responding with payload:", JSON.stringify(errorPayload, null, 2));
-    console.error("Error Stack:", err.stack || 'N/A');
+    logger.error("Responding with payload:", JSON.stringify(errorPayload, null, 2));
+    logger.error("Error Stack:", err.stack || 'N/A');
   } else {
     // In production, log essential info without overwhelming logs; full stack might go to a dedicated logging service
-    console.error(`Prod Error: Status ${statusCode}, Path: ${req.path}, UID: ${req.user ? req.user.uid : 'N/A'}, Error: ${err.message}`);
+    logger.error(`Prod Error: Status ${statusCode}, Path: ${req.path}, UID: ${req.user ? req.user.uid : 'N/A'}, Error: ${err.message}`);
   }
 
   if (!res.headersSent) {
     res.status(statusCode).json(errorPayload);
   } else {
-    console.error("Global Error Handler: Headers already sent. Delegating to default Express error handler.");
+    logger.error("Global Error Handler: Headers already sent. Delegating to default Express error handler.");
     next(err); // Essential for Express to handle if headers are sent
   }
 });
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}. NODE_ENV=${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Server running on port ${PORT}. NODE_ENV=${process.env.NODE_ENV || 'development'}`);
 });

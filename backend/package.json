@@ -23,7 +23,8 @@
     "bcryptjs": "^2.4.3",
     "stripe": "^14.25.0",
     "@aws-sdk/client-s3": "^3.574.0",
-    "@aws-sdk/s3-request-presigner": "^3.574.0"
+    "@aws-sdk/s3-request-presigner": "^3.574.0",
+    "winston": "^3.13.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
