@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors");
+const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan"); // For request logging
@@ -14,18 +14,10 @@ const logger = require('./utils/logger'); // Import the new logger
 const app = express();
 const server = http.createServer(app);
 
-// Security, CORS, JSON, basic logging, rate limiting
+// Security, JSON, basic logging, rate limiting
 app.use(helmet());
-const corsOptions = {
-  origin: [
-    'https://dating-app-seven-liard.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:5000'
-  ],
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Morgan for HTTP request logging, integrated with Winston
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
@@ -81,6 +73,11 @@ app.use("/api/reports", authMiddleware, require("./routes/reports"));
 // Admin routes
 const adminUsersRouter = require('./routes/adminUsers'); // Ensure this file exists and exports a router
 app.use('/api/admin/users', adminUsersRouter); // Consider adding admin-specific auth here
+
+// Serve frontend for any route that is not an API route
+app.get('*', (req, res) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
+});
 
 // Global Error Handling Middleware (must be the last app.use call)
 app.use((err, req, res, next) => {
