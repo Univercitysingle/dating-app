@@ -60,13 +60,19 @@ jobs:
           sudo apt-get install -y git-lfs
           git lfs install
 
-      - name: Clone Hugging Face Space with authentication
+      - name: Sync files to Hugging Face Space
         run: |
+          # Clone the space repository
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
-          cp -r backend/* hf_space/
+
+          # Use rsync to efficiently sync the project files to the space.
+          # The --delete flag ensures that old files are removed.
+          rsync -av --delete . hf_space/ --exclude .git --exclude hf_space --exclude .github
+
+          # Go into the space directory, commit and push the changes
           cd hf_space
+          git add .
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git add .
           git commit -m "Deploy from GitHub Actions" || echo "No changes to commit"
-          git push https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit main
+          git push
