@@ -93,4 +93,9 @@ const setInitialPassword = async (req, res) => {
   }
 };
 
-module.exports = { login, setInitialPassword };
+const logout = (req, res) => {
+  res.clearCookie('token');
+  res.status(200).json({ message: 'Logged out successfully' });
+};
+
+module.exports = { login, setInitialPassword, logout };
