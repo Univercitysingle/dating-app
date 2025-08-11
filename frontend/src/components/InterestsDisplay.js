@@ -7,7 +7,8 @@ const InterestsDisplay = ({ interests }) => {
 
   return (
     <div className="my-4">
-      <h3 className="text-xl font-semibold mb-2">Interests</h3> {/* Changed text-lg to text-xl */}
+      <h3 className="text-xl font-semibold mb-2">Interests</h3>{' '}
+      {/* Changed text-lg to text-xl */}
       <div className="flex flex-wrap gap-2">
         {interests.map((interest, index) => (
           <span

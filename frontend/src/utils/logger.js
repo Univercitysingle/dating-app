@@ -5,7 +5,8 @@ const LOG_LEVEL = {
   ERROR: 3,
 };
 
-const currentLogLevel = process.env.NODE_ENV === 'production' ? LOG_LEVEL.INFO : LOG_LEVEL.DEBUG;
+const currentLogLevel =
+  process.env.NODE_ENV === 'production' ? LOG_LEVEL.INFO : LOG_LEVEL.DEBUG;
 
 const logger = {
   debug: (...args) => {
