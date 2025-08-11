@@ -7,12 +7,16 @@ const rateLimit = require("express-rate-limit");
 const morgan = require("morgan"); // For request logging
 const http = require('http');
 const { initSocket } = require('./routes/chat'); // Assuming this is correctly set up
-const authMiddleware = require("./middleware/authMiddleware");
+const authMiddleware = require("./middleware/authentication");
 const admin = require("./services/firebaseAdmin"); // Firebase Admin SDK
 const logger = require('./utils/logger'); // Import the new logger
+const correlationIdMiddleware = require('./middleware/correlationId');
 
 const app = express();
 const server = http.createServer(app);
+
+// Add correlation ID to all requests
+app.use(correlationIdMiddleware);
 
 // Security, JSON, basic logging, rate limiting
 app.use(helmet());
@@ -101,19 +105,20 @@ app.use((err, req, res, next) => {
   }
 
   // Detailed logging
-  logger.error(`Global Error Handler Caught: Status ${statusCode}, Message: ${err.message || 'N/A'}`);
+  const log = req.log || logger;
+  log.error(`Global Error Handler Caught: Status ${statusCode}, Message: ${err.message || 'N/A'}`);
   if (process.env.NODE_ENV !== 'production') {
-    logger.error("Responding with payload:", JSON.stringify(errorPayload, null, 2));
-    logger.error("Error Stack:", err.stack || 'N/A');
+    log.error("Responding with payload:", JSON.stringify(errorPayload, null, 2));
+    log.error("Error Stack:", err.stack || 'N/A');
   } else {
     // In production, log essential info without overwhelming logs; full stack might go to a dedicated logging service
-    logger.error(`Prod Error: Status ${statusCode}, Path: ${req.path}, UID: ${req.user ? req.user.uid : 'N/A'}, Error: ${err.message}`);
+    log.error(`Prod Error: Status ${statusCode}, Path: ${req.path}, UID: ${req.user ? req.user.uid : 'N/A'}, Error: ${err.message}`);
   }
 
   if (!res.headersSent) {
     res.status(statusCode).json(errorPayload);
   } else {
-    logger.error("Global Error Handler: Headers already sent. Delegating to default Express error handler.");
+    log.error("Global Error Handler: Headers already sent. Delegating to default Express error handler.");
     next(err); // Essential for Express to handle if headers are sent
   }
 });

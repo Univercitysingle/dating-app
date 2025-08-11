@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "depcheck": "depcheck"
+    "depcheck": "depcheck",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "aws-sdk": "^2.1611.0",
@@ -28,6 +30,10 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
-    "depcheck": "^1.4.7"
+    "depcheck": "^1.4.7",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^8.0.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "prettier": "^2.0.0"
   }
 }

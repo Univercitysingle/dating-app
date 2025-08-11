@@ -16,10 +16,17 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "devDependencies": {
     "postcss": "^8.4.38",
-    "autoprefixer": "^10.4.19"
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^8.0.0",
+    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-react": "^7.20.0",
+    "prettier": "^2.0.0"
   }
 }

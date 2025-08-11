@@ -1,6 +1,2 @@
 {
-  "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "react-tinder-card": "^1.6.4"
-  }
 }
