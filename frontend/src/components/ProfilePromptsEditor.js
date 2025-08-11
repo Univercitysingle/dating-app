@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import apiClient from '../api/apiClient';
+import logger from '../utils/logger';
 
 const PREDEFINED_PROMPTS = [
-  "My ideal first date involves...",
-  "Two truths and a lie about me are...",
+  'My ideal first date involves...',
+  'Two truths and a lie about me are...',
   "The most spontaneous thing I've ever done is...",
   "A skill I'm currently learning is...",
-  "My simple pleasures in life are...",
+  'My simple pleasures in life are...',
   "I'm looking for someone who...",
-  "My friends would describe me as...",
+  'My friends would describe me as...',
   "If I could travel anywhere, I'd go to...",
 ];
 
@@ -18,67 +21,56 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    // Initialize with prompts that have answers, ensuring they are from the predefined list
-    const validInitialPrompts = initialPrompts.filter(p => PREDEFINED_PROMPTS.includes(p.prompt) && p.answer);
+    const validInitialPrompts = initialPrompts.filter(
+      (p) => PREDEFINED_PROMPTS.includes(p.prompt) && p.answer
+    );
     setSelectedPrompts(validInitialPrompts);
   }, [initialPrompts]);
 
   const handleAddPrompt = (prompt) => {
-    if (selectedPrompts.length < MAX_PROMPTS && !selectedPrompts.find(p => p.prompt === prompt)) {
+    if (
+      selectedPrompts.length < MAX_PROMPTS &&
+      !selectedPrompts.find((p) => p.prompt === prompt)
+    ) {
       setSelectedPrompts([...selectedPrompts, { prompt, answer: '' }]);
     }
   };
 
   const handleRemovePrompt = (promptToRemove) => {
-    setSelectedPrompts(selectedPrompts.filter(p => p.prompt !== promptToRemove));
+    setSelectedPrompts(
+      selectedPrompts.filter((p) => p.prompt !== promptToRemove)
+    );
   };
 
   const handleAnswerChange = (prompt, answer) => {
     setSelectedPrompts(
-      selectedPrompts.map(p => (p.prompt === prompt ? { ...p, answer } : p))
+      selectedPrompts.map((p) => (p.prompt === prompt ? { ...p, answer } : p))
     );
   };
 
   const handleSave = async () => {
     setStatus('Saving...');
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || !user.token) {
-      setStatus('Error: Not authenticated.');
-      return;
-    }
-
-    // Filter out prompts without answers before saving
-    const promptsToSave = selectedPrompts.filter(p => p.answer && p.answer.trim() !== '');
+    const promptsToSave = selectedPrompts.filter(
+      (p) => p.answer && p.answer.trim() !== ''
+    );
 
     try {
-      const response = await fetch('/api/users/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ profilePrompts: promptsToSave }),
+      const savedData = await apiClient.put('/api/users/me', {
+        profilePrompts: promptsToSave,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save prompts.');
-      }
-
-      const savedData = await response.json(); // Get the updated user profile
       setStatus('Prompts saved successfully!');
       if (onSave) {
-        onSave(savedData.profilePrompts || promptsToSave); // Pass back the saved prompts
+        onSave(savedData.profilePrompts || promptsToSave);
       }
       setTimeout(() => setStatus(''), 3000);
     } catch (error) {
       setStatus(`Error: ${error.message}`);
-      console.error('Failed to save prompts:', error);
+      logger.error('Failed to save prompts:', error);
     }
   };
 
   const availablePrompts = PREDEFINED_PROMPTS.filter(
-    prompt => !selectedPrompts.find(p => p.prompt === prompt)
+    (prompt) => !selectedPrompts.find((p) => p.prompt === prompt)
   );
 
   return (
@@ -87,7 +79,10 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
 
       {selectedPrompts.length < MAX_PROMPTS && availablePrompts.length > 0 && (
         <div className="mb-4">
-          <label htmlFor="prompt-select" className="block text-sm font-medium text-gray-700 mb-1">
+          <label
+            htmlFor="prompt-select"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
             Choose a prompt to answer (up to {MAX_PROMPTS}):
           </label>
           <select
@@ -96,15 +91,21 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
             value=""
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
           >
-            <option value="" disabled>Select a prompt</option>
-            {availablePrompts.map(prompt => (
-              <option key={prompt} value={prompt}>{prompt}</option>
+            <option value="" disabled>
+              Select a prompt
+            </option>
+            {availablePrompts.map((prompt) => (
+              <option key={prompt} value={prompt}>
+                {prompt}
+              </option>
             ))}
           </select>
         </div>
       )}
       {selectedPrompts.length >= MAX_PROMPTS && (
-         <p className="text-sm text-gray-600 mb-4">You've reached the maximum of {MAX_PROMPTS} prompts.</p>
+        <p className="text-sm text-gray-600 mb-4">
+          You have reached the maximum of {MAX_PROMPTS} prompts.
+        </p>
       )}
 
       <div className="space-y-4">
@@ -141,6 +142,11 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
       {status && <p className="mt-3 text-sm text-gray-700">{status}</p>}
     </div>
   );
+};
+
+ProfilePromptsEditor.propTypes = {
+  initialPrompts: PropTypes.array,
+  onSave: PropTypes.func.isRequired,
 };
 
 export default ProfilePromptsEditor;

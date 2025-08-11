@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 const ProfilePromptsDisplay = ({ profilePrompts }) => {
   if (!profilePrompts || profilePrompts.length === 0) {
@@ -18,6 +19,15 @@ const ProfilePromptsDisplay = ({ profilePrompts }) => {
       </div>
     </div>
   );
+};
+
+ProfilePromptsDisplay.propTypes = {
+  profilePrompts: PropTypes.arrayOf(
+    PropTypes.shape({
+      prompt: PropTypes.string.isRequired,
+      answer: PropTypes.string.isRequired,
+    })
+  ).isRequired,
 };
 
 export default ProfilePromptsDisplay;
