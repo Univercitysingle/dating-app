@@ -2,5 +2,4 @@ node_modules
 build
 .dockerignore
 Dockerfile
-nginx.conf
 .env
