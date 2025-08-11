@@ -17,7 +17,8 @@ const AdminLayout = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const isAdminOrSuperAdmin = user.role === 'admin' || user.role === 'superadmin';
+  const isAdminOrSuperAdmin =
+    user.role === 'admin' || user.role === 'superadmin';
 
   if (!isAdminOrSuperAdmin) {
     return <Navigate to="/unauthorized" replace />;

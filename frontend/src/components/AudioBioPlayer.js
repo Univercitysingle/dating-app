@@ -2,7 +2,9 @@ import React from 'react';
 
 const AudioBioPlayer = ({ audioUrl }) => {
   if (!audioUrl) {
-    return <p className="text-gray-500 italic text-sm">No audio bio available.</p>;
+    return (
+      <p className="text-gray-500 italic text-sm">No audio bio available.</p>
+    );
   }
 
   return (

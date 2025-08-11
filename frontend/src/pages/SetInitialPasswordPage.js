@@ -8,7 +8,8 @@ const SetInitialPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const { tempAuthInfo, completePasswordSetupAndLogin, user, logout } = useAuth();
+  const { tempAuthInfo, completePasswordSetupAndLogin, user, logout } =
+    useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -17,14 +18,15 @@ const SetInitialPasswordPage = () => {
     if (!tempAuthInfo || (user && !tempAuthInfo?.user?.uid === user.uid)) {
       // A user might be logged in but not the one needing password setup
       // Or tempAuthInfo might be cleared after successful setup & refresh
-      console.warn("Redirecting from set-initial-password: No tempAuthInfo or user mismatch.");
+      console.warn(
+        'Redirecting from set-initial-password: No tempAuthInfo or user mismatch.'
+      );
       navigate('/');
     }
     // Retrieve from localStorage if context is empty (e.g. after refresh)
     // This part is tricky because AuthContext might re-initialize tempAuthInfo from localStorage itself.
     // For simplicity, primary reliance is on AuthContext state.
   }, [tempAuthInfo, user, navigate]);
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,7 +55,7 @@ const SetInitialPasswordPage = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tempAuthInfo.token}`,
+          Authorization: `Bearer ${tempAuthInfo.token}`,
         },
         body: JSON.stringify({ newPassword }),
       });
@@ -61,10 +63,14 @@ const SetInitialPasswordPage = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Failed to set password.');
+        throw new Error(
+          data.message || data.error || 'Failed to set password.'
+        );
       }
 
-      setSuccessMessage(data.message || 'Password set successfully! Redirecting...');
+      setSuccessMessage(
+        data.message || 'Password set successfully! Redirecting...'
+      );
 
       // The backend currently doesn't return the user object or a new token on this specific call.
       // It just returns { message: "..." }.
@@ -77,16 +83,18 @@ const SetInitialPasswordPage = () => {
 
       setTimeout(() => {
         // Navigate based on role, or to a generic post-login page
-        if (tempAuthInfo.user.role === 'admin' || tempAuthInfo.user.role === 'superadmin') {
+        if (
+          tempAuthInfo.user.role === 'admin' ||
+          tempAuthInfo.user.role === 'superadmin'
+        ) {
           navigate('/admin/dashboard'); // Or wherever admin should go
         } else {
           navigate('/'); // Default page for other roles
         }
       }, 2000);
-
     } catch (err) {
       setError(err.message);
-      console.error("Set initial password error:", err);
+      console.error('Set initial password error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -94,22 +102,25 @@ const SetInitialPasswordPage = () => {
 
   // Handle case where user might try to access this page directly without tempAuthInfo
   if (!tempAuthInfo && !isLoading) {
-      // This check might be too aggressive if AuthContext is still loading.
-      // A better check might be after AuthContext.isLoading is false and tempAuthInfo is still null.
-      // For now, this is a simple guard.
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-            <p className="text-red-500">No pending password setup. Redirecting to login...</p>
-            {/* setTimeout(() => navigate('/login'), 2000); // Can cause issues if rendered multiple times */}
-        </div>
-      );
+    // This check might be too aggressive if AuthContext is still loading.
+    // A better check might be after AuthContext.isLoading is false and tempAuthInfo is still null.
+    // For now, this is a simple guard.
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+        <p className="text-red-500">
+          No pending password setup. Redirecting to login...
+        </p>
+        {/* setTimeout(() => navigate('/login'), 2000); // Can cause issues if rendered multiple times */}
+      </div>
+    );
   }
-
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-700">Set Your Initial Password</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-700">
+          Set Your Initial Password
+        </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -146,7 +157,11 @@ const SetInitialPasswordPage = () => {
           </div>
 
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          {successMessage && <p className="text-green-500 text-sm text-center">{successMessage}</p>}
+          {successMessage && (
+            <p className="text-green-500 text-sm text-center">
+              {successMessage}
+            </p>
+          )}
 
           <button
             type="submit"
@@ -156,12 +171,15 @@ const SetInitialPasswordPage = () => {
             {isLoading ? 'Setting Password...' : 'Set Password'}
           </button>
         </form>
-         <button
-            onClick={async () => { await logout(); navigate('/login');}}
-            className="w-full mt-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-          >
-            Cancel and Logout
-          </button>
+        <button
+          onClick={async () => {
+            await logout();
+            navigate('/login');
+          }}
+          className="w-full mt-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+        >
+          Cancel and Logout
+        </button>
       </div>
     </div>
   );

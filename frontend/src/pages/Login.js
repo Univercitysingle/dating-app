@@ -208,10 +208,10 @@ function Login() {
           {showPhone
             ? 'Phone Login'
             : showReset
-            ? 'Reset Password'
-            : isSignUp
-            ? 'Sign Up'
-            : 'Login'}
+              ? 'Reset Password'
+              : isSignUp
+                ? 'Sign Up'
+                : 'Login'}
         </h2>
         {verificationMessage && (
           <p className="text-sm text-center text-green-300 py-2">
@@ -223,7 +223,9 @@ function Login() {
             {successMessage}
           </p>
         )}
-        {error && <p className="text-sm text-center text-red-400 py-2">{error}</p>}
+        {error && (
+          <p className="text-sm text-center text-red-400 py-2">{error}</p>
+        )}
 
         {!showPhone && !showReset && (
           <>
@@ -261,8 +263,8 @@ function Login() {
                   ? 'Signing up...'
                   : 'Logging in...'
                 : isSignUp
-                ? 'Sign Up'
-                : 'Login'}
+                  ? 'Sign Up'
+                  : 'Login'}
             </button>
             <button
               onClick={handleGoogleSSO}
