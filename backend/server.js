@@ -67,12 +67,18 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
+// Status page
+app.get('/status', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'status.html'));
+});
+
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", authMiddleware, require("./routes/users")); // authMiddleware applied here
 app.use("/api/matches", authMiddleware, require("./routes/matches"));
 app.use("/api/chat", authMiddleware, require("./routes/chat").router); // Ensure chat.js exports router
 app.use("/api/video", authMiddleware, require("./routes/video"));
 app.use("/api/reports", authMiddleware, require("./routes/reports"));
+app.use('/api/status', require('./routes/status'));
 
 // Admin routes
 const adminUsersRouter = require('./routes/adminUsers'); // Ensure this file exists and exports a router
