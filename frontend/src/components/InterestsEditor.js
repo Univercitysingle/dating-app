@@ -18,7 +18,7 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
   };
 
   const handleRemoveInterest = (interestToRemove) => {
-    setInterests(interests.filter((interest) => interest !== interestToRemove));
+    setInterests(interests.filter(interest => interest !== interestToRemove));
   };
 
   const handleSave = async () => {
@@ -34,7 +34,7 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`,
+          'Authorization': `Bearer ${user.token}`,
         },
         body: JSON.stringify({ interests }),
       });
@@ -66,12 +66,7 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Add an interest"
           className="flex-grow p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleAddInterest();
-              e.preventDefault();
-            }
-          }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { handleAddInterest(); e.preventDefault(); }}}
         />
         <button
           onClick={handleAddInterest}

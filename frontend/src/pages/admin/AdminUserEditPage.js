@@ -34,7 +34,7 @@ const AdminUserEditPage = () => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
-        headers: { Authorization: `Bearer ${adminUser.token}` },
+        headers: { 'Authorization': `Bearer ${adminUser.token}` },
       });
       if (!response.ok) throw new Error('Failed to fetch user data');
       const data = await response.json();
@@ -42,8 +42,7 @@ const AdminUserEditPage = () => {
         name: data.name || '',
         email: data.email || '',
         role: data.role || 'user',
-        isProfileVisible:
-          data.isProfileVisible !== undefined ? data.isProfileVisible : true,
+        isProfileVisible: data.isProfileVisible !== undefined ? data.isProfileVisible : true,
         education: data.education || '',
         relationshipGoals: data.relationshipGoals || '',
         bio: data.bio || '',
@@ -63,7 +62,7 @@ const AdminUserEditPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setUserData((prev) => ({
+    setUserData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
@@ -76,7 +75,7 @@ const AdminUserEditPage = () => {
     setSuccessMessage('');
 
     if (!adminUser || !adminUser.token) {
-      setError('Authentication error.');
+      setError("Authentication error.");
       setIsLoading(false);
       return;
     }
@@ -97,26 +96,21 @@ const AdminUserEditPage = () => {
         method,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminUser.token}`,
+          'Authorization': `Bearer ${adminUser.token}`,
         },
         body: JSON.stringify(payload),
       });
       const responseData = await response.json();
       if (!response.ok) {
-        throw new Error(
-          responseData.message ||
-            `Failed to ${isNewUser ? 'create' : 'update'} user`
-        );
+        throw new Error(responseData.message || `Failed to ${isNewUser ? 'create' : 'update'} user`);
       }
-      setSuccessMessage(
-        `User ${isNewUser ? 'created' : 'updated'} successfully!`
-      );
+      setSuccessMessage(`User ${isNewUser ? 'created' : 'updated'} successfully!`);
       if (isNewUser && responseData._id) {
         navigate(`/admin/users/${responseData._id}/edit`);
       }
     } catch (err) {
       setError(err.message);
-      console.error('Save user error:', err);
+      console.error("Save user error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -127,197 +121,68 @@ const AdminUserEditPage = () => {
       return AVAILABLE_ROLES;
     }
     if (adminUser && adminUser.role === 'admin') {
-      return AVAILABLE_ROLES.filter((r) => r !== 'superadmin');
+      return AVAILABLE_ROLES.filter(r => r !== 'superadmin');
     }
     return [];
   };
   const assignableRoles = getAssignableRoles();
 
-  if (isLoading && !isNewUser)
-    return <p className="p-4 text-center">Loading user data...</p>;
-  if (error && !isNewUser && !userData.email)
-    return (
-      <p className="p-4 text-red-500 text-center">
-        Error loading user: {error}
-      </p>
-    );
+  if (isLoading && !isNewUser) return <p className="p-4 text-center">Loading user data...</p>;
+  if (error && !isNewUser && !userData.email) return <p className="p-4 text-red-500 text-center">Error loading user: {error}</p>;
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">
-        {isNewUser
-          ? 'Create New User'
-          : `Edit User: ${userData.name || userId}`}
+        {isNewUser ? 'Create New User' : `Edit User: ${userData.name || userId}`}
       </h1>
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white shadow-md rounded-lg p-6 space-y-6"
-      >
+      <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6 space-y-6">
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Name
-          </label>
-          <input
-            type="text"
-            name="name"
-            id="name"
-            value={userData.name}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          />
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+          <input type="text" name="name" id="name" value={userData.name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
         </div>
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            value={userData.email}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          />
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" name="email" id="email" value={userData.email} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
         </div>
         {isNewUser && (
           <div>
-            <label
-              htmlFor="password_edit"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              id="password_edit"
-              value={userData.password}
-              onChange={handleChange}
-              placeholder="Leave blank if user should set on first login"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              If no password, &apos;Must Set Password&apos; will be true unless UID
-              provided.
-            </p>
+            <label htmlFor="password_edit" className="block text-sm font-medium text-gray-700">Password</label>
+            <input type="password" name="password" id="password_edit" value={userData.password} onChange={handleChange} placeholder="Leave blank if user should set on first login" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
+            <p className="text-xs text-gray-500 mt-1">If no password, 'Must Set Password' will be true unless UID provided.</p>
           </div>
         )}
         <div>
-          <label
-            htmlFor="role"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Role
-          </label>
-          <select
-            name="role"
-            id="role"
-            value={userData.role}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            {assignableRoles.map((r) => (
-              <option key={r} value={r}>
-                {r.charAt(0).toUpperCase() + r.slice(1)}
-              </option>
-            ))}
+          <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
+          <select name="role" id="role" value={userData.role} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            {assignableRoles.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
           </select>
         </div>
         <div>
-          <label
-            htmlFor="education"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Education
-          </label>
-          <input
-            type="text"
-            name="education"
-            id="education"
-            value={userData.education}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          />
+          <label htmlFor="education" className="block text-sm font-medium text-gray-700">Education</label>
+          <input type="text" name="education" id="education" value={userData.education} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
         </div>
         <div>
-          <label
-            htmlFor="relationshipGoals"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Relationship Goals
-          </label>
-          <input
-            type="text"
-            name="relationshipGoals"
-            id="relationshipGoals"
-            value={userData.relationshipGoals}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          />
+          <label htmlFor="relationshipGoals" className="block text-sm font-medium text-gray-700">Relationship Goals</label>
+          <input type="text" name="relationshipGoals" id="relationshipGoals" value={userData.relationshipGoals} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
         </div>
         <div>
-          <label
-            htmlFor="bio"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Bio
-          </label>
-          <textarea
-            name="bio"
-            id="bio"
-            value={userData.bio}
-            onChange={handleChange}
-            rows="3"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          ></textarea>
+          <label htmlFor="bio" className="block text-sm font-medium text-gray-700">Bio</label>
+          <textarea name="bio" id="bio" value={userData.bio} onChange={handleChange} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
         </div>
         <div className="flex items-center">
-          <input
-            type="checkbox"
-            name="isProfileVisible"
-            id="isProfileVisible"
-            checked={userData.isProfileVisible}
-            onChange={handleChange}
-            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-          />
-          <label
-            htmlFor="isProfileVisible"
-            className="ml-2 block text-sm text-gray-900"
-          >
-            Profile Visible
-          </label>
+          <input type="checkbox" name="isProfileVisible" id="isProfileVisible" checked={userData.isProfileVisible} onChange={handleChange} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"/>
+          <label htmlFor="isProfileVisible" className="ml-2 block text-sm text-gray-900">Profile Visible</label>
         </div>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
-        {successMessage && (
-          <p className="text-green-500 text-sm">{successMessage}</p>
-        )}
+        {successMessage && <p className="text-green-500 text-sm">{successMessage}</p>}
 
         <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate('/admin/users')}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded shadow-md"
-          >
+          <button type="button" onClick={() => navigate('/admin/users')} className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded shadow-md">
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded shadow-md disabled:bg-gray-400"
-          >
-            {isLoading
-              ? 'Saving...'
-              : isNewUser
-                ? 'Create User'
-                : 'Save Changes'}
+          <button type="submit" disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded shadow-md disabled:bg-gray-400">
+            {isLoading ? 'Saving...' : (isNewUser ? 'Create User' : 'Save Changes')}
           </button>
         </div>
       </form>
