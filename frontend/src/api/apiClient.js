@@ -7,10 +7,10 @@ const apiClient = {
       ...options.headers,
     });
 
-    let baseUrl = process.env.REACT_APP_API_BASE_URL || '';
+    let baseUrl = process.env.REACT_APP_API_BASE_URL || "";
     if (!baseUrl) {
-      baseUrl = '';
-      logger.warn('REACT_APP_API_BASE_URL not set! Using relative paths.');
+      baseUrl = "";
+      logger.warn("REACT_APP_API_BASE_URL not set! Using relative paths.");
     }
 
     const url = `${baseUrl}${path}`;
@@ -45,9 +45,7 @@ const apiClient = {
           errorData = { message: response.statusText || 'An error occurred' };
         }
 
-        const error = new Error(
-          errorData.message || 'Network response was not ok.'
-        );
+        const error = new Error(errorData.message || 'Network response was not ok.');
         error.status = response.status;
         error.data = errorData;
 
@@ -87,7 +85,7 @@ const apiClient = {
 
   patch(path, data, options = {}) {
     return this.request('PATCH', path, data, options);
-  },
+  }
 };
 
 export default apiClient;

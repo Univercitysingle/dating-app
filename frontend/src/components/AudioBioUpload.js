@@ -33,7 +33,7 @@ const AudioBioUpload = ({ currentAudioUrl, onUploadComplete }) => {
       const response = await fetch('/api/users/upload-audio-bio', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${user.token}`,
+          'Authorization': `Bearer ${user.token}`,
           // 'Content-Type': 'multipart/form-data' is set automatically by browser for FormData
         },
         body: formData,
@@ -60,13 +60,10 @@ const AudioBioUpload = ({ currentAudioUrl, onUploadComplete }) => {
 
   return (
     <div className="my-4 p-4 border border-gray-300 rounded-lg shadow-sm">
-      <h4 className="text-md font-semibold mb-2 text-gray-700">
-        Upload Audio Bio
-      </h4>
+      <h4 className="text-md font-semibold mb-2 text-gray-700">Upload Audio Bio</h4>
       {currentAudioUrl && (
         <p className="text-xs text-gray-500 mb-2">
-          Current audio bio exists. Uploading a new one will allow you to save
-          it, replacing the current one.
+          Current audio bio exists. Uploading a new one will allow you to save it, replacing the current one.
         </p>
       )}
       <input
@@ -80,9 +77,7 @@ const AudioBioUpload = ({ currentAudioUrl, onUploadComplete }) => {
                    file:bg-blue-50 file:text-blue-700
                    hover:file:bg-blue-100 mb-2"
       />
-      {file && (
-        <p className="text-sm text-gray-600 mb-2">Selected: {file.name}</p>
-      )}
+      {file && <p className="text-sm text-gray-600 mb-2">Selected: {file.name}</p>}
       <button
         onClick={handleUpload}
         disabled={loading || !file}

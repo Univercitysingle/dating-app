@@ -18,49 +18,7 @@ jobs:
           node-version: 18
 
 
-      - name: Install frontend dependencies
-        run: npm install
-        working-directory: ./frontend
-
-      - name: Build frontend
-        run: npm run build
-        working-directory: ./frontend
-
       - name: Build frontend Docker image
         run: docker build -t myapp-frontend ./frontend
 
-      - name: Deploy to production
-        run: |
-          echo "TODO: Add deployment steps here."
-          echo "For example, to push to a Docker registry and deploy to a server."
-        # Example for AWS ECR and ECS:
-        # - name: Configure AWS credentials
-        #   uses: aws-actions/configure-aws-credentials@v1
-        #   with:
-        #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        #     aws-region: us-east-1
-        #
-        # - name: Log in to Amazon ECR
-        #   id: login-ecr
-        #   uses: aws-actions/amazon-ecr-login@v1
-        #
-        # - name: Build, tag, and push image to Amazon ECR
-        #   id: build-image
-        #   env:
-        #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        #     ECR_REPOSITORY: myapp-frontend
-        #     IMAGE_TAG: ${{ github.sha }}
-        #   run: |
-        #     docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
-        #     docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        #     echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-        #
-        # - name: Deploy to ECS
-        #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        #   with:
-        #     task-definition: ${{ secrets.ECS_TASK_DEFINITION }}
-        #     cluster: ${{ secrets.ECS_CLUSTER }}
-        #     service: ${{ secrets.ECS_SERVICE }}
-        #     image: ${{ steps.build-image.outputs.image }}
-        #     wait-for-service-stability: true
+      # Add deployment steps here for your cloud provider (e.g. AWS ECS, DigitalOcean, etc.)
