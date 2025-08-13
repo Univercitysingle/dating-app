@@ -223,7 +223,9 @@ function Login() {
             {successMessage}
           </p>
         )}
-        {error && <p className="text-sm text-center text-red-400 py-2">{error}</p>}
+        {error && (
+          <p className="text-sm text-center text-red-400 py-2">{error}</p>
+        )}
 
         {!showPhone && !showReset && (
           <>

@@ -1,20 +1,20 @@
-import React, { useEffect, useState, useCallback } from "react";
-import VideoProfileUpload from "../components/VideoProfileUpload";
-import VideoCall from "../components/VideoCall";
-import InterestsDisplay from "../components/InterestsDisplay";
-import InterestsEditor from "../components/InterestsEditor";
-import ProfilePromptsDisplay from "../components/ProfilePromptsDisplay";
-import ProfilePromptsEditor from "../components/ProfilePromptsEditor";
+import React, { useEffect, useState, useCallback } from 'react';
+import VideoProfileUpload from '../components/VideoProfileUpload';
+import VideoCall from '../components/VideoCall';
+import InterestsDisplay from '../components/InterestsDisplay';
+import InterestsEditor from '../components/InterestsEditor';
+import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
+import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import AudioBioPlayer from "../components/AudioBioPlayer";
-import AudioBioUpload from "../components/AudioBioUpload";
-import VideoBioSnippetPlayer from "../components/VideoBioSnippetPlayer";
-import VideoBioSnippetUpload from "../components/VideoBioSnippetUpload";
-import PersonalityQuizDisplay from "../components/PersonalityQuizDisplay";
-import PersonalityQuizEditor from "../components/PersonalityQuizEditor";
-import SocialMediaLinksDisplay from "../components/SocialMediaLinksDisplay";
-import SocialMediaLinksEditor from "../components/SocialMediaLinksEditor";
+import AudioBioPlayer from '../components/AudioBioPlayer';
+import AudioBioUpload from '../components/AudioBioUpload';
+import VideoBioSnippetPlayer from '../components/VideoBioSnippetPlayer';
+import VideoBioSnippetUpload from '../components/VideoBioSnippetUpload';
+import PersonalityQuizDisplay from '../components/PersonalityQuizDisplay';
+import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
+import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
+import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
 import apiClient from '../api/apiClient';
 import HeroCaptureSection from '../components/HeroCaptureSection'; // Import the new component
 
@@ -52,23 +52,30 @@ function Profile() {
   const [fetchError, setFetchError] = useState(null);
 
   const [editableEducation, setEditableEducation] = useState('');
-  const [editableRelationshipGoals, setEditableRelationshipGoals] = useState('');
+  const [editableRelationshipGoals, setEditableRelationshipGoals] =
+    useState('');
   const [editableAboutMe, setEditableAboutMe] = useState('');
   const [heroMediaSaveStatus, setHeroMediaSaveStatus] = useState('');
 
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const handleHeroMediaUploadComplete = async (mediaUrl) => {
-    setHeroMediaSaveStatus("Saving hero media...");
+    setHeroMediaSaveStatus('Saving hero media...');
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", { heroMediaUrl: mediaUrl });
+      const updatedProfile = await apiClient.put('/api/users/me', {
+        heroMediaUrl: mediaUrl,
+      });
       setProfile(updatedProfile);
-      setHeroMediaSaveStatus("Hero media saved successfully!");
+      setHeroMediaSaveStatus('Hero media saved successfully!');
       setTimeout(() => setHeroMediaSaveStatus(''), 3000);
     } catch (error) {
-      console.error("Error saving hero media:", error);
-      setHeroMediaSaveStatus(`Error: ${error.data?.message || error.message || "Failed to save hero media."}`);
+      console.error('Error saving hero media:', error);
+      setHeroMediaSaveStatus(
+        `Error: ${
+          error.data?.message || error.message || 'Failed to save hero media.'
+        }`
+      );
     }
   };
 
@@ -77,13 +84,14 @@ function Profile() {
       await logout();
       navigate('/login');
     } catch (error) {
-      console.error("Failed to logout:", error);
+      console.error('Failed to logout:', error);
     }
   };
 
   const fetchProfile = useCallback(() => {
-    apiClient.get("/api/users/me")
-      .then(data => {
+    apiClient
+      .get('/api/users/me')
+      .then((data) => {
         setProfile(data);
         setEditableEducation(data.education || '');
         setEditableRelationshipGoals(data.relationshipGoals || '');
@@ -91,9 +99,11 @@ function Profile() {
         // Corrected: Removed setProfileImages as it's no longer used
         setFetchError(null);
       })
-      .catch(error => {
-        console.error("Error fetching profile:", error);
-        setFetchError(error.data?.message || error.message || "Failed to load profile");
+      .catch((error) => {
+        console.error('Error fetching profile:', error);
+        setFetchError(
+          error.data?.message || error.message || 'Failed to load profile'
+        );
         setProfile(null);
       });
   }, []);
@@ -123,7 +133,7 @@ function Profile() {
   const handleDetailsSave = async () => {
     setDetailsSaveStatus('Saving details...');
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", {
+      const updatedProfile = await apiClient.put('/api/users/me', {
         education: editableEducation,
         relationshipGoals: editableRelationshipGoals,
         aboutMe: editableAboutMe,
@@ -140,7 +150,9 @@ function Profile() {
   const handlePersonalityQuizSave = async (newQuizResults) => {
     setQuizSaveStatus('Saving personality quiz...');
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", { personalityQuizResults: newQuizResults });
+      const updatedProfile = await apiClient.put('/api/users/me', {
+        personalityQuizResults: newQuizResults,
+      });
       setProfile(updatedProfile);
       setQuizSaveStatus('Personality quiz saved successfully!');
       setTimeout(() => setQuizSaveStatus(''), 3000);
@@ -153,13 +165,17 @@ function Profile() {
   const handleSocialMediaLinksSave = async (newLinksData) => {
     setSocialLinksSaveStatus('Saving social media links...');
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", { socialMediaLinks: newLinksData });
+      const updatedProfile = await apiClient.put('/api/users/me', {
+        socialMediaLinks: newLinksData,
+      });
       setProfile(updatedProfile);
       setSocialLinksSaveStatus('Social media links saved successfully!');
       setTimeout(() => setSocialLinksSaveStatus(''), 3000);
     } catch (error) {
       console.error('Error saving social media links:', error);
-      setSocialLinksSaveStatus(`Error: ${error.data?.message || error.message}`);
+      setSocialLinksSaveStatus(
+        `Error: ${error.data?.message || error.message}`
+      );
     }
   };
 
@@ -168,7 +184,9 @@ function Profile() {
   const handleMediaUploadComplete = async (fileUrl, fieldName) => {
     setMediaSaveStatus(`Saving ${fieldName}...`);
     try {
-      const updatedProfile = await apiClient.put("/api/users/me", { [fieldName]: fileUrl });
+      const updatedProfile = await apiClient.put('/api/users/me', {
+        [fieldName]: fileUrl,
+      });
       setProfile(updatedProfile);
       setMediaSaveStatus(`${fieldName} saved successfully!`);
       setTimeout(() => setMediaSaveStatus(''), 3000);
@@ -179,11 +197,11 @@ function Profile() {
   };
 
   const handleInterestsSaved = (updatedInterests) => {
-    setProfile(prev => ({ ...prev, interests: updatedInterests }));
+    setProfile((prev) => ({ ...prev, interests: updatedInterests }));
   };
 
   const handlePromptsSaved = (updatedPrompts) => {
-    setProfile(prev => ({ ...prev, profilePrompts: updatedPrompts }));
+    setProfile((prev) => ({ ...prev, profilePrompts: updatedPrompts }));
   };
 
   if (fetchError) {
@@ -202,7 +220,7 @@ function Profile() {
             onClick={() => setIsEditing(!isEditing)}
             className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md mr-2"
           >
-            {isEditing ? "View Profile" : "Edit Profile"}
+            {isEditing ? 'View Profile' : 'Edit Profile'}
           </button>
           <button
             onClick={handleLogout}
@@ -221,8 +239,14 @@ function Profile() {
           {!isEditing && profile && (
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
               <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-white">{profile.name}</h1>
-                {profile.age && <span className="text-xl ml-2 text-gray-200">({profile.age})</span>}
+                <h1 className="text-2xl font-bold text-white">
+                  {profile.name}
+                </h1>
+                {profile.age && (
+                  <span className="text-xl ml-2 text-gray-200">
+                    ({profile.age})
+                  </span>
+                )}
               </div>
               <div className="flex items-center mt-1">
                 {isPremium && <PremiumBadge />}
@@ -231,30 +255,40 @@ function Profile() {
             </div>
           )}
           {heroMediaSaveStatus && (
-            <p className={`text-sm text-center py-2 ${heroMediaSaveStatus.startsWith("Error:") ? 'text-red-500' : 'text-green-500'}`}>
+            <p
+              className={`text-sm text-center py-2 ${
+                heroMediaSaveStatus.startsWith('Error:')
+                  ? 'text-red-500'
+                  : 'text-green-500'
+              }`}
+            >
               {heroMediaSaveStatus}
             </p>
           )}
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mb-2">Profile Snippet (Secondary)</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            Profile Snippet (Secondary)
+          </h2>
           {isEditing ? (
             <VideoBioSnippetUpload
               currentVideoUrl={profile.videoBioUrl || ''}
               onUploadComplete={handleMediaUploadComplete}
             />
+          ) : profile.videoBioUrl ? (
+            <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl} />
           ) : (
-            profile.videoBioUrl ?
-              <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl} /> :
-              <p className="text-gray-500">No secondary video snippet.</p>
+            <p className="text-gray-500">No secondary video snippet.</p>
           )}
         </section>
 
         {!isEditing && profile.aboutMe && (
           <section>
             <h2 className="text-xl font-semibold mb-2">About Me</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{profile.aboutMe}</p>
+            <p className="text-gray-700 whitespace-pre-wrap">
+              {profile.aboutMe}
+            </p>
           </section>
         )}
 
@@ -263,34 +297,51 @@ function Profile() {
           {isEditing ? (
             <>
               <p>Name: {profile.name} (readonly)</p>
-              <p>Age: {profile.age || "N/A"} (readonly)</p>
+              <p>Age: {profile.age || 'N/A'} (readonly)</p>
               <div className="my-2">
-                <label htmlFor="education" className="block text-sm font-medium text-gray-700">Education</label>
+                <label
+                  htmlFor="education"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Education
+                </label>
                 <input
                   id="education"
                   type="text"
                   value={editableEducation}
-                  onChange={e => setEditableEducation(e.target.value)}
+                  onChange={(e) => setEditableEducation(e.target.value)}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
               </div>
               <div className="my-2">
-                <label htmlFor="relationshipGoals" className="block text-sm font-medium text-gray-700">Relationship Goals</label>
+                <label
+                  htmlFor="relationshipGoals"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Relationship Goals
+                </label>
                 <input
                   id="relationshipGoals"
                   type="text"
                   value={editableRelationshipGoals}
-                  onChange={e => setEditableRelationshipGoals(e.target.value)}
+                  onChange={(e) =>
+                    setEditableRelationshipGoals(e.target.value)
+                  }
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
               </div>
               <div className="my-2">
-                <label htmlFor="aboutMe" className="block text-sm font-medium text-gray-700">About Me (Max 200 words)</label>
+                <label
+                  htmlFor="aboutMe"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  About Me (Max 200 words)
+                </label>
                 <textarea
                   id="aboutMe"
                   rows={5}
                   value={editableAboutMe}
-                  onChange={e => {
+                  onChange={(e) => {
                     const newText = e.target.value;
                     const words = newText.trim().split(/\\s+/);
                     if (words.length > 200) {
@@ -302,7 +353,11 @@ function Profile() {
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Words: {editableAboutMe.trim().split(/\\s+/).filter(Boolean).length} / 200
+                  Words:{' '}
+                  {
+                    editableAboutMe.trim().split(/\\s+/).filter(Boolean).length
+                  }{' '}
+                  / 200
                 </p>
               </div>
               <button
@@ -311,29 +366,47 @@ function Profile() {
               >
                 Save Details & About Me
               </button>
-              {detailsSaveStatus && <p className="text-xs text-gray-500 mt-1">{detailsSaveStatus}</p>}
+              {detailsSaveStatus && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {detailsSaveStatus}
+                </p>
+              )}
             </>
           ) : (
             <div className="mt-2 space-y-3">
               <div>
                 <span className="font-medium text-gray-500 mr-2">Gender:</span>
-                <span className="text-gray-800">{profile.gender || "N/A"}</span>
+                <span className="text-gray-800">
+                  {profile.gender || 'N/A'}
+                </span>
               </div>
               <div>
-                <span className="font-medium text-gray-500 mr-2">Preference:</span>
-                <span className="text-gray-800">{profile.preference || "N/A"}</span>
+                <span className="font-medium text-gray-500 mr-2">
+                  Preference:
+                </span>
+                <span className="text-gray-800">
+                  {profile.preference || 'N/A'}
+                </span>
               </div>
               <div>
                 <span className="font-medium text-gray-500 mr-2">Email:</span>
                 <span className="text-gray-800">{profile.email}</span>
               </div>
               <div>
-                <span className="font-medium text-gray-500 mr-2">Education:</span>
-                <span className="text-gray-800">{profile.education || "N/A"}</span>
+                <span className="font-medium text-gray-500 mr-2">
+                  Education:
+                </span>
+                <span className="text-gray-800">
+                  {profile.education || 'N/A'}
+                </span>
               </div>
               <div>
-                <span className="font-medium text-gray-500 mr-2">Relationship Goals:</span>
-                <span className="text-gray-800">{profile.relationshipGoals || "N/A"}</span>
+                <span className="font-medium text-gray-500 mr-2">
+                  Relationship Goals:
+                </span>
+                <span className="text-gray-800">
+                  {profile.relationshipGoals || 'N/A'}
+                </span>
               </div>
             </div>
           )}
@@ -357,7 +430,9 @@ function Profile() {
               onSave={handlePromptsSaved}
             />
           ) : (
-            <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
+            <ProfilePromptsDisplay
+              profilePrompts={profile.profilePrompts || []}
+            />
           )}
         </section>
 
@@ -371,7 +446,9 @@ function Profile() {
           ) : (
             <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
           )}
-          {mediaSaveStatus && <p className="text-sm text-gray-600 mt-2">{mediaSaveStatus}</p>}
+          {mediaSaveStatus && (
+            <p className="text-sm text-gray-600 mt-2">{mediaSaveStatus}</p>
+          )}
         </section>
 
         <section>
@@ -383,7 +460,9 @@ function Profile() {
               setStatusMessage={setQuizSaveStatus}
             />
           ) : (
-            <PersonalityQuizDisplay quizResults={profile.personalityQuizResults || {}} />
+            <PersonalityQuizDisplay
+              quizResults={profile.personalityQuizResults || {}}
+            />
           )}
         </section>
 
@@ -396,7 +475,9 @@ function Profile() {
               setSaveStatus={setSocialLinksSaveStatus}
             />
           ) : (
-            <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />
+            <SocialMediaLinksDisplay
+              socialMediaLinks={profile.socialMediaLinks || {}}
+            />
           )}
         </section>
 
