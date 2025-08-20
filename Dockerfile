@@ -28,8 +28,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 3000
+# Hugging Face Spaces requires apps to bind to $PORT (default: 7860)
+EXPOSE 7860
+ENV PORT=7860
 
-ENV PORT 3000
-
+# Start the Next.js standalone server
 CMD ["node", "server.js"]
