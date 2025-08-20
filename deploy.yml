@@ -14,123 +14,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install jq
+      - name: Set up jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      # === Sync Server-Side Secrets ===
-      - name: Sync FIREBASE_PROJECT_ID
+      - name: Sync Secrets to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          # Client-side variables required by the application
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
         run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
+          # Combine all secrets to sync into one list
+          SECRETS_TO_SYNC="FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY NEXT_PUBLIC_FIREBASE_API_KEY NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN NEXT_PUBLIC_FIREBASE_PROJECT_ID NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID NEXT_PUBLIC_FIREBASE_APP_ID"
 
-      - name: Sync FIREBASE_CLIENT_EMAIL
-        run: |
+          # Add static PORT secret for Hugging Face
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Authorization: Bearer $HF_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"key\": \"FIREBASE_CLIENT_EMAIL\", \"value\": \"${{ secrets.FIREBASE_CLIENT_EMAIL }}\"}"
+            -d '{"key": "PORT", "value": "7860"}'
 
-      - name: Sync FIREBASE_PRIVATE_KEY
-        run: |
-          JSON_PAYLOAD=$(jq -n --arg key "FIREBASE_PRIVATE_KEY" --arg value "${{ secrets.FIREBASE_PRIVATE_KEY }}" \
-            '{key: $key, value: $value}')
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "$JSON_PAYLOAD"
+          # Loop through secrets and sync them
+          for SECRET_KEY in $SECRETS_TO_SYNC; do
+            SECRET_VALUE=$(printenv $SECRET_KEY)
+            # Use jq to safely create the JSON payload
+            JSON_PAYLOAD=$(jq -n --arg key "$SECRET_KEY" --arg value "$SECRET_VALUE" '{key: $key, value: $value}')
 
-      # === Sync Client-Side (NEXT_PUBLIC_) Secrets ===
-      - name: Sync NEXT_PUBLIC_FIREBASE_API_KEY
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_API_KEY\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}\"}"
-
-      - name: Sync NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}\"}"
-
-      - name: Sync NEXT_PUBLIC_FIREBASE_PROJECT_ID
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}\"}"
-
-      - name: Sync NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}\"}"
-
-      - name: Sync NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}\"}"
-
-      - name: Sync NEXT_PUBLIC_FIREBASE_APP_ID
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_APP_ID\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}\"}"
-
-      # === Sync Other Secrets ===
-      - name: Sync JWT_SECRET
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"JWT_SECRET\", \"value\": \"${{ secrets.JWT_SECRET }}\"}"
-
-      - name: Sync MONGO_URI
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"MONGO_URI\", \"value\": \"${{ secrets.MONGO_URI }}\"}"
-
-      - name: Sync STRIPE_SECRET_KEY
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"STRIPE_SECRET_KEY\", \"value\": \"${{ secrets.STRIPE_SECRET_KEY }}\"}"
-
-      - name: Sync STRIPE_WEBHOOK_SECRET
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"STRIPE_WEBHOOK_SECRET\", \"value\": \"${{ secrets.STRIPE_WEBHOOK_SECRET }}\"}"
-
-      - name: Sync PORT
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"PORT\", \"value\": \"7860\"}"
-
-      # === Deploy Application ===
-      - name: Install Git LFS
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git-lfs
-          git lfs install
+            curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+              -H "Authorization: Bearer $HF_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$JSON_PAYLOAD"
+          done
 
       - name: Sync files to Hugging Face Space
         run: |
-          git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
-          rsync -av --delete ./ hf_space/ --exclude .git --exclude hf_space --exclude .github
+          # Clone the space repository into a directory named 'hf_space'
+          git clone "https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit" hf_space
+
+          # Use rsync to sync the entire project.
+          rsync -av --delete --exclude='.git/' --exclude='hf_space/' --exclude='node_modules/' ./ hf_space/
+
+          # Go into the space directory, commit and push the changes
           cd hf_space
           git add .
           git config user.email "actions@github.com"
