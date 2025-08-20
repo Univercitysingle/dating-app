@@ -9,7 +9,14 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN echo "--- Building application ---" && npm run build
+RUN echo "--- Building application ---" && \
+    NEXT_PUBLIC_FIREBASE_API_KEY="dummy" \
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="dummy" \
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID="dummy" \
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="dummy" \
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="dummy" \
+    NEXT_PUBLIC_FIREBASE_APP_ID="dummy" \
+    npm run build
 
 # Stage 3: Production image (Standalone)
 FROM node:20-alpine AS runner
