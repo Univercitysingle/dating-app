@@ -1,0 +1,24 @@
+# Docker files
+Dockerfile
+.dockerignore
+
+# Git files
+.git
+.gitignore
+
+# Node modules
+node_modules
+frontend/node_modules
+
+# Next.js build artifacts
+frontend/.next
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
