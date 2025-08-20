@@ -1,0 +1,42 @@
+# This workflow is part of Task 1.2
+name: Test and Lint
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    # =====================================================================================
+    # NOTE: THIS STEP IS EXPECTED TO FAIL
+    # The agent's execution environment has a file count limit that is smaller
+    # than the number of files in a standard node_modules directory.
+    # This workflow is being created as a placeholder for when that issue is resolved.
+    # =====================================================================================
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Lint workspaces
+      run: npm run lint --workspaces --if-present
+
+    - name: Test workspaces
+      run: npm run test --workspaces --if-present
