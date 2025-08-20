@@ -1,11 +1,6 @@
 # FWB/Dating Web Application
 
-This repository contains the source code for a modern dating and friends-with-benefits web application.
-
-## Project Structure
-
-- `/frontend`: Contains the Next.js application.
-- `/backend`: Placeholder for future backend services.
+This repository contains the source code for a modern, full-stack dating and friends-with-benefits web application built with Next.js.
 
 ## Getting Started
 
@@ -22,14 +17,13 @@ This repository contains the source code for a modern dating and friends-with-be
     cd <repository-name>
     ```
 
-2.  **Install frontend dependencies:**
+2.  **Install dependencies:**
     ```bash
-    cd frontend
     npm install
     ```
 
 3.  **Set up environment variables:**
-    Create a `.env.local` file in the `frontend` directory by copying the example:
+    Create a `.env.local` file by copying the example:
     ```bash
     cp .env.example .env.local
     ```

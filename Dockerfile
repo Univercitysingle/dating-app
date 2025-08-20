@@ -2,15 +2,15 @@
 FROM node:18-alpine AS deps
 WORKDIR /app
 
-# Copy package.json and lockfile from frontend
-COPY frontend/package.json frontend/package-lock.json* ./
+# Copy package.json and lockfile
+COPY package.json package-lock.json* ./
 RUN npm install
 
 # Stage 2: Build the application
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY frontend ./
+COPY . .
 # The --no-lint flag is added to avoid potential CI issues with linting during build.
 RUN npm run build -- --no-lint
 

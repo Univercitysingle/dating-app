@@ -8,10 +8,9 @@ Dockerfile
 
 # Node modules
 node_modules
-frontend/node_modules
 
 # Next.js build artifacts
-frontend/.next
+.next
 
 # Log files
 npm-debug.log*
