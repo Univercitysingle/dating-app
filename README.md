@@ -1,3 +1,13 @@
+---
+title: FWB/Dating Web App
+emoji: ❤️
+colorFrom: pink
+colorTo: red
+sdk: docker
+pinned: false
+app_port: 3000
+---
+
 # FWB/Dating Web Application
 
 This repository contains the source code for a modern, full-stack dating and friends-with-benefits web application built with Next.js.
