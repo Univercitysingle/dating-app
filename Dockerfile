@@ -1,8 +1,6 @@
 # Stage 1: Install dependencies
 FROM node:18-alpine AS deps
 WORKDIR /app
-
-# Copy package.json and lockfile
 COPY package.json package-lock.json* ./
 RUN npm install
 
@@ -11,28 +9,27 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# The --no-lint flag is added to avoid potential CI issues with linting during build.
-RUN npm run build -- --no-lint
+RUN npm run build
 
-# Stage 3: Production image
+# Stage 3: Production image (Standalone)
 FROM node:18-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Uncomment the following line in case you want to expose a different port
-ENV PORT 3000
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy necessary files from the builder stage
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+# Copy the standalone output
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Copy the public and static folders
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+ENV PORT 3000
+
+CMD ["node", "server.js"]
