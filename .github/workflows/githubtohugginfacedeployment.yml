@@ -14,14 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check package-lock.json exists
-        run: |
-          if [ ! -f backend/package-lock.json ]; then
-            echo "Error: backend/package-lock.json is missing!"
-            exit 1
-          fi
-
-      - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
+     - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
