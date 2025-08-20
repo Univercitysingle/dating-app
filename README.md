@@ -47,3 +47,9 @@ This repository contains the source code for a modern, full-stack dating and fri
     docker run -p 3000:3000 fwb-app
     ```
     The application will be available at [http://localhost:3000](http://localhost:3000).
+
+## Project Notes
+
+### Package Manager
+
+This project uses `npm` as its package manager. While `pnpm` was preferred initially, persistent environment errors during the setup phase required a fallback to `npm` for stability.

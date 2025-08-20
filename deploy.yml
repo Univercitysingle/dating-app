@@ -17,7 +17,7 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      # Sync FIREBASE_PROJECT_ID
+      # === Sync Server-Side Secrets ===
       - name: Sync FIREBASE_PROJECT_ID
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
@@ -25,7 +25,6 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
 
-      # Sync FIREBASE_CLIENT_EMAIL
       - name: Sync FIREBASE_CLIENT_EMAIL
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
@@ -33,7 +32,6 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"key\": \"FIREBASE_CLIENT_EMAIL\", \"value\": \"${{ secrets.FIREBASE_CLIENT_EMAIL }}\"}"
 
-      # Sync FIREBASE_PRIVATE_KEY
       - name: Sync FIREBASE_PRIVATE_KEY
         run: |
           JSON_PAYLOAD=$(jq -n --arg key "FIREBASE_PRIVATE_KEY" --arg value "${{ secrets.FIREBASE_PRIVATE_KEY }}" \
@@ -43,7 +41,50 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$JSON_PAYLOAD"
 
-      # Sync other secrets
+      # === Sync Client-Side (NEXT_PUBLIC_) Secrets ===
+      - name: Sync NEXT_PUBLIC_FIREBASE_API_KEY
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_API_KEY\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}\"}"
+
+      - name: Sync NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}\"}"
+
+      - name: Sync NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}\"}"
+
+      - name: Sync NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}\"}"
+
+      - name: Sync NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}\"}"
+
+      - name: Sync NEXT_PUBLIC_FIREBASE_APP_ID
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_APP_ID\", \"value\": \"${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}\"}"
+
+      # === Sync Other Secrets ===
       - name: Sync JWT_SECRET
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
@@ -72,7 +113,6 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"key\": \"STRIPE_WEBHOOK_SECRET\", \"value\": \"${{ secrets.STRIPE_WEBHOOK_SECRET }}\"}"
 
-      # Sync PORT
       - name: Sync PORT
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
@@ -80,6 +120,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"key\": \"PORT\", \"value\": \"7860\"}"
 
+      # === Deploy Application ===
       - name: Install Git LFS
         run: |
           sudo apt-get update
