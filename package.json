@@ -1,2 +1,20 @@
 {
+  "name": "fwb-dating-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm run start --workspace=apps/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "functions"
+  ],
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5"
+  }
 }
