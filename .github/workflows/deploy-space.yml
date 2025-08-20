@@ -1,0 +1,33 @@
+# This workflow is part of Task 1.2
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-to-hub:
+    name: Deploy to Hub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for a proper push
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE }}
+        run: |
+          git config --global user.email "jules-agent@google.com"
+          git config --global user.name "Jules Agent"
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main
+        # =====================================================================================
+        # NOTE: THIS WORKFLOW ONLY PUSHES THE CODE.
+        # The Hugging Face Space is expected to build the Dockerfile upon receiving the push.
+        # That build process will likely FAIL because it depends on `npm install`,
+        # which is the step that is currently blocked in all environments.
+        # This workflow is being created as a placeholder for when that issue is resolved.
+        # =====================================================================================
