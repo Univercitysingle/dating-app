@@ -57,17 +57,20 @@ jobs:
 
       - name: Sync files to Hugging Face Space
         run: |
-          # Clone the space repository
+          set -x
+          echo "INFO: Cloning Hugging Face Space repository..."
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
+          echo "INFO: Clone complete."
 
-          # Use rsync to efficiently sync the repository content to the space.
-          # The --delete flag ensures that old files are removed.
+          echo "INFO: Syncing application files with rsync..."
           rsync -av --delete ./ hf_space/ --exclude=".git" --exclude="hf_space" --exclude=".github" --exclude="node_modules" --exclude=".next"
+          echo "INFO: Sync complete."
 
-          # Go into the space directory, commit and push the changes
+          echo "INFO: Committing and pushing changes to Hugging Face Space..."
           cd hf_space
           git add .
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git commit -m "Deploy from GitHub Actions" || echo "No changes to commit"
           git push
+          echo "INFO: Push to Hugging Face Space complete."

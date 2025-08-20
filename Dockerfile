@@ -2,14 +2,14 @@
 FROM node:18-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN echo "--- Installing dependencies ---" && npm install
 
 # Stage 2: Build the application
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN echo "--- Building application ---" && npm run build
 
 # Stage 3: Production image (Standalone)
 FROM node:18-alpine AS runner
@@ -28,9 +28,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-# Hugging Face Spaces requires apps to bind to $PORT (default: 7860)
-EXPOSE 7860
-ENV PORT=7860
+EXPOSE 3000
 
-# Start the Next.js standalone server
+ENV PORT 3000
+
 CMD ["node", "server.js"]
