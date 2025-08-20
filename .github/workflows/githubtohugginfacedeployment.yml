@@ -14,27 +14,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Check package-lock.json exists
+        run: |
+          if [ ! -f backend/package-lock.json ]; then
+            echo "Error: backend/package-lock.json is missing!"
+            exit 1
+          fi
 
-      # Sync FIREBASE_PROJECT_ID
-      - name: Sync FIREBASE_PROJECT_ID
+      - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
             -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
 
-      # Sync FIREBASE_CLIENT_EMAIL
-      - name: Sync FIREBASE_CLIENT_EMAIL
+      - name: Sync FIREBASE_CLIENT_EMAIL secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
             -d "{\"key\": \"FIREBASE_CLIENT_EMAIL\", \"value\": \"${{ secrets.FIREBASE_CLIENT_EMAIL }}\"}"
 
-      # Sync FIREBASE_PRIVATE_KEY
-      - name: Sync FIREBASE_PRIVATE_KEY
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Sync FIREBASE_PRIVATE_KEY secret to Hugging Face Space
         run: |
           JSON_PAYLOAD=$(jq -n --arg key "FIREBASE_PRIVATE_KEY" --arg value "${{ secrets.FIREBASE_PRIVATE_KEY }}" \
             '{key: $key, value: $value}')
@@ -43,37 +47,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$JSON_PAYLOAD"
 
-      # Sync other secrets
-      - name: Sync JWT_SECRET
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"JWT_SECRET\", \"value\": \"${{ secrets.JWT_SECRET }}\"}"
-
-      - name: Sync MONGO_URI
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"MONGO_URI\", \"value\": \"${{ secrets.MONGO_URI }}\"}"
-
-      - name: Sync STRIPE_SECRET_KEY
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"STRIPE_SECRET_KEY\", \"value\": \"${{ secrets.STRIPE_SECRET_KEY }}\"}"
-
-      - name: Sync STRIPE_WEBHOOK_SECRET
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"STRIPE_WEBHOOK_SECRET\", \"value\": \"${{ secrets.STRIPE_WEBHOOK_SECRET }}\"}"
-
-      # Sync PORT
-      - name: Sync PORT
+      - name: Sync PORT secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
@@ -88,8 +62,14 @@ jobs:
 
       - name: Sync files to Hugging Face Space
         run: |
+          # Clone the space repository
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
-          rsync -av --delete ./ hf_space/ --exclude .git --exclude hf_space --exclude .github
+
+          # Use rsync to efficiently sync only the backend directory to the space.
+          # The --delete flag ensures that old files are removed.
+          rsync -av --delete backend/ hf_space/ --exclude .git --exclude hf_space --exclude .github
+
+          # Go into the space directory, commit and push the changes
           cd hf_space
           git add .
           git config user.email "actions@github.com"

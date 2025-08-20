@@ -14,52 +14,85 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up jq
+      - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Sync Secrets to Hugging Face Space
-        env:
-          HF_TOKEN: ${{ secrets.HF }}
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+      # Sync FIREBASE_PROJECT_ID
+      - name: Sync FIREBASE_PROJECT_ID
         run: |
-          # List of secrets to sync from GitHub secrets
-          SECRETS_TO_SYNC="FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY"
-
-          # Add static PORT secret for Hugging Face
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer $HF_TOKEN" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
-            -d '{"key": "PORT", "value": "7860"}'
+            -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
 
-          # Loop through secrets and sync them
-          for SECRET_KEY in $SECRETS_TO_SYNC; do
-            SECRET_VALUE=$(printenv $SECRET_KEY)
-            # Use jq to safely create the JSON payload
-            JSON_PAYLOAD=$(jq -n --arg key "$SECRET_KEY" --arg value "$SECRET_VALUE" '{key: $key, value: $value}')
+      # Sync FIREBASE_CLIENT_EMAIL
+      - name: Sync FIREBASE_CLIENT_EMAIL
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"FIREBASE_CLIENT_EMAIL\", \"value\": \"${{ secrets.FIREBASE_CLIENT_EMAIL }}\"}"
 
-            curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-              -H "Authorization: Bearer $HF_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$JSON_PAYLOAD"
-          done
+      # Sync FIREBASE_PRIVATE_KEY
+      - name: Sync FIREBASE_PRIVATE_KEY
+        run: |
+          JSON_PAYLOAD=$(jq -n --arg key "FIREBASE_PRIVATE_KEY" --arg value "${{ secrets.FIREBASE_PRIVATE_KEY }}" \
+            '{key: $key, value: $value}')
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "$JSON_PAYLOAD"
+
+      # Sync other secrets
+      - name: Sync JWT_SECRET
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"JWT_SECRET\", \"value\": \"${{ secrets.JWT_SECRET }}\"}"
+
+      - name: Sync MONGO_URI
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"MONGO_URI\", \"value\": \"${{ secrets.MONGO_URI }}\"}"
+
+      - name: Sync STRIPE_SECRET_KEY
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"STRIPE_SECRET_KEY\", \"value\": \"${{ secrets.STRIPE_SECRET_KEY }}\"}"
+
+      - name: Sync STRIPE_WEBHOOK_SECRET
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"STRIPE_WEBHOOK_SECRET\", \"value\": \"${{ secrets.STRIPE_WEBHOOK_SECRET }}\"}"
+
+      # Sync PORT
+      - name: Sync PORT
+        run: |
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+            -H "Authorization: Bearer ${{ secrets.HF }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\": \"PORT\", \"value\": \"7860\"}"
+
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
+          git lfs install
 
       - name: Sync files to Hugging Face Space
         run: |
-          # Clone the space repository into a directory named 'hf_space'
-          git clone "https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit" hf_space
-
-          # Use rsync to sync the entire project.
-          # --delete removes files in the destination that are not in the source.
-          rsync -av --delete --exclude='.git/' --exclude='hf_space/' --exclude='node_modules/' ./ hf_space/
-
-          # Go into the space directory, commit and push the changes
+          git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
+          rsync -av --delete ./ hf_space/ --exclude .git --exclude hf_space --exclude .github
           cd hf_space
           git add .
-          # Configure git user for the commit
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          # Commit changes, or echo if no changes
           git commit -m "Deploy from GitHub Actions" || echo "No changes to commit"
           git push
