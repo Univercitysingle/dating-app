@@ -60,9 +60,9 @@ jobs:
           # Clone the space repository
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
 
-          # Use rsync to efficiently sync only the backend directory to the space.
+          # Use rsync to efficiently sync the repository content to the space.
           # The --delete flag ensures that old files are removed.
-          rsync -av --delete backend/ hf_space/ --exclude .git --exclude hf_space --exclude .github
+          rsync -av --delete ./ hf_space/ --exclude=".git" --exclude="hf_space" --exclude=".github" --exclude="node_modules" --exclude=".next"
 
           # Go into the space directory, commit and push the changes
           cd hf_space
