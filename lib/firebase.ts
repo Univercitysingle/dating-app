@@ -11,6 +11,12 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// --- SAFE DEBUGGING LOG ---
+console.log("Initializing Firebase...");
+console.log("Project ID:", firebaseConfig.projectId);
+console.log("API Key (first 5):", firebaseConfig.apiKey?.substring(0, 5));
+// --------------------------
+
 // Initialize Firebase
 // Check if the app is already initialized to avoid errors during hot-reloading
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
