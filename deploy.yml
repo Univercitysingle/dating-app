@@ -12,6 +12,17 @@ jobs:
 
     env:
       HF_SPACE: Sarangat/jit
+      # Server-side secrets
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+      FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+      # Client-side secrets
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }} # Use single source of truth
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
 
     steps:
       - name: Checkout repository
@@ -23,21 +34,9 @@ jobs:
       - name: Sync Secrets to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF }}
-          # Server-side secrets
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          # Client-side secrets
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }} # Use single source of truth
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
         run: |
           SECRETS_TO_SYNC="FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY"
 
-          # Function to create a secret in Hugging Face
           create_secret() {
             local key=$1
             local value=$2
@@ -49,23 +48,27 @@ jobs:
               -d "$payload"
           }
 
-          # Sync application secrets
           for secret_key in $SECRETS_TO_SYNC; do
             create_secret "$secret_key" "$(printenv "$secret_key")"
           done
 
-          # Sync static PORT secret
           create_secret "PORT" "7860"
+
+      - name: Create .env.local file
+        run: |
+          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}" > .env.local
+          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}" >> .env.local
+          echo "NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}" >> .env.local
 
       - name: Sync files to Hugging Face Space
         run: |
-          # Clone the space repository
           git clone "https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/${HF_SPACE}" hf_space
 
-          # Copy all files except for .git, hf_space and node_modules
           rsync -av --delete --exclude='.git/' --exclude='hf_space/' --exclude='node_modules/' ./ hf_space/
 
-          # Commit and push changes
           cd hf_space
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
