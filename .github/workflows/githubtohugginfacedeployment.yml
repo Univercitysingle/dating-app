@@ -16,29 +16,41 @@ jobs:
 
       - name: Clean and Sync Public Firebase Variables
         run: |
-          # For each key, first delete it from both variables and secrets to prevent collision.
-          # Then, create it in the correct place (/variables).
+          # For each key, first delete all possible old and new names from both variables and secrets to prevent collision.
+          # Then, create the key in the correct place (/variables).
           # The -f flag on curl makes it not fail on a 404 (if the key doesn't exist).
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_API_KEY\", \"value\": \"${{ secrets.FIREBASE_API_KEY }}\"}"
 
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_AUTH_DOMAIN" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_AUTH_DOMAIN" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN\", \"value\": \"${{ secrets.FIREBASE_AUTH_DOMAIN }}\"}"
 
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_PROJECT_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_PROJECT_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_PROJECT_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_PROJECT_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
 
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_STORAGE_BUCKET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_STORAGE_BUCKET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET\", \"value\": \"${{ secrets.FIREBASE_STORAGE_BUCKET }}\"}"
 
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_MESSAGING_SENDER_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_MESSAGING_SENDER_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID\", \"value\": \"${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}\"}"
 
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_APP_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_APP_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_APP_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_APP_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_APP_ID\", \"value\": \"${{ secrets.FIREBASE_APP_ID }}\"}"
