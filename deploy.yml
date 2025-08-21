@@ -42,7 +42,7 @@ jobs:
             local value=$2
             local payload
             payload=$(jq -n --arg key "$key" --arg value "$value" '{key: $key, value: $value}')
-            curl -s -X POST "https://huggingface.co/api/spaces/${HF_SPACE}/secrets" \
+            curl -sv -X POST "https://huggingface.co/api/spaces/${HF_SPACE}/secrets" \
               -H "Authorization: Bearer $HF_TOKEN" \
               -H "Content-Type: application/json" \
               -d "$payload"
@@ -53,6 +53,12 @@ jobs:
           done
 
           create_secret "PORT" "7860"
+
+      - name: Debug Environment Variables
+        run: |
+          echo "--- Printing all environment variables ---"
+          printenv
+          echo "----------------------------------------"
 
       - name: Sync files to Hugging Face Space
         run: |

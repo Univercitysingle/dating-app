@@ -13,6 +13,10 @@ COPY . .
 # The NEXT_PUBLIC_* variables are expected to be provided by the Hugging Face Space's
 # configuration, likely in the README.md metadata.
 
+RUN echo "--- Listing files in build context ---" && ls -la
+RUN echo "--- Printing environment variables ---" && printenv
+RUN echo "--------------------------------------"
+
 RUN echo "--- Building application ---" && npm run build
 
 # Stage 3: Production image (Standalone)
