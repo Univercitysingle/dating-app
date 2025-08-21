@@ -4,6 +4,19 @@ import { app } from '../lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
+const getFirebaseErrorMessage = (errorCode: string): string => {
+  switch (errorCode) {
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/weak-password':
+      return 'The password is too weak. Please choose a stronger password.';
+    default:
+      return 'An unexpected error occurred. Please try again.';
+  }
+};
+
 const SignupPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +34,7 @@ const SignupPage = () => {
       await createUserWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (err: any) {
-      setError(err.message);
+      setError(getFirebaseErrorMessage(err.code));
       console.error(err);
     } finally {
       setLoading(false);

@@ -4,6 +4,19 @@ import { app } from '../lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
+const getFirebaseErrorMessage = (errorCode: string): string => {
+  switch (errorCode) {
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Invalid email or password. Please try again.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    default:
+      return 'An unexpected error occurred. Please try again.';
+  }
+};
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +34,7 @@ const LoginPage = () => {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (err: any) {
-      setError(err.message);
+      setError(getFirebaseErrorMessage(err.code));
       console.error(err);
     } finally {
       setLoading(false);
