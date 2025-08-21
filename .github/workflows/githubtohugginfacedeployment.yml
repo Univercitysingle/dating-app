@@ -36,13 +36,11 @@ jobs:
             VALUE="${VARS[$KEY]}"
             echo "INFO: Syncing variable $KEY"
 
-            # Clean up old entries
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" \
-              -H "Authorization: Bearer ${{ secrets.HF }}" || true
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" \
-              -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            # Clean up old entries in both variables & secrets
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
 
-            # Post new variable
+            # Post new variable safely
             JSON_PAYLOAD=$(jq -n --arg key "$KEY" --arg value "$VALUE" '{key: $key, value: $value}')
             curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" \
               -H "Authorization: Bearer ${{ secrets.HF }}" \
@@ -61,19 +59,27 @@ jobs:
             VALUE="${SECRETS[$KEY]}"
             echo "INFO: Syncing secret $KEY"
 
-            # Clean up old entries
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" \
-              -H "Authorization: Bearer ${{ secrets.HF }}" || true
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" \
-              -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            # Clean up old entries in both variables & secrets
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
 
-            # Post new secret
+            # Post new secret safely
             JSON_PAYLOAD=$(jq -n --arg key "$KEY" --arg value "$VALUE" '{key: $key, value: $value}')
             curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
               -H "Authorization: Bearer ${{ secrets.HF }}" \
               -H "Content-Type: application/json" \
               -d "$JSON_PAYLOAD"
           done
+
+      - name: Debug Hugging Face Variables/Secrets
+        run: |
+          echo "INFO: Current Variables:"
+          curl -s -H "Authorization: Bearer ${{ secrets.HF }}" \
+            https://huggingface.co/api/spaces/Sarangat/jit/variables | jq
+
+          echo "INFO: Current Secrets:"
+          curl -s -H "Authorization: Bearer ${{ secrets.HF }}" \
+            https://huggingface.co/api/spaces/Sarangat/jit/secrets | jq
 
       - name: Sync files to Hugging Face Space
         run: |
