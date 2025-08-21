@@ -14,11 +14,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Clean and Sync Public Firebase Variables
+      - name: Sync All Variables and Secrets to Hugging Face Space
         run: |
-          # For each key, first delete all possible old and new names from both variables and secrets to prevent collision.
-          # Then, create the key in the correct place (/variables).
-          # The -f flag on curl makes it not fail on a 404 (if the key doesn't exist).
+          # This script is designed to be fully idempotent.
+          # For each key, it deletes any potential old/new name combinations from both /variables and /secrets
+          # before creating the definitive entry in the correct category.
+
+          # --- Public Firebase Variables ---
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/NEXT_PUBLIC_FIREBASE_API_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
@@ -55,11 +57,43 @@ jobs:
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/NEXT_PUBLIC_FIREBASE_APP_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"NEXT_PUBLIC_FIREBASE_APP_ID\", \"value\": \"${{ secrets.FIREBASE_APP_ID }}\"}"
 
-      - name: Clean and Sync Private Firebase Secrets
-        run: |
+          # --- Public AWS Variables ---
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/AWS_REGION" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/AWS_REGION" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"AWS_REGION\", \"value\": \"${{ secrets.AWS_REGION }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/AWS_S3_BUCKET_NAME" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/AWS_S3_BUCKET_NAME" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"AWS_S3_BUCKET_NAME\", \"value\": \"${{ secrets.AWS_S3_BUCKET_NAME }}\"}"
+
+          # --- Private Secrets (Firebase, AWS, etc.) ---
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/FIREBASE_CLIENT_EMAIL" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/FIREBASE_CLIENT_EMAIL" -H "Authorization: Bearer ${{ secrets.HF }}" || true
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"FIREBASE_CLIENT_EMAIL\", \"value\": \"${{ secrets.FIREBASE_CLIENT_EMAIL }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/AWS_ACCESS_KEY_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/AWS_ACCESS_KEY_ID" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"AWS_ACCESS_KEY_ID\", \"value\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/AWS_SECRET_ACCESS_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/AWS_SECRET_ACCESS_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"AWS_SECRET_ACCESS_KEY\", \"value\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/JWT_SECRET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/JWT_SECRET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"JWT_SECRET\", \"value\": \"${{ secrets.JWT_SECRET }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/MONGO_URI" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/MONGO_URI" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"MONGO_URI\", \"value\": \"${{ secrets.MONGO_URI }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/STRIPE_SECRET_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/STRIPE_SECRET_KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"STRIPE_SECRET_KEY\", \"value\": \"${{ secrets.STRIPE_SECRET_KEY }}\"}"
+
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/STRIPE_WEBHOOK_SECRET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/STRIPE_WEBHOOK_SECRET" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" -H "Authorization: Bearer ${{ secrets.HF }}" -H "Content-Type: application/json" -d "{\"key\": \"STRIPE_WEBHOOK_SECRET\", \"value\": \"${{ secrets.STRIPE_WEBHOOK_SECRET }}\"}"
 
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
