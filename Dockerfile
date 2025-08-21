@@ -10,12 +10,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# The NEXT_PUBLIC_* variables are expected to be provided by the Hugging Face Space's
-# configuration, likely in the README.md metadata.
-
-RUN echo "--- Listing files in build context ---" && ls -la
-RUN echo "--- Printing environment variables ---" && printenv
-RUN echo "--------------------------------------"
+# The NEXT_PUBLIC_* variables are provided by the Hugging Face Space secrets
+# and are available as environment variables during the build.
 
 RUN echo "--- Building application ---" && npm run build
 
