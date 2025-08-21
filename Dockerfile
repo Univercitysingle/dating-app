@@ -10,8 +10,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# NEXT_PUBLIC_* variables are automatically available in the build environment on Vercel and other modern hosting platforms.
-# No need to manually pass them as build arguments.
+# Copy the environment file and rename it to .env.local
+# This ensures that the Next.js build can access the environment variables
+COPY deployment.env .
+RUN mv deployment.env .env.local
 
 RUN echo "--- Building application ---" && npm run build
 
