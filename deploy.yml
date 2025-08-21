@@ -54,26 +54,16 @@ jobs:
 
           create_secret "PORT" "7860"
 
-      - name: Create deployment.env file
-        run: |
-          echo "NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY}" > deployment.env
-          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}" >> deployment.env
-          echo "NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID}" >> deployment.env
-          echo "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}" >> deployment.env
-          echo "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}" >> deployment.env
-          echo "NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}" >> deployment.env
-
       - name: Sync files to Hugging Face Space
         run: |
           git clone "https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/${HF_SPACE}" hf_space
 
-          rsync -av --delete --exclude='.git/' --exclude='hf_space/' --exclude='node_modules/' ./ hf_space/
+          rsync -av --delete --exclude='.git/' --exclude='hf_space/' --exclude='node_modules/' --exclude='README.md' ./ hf_space/
 
           cd hf_space
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git add .
-          git add -f deployment.env
           if git diff-index --quiet HEAD; then
             echo "No changes to commit."
           else

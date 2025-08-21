@@ -10,10 +10,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Copy the environment file and rename it to .env.local
-# This ensures that the Next.js build can access the environment variables
-COPY deployment.env .
-RUN mv deployment.env .env.local
+# The NEXT_PUBLIC_* variables are expected to be provided by the Hugging Face Space's
+# configuration, likely in the README.md metadata.
 
 RUN echo "--- Building application ---" && npm run build
 
