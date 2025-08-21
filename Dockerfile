@@ -26,8 +26,11 @@ ENV NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SEN
 ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
 
 # Fail fast if the required build arguments are not set
-RUN if [ -z "$NEXT_PUBLIC_FIREBASE_API_KEY" ]; then echo "ERROR: Build argument NEXT_PUBLIC_FIREBASE_API_KEY is not set" && exit 1; fi
-RUN if [ -z "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" ]; then echo "ERROR: Build argument NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set" && exit 1; fi
+RUN if [ -z "$NEXT_PUBLIC_FIREBASE_API_KEY" ] || [ -z "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" ]; then \
+      echo "ERROR: Missing required build arguments." && \
+      echo "Ensure NEXT_PUBLIC_FIREBASE_API_KEY and NEXT_PUBLIC_FIREBASE_PROJECT_ID are set." && \
+      exit 1; \
+    fi
 
 RUN echo "--- Building application ---" && npm run build
 

@@ -10,6 +10,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      HF_SPACE: Sarangat/jit
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -20,50 +23,56 @@ jobs:
       - name: Sync Secrets to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF }}
+          # Server-side secrets
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          # Client-side variables required by the application
+          # Client-side secrets
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }} # Use single source of truth
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
         run: |
-          # Combine all secrets to sync into one list
           SECRETS_TO_SYNC="FIREBASE_PROJECT_ID FIREBASE_CLIENT_EMAIL FIREBASE_PRIVATE_KEY NEXT_PUBLIC_FIREBASE_API_KEY NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN NEXT_PUBLIC_FIREBASE_PROJECT_ID NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID NEXT_PUBLIC_FIREBASE_APP_ID"
 
-          # Add static PORT secret for Hugging Face
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer $HF_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"key": "PORT", "value": "7860"}'
-
-          # Loop through secrets and sync them
-          for SECRET_KEY in $SECRETS_TO_SYNC; do
-            SECRET_VALUE=$(printenv $SECRET_KEY)
-            # Use jq to safely create the JSON payload
-            JSON_PAYLOAD=$(jq -n --arg key "$SECRET_KEY" --arg value "$SECRET_VALUE" '{key: $key, value: $value}')
-
-            curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
+          # Function to create a secret in Hugging Face
+          create_secret() {
+            local key=$1
+            local value=$2
+            local payload
+            payload=$(jq -n --arg key "$key" --arg value "$value" '{key: $key, value: $value}')
+            curl -s -X POST "https://huggingface.co/api/spaces/${HF_SPACE}/secrets" \
               -H "Authorization: Bearer $HF_TOKEN" \
               -H "Content-Type: application/json" \
-              -d "$JSON_PAYLOAD"
+              -d "$payload"
+          }
+
+          # Sync application secrets
+          for secret_key in $SECRETS_TO_SYNC; do
+            create_secret "$secret_key" "$(printenv "$secret_key")"
           done
+
+          # Sync static PORT secret
+          create_secret "PORT" "7860"
 
       - name: Sync files to Hugging Face Space
         run: |
-          # Clone the space repository into a directory named 'hf_space'
-          git clone "https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit" hf_space
+          # Clone the space repository
+          git clone "https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/${HF_SPACE}" hf_space
 
-          # Use rsync to sync the entire project.
+          # Copy all files except for .git, hf_space and node_modules
           rsync -av --delete --exclude='.git/' --exclude='hf_space/' --exclude='node_modules/' ./ hf_space/
 
-          # Go into the space directory, commit and push the changes
+          # Commit and push changes
           cd hf_space
-          git add .
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git commit -m "Deploy from GitHub Actions" || echo "No changes to commit"
-          git push
+          git add .
+          if git diff-index --quiet HEAD; then
+            echo "No changes to commit."
+          else
+            git commit -m "Deploy from GitHub Actions"
+            git push
+          fi
