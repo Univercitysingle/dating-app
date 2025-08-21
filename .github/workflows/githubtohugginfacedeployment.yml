@@ -20,11 +20,29 @@ jobs:
           sudo apt-get install -y jq git-lfs
           git lfs install
 
-          # Clean up old entries in both variables & secrets
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+      - name: Sync Public Firebase Variables
+        run: |
+          declare -A VARS=(
+            ["NEXT_PUBLIC_FIREBASE_API_KEY"]="${{ secrets.FIREBASE_API_KEY }}"
+            ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"]="${{ secrets.FIREBASE_AUTH_DOMAIN }}"
+            ["NEXT_PUBLIC_FIREBASE_PROJECT_ID"]="${{ secrets.FIREBASE_PROJECT_ID }}"
+            ["NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"]="${{ secrets.FIREBASE_STORAGE_BUCKET }}"
+            ["NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"]="${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}"
+            ["NEXT_PUBLIC_FIREBASE_APP_ID"]="${{ secrets.FIREBASE_APP_ID }}"
+            ["PORT"]="3000"
+          )
 
-            # Post new variable safely
+          for KEY in "${!VARS[@]}"; do
+            VALUE="${VARS[$KEY]}"
+            echo "INFO: Syncing variable $KEY"
+
+            # Clean up old entries
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" \
+              -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" \
+              -H "Authorization: Bearer ${{ secrets.HF }}" || true
+
+            # Post new variable
             JSON_PAYLOAD=$(jq -n --arg key "$KEY" --arg value "$VALUE" '{key: $key, value: $value}')
             curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/variables" \
               -H "Authorization: Bearer ${{ secrets.HF }}" \
@@ -43,27 +61,19 @@ jobs:
             VALUE="${SECRETS[$KEY]}"
             echo "INFO: Syncing secret $KEY"
 
-            # Clean up old entries in both variables & secrets
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
-            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            # Clean up old entries
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/variables/$KEY" \
+              -H "Authorization: Bearer ${{ secrets.HF }}" || true
+            curl -f -X DELETE "https://huggingface.co/api/spaces/Sarangat/jit/secrets/$KEY" \
+              -H "Authorization: Bearer ${{ secrets.HF }}" || true
 
-            # Post new secret safely
+            # Post new secret
             JSON_PAYLOAD=$(jq -n --arg key "$KEY" --arg value "$VALUE" '{key: $key, value: $value}')
             curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
               -H "Authorization: Bearer ${{ secrets.HF }}" \
               -H "Content-Type: application/json" \
               -d "$JSON_PAYLOAD"
           done
-
-      - name: Debug Hugging Face Variables/Secrets
-        run: |
-          echo "INFO: Current Variables:"
-          curl -s -H "Authorization: Bearer ${{ secrets.HF }}" \
-            https://huggingface.co/api/spaces/Sarangat/jit/variables | jq
-
-          echo "INFO: Current Secrets:"
-          curl -s -H "Authorization: Bearer ${{ secrets.HF }}" \
-            https://huggingface.co/api/spaces/Sarangat/jit/secrets | jq
 
       - name: Sync files to Hugging Face Space
         run: |
