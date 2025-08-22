@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDatabase, ref, get } from 'firebase/database';
+import { getDatabase, ref, get, set, serverTimestamp } from 'firebase/database';
 import { database } from '../lib/firebase';
 import useAuth from '../hooks/useAuth';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -51,23 +51,41 @@ const BrowsePage = () => {
     if (!user) return;
     console.log(`User ${user.uid} swiped ${direction} on user ${swipedUserId}`);
 
+    const db = getDatabase();
+    const swipeData = {
+      swiperId: user.uid,
+      swipedId: swipedUserId,
+      direction,
+      timestamp: serverTimestamp(),
+    };
+
     try {
-      const db = getDatabase();
       // Record the swipe
-      const swipeData = {
-        swiperId: user.uid,
-        swipedId: swipedUserId,
-        direction,
-        timestamp: serverTimestamp(),
-      };
-      // For simplicity, we're not using push here, but overwriting a path.
-      // A real app might use push() for a list of swipes.
-      // Example: users/{swiperId}/swipes/{swipedId}
       const swipeRef = ref(db, `swipes/${user.uid}/${swipedUserId}`);
       await set(swipeRef, swipeData);
       console.log('Swipe recorded successfully.');
+
+      // Check for a match if the user liked the profile
+      if (direction === 'like') {
+        console.log('Checking for a match...');
+        const otherUserSwipeRef = ref(db, `swipes/${swipedUserId}/${user.uid}`);
+        const otherUserSwipeSnapshot = await get(otherUserSwipeRef);
+
+        if (otherUserSwipeSnapshot.exists() && otherUserSwipeSnapshot.val().direction === 'like') {
+          console.log(`It's a match with ${swipedUserId}!`);
+          // Create a match record
+          const matchId = [user.uid, swipedUserId].sort().join('_');
+          const matchRef = ref(db, `matches/${matchId}`);
+          await set(matchRef, {
+            users: [user.uid, swipedUserId],
+            createdAt: serverTimestamp(),
+          });
+          console.log('Match record created.');
+          alert(`It's a match with ${swipedUserId}!`);
+        }
+      }
     } catch (error) {
-      console.error('Failed to record swipe:', error);
+      console.error('Failed to process swipe:', error);
     }
   };
 
