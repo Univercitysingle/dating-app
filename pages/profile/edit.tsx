@@ -17,6 +17,7 @@ const EditProfilePage = () => {
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
+  const [interests, setInterests] = useState('');
   const [photos, setPhotos] = useState<{ id: string; url: string }[]>([]);
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>(
     'idle',
@@ -31,6 +32,7 @@ const EditProfilePage = () => {
           const userData: UserProfile = snapshot.val();
           setDisplayName(userData.displayName || '');
           setBio(userData.bio || '');
+          setInterests((userData.interests || []).join(', '));
           // The photos in the DB might not have IDs, so we add them here.
           // The ID is just the URL, which should be unique enough for this purpose.
           setPhotos(
@@ -58,9 +60,11 @@ const EditProfilePage = () => {
     setStatus('saving');
     try {
       const userRef = ref(database, 'users/' + user.uid);
+      const interestsArray = interests.split(',').map(s => s.trim()).filter(Boolean);
       await update(userRef, {
         displayName,
         bio,
+        interests: interestsArray,
       });
       console.log('Profile updated successfully.');
       setStatus('success');
@@ -149,6 +153,18 @@ const EditProfilePage = () => {
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               rows={4}
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="interests" className="block mb-2 text-sm font-medium">
+              Interests (comma-separated)
+            </label>
+            <input
+              id="interests"
+              type="text"
+              value={interests}
+              onChange={(e) => setInterests(e.target.value)}
               className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>

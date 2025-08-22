@@ -16,6 +16,7 @@ interface UserProfile {
     email: string;
     photos: string[];
     createdAt: number;
+    interests: string[];
 }
 
 const UserProfilePage = () => {
@@ -92,6 +93,21 @@ const UserProfilePage = () => {
           <div>
             <h1 className="text-4xl font-bold">{profile?.displayName || 'Unnamed User'}</h1>
             <p className="mt-2 text-lg">{profile?.bio}</p>
+            {profile?.interests && profile.interests.length > 0 && (
+              <div className="mt-4">
+                <h2 className="text-lg font-semibold">Interests</h2>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {profile.interests.map((interest) => (
+                    <span
+                      key={interest}
+                      className="px-3 py-1 bg-white/20 rounded-full text-sm"
+                    >
+                      {interest}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           {currentUser && currentUser.uid === userId && (
             <Link href="/profile/edit" className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-lg font-semibold">
