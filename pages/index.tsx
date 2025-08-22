@@ -45,6 +45,12 @@ export default function Home() {
                 >
                   My Profile
                 </Link>
+                <Link
+                  href="/browse"
+                  className="px-6 py-3 bg-blue-600 rounded-md font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Browse Profiles
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="px-6 py-3 bg-red-600 rounded-md font-semibold hover:bg-red-700 transition-colors"
