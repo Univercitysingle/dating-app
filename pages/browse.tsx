@@ -62,6 +62,7 @@ const BrowsePage = () => {
     try {
       // Record the swipe
       const swipeRef = ref(db, `swipes/${user.uid}/${swipedUserId}`);
+      console.log('Saving swipe data:', swipeData);
       await set(swipeRef, swipeData);
       console.log('Swipe recorded successfully.');
 
@@ -82,6 +83,8 @@ const BrowsePage = () => {
           });
           console.log('Match record created.');
           alert(`It's a match with ${swipedUserId}!`);
+        } else {
+          console.log('Not a match yet.');
         }
       }
     } catch (error) {
