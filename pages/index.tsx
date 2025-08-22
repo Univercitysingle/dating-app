@@ -40,10 +40,10 @@ export default function Home() {
               <div className="flex items-center justify-center gap-4 mb-8">
                 <p className="text-lg">Welcome, {user.email}</p>
                 <Link
-                  href="/profile/edit"
+                  href={`/profile/${user.uid}`}
                   className="px-6 py-3 bg-gray-700 rounded-md font-semibold hover:bg-gray-600 transition-colors"
                 >
-                  Edit Profile
+                  My Profile
                 </Link>
                 <button
                   onClick={handleLogout}
