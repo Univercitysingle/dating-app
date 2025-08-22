@@ -4,11 +4,12 @@ import { useRouter } from 'next/router';
 import { getDatabase, ref, get, update } from 'firebase/database';
 import { database } from '../../lib/firebase';
 import ProfilePhotoUpload from '../../components/ProfilePhotoUpload';
+import { SortablePhotoGrid } from '../../components/SortablePhotoGrid';
 
 interface UserProfile {
     displayName: string;
     bio: string;
-    photos: string[];
+    photos: { id: string; url: string }[];
 }
 
 const EditProfilePage = () => {
@@ -16,7 +17,7 @@ const EditProfilePage = () => {
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<{ id: string; url: string }[]>([]);
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>(
     'idle',
   );
@@ -30,7 +31,13 @@ const EditProfilePage = () => {
           const userData: UserProfile = snapshot.val();
           setDisplayName(userData.displayName || '');
           setBio(userData.bio || '');
-          setPhotos(userData.photos || []);
+          // The photos in the DB might not have IDs, so we add them here.
+          // The ID is just the URL, which should be unique enough for this purpose.
+          setPhotos(
+            (userData.photos || []).map((p) =>
+              typeof p === 'string' ? { id: p, url: p } : p,
+            ),
+          );
         }
       }
     };
@@ -59,14 +66,39 @@ const EditProfilePage = () => {
     if (!user) return;
     try {
       const userRef = ref(database, 'users/' + user.uid);
-      // Realtime Database doesn't have arrayUnion, so we read, update, and write.
-      const newPhotos = [...photos, url];
+      const newPhoto = { id: url, url };
+      const newPhotos = [...photos, newPhoto];
       await update(userRef, {
-        photos: newPhotos,
+        photos: newPhotos.map((p) => p.url), // Store only URLs
       });
       setPhotos(newPhotos);
     } catch (error) {
       console.error('Error adding photo to profile:', error);
+    }
+  };
+
+  const handlePhotoReorder = async (newPhotos: { id: string; url: string }[]) => {
+    if (!user) return;
+    setPhotos(newPhotos);
+    try {
+      const userRef = ref(database, 'users/' + user.uid);
+      await update(userRef, { photos: newPhotos.map((p) => p.url) }); // Store only URLs
+    } catch (error) {
+      console.error('Error reordering photos:', error);
+      // Optionally revert the state change
+    }
+  };
+
+  const handlePhotoDelete = async (id: string) => {
+    if (!user) return;
+    const newPhotos = photos.filter((p) => p.id !== id);
+    setPhotos(newPhotos);
+    try {
+      const userRef = ref(database, 'users/' + user.uid);
+      await update(userRef, { photos: newPhotos.map((p) => p.url) }); // Store only URLs
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      // Optionally revert the state change
     }
   };
 
@@ -133,17 +165,11 @@ const EditProfilePage = () => {
 
         <div className="pt-6 border-t border-gray-700">
           <h2 className="text-xl font-semibold mb-4">Your Photos</h2>
-          <div className="grid grid-cols-3 gap-4">
-            {photos.map((photoUrl) => (
-              <div key={photoUrl} className="relative aspect-square">
-                <img
-                  src={photoUrl}
-                  alt="Profile photo"
-                  className="object-cover w-full h-full rounded-md"
-                />
-              </div>
-            ))}
-          </div>
+          <SortablePhotoGrid
+            photos={photos}
+            onReorder={handlePhotoReorder}
+            onDelete={handlePhotoDelete}
+          />
         </div>
 
         <div className="pt-6 border-t border-gray-700">
