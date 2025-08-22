@@ -4,6 +4,7 @@ import useAuth from '../hooks/useAuth';
 import Link from 'next/link';
 
 interface MatchProfile {
+  matchId: string;
   id: string;
   displayName: string;
   photos: string[];
@@ -44,6 +45,7 @@ const MatchesPage = () => {
             const userSnapshot = await get(userRef);
             if (userSnapshot.exists()) {
               return {
+                matchId,
                 id: otherUserId,
                 ...userSnapshot.val(),
               };
@@ -74,7 +76,7 @@ const MatchesPage = () => {
       <div className="w-full max-w-lg space-y-4">
         {matches.length > 0 ? (
           matches.map((match) => (
-            <Link key={match.id} href={`/chat/${match.id}`} className="block">
+            <Link key={match.id} href={`/chat/${match.matchId}`} className="block">
               <div className="flex items-center gap-4 p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
                 <img
                   src={match.photos?.[0] || 'https://via.placeholder.com/150'}
