@@ -1,25 +1,85 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import TinderCard from 'react-tinder-card';
 import apiClient from '../api/apiClient';
-import SwipeCard from '../components/SwipeCard'; // Assuming SwipeCard.jsx is in components
+import SwipeCard from '../components/SwipeCard';
+import { Link } from 'react-router-dom';
+
+// A simple placeholder for the navigation bar
+const BottomNav = () => (
+  <nav className="w-full bg-neutral-50 dark:bg-neutral-900 shadow-t-md">
+    <div className="flex justify-around max-w-md mx-auto px-4 py-2">
+      <Link to="/discover" className="text-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+        </svg>
+      </Link>
+      <Link to="/matches" className="text-neutral-400 hover:text-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2V7a2 2 0 012-2h6l2-2h2l-2 2z" />
+        </svg>
+      </Link>
+      <Link to="/profile" className="text-neutral-400 hover:text-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      </Link>
+    </div>
+  </nav>
+);
+
+const MatchModal = ({ matchInfo, onContinue, onChat }) => (
+    <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
+        <div className="text-center">
+            <h2 className="text-5xl font-bold text-white mb-2 animate-pulse">It's a Match!</h2>
+            <p className="text-xl text-accent">You and {matchInfo.name || 'someone'} liked each other.</p>
+        </div>
+        <div className="flex items-center my-8">
+            {/* Placeholder for user's own image */}
+            <div className="w-32 h-32 rounded-full bg-neutral-400 border-4 border-white transform -rotate-12"></div>
+            {/* Placeholder for matched user's image */}
+            <div className="w-32 h-32 rounded-full bg-neutral-500 border-4 border-white transform rotate-12 -ml-8"></div>
+        </div>
+        <div className="flex flex-col items-center">
+             <button
+                onClick={onChat}
+                className="mt-4 px-8 py-3 bg-primary text-white rounded-full text-lg font-semibold hover:bg-primary-dark transition-transform transform hover:scale-105"
+            >
+                Send a Message
+            </button>
+            <button
+                onClick={onContinue}
+                className="mt-4 px-8 py-2 text-white text-md"
+            >
+                Keep Swiping
+            </button>
+        </div>
+    </div>
+);
+
+const NoMoreProfiles = () => (
+    <div className="flex flex-col justify-center items-center h-full text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-neutral-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p className="text-neutral-500 dark:text-neutral-400 text-xl font-semibold">That's everyone for now!</p>
+        <p className="text-neutral-400 dark:text-neutral-500 mt-1">Check back later for new profiles.</p>
+    </div>
+);
+
 
 const SwipeDeck = () => {
   const [usersToSwipe, setUsersToSwipe] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  // currentIndex is less critical if we modify the array directly
-  // const [currentIndex, setCurrentIndex] = useState(0);
-  const [lastDirection, setLastDirection] = useState(null); // For feedback
-  const [newMatchInfo, setNewMatchInfo] = useState(null); // To store info about a new match
+  const [newMatchInfo, setNewMatchInfo] = useState(null);
 
   const fetchUsersToSwipe = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setNewMatchInfo(null); // Clear any previous match info
+    setNewMatchInfo(null);
     try {
-      const data = await apiClient.get('/api/users/discover');
-      setUsersToSwipe(data || []); // Assuming data is an array of users
-      setCurrentIndex((data || []).length - 1); // react-tinder-card swipes from the end of the array
+      const { data } = await apiClient.get('/api/users/discover');
+      setUsersToSwipe(data || []);
     } catch (err) {
       console.error("Error fetching users for swipe deck:", err);
       setError(err.data?.message || err.message || "Failed to load users.");
@@ -33,68 +93,33 @@ const SwipeDeck = () => {
     fetchUsersToSwipe();
   }, [fetchUsersToSwipe]);
 
-  // memoized version of users to prevent re-render of cards unless usersToSwipe changes
-  const [childRefs, setChildRefs] = useState([]);
+  const childRefs = useMemo(() => Array(usersToSwipe.length).fill(0).map(() => React.createRef()), [usersToSwipe]);
 
-  // Initialize childRefs when usersForCards changes
-  useEffect(() => {
-    if (usersToSwipe.length > 0) {
-      setChildRefs(Array(usersToSwipe.length).fill(0).map(() => React.createRef()));
-    } else {
-      setChildRefs([]);
-    }
-  }, [usersToSwipe]);
-
-  // memoized version of users to prevent re-render of cards unless usersToSwipe changes
-  // usersForCards is now the source of truth for current cards on screen.
-  // We swipe from the end of this array.
-  const usersForCards = useMemo(() => usersToSwipe, [usersToSwipe]);
-
-
-  // Called when a swipe is completed (gesture finishes)
   const onSwipe = async (direction, swipedUserId) => {
     console.log(`You swiped ${direction} on ${swipedUserId}`);
-    setLastDirection(direction);
-    setNewMatchInfo(null);
-
     try {
-      const response = await apiClient.post('/api/swipes', {
+      const { data } = await apiClient.post('/api/swipes', {
         targetUserId: swipedUserId,
         direction: direction
       });
 
-      if (response && response.match) {
-        console.log("IT'S A MATCH with user:", response.matchedUser || swipedUserId);
-        // Assuming response.matchedUser contains { id, name, images? }
-        setNewMatchInfo(response.matchedUser || { id: swipedUserId, name: 'Your New Match!' });
-        // TODO: Implement a proper "It's a Match!" modal/popup that shows both users.
+      if (data && data.match) {
+        setNewMatchInfo(data.matchedUser || { id: swipedUserId, name: 'Your New Match!' });
       }
     } catch (swipeError) {
       console.error("Error recording swipe:", swipeError);
-      // Potentially handle swipe error, e.g., show a toast
     }
   };
 
-  // Called AFTER the card has left the screen
   const onCardLeftScreenHandler = (userIdThatLeft) => {
     console.log(userIdThatLeft + ' left the screen.');
-    // Remove the user from the usersToSwipe array to prevent them from reappearing
     setUsersToSwipe(prevUsers => prevUsers.filter(user => (user.id || user._id) !== userIdThatLeft));
   };
 
   const triggerSwipe = async (direction) => {
-    // We swipe the card at the end of the usersForCards array, as it's visually on top.
-    const currentCardIndex = usersForCards.length - 1;
+    const currentCardIndex = usersToSwipe.length - 1;
     if (currentCardIndex >= 0 && childRefs[currentCardIndex] && childRefs[currentCardIndex].current) {
-      try {
-        await childRefs[currentCardIndex].current.swipe(direction); // Trigger swipe on the card
-        // The onSwipe and onCardLeftScreenHandler will be called by TinderCard component
-      } catch (err) {
-        console.error("Error triggering swipe:", err);
-        // This might happen if the card is already swiped or not available.
-      }
-    } else {
-      console.log("No cards to swipe or ref not available for index: ", currentCardIndex);
+        await childRefs[currentCardIndex].current.swipe(direction);
     }
   };
 
@@ -107,69 +132,65 @@ const SwipeDeck = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 dark:bg-gray-800 overflow-hidden">
-      <h1 className="text-2xl font-bold my-4 text-gray-700 dark:text-gray-200">Discover</h1>
-      <div className="relative w-[90vw] h-[70vh] max-w-sm"> {/* Card container */}
-        {usersForCards.length > 0 ? (
-          usersForCards.map((user, index) => (
-            <TinderCard
-              ref={childRefs[index]} // Assign ref
-              className="absolute"
-              key={user.id || user._id}
-              onSwipe={(dir) => onSwipe(dir, user.id || user._id)}
-              onCardLeftScreen={() => onCardLeftScreenHandler(user.id || user._id)}
-              preventSwipe={['up', 'down']}
-            >
-              <SwipeCard user={user} />
-            </TinderCard>
-          ))
-        ) : (
-          !isLoading && <div className="flex justify-center items-center h-full"> {/* Show only if not loading */}
-            <p className="text-gray-500 dark:text-gray-400 text-xl">No more profiles to swipe right now. Check back later!</p>
-          </div>
+    <div className="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900">
+        <header className="flex-shrink-0">
+            <h1 className="text-2xl font-bold my-4 text-center text-neutral-700 dark:text-neutral-200">Discover</h1>
+        </header>
+
+        <main className="flex-grow flex flex-col items-center justify-center">
+            <div className="relative w-[90vw] h-[65vh] max-w-sm">
+                {usersToSwipe.length > 0 ? (
+                usersToSwipe.map((user, index) => (
+                    <TinderCard
+                    ref={childRefs[index]}
+                    className="absolute"
+                    key={user.id || user._id}
+                    onSwipe={(dir) => onSwipe(dir, user.id || user._id)}
+                    onCardLeftScreen={() => onCardLeftScreenHandler(user.id || user._id)}
+                    preventSwipe={['up', 'down']}
+                    >
+                    <SwipeCard user={user} />
+                    </TinderCard>
+                ))
+                ) : (
+                <NoMoreProfiles />
+                )}
+            </div>
+        </main>
+
+        <footer className="flex-shrink-0">
+            {usersToSwipe.length > 0 && !newMatchInfo && (
+                <div className="flex justify-center items-center my-4 space-x-8">
+                <button
+                    onClick={() => triggerSwipe('left')}
+                    className="p-4 bg-neutral-50 rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
+                    aria-label="Pass"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="red" className="w-8 h-8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <button
+                    onClick={() => triggerSwipe('right')}
+                    className="p-5 bg-neutral-50 rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
+                    aria-label="Like"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="green" viewBox="0 0 24 24" strokeWidth={1.5} stroke="white" className="w-10 h-10">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                </button>
+                </div>
+            )}
+            <BottomNav />
+        </footer>
+
+        {newMatchInfo && (
+            <MatchModal
+                matchInfo={newMatchInfo}
+                onContinue={() => setNewMatchInfo(null)}
+                onChat={() => { /* Implement navigation to chat */ alert(`Navigating to chat with ${newMatchInfo.name}`); setNewMatchInfo(null);}}
+            />
         )}
-      </div>
-
-      {/* Swipe Buttons */}
-      {usersForCards.length > 0 && !newMatchInfo && ( // Show buttons only if cards are present and no match overlay
-        <div className="flex justify-center items-center mt-6 space-x-6">
-          <button
-            onClick={() => triggerSwipe('left')}
-            className="p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-colors"
-            aria-label="Pass"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="red" className="w-8 h-8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-          <button
-            onClick={() => triggerSwipe('right')}
-            className="p-4 bg-white rounded-full shadow-lg hover:bg-green-100 transition-colors"
-            aria-label="Like"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="green" className="w-8 h-8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {/* Basic "It's a Match!" message - replace with modal later */}
-      {newMatchInfo && (
-        <div className="absolute inset-0 bg-black bg-opacity-75 flex flex-col justify-center items-center z-50">
-          <p className="text-4xl font-bold text-white mb-4">It's a Match!</p>
-          <p className="text-xl text-yellow-300">You matched with {newMatchInfo.name || 'someone'}</p>
-          <button
-            onClick={() => setNewMatchInfo(null)}
-            className="mt-8 px-6 py-2 bg-pink-500 text-white rounded-full text-lg hover:bg-pink-600"
-          >
-            Keep Swiping
-          </button>
-        </div>
-      )}
-      {lastDirection && !newMatchInfo && (
-        <h2 className="mt-4 text-xl text-gray-600 dark:text-gray-300">You swiped {lastDirection}</h2>
-      )}
     </div>
   );
 };

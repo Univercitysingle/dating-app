@@ -17,16 +17,16 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdminUserListPage from './pages/admin/AdminUserListPage';
 import AdminUserEditPage from './pages/admin/AdminUserEditPage';
-import SwipeDeck from './pages/SwipeDeck'; // Import SwipeDeck
+import SwipeDeck from './pages/SwipeDeck';
 
 function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <div className="loading-container">
-        <h1 className="loading-title">Single</h1>
-        <p className="loading-subtitle">
+      <div className="flex flex-col justify-center items-center h-screen bg-neutral-50 font-sans text-center">
+        <h1 className="text-4xl font-bold text-primary mb-2">Single</h1>
+        <p className="text-lg text-neutral-600">
           Specially built for singles to mingle
         </p>
       </div>
@@ -40,9 +40,9 @@ function AdminRoute({ children }) {
 
   if (isLoading) {
     return (
-      <div className="loading-container">
-        <h1 className="admin-loading-title">Loading Admin Section...</h1>
-        <p className="admin-loading-subtitle">Single</p>
+      <div className="flex flex-col justify-center items-center h-screen bg-neutral-50 font-sans text-center">
+        <h1 className="text-3xl font-bold text-neutral-800">Loading Admin Section...</h1>
+        <p className="text-primary-dark font-bold">Single</p>
       </div>
     );
   }
@@ -105,7 +105,14 @@ function App() {
               </PrivateRoute>
             }
           />
-          {/* Add discover route */}
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            }
+          />
 
           {/* Admin Routes */}
           <Route

@@ -10,20 +10,27 @@ const SwipeCard = ({ user }) => {
   const primaryImage =
     images && images.length > 0
       ? images[0]
-      : 'https://via.placeholder.com/400x600?text=No+Image';
+      : 'https://via.placeholder.com/400x600?text=Profile+Image';
 
   return (
-    <div className="relative w-full h-full rounded-xl overflow-hidden shadow-xl bg-gray-300">
+    <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-card bg-neutral-300 border border-neutral-200 dark:border-neutral-700">
       <img
         src={primaryImage}
         alt={name || 'User profile'}
         className="w-full h-full object-cover"
       />
-      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-        <h3 className="text-2xl font-bold text-white">
+      <div className="absolute top-4 right-4">
+        <button className="text-neutral-50 opacity-80 hover:opacity-100">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </button>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-neutral-900/80 to-transparent h-1/2 flex flex-col justify-end">
+        <h3 className="text-3xl font-extrabold text-neutral-50">
           {name || 'Unknown User'}
         </h3>
-        {age && <p className="text-xl text-gray-200">{age}</p>}
+        {age && <p className="text-2xl text-neutral-100">{age}</p>}
       </div>
     </div>
   );

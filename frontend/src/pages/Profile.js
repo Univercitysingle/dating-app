@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import apiClient from '../api/apiClient';
+
+// Import all necessary components
 import VideoProfileUpload from '../components/VideoProfileUpload';
 import VideoCall from '../components/VideoCall';
 import InterestsDisplay from '../components/InterestsDisplay';
 import InterestsEditor from '../components/InterestsEditor';
 import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import AudioBioPlayer from '../components/AudioBioPlayer';
 import AudioBioUpload from '../components/AudioBioUpload';
 import VideoBioSnippetPlayer from '../components/VideoBioSnippetPlayer';
@@ -15,96 +18,66 @@ import PersonalityQuizDisplay from '../components/PersonalityQuizDisplay';
 import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
 import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
 import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
-import apiClient from '../api/apiClient';
-import HeroCaptureSection from '../components/HeroCaptureSection'; // Import the new component
+import HeroCaptureSection from '../components/HeroCaptureSection';
 
-// Badge components
+// Reusable components
 const PremiumBadge = () => (
-  <span className="ml-3 px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-300 rounded-full">
-    Premium
-  </span>
+  <span className="ml-2 px-2 py-1 text-xs font-semibold text-accent-dark bg-accent rounded-full">Premium</span>
 );
 
 const VerifiedBadge = () => (
-  <span className="ml-3 px-2 py-1 text-xs font-semibold text-green-800 bg-green-300 rounded-full flex items-center">
-    <svg
-      className="w-4 h-4 mr-1"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
+  <span className="ml-2 px-2 py-1 text-xs font-semibold text-green-800 bg-green-300 rounded-full flex items-center">
+    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
     Verified
   </span>
 );
 
+const SectionCard = ({ title, children }) => (
+    <div className="bg-neutral-100 dark:bg-neutral-800 p-6 rounded-lg shadow-sm">
+        <h2 className="text-xl font-bold mb-4 text-neutral-800 dark:text-neutral-50">{title}</h2>
+        {children}
+    </div>
+);
+
 function Profile() {
   const [profile, setProfile] = useState(null);
-  const [mediaSaveStatus, setMediaSaveStatus] = useState('');
-  const [quizSaveStatus, setQuizSaveStatus] = useState('');
-  const [socialLinksSaveStatus, setSocialLinksSaveStatus] = useState('');
-  const [detailsSaveStatus, setDetailsSaveStatus] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [activeTab, setActiveTab] = useState('profile');
 
-  const [editableEducation, setEditableEducation] = useState('');
-  const [editableRelationshipGoals, setEditableRelationshipGoals] =
-    useState('');
-  const [editableAboutMe, setEditableAboutMe] = useState('');
-  const [heroMediaSaveStatus, setHeroMediaSaveStatus] = useState('');
+  // State for editable fields
+  const [editableFields, setEditableFields] = useState({
+      education: '',
+      relationshipGoals: '',
+      aboutMe: '',
+  });
+
+  // State for save statuses
+  const [saveStatus, setSaveStatus] = useState({
+      details: '',
+      quiz: '',
+      social: '',
+      media: '',
+      hero: '',
+  });
 
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleHeroMediaUploadComplete = async (mediaUrl) => {
-    setHeroMediaSaveStatus('Saving hero media...');
-    try {
-      const updatedProfile = await apiClient.put('/api/users/me', {
-        heroMediaUrl: mediaUrl,
-      });
-      setProfile(updatedProfile);
-      setHeroMediaSaveStatus('Hero media saved successfully!');
-      setTimeout(() => setHeroMediaSaveStatus(''), 3000);
-    } catch (error) {
-      console.error('Error saving hero media:', error);
-      setHeroMediaSaveStatus(
-        `Error: ${
-          error.data?.message || error.message || 'Failed to save hero media.'
-        }`
-      );
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Failed to logout:', error);
-    }
-  };
-
   const fetchProfile = useCallback(() => {
-    apiClient
-      .get('/api/users/me')
+    apiClient.get('/api/users/me')
       .then((data) => {
         setProfile(data);
-        setEditableEducation(data.education || '');
-        setEditableRelationshipGoals(data.relationshipGoals || '');
-        setEditableAboutMe(data.aboutMe || '');
-        // Corrected: Removed setProfileImages as it's no longer used
+        setEditableFields({
+            education: data.education || '',
+            relationshipGoals: data.relationshipGoals || '',
+            aboutMe: data.aboutMe || '',
+        });
         setFetchError(null);
       })
       .catch((error) => {
         console.error('Error fetching profile:', error);
-        setFetchError(
-          error.data?.message || error.message || 'Failed to load profile'
-        );
-        setProfile(null);
+        setFetchError(error.data?.message || 'Failed to load profile');
       });
   }, []);
 
@@ -112,387 +85,170 @@ function Profile() {
     fetchProfile();
   }, [fetchProfile]);
 
-  useEffect(() => {
-    if (isEditing && profile) {
-      setEditableEducation(profile.education || '');
-      setEditableRelationshipGoals(profile.relationshipGoals || '');
-      setEditableAboutMe(profile.aboutMe || '');
-      // Corrected: All references to removed states (profileImages, selectedFiles, imagePreviews, imageUploadStatus)
-      // and their setters are removed from this hook.
-      // HeroCaptureSection manages its own media state.
-    } else {
-      // When exiting edit mode. No specific cleanup needed here for HeroCaptureSection's internal state
-      // or for the removed multi-image gallery states.
-    }
-
-    // Corrected: Cleanup function is now empty as no Profile.js managed states need specific cleanup here.
-    // HeroCaptureSection handles its own internal cleanup (e.g., stopping camera stream).
-    return () => {};
-  }, [isEditing, profile]);
-
-  const handleDetailsSave = async () => {
-    setDetailsSaveStatus('Saving details...');
-    try {
-      const updatedProfile = await apiClient.put('/api/users/me', {
-        education: editableEducation,
-        relationshipGoals: editableRelationshipGoals,
-        aboutMe: editableAboutMe,
-      });
-      setProfile(updatedProfile);
-      setDetailsSaveStatus('Details saved successfully!');
-      setTimeout(() => setDetailsSaveStatus(''), 3000);
-    } catch (error) {
-      console.error('Error saving details:', error);
-      setDetailsSaveStatus(`Error: ${error.data?.message || error.message}`);
-    }
-  };
-
-  const handlePersonalityQuizSave = async (newQuizResults) => {
-    setQuizSaveStatus('Saving personality quiz...');
-    try {
-      const updatedProfile = await apiClient.put('/api/users/me', {
-        personalityQuizResults: newQuizResults,
-      });
-      setProfile(updatedProfile);
-      setQuizSaveStatus('Personality quiz saved successfully!');
-      setTimeout(() => setQuizSaveStatus(''), 3000);
-    } catch (error) {
-      console.error('Error saving personality quiz:', error);
-      setQuizSaveStatus(`Error: ${error.data?.message || error.message}`);
-    }
-  };
-
-  const handleSocialMediaLinksSave = async (newLinksData) => {
-    setSocialLinksSaveStatus('Saving social media links...');
-    try {
-      const updatedProfile = await apiClient.put('/api/users/me', {
-        socialMediaLinks: newLinksData,
-      });
-      setProfile(updatedProfile);
-      setSocialLinksSaveStatus('Social media links saved successfully!');
-      setTimeout(() => setSocialLinksSaveStatus(''), 3000);
-    } catch (error) {
-      console.error('Error saving social media links:', error);
-      setSocialLinksSaveStatus(
-        `Error: ${error.data?.message || error.message}`
-      );
-    }
-  };
-
-  // This specific handleMediaUploadComplete is for the secondary media items like audioBioUrl, videoBioUrl, videoProfileUrl
-  // It's different from handleHeroMediaUploadComplete
-  const handleMediaUploadComplete = async (fileUrl, fieldName) => {
-    setMediaSaveStatus(`Saving ${fieldName}...`);
-    try {
-      const updatedProfile = await apiClient.put('/api/users/me', {
-        [fieldName]: fileUrl,
-      });
-      setProfile(updatedProfile);
-      setMediaSaveStatus(`${fieldName} saved successfully!`);
-      setTimeout(() => setMediaSaveStatus(''), 3000);
-    } catch (error) {
-      console.error(`Error saving ${fieldName}:`, error);
-      setMediaSaveStatus(`Error: ${error.data?.message || error.message}`);
-    }
-  };
-
-  const handleInterestsSaved = (updatedInterests) => {
-    setProfile((prev) => ({ ...prev, interests: updatedInterests }));
-  };
-
-  const handlePromptsSaved = (updatedPrompts) => {
-    setProfile((prev) => ({ ...prev, profilePrompts: updatedPrompts }));
-  };
-
-  if (fetchError) {
-    return <p className="text-red-500 p-4">Error: {fetchError}</p>;
+  const handleFieldChange = (e) => {
+      const { id, value } = e.target;
+      setEditableFields(prev => ({...prev, [id]: value}));
   }
+
+  const handleSave = async (endpoint, data, statusKey) => {
+      setSaveStatus(prev => ({...prev, [statusKey]: 'Saving...'}));
+      try {
+          const updatedProfile = await apiClient.put(endpoint, data);
+          setProfile(updatedProfile);
+          setSaveStatus(prev => ({...prev, [statusKey]: 'Saved successfully!'}));
+          setTimeout(() => setSaveStatus(prev => ({...prev, [statusKey]: ''})), 3000);
+      } catch (error) {
+          console.error(`Error saving ${statusKey}:`, error);
+          setSaveStatus(prev => ({...prev, [statusKey]: `Error: ${error.data?.message || 'Failed to save'}`}));
+      }
+  };
+
+  const handleDetailsSave = () => {
+      handleSave('/api/users/me', editableFields, 'details');
+  };
+
+  const handleInterestsSaved = (interests) => {
+      handleSave('/api/users/me', { interests }, 'interests');
+  };
+
+  const handlePromptsSaved = (prompts) => {
+      handleSave('/api/users/me', { profilePrompts: prompts }, 'prompts');
+  };
+
+  const handlePersonalityQuizSave = (quizResults) => {
+      handleSave('/api/users/me', { personalityQuizResults: quizResults }, 'quiz');
+  };
+
+  const handleSocialMediaLinksSave = (links) => {
+      handleSave('/api/users/me', { socialMediaLinks: links }, 'social');
+  };
+
+  const handleMediaUploadComplete = (fileUrl, fieldName) => {
+      handleSave('/api/users/me', { [fieldName]: fileUrl }, 'media');
+  };
+
+  const handleHeroMediaUploadComplete = (mediaUrl) => {
+    handleSave('/api/users/me', { heroMediaUrl: mediaUrl }, 'hero');
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  if (fetchError) return <p className="text-red-500 p-4">Error: {fetchError}</p>;
   if (!profile) return <p className="p-4">Loading profile...</p>;
 
   const isPremium = profile.tier === 'premium';
   const isVerified = profile.isVerified === true;
 
+  const renderContent = () => {
+      switch(activeTab) {
+          case 'profile':
+              return (
+                  <div className="space-y-6">
+                      {!isEditing && profile.aboutMe && (
+                        <SectionCard title="About Me">
+                            <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
+                        </SectionCard>
+                      )}
+                       <SectionCard title="Details">
+                            {isEditing ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="aboutMe" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">About Me</label>
+                                        <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
+                                        <input type="text" id="education" value={editableFields.education} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="relationshipGoals" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Relationship Goals</label>
+                                        <input type="text" id="relationshipGoals" value={editableFields.relationshipGoals} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <button onClick={handleDetailsSave} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save Details'}</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                                    <p><strong>Email:</strong> {profile.email}</p>
+                                    <p><strong>Gender:</strong> {profile.gender}</p>
+                                    <p><strong>Preference:</strong> {profile.preference}</p>
+                                    <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
+                                    <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
+                                </div>
+                            )}
+                        </SectionCard>
+                        <SectionCard title="Interests">
+                            {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
+                        </SectionCard>
+                        <SectionCard title="Profile Prompts">
+                            {isEditing ? <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} /> : <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />}
+                        </SectionCard>
+                        <SectionCard title="Personality Quiz">
+                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizDisplay quizResults={profile.personalityQuizResults || {}} />}
+                        </SectionCard>
+                        <SectionCard title="Social Media">
+                            {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
+                        </SectionCard>
+                  </div>
+              );
+          case 'media':
+              return (
+                  <div className="space-y-6">
+                      <SectionCard title="Profile Media">
+                          <HeroCaptureSection onUploadComplete={handleHeroMediaUploadComplete} />
+                          {saveStatus.hero && <p className="text-sm mt-2">{saveStatus.hero}</p>}
+                      </SectionCard>
+                      <SectionCard title="Video Profile">
+                          <VideoProfileUpload currentVideoUrl={profile.videoProfileUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'videoProfileUrl')} />
+                      </SectionCard>
+                       <SectionCard title="Audio Bio">
+                          {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
+                      </SectionCard>
+                       <SectionCard title="Video Snippet">
+                          {isEditing ? <VideoBioSnippetUpload currentVideoUrl={profile.videoBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'videoBioUrl')} /> : <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />}
+                      </SectionCard>
+                  </div>
+              );
+          case 'settings':
+              return (
+                  <SectionCard title="Settings">
+                      <VideoCall />
+                      <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
+                  </SectionCard>
+              );
+          default: return null;
+      }
+  }
+
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-end items-center mb-6 h-10">
-        <div>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md mr-2"
-          >
-            {isEditing ? 'View Profile' : 'Edit Profile'}
-          </button>
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md"
-          >
-            Logout
-          </button>
+    <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
+        <div className="container mx-auto p-4">
+            <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden shadow-lg mb-6">
+                <img src={profile.heroMediaUrl || 'https://via.placeholder.com/800x400?text=Your+Hero+Image'} alt="Hero" className="w-full h-full object-cover"/>
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-neutral-900/60 to-transparent">
+                    <h1 className="text-3xl font-bold text-neutral-50">{profile.name}, {profile.age}</h1>
+                    <div className="flex items-center mt-1">
+                        {isPremium && <PremiumBadge />}
+                        {isVerified && <VerifiedBadge />}
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex space-x-1 bg-neutral-200 dark:bg-neutral-700 rounded-lg p-1">
+                    <button onClick={() => setActiveTab('profile')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'profile' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Profile</button>
+                    <button onClick={() => setActiveTab('media')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'media' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Media</button>
+                    <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'settings' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Settings</button>
+                </div>
+                <button onClick={() => setIsEditing(!isEditing)} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">
+                    {isEditing ? 'View Profile' : 'Edit Profile'}
+                </button>
+            </div>
+
+            {renderContent()}
         </div>
-      </div>
-
-      <div className="flex flex-col space-y-6">
-        <section className="w-full relative">
-          <HeroCaptureSection
-            onUploadComplete={handleHeroMediaUploadComplete}
-          />
-          {!isEditing && profile && (
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-              <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-white">
-                  {profile.name}
-                </h1>
-                {profile.age && (
-                  <span className="text-xl ml-2 text-gray-200">
-                    ({profile.age})
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center mt-1">
-                {isPremium && <PremiumBadge />}
-                {isVerified && <VerifiedBadge />}
-              </div>
-            </div>
-          )}
-          {heroMediaSaveStatus && (
-            <p
-              className={`text-sm text-center py-2 ${
-                heroMediaSaveStatus.startsWith('Error:')
-                  ? 'text-red-500'
-                  : 'text-green-500'
-              }`}
-            >
-              {heroMediaSaveStatus}
-            </p>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold mb-2">
-            Profile Snippet (Secondary)
-          </h2>
-          {isEditing ? (
-            <VideoBioSnippetUpload
-              currentVideoUrl={profile.videoBioUrl || ''}
-              onUploadComplete={handleMediaUploadComplete}
-            />
-          ) : profile.videoBioUrl ? (
-            <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl} />
-          ) : (
-            <p className="text-gray-500">No secondary video snippet.</p>
-          )}
-        </section>
-
-        {!isEditing && profile.aboutMe && (
-          <section>
-            <h2 className="text-xl font-semibold mb-2">About Me</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">
-              {profile.aboutMe}
-            </p>
-          </section>
-        )}
-
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Details</h2>
-          {isEditing ? (
-            <>
-              <p>Name: {profile.name} (readonly)</p>
-              <p>Age: {profile.age || 'N/A'} (readonly)</p>
-              <div className="my-2">
-                <label
-                  htmlFor="education"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Education
-                </label>
-                <input
-                  id="education"
-                  type="text"
-                  value={editableEducation}
-                  onChange={(e) => setEditableEducation(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
-              <div className="my-2">
-                <label
-                  htmlFor="relationshipGoals"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Relationship Goals
-                </label>
-                <input
-                  id="relationshipGoals"
-                  type="text"
-                  value={editableRelationshipGoals}
-                  onChange={(e) =>
-                    setEditableRelationshipGoals(e.target.value)
-                  }
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
-              <div className="my-2">
-                <label
-                  htmlFor="aboutMe"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  About Me (Max 200 words)
-                </label>
-                <textarea
-                  id="aboutMe"
-                  rows={5}
-                  value={editableAboutMe}
-                  onChange={(e) => {
-                    const newText = e.target.value;
-                    const words = newText.trim().split(/\\s+/);
-                    if (words.length > 200) {
-                      setEditableAboutMe(words.slice(0, 200).join(' '));
-                    } else {
-                      setEditableAboutMe(newText);
-                    }
-                  }}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Words:{' '}
-                  {
-                    editableAboutMe.trim().split(/\\s+/).filter(Boolean).length
-                  }{' '}
-                  / 200
-                </p>
-              </div>
-              <button
-                onClick={handleDetailsSave}
-                className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm"
-              >
-                Save Details & About Me
-              </button>
-              {detailsSaveStatus && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {detailsSaveStatus}
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="mt-2 space-y-3">
-              <div>
-                <span className="font-medium text-gray-500 mr-2">Gender:</span>
-                <span className="text-gray-800">
-                  {profile.gender || 'N/A'}
-                </span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-500 mr-2">
-                  Preference:
-                </span>
-                <span className="text-gray-800">
-                  {profile.preference || 'N/A'}
-                </span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-500 mr-2">Email:</span>
-                <span className="text-gray-800">{profile.email}</span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-500 mr-2">
-                  Education:
-                </span>
-                <span className="text-gray-800">
-                  {profile.education || 'N/A'}
-                </span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-500 mr-2">
-                  Relationship Goals:
-                </span>
-                <span className="text-gray-800">
-                  {profile.relationshipGoals || 'N/A'}
-                </span>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section>
-          {isEditing ? (
-            <InterestsEditor
-              initialInterests={profile.interests || []}
-              onSave={handleInterestsSaved}
-            />
-          ) : (
-            <InterestsDisplay interests={profile.interests || []} />
-          )}
-        </section>
-
-        <section>
-          {isEditing ? (
-            <ProfilePromptsEditor
-              initialPrompts={profile.profilePrompts || []}
-              onSave={handlePromptsSaved}
-            />
-          ) : (
-            <ProfilePromptsDisplay
-              profilePrompts={profile.profilePrompts || []}
-            />
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-xl font-semibold mb-2 mt-4">Audio Bio</h2>
-          {isEditing ? (
-            <AudioBioUpload
-              currentAudioUrl={profile.audioBioUrl || ''}
-              onUploadComplete={handleMediaUploadComplete}
-            />
-          ) : (
-            <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
-          )}
-          {mediaSaveStatus && (
-            <p className="text-sm text-gray-600 mt-2">{mediaSaveStatus}</p>
-          )}
-        </section>
-
-        <section>
-          {isEditing ? (
-            <PersonalityQuizEditor
-              currentQuizResults={profile.personalityQuizResults || {}}
-              onSave={handlePersonalityQuizSave}
-              statusMessage={quizSaveStatus}
-              setStatusMessage={setQuizSaveStatus}
-            />
-          ) : (
-            <PersonalityQuizDisplay
-              quizResults={profile.personalityQuizResults || {}}
-            />
-          )}
-        </section>
-
-        <section>
-          {isEditing ? (
-            <SocialMediaLinksEditor
-              initialLinks={profile.socialMediaLinks || {}}
-              onSave={handleSocialMediaLinksSave}
-              saveStatus={socialLinksSaveStatus}
-              setSaveStatus={setSocialLinksSaveStatus}
-            />
-          ) : (
-            <SocialMediaLinksDisplay
-              socialMediaLinks={profile.socialMediaLinks || {}}
-            />
-          )}
-        </section>
-
-        <section className="mt-4">
-          <h2 className="text-xl font-semibold mb-2">Video Profile</h2>
-          <VideoProfileUpload
-            currentVideoUrl={profile.videoProfileUrl || ''}
-            onUploadComplete={handleMediaUploadComplete}
-          />
-        </section>
-
-        <section className="mt-4">
-          <VideoCall />
-        </section>
-      </div>
     </div>
   );
 }
