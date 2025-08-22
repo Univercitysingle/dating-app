@@ -1,0 +1,41 @@
+name: Create /api/users/me.js API route
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # <-- This allows the workflow to push changes to your repository
+
+jobs:
+  create-api-users-me:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure API directory exists
+        run: |
+          mkdir -p pages/api/users
+
+      - name: Create /api/users/me.js
+        run: |
+          cat << 'EOF' > pages/api/users/me.js
+          export default function handler(req, res) {
+            // Example: Return dummy user info. Update logic as needed.
+            res.status(200).json({
+              user: {
+                id: "123",
+                email: "enadoctemp@gmail.com"
+              }
+            });
+          }
+          EOF
+
+      - name: Show created file
+        run: cat pages/api/users/me.js
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Add /api/users/me.js API route"
+          branch: ${{ github.head_ref || github.ref_name }}

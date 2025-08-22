@@ -1,0 +1,24 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # this allows manual trigger from GitHub UI
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+
+      - name: Build frontend Docker image
+        run: docker build -t myapp-frontend ./frontend
+
+      # Add deployment steps here for your cloud provider (e.g. AWS ECS, DigitalOcean, etc.)
