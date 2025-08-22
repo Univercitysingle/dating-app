@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { app } from '../lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { app, firestore } from '../lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -31,7 +32,23 @@ const SignupPage = () => {
 
     const auth = getAuth(app);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      const user = userCredential.user;
+
+      // Create a user document in Firestore
+      await setDoc(doc(firestore, 'users', user.uid), {
+        email: user.email,
+        createdAt: serverTimestamp(),
+        displayName: '',
+        bio: '',
+        photos: [],
+        interests: [],
+      });
+
       router.push('/');
     } catch (err: any) {
       setError(getFirebaseErrorMessage(err.code));

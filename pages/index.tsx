@@ -2,7 +2,6 @@ import Link from 'next/link';
 import useAuth from '../hooks/useAuth';
 import { getAuth, signOut } from 'firebase/auth';
 import { useRouter } from 'next/router';
-import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -40,6 +39,12 @@ export default function Home() {
             <div className="w-full max-w-md">
               <div className="flex items-center justify-center gap-4 mb-8">
                 <p className="text-lg">Welcome, {user.email}</p>
+                <Link
+                  href="/profile/edit"
+                  className="px-6 py-3 bg-gray-700 rounded-md font-semibold hover:bg-gray-600 transition-colors"
+                >
+                  Edit Profile
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="px-6 py-3 bg-red-600 rounded-md font-semibold hover:bg-red-700 transition-colors"
@@ -47,7 +52,6 @@ export default function Home() {
                   Logout
                 </button>
               </div>
-              <ProfilePhotoUpload />
             </div>
           ) : (
             <div className="flex gap-4">

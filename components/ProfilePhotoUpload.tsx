@@ -1,6 +1,10 @@
 import { useState } from 'react';
 
-const ProfilePhotoUpload = () => {
+interface ProfilePhotoUploadProps {
+  onUploadSuccess: (url: string) => void;
+}
+
+const ProfilePhotoUpload = ({ onUploadSuccess }: ProfilePhotoUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<
     'idle' | 'uploading' | 'success' | 'error'
@@ -11,6 +15,8 @@ const ProfilePhotoUpload = () => {
     const files = e.target.files;
     if (files && files.length > 0) {
       setFile(files[0]);
+      setStatus('idle');
+      setUploadedFileUrl(null);
     }
   };
 
@@ -53,14 +59,13 @@ const ProfilePhotoUpload = () => {
         throw new Error('Upload failed.');
       }
 
+      // Construct the public URL for the uploaded file
       const bucketName = process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME;
-      const region = process.env.NEXT_PUBLIC_AWS_REGION;
-      // Note: The public URL for Backblaze B2 is different from the S3 endpoint.
-      // You might need to construct this URL based on your B2 bucket settings.
-      // Example format: `https://<your-bucket-name>.s3.<your-region>.backblazeb2.com/<object-key>`
-      const publicUrl = `https://${bucketName}.s3.${region}.backblazeb2.com/${key}`;
+      const publicUrl = `https://s3.us-west-002.backblazeb2.com/${bucketName}/${key}`;
+
       setUploadedFileUrl(publicUrl);
       setStatus('success');
+      onUploadSuccess(publicUrl); // Notify parent component
     } catch (error) {
       console.error(error);
       setStatus('error');
