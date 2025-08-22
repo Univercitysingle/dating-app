@@ -46,7 +46,14 @@ const EditProfilePage = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      console.log('No user found, cannot save.');
+      return;
+    }
+
+    console.log('Saving profile for user:', user.uid);
+    console.log('Display Name:', displayName);
+    console.log('Bio:', bio);
 
     setStatus('saving');
     try {
@@ -55,6 +62,7 @@ const EditProfilePage = () => {
         displayName,
         bio,
       });
+      console.log('Profile updated successfully.');
       setStatus('success');
     } catch (error) {
       console.error('Error updating profile:', error);
