@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import useAuth from '../../hooks/useAuth';
 import { useRouter } from 'next/router';
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { firestore } from '../../lib/firebase';
+import { getDatabase, ref, get, update } from 'firebase/database';
+import { database } from '../../lib/firebase';
 import ProfilePhotoUpload from '../../components/ProfilePhotoUpload';
+
+interface UserProfile {
+    displayName: string;
+    bio: string;
+    photos: string[];
+}
 
 const EditProfilePage = () => {
   const { user, loading } = useAuth();
@@ -18,10 +24,10 @@ const EditProfilePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
+        const userRef = ref(database, 'users/' + user.uid);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          const userData: UserProfile = snapshot.val();
           setDisplayName(userData.displayName || '');
           setBio(userData.bio || '');
           setPhotos(userData.photos || []);
@@ -37,8 +43,8 @@ const EditProfilePage = () => {
 
     setStatus('saving');
     try {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      await updateDoc(userDocRef, {
+      const userRef = ref(database, 'users/' + user.uid);
+      await update(userRef, {
         displayName,
         bio,
       });
@@ -52,11 +58,13 @@ const EditProfilePage = () => {
   const handlePhotoUploadSuccess = async (url: string) => {
     if (!user) return;
     try {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      await updateDoc(userDocRef, {
-        photos: arrayUnion(url),
+      const userRef = ref(database, 'users/' + user.uid);
+      // Realtime Database doesn't have arrayUnion, so we read, update, and write.
+      const newPhotos = [...photos, url];
+      await update(userRef, {
+        photos: newPhotos,
       });
-      setPhotos((prevPhotos) => [...prevPhotos, url]);
+      setPhotos(newPhotos);
     } catch (error) {
       console.error('Error adding photo to profile:', error);
     }

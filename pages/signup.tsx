@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { app, firestore } from '../lib/firebase';
+import { getDatabase, ref, set, serverTimestamp } from 'firebase/database';
+import { app } from '../lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -39,8 +39,9 @@ const SignupPage = () => {
       );
       const user = userCredential.user;
 
-      // Create a user document in Firestore
-      await setDoc(doc(firestore, 'users', user.uid), {
+      // Create a user record in the Realtime Database
+      const db = getDatabase(app);
+      await set(ref(db, 'users/' + user.uid), {
         email: user.email,
         createdAt: serverTimestamp(),
         displayName: '',

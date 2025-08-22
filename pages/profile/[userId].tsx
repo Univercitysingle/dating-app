@@ -1,8 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { firestore } from '../../lib/firebase';
-import type { DocumentData } from 'firebase/firestore';
+import { getDatabase, ref, get } from 'firebase/database';
+import { database } from '../../lib/firebase';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination } from 'swiper/modules';
 import useAuth from '../../hooks/useAuth';
@@ -11,11 +10,19 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 
+interface UserProfile {
+    displayName: string;
+    bio: string;
+    email: string;
+    photos: string[];
+    createdAt: number;
+}
+
 const UserProfilePage = () => {
   const router = useRouter();
   const { userId } = router.query;
   const { user: currentUser } = useAuth();
-  const [profile, setProfile] = useState<DocumentData | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,11 +33,11 @@ const UserProfilePage = () => {
       }
       try {
         setLoading(true);
-        const userDocRef = doc(firestore, 'users', userId);
-        const userDocSnap = await getDoc(userDocRef);
+        const userRef = ref(database, 'users/' + userId);
+        const snapshot = await get(userRef);
 
-        if (userDocSnap.exists()) {
-          setProfile(userDocSnap.data());
+        if (snapshot.exists()) {
+          setProfile(snapshot.val());
         } else {
           setError('User not found.');
         }
