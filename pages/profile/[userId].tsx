@@ -32,13 +32,16 @@ const UserProfilePage = () => {
       if (typeof userId !== 'string') {
         return;
       }
+      console.log('Fetching profile for user ID:', userId);
       try {
         setLoading(true);
         const userRef = ref(database, 'users/' + userId);
         const snapshot = await get(userRef);
 
         if (snapshot.exists()) {
-          setProfile(snapshot.val());
+          const profileData = snapshot.val();
+          setProfile(profileData);
+          console.log('Profile data fetched successfully for user ID:', userId, profileData);
         } else {
           setError('User not found.');
         }

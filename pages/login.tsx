@@ -28,10 +28,12 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    console.log('Attempting to log in user with email:', email);
 
     const auth = getAuth(app);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('User logged in successfully:', userCredential.user.uid);
       router.push('/');
     } catch (err: any) {
       setError(getFirebaseErrorMessage(err.code));

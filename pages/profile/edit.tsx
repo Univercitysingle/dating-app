@@ -26,10 +26,12 @@ const EditProfilePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
+        console.log('Fetching profile data for user:', user.uid);
         const userRef = ref(database, 'users/' + user.uid);
         const snapshot = await get(userRef);
         if (snapshot.exists()) {
           const userData: UserProfile = snapshot.val();
+          console.log('Profile data fetched successfully:', userData);
           setDisplayName(userData.displayName || '');
           setBio(userData.bio || '');
           setInterests((userData.interests || []).join(', '));
@@ -76,6 +78,7 @@ const EditProfilePage = () => {
 
   const handlePhotoUploadSuccess = async (url: string) => {
     if (!user) return;
+    console.log(`User ${user.uid} uploaded a new photo: ${url}`);
     try {
       const userRef = ref(database, 'users/' + user.uid);
       const newPhoto = { id: url, url };
@@ -84,6 +87,7 @@ const EditProfilePage = () => {
         photos: newPhotos.map((p) => p.url), // Store only URLs
       });
       setPhotos(newPhotos);
+      console.log('Photo added to profile successfully.');
     } catch (error) {
       console.error('Error adding photo to profile:', error);
     }
@@ -92,9 +96,11 @@ const EditProfilePage = () => {
   const handlePhotoReorder = async (newPhotos: { id: string; url: string }[]) => {
     if (!user) return;
     setPhotos(newPhotos);
+    console.log(`User ${user.uid} is reordering photos.`);
     try {
       const userRef = ref(database, 'users/' + user.uid);
       await update(userRef, { photos: newPhotos.map((p) => p.url) }); // Store only URLs
+      console.log('Photos reordered successfully.');
     } catch (error) {
       console.error('Error reordering photos:', error);
       // Optionally revert the state change
@@ -105,9 +111,11 @@ const EditProfilePage = () => {
     if (!user) return;
     const newPhotos = photos.filter((p) => p.id !== id);
     setPhotos(newPhotos);
+    console.log(`User ${user.uid} is deleting photo: ${id}`);
     try {
       const userRef = ref(database, 'users/' + user.uid);
       await update(userRef, { photos: newPhotos.map((p) => p.url) }); // Store only URLs
+      console.log('Photo deleted successfully.');
     } catch (error) {
       console.error('Error deleting photo:', error);
       // Optionally revert the state change

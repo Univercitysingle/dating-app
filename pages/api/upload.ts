@@ -26,8 +26,10 @@ export default async function handler(
     }
 
     const { filename, contentType } = req.body;
+    console.log(`Received request to generate presigned URL for file: ${filename} (${contentType})`);
 
     if (!filename || !contentType) {
+      console.log('Request is missing filename or contentType.');
       return res
         .status(400)
         .json({ error: 'Missing filename or contentType' });
@@ -46,6 +48,8 @@ export default async function handler(
     const signedUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 60, // URL expires in 60 seconds
     });
+
+    console.log(`Successfully generated presigned URL for: ${objectKey}`);
 
     res.status(200).json({
       url: signedUrl,

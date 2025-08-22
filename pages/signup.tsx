@@ -31,6 +31,7 @@ const SignupPage = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    console.log('Attempting to sign up user with email:', email);
 
     const auth = getAuth(app);
     try {
@@ -40,9 +41,11 @@ const SignupPage = () => {
         password,
       );
       const user = userCredential.user;
+      console.log('User created successfully in Firebase Auth:', user.uid);
 
       // Create a user record in the Realtime Database
       const db = getDatabase(app);
+      console.log('Creating user record in Realtime Database...');
       await set(ref(db, 'users/' + user.uid), {
         email: user.email,
         createdAt: serverTimestamp(),
@@ -51,6 +54,7 @@ const SignupPage = () => {
         photos: [],
         interests: [],
       });
+      console.log('User record created successfully.');
 
       router.push('/');
     } catch (err: any) {
