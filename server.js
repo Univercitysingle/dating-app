@@ -4,139 +4,176 @@ const mongoose = require("mongoose");
 const path = require("path");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const morgan = require("morgan"); // For request logging
-const http = require('http');
-const cors = require('cors');
-const { initSocket } = require('./routes/chat'); // Assuming this is correctly set up
+const morgan = require("morgan");
+const http = require("http");
+const cors = require("cors");
+
+const { initSocket } = require("./routes/chat");
 const authMiddleware = require("./middleware/authentication");
-const admin = require("./services/firebaseAdmin"); // Firebase Admin SDK
-const { logger } = require('./utils/logger'); // Import the new logger
-const correlationIdMiddleware = require('./middleware/correlationId');
+const { globalLogger: logger, buildLogger } = require("./utils/logger");
+const correlationIdMiddleware = require("./middleware/correlationId");
+
+// Firebase Admin (safe import)
+let admin;
+try {
+  admin = require("./services/firebaseAdmin");
+} catch (err) {
+  logger.warn(
+    "⚠ Firebase Admin SDK not initialized (missing env vars). Running without Firebase."
+  );
+}
 
 const app = express();
 const server = http.createServer(app);
 
+// -------------------- MIDDLEWARE --------------------
+
 // Add correlation ID to all requests
 app.use(correlationIdMiddleware);
 
-// Security, JSON, basic logging, rate limiting
-app.use(cors());
+// CORS setup with preflight handling
+const corsOptions = {
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+// Security headers & JSON parsing
 app.use(helmet());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Morgan for HTTP request logging, integrated with Winston
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', { stream: logger.stream }));
-
-// Before rateLimit, tell Express it's behind a proxy.
-// This is important for express-rate-limit to get the correct client IP.
-// Adjust '1' if you have more than one layer of proxy.
-app.set('trust proxy', 1);
-
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
-
-const mongoUri = process.env.MONGO_URI;
-if (!mongoUri) {
-  logger.error("MongoDB connection string is missing! Set MONGO_URI in your environment.");
-  process.exit(1);
-}
-mongoose.connect(mongoUri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => logger.info("MongoDB connected successfully."))
-.catch(err => {
-  logger.error("MongoDB connection error:", err);
-  process.exit(1);
-});
-
-// Initialize Socket.IO (if used)
-if (initSocket) { // Check if initSocket is defined, in case chat.js is complex
-    try {
-        initSocket(server);
-        logger.info("Socket.IO initialized.");
-    } catch (socketError) {
-        logger.error("Failed to initialize Socket.IO:", socketError);
-    }
-}
-
-
-// Routes
+// -------------------- REQUEST/RESPONSE LOGGING --------------------
 app.use((req, res, next) => {
-  console.log(`Request received: ${req.method} ${req.url}`);
+  req.log = buildLogger(req.correlationId || "GLOBAL");
+  const startTime = Date.now();
+
+  req.log.info(`Incoming Request: ${req.method} ${req.originalUrl}`, {
+    headers: req.headers,
+    body: req.body,
+  });
+
+  res.on("finish", () => {
+    const duration = Date.now() - startTime;
+    req.log.info(`Response: ${req.method} ${req.originalUrl}`, {
+      statusCode: res.statusCode,
+      durationMs: duration,
+    });
+  });
+
   next();
 });
 
-app.get('/', (req, res) => res.send('API is running...')); // Basic health check route
+// Morgan logging via Winston
+app.use(
+  morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", {
+    stream: { write: (msg) => logger.debug(msg.trim()) },
+  })
+);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
+// Trust proxy for rate limiting
+app.set("trust proxy", 1);
 
-// Status page
-app.get('/status', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'status.html'));
-});
+// Rate limiting
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+
+// -------------------- DATABASE --------------------
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  logger.error(
+    "❌ MongoDB connection string is missing! Set MONGO_URI in your environment."
+  );
+  process.exit(1);
+}
+
+mongoose
+  .connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => logger.info("✅ MongoDB connected successfully."))
+  .catch((err) => {
+    logger.error("❌ MongoDB connection error:", { error: err });
+    process.exit(1);
+  });
+
+// -------------------- SOCKET.IO --------------------
+if (initSocket) {
+  try {
+    initSocket(server);
+    logger.info("✅ Socket.IO initialized.");
+  } catch (socketError) {
+    logger.error(
+      `❌ Failed to initialize Socket.IO: ${socketError.message || socketError}`,
+      { stack: socketError.stack }
+    );
+  }
+}
+
+// -------------------- ROUTES --------------------
+app.get("/", (req, res) => res.send("API is running..."));
+app.get("/health", (req, res) => res.status(200).send("OK"));
+app.get("/status", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "status.html"))
+);
 
 app.use("/api/auth", require("./routes/auth"));
-app.use("/api/users", authMiddleware, require("./routes/users")); // authMiddleware applied here
+app.use("/api/users", authMiddleware, require("./routes/users"));
 app.use("/api/matches", authMiddleware, require("./routes/matches"));
-app.use("/api/chat", authMiddleware, require("./routes/chat").router); // Ensure chat.js exports router
+app.use("/api/chat", authMiddleware, require("./routes/chat").router);
 app.use("/api/video", authMiddleware, require("./routes/video"));
 app.use("/api/reports", authMiddleware, require("./routes/reports"));
-app.use('/api/status', require('./routes/status'));
+app.use("/api/status", require("./routes/status"));
 
 // Admin routes
-const adminUsersRouter = require('./routes/adminUsers'); // Ensure this file exists and exports a router
-app.use('/api/admin/users', adminUsersRouter); // Consider adding admin-specific auth here
+const adminUsersRouter = require("./routes/adminUsers");
+app.use("/api/admin/users", adminUsersRouter);
 
-// Serve frontend for any route that is not an API route
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
+// React frontend fallback for non-API routes
+app.get("*", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "public", "index.html"));
 });
 
-// Global Error Handling Middleware (must be the last app.use call)
+// -------------------- GLOBAL ERROR HANDLER --------------------
 app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
   let responseErrorMessage = "An internal server error occurred. Please try again later.";
 
-  // For non-production, use the actual error message.
-  // For production, use a generic message unless it's a specific, safe-to-expose error.
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== "production") {
     responseErrorMessage = err.message || "Internal Server Error (No specific message)";
-  } else {
-    // You might have specific error types you want to expose in production
-    if (err.isOperational) { // Hypothetical property for operational errors
-        responseErrorMessage = err.message;
-    }
+  } else if (err.isOperational) {
+    responseErrorMessage = err.message;
   }
 
   const errorPayload = { error: responseErrorMessage };
-  if (process.env.NODE_ENV !== 'production' && err.details) { // Add details if present (e.g. validation errors)
+  if (process.env.NODE_ENV !== "production" && err.details) {
     errorPayload.details = err.details;
   }
 
-  // Detailed logging
   const log = req.log || logger;
-  log.error(`Global Error Handler Caught: Status ${statusCode}, Message: ${err.message || 'N/A'}`);
-  if (process.env.NODE_ENV !== 'production') {
-    log.error("Responding with payload:", JSON.stringify(errorPayload, null, 2));
-    log.error("Error Stack:", err.stack || 'N/A');
-  } else {
-    // In production, log essential info without overwhelming logs; full stack might go to a dedicated logging service
-    log.error(`Prod Error: Status ${statusCode}, Path: ${req.path}, UID: ${req.user ? req.user.uid : 'N/A'}, Error: ${err.message}`);
-  }
+  log.error(`Global Error Handler: Status ${statusCode}, Message: ${err.message || "N/A"}`, {
+    stack: err.stack,
+    payload: errorPayload,
+  });
 
   if (!res.headersSent) {
     res.status(statusCode).json(errorPayload);
   } else {
-    log.error("Global Error Handler: Headers already sent. Delegating to default Express error handler.");
-    next(err); // Essential for Express to handle if headers are sent
+    log.error("Headers already sent. Delegating to default Express handler.");
+    next(err);
   }
 });
 
+// -------------------- START SERVER --------------------
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}. NODE_ENV=${process.env.NODE_ENV || 'development'}`);
+  logger.info(
+    `🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`
+  );
 });
