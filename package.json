@@ -7,7 +7,7 @@
     "start": "node server.js",
     "dev:backend": "nodemon server.js",
     "dev:frontend": "react-scripts start",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "node scripts/dev.js",
     "build": "react-scripts build",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -52,8 +52,7 @@
     "eslint-plugin-react": "^7.20.0",
     "prettier": "^2.0.0",
     "nodemon": "^3.1.0",
-    "depcheck": "^1.4.7",
-    "concurrently": "^8.2.0"
+    "depcheck": "^1.4.7"
   },
   "browserslist": {
     "production": [
@@ -66,6 +65,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "proxy": "http://localhost:5000"
+  }
 }

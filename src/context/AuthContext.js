@@ -10,23 +10,24 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
-      try {
-        const currentUser = await apiClient.get('/api/users/me');
-        setUser(currentUser);
-      } catch (error) {
-        setUser(null);
-      } finally {
-        setIsLoading(false);
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        try {
+          const currentUser = await apiClient.get('/api/users/me');
+          setUser(currentUser);
+        } catch (error) {
+          setUser(null);
+          localStorage.removeItem("authToken");
+        }
       }
+      setIsLoading(false);
     };
 
     fetchCurrentUser();
   }, []);
 
   const login = async (token) => {
-    // The backend will set the cookie upon successful login
-    await apiClient.post('/api/auth/login', { token });
-    // After login, fetch the user profile
+    localStorage.setItem("authToken", token);
     const currentUser = await apiClient.get('/api/users/me');
     setUser(currentUser);
   };
@@ -34,9 +35,11 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await apiClient.post('/api/auth/logout');
-      setUser(null);
     } catch (error) {
       logger.error('Logout failed:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem("authToken");
     }
   };
 

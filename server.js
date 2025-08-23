@@ -10,7 +10,7 @@ const cors = require("cors");
 
 const { initSocket } = require("./routes/chat");
 const authMiddleware = require("./middleware/authentication");
-//const { globalLogger: logger, buildLogger } = require("./utils/logger");
+const { globalLogger: logger, buildLogger } = require("./utils/logger");
 const correlationIdMiddleware = require("./middleware/correlationId");
 
 // Firebase Admin (safe import)

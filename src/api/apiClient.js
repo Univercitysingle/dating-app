@@ -7,6 +7,11 @@ const apiClient = {
       ...options.headers,
     });
 
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+
     let baseUrl = process.env.REACT_APP_API_BASE_URL || '';
     if (!baseUrl) {
       baseUrl = '';
