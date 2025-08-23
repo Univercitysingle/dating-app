@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const morgan = require("morgan"); // For request logging
 const http = require('http');
+const cors = require('cors');
 const { initSocket } = require('./routes/chat'); // Assuming this is correctly set up
 const authMiddleware = require("./middleware/authentication");
 const admin = require("./services/firebaseAdmin"); // Firebase Admin SDK
@@ -19,6 +20,7 @@ const server = http.createServer(app);
 app.use(correlationIdMiddleware);
 
 // Security, JSON, basic logging, rate limiting
+app.use(cors());
 app.use(helmet());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -60,6 +62,11 @@ if (initSocket) { // Check if initSocket is defined, in case chat.js is complex
 
 
 // Routes
+app.use((req, res, next) => {
+  console.log(`Request received: ${req.method} ${req.url}`);
+  next();
+});
+
 app.get('/', (req, res) => res.send('API is running...')); // Basic health check route
 
 // Health check endpoint

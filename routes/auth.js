@@ -12,6 +12,13 @@ const authMiddleware = require("../middleware/authentication");
 // @access  Public
 router.post("/login", login);
 
+// @route   GET /api/auth/test
+// @desc    Test route
+// @access  Public
+router.get("/test", (req, res) => {
+  res.send("Auth test route is working");
+});
+
 // @route   POST /api/auth/logout
 // @desc    Logout user and clear cookie
 // @access  Public
