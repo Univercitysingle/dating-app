@@ -27,7 +27,4 @@ globalLogger.stream = {
   },
 };
 
-module.exports = {
-  createLogger,
-  logger: globalLogger,
-};
+module.exports = globalLogger;
