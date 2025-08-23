@@ -1,16 +1,23 @@
-import logger from '../utils/logger';
+import logger from "../utils/logger";
+
+function getAuthToken() {
+  return localStorage.getItem("authToken"); // Or sessionStorage if you prefer
+}
 
 const apiClient = {
   async request(method, path, data = null, options = {}) {
+    const token = getAuthToken();
+
     const headers = new Headers({
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     });
 
-    let baseUrl = process.env.REACT_APP_API_BASE_URL || '';
+    let baseUrl = process.env.REACT_APP_API_BASE_URL || "";
     if (!baseUrl) {
-      baseUrl = '';
-      logger.warn('REACT_APP_API_BASE_URL not set! Using relative paths.');
+      baseUrl = "";
+      logger.warn("REACT_APP_API_BASE_URL not set! Using relative paths.");
     }
 
     const url = `${baseUrl}${path}`;
@@ -20,11 +27,11 @@ const apiClient = {
       ...options,
     };
 
-    if (data && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
+    if (data && ["POST", "PUT", "PATCH"].includes(config.method)) {
       config.body = JSON.stringify(data);
     }
 
-    logger.debug(`API Request - ${config.method} ${url}`, {
+    logger.debug(`➡️ API Request: ${config.method} ${url}`, {
       headers: Object.fromEntries(headers.entries()),
       body: data,
     });
@@ -32,8 +39,9 @@ const apiClient = {
     try {
       const response = await fetch(url, config);
 
-      logger.debug(`API Response - ${config.method} ${url}`, {
+      logger.debug(`⬅️ API Response: ${config.method} ${url}`, {
         status: response.status,
+        ok: response.ok,
         headers: Array.from(response.headers.entries()),
       });
 
@@ -42,16 +50,19 @@ const apiClient = {
         try {
           errorData = await response.json();
         } catch (e) {
-          errorData = { message: response.statusText || 'An error occurred' };
+          errorData = { message: response.statusText || "An error occurred" };
         }
 
         const error = new Error(
-          errorData.message || 'Network response was not ok.'
+          errorData.message || "Network response was not ok."
         );
         error.status = response.status;
         error.data = errorData;
 
-        logger.error(`API Error (${config.method} ${url})`, errorData);
+        logger.error(
+          `❌ API Error: ${config.method} ${url} [${response.status}]`,
+          errorData
+        );
         throw error;
       }
 
@@ -61,32 +72,35 @@ const apiClient = {
       }
 
       const jsonData = await response.json();
-      logger.debug(`API Success (${config.method} ${url})`, jsonData);
+      logger.debug(`✅ API Success (${config.method} ${url})`, jsonData);
       return jsonData;
     } catch (error) {
-      logger.error(`API Client Caught Error (${config.method} ${url})`, error);
+      logger.error(
+        `🔥 API Client Caught Error: ${config.method} ${url}`,
+        error
+      );
       throw error;
     }
   },
 
   get(path, options = {}) {
-    return this.request('GET', path, null, options);
+    return this.request("GET", path, null, options);
   },
 
   post(path, data, options = {}) {
-    return this.request('POST', path, data, options);
+    return this.request("POST", path, data, options);
   },
 
   put(path, data, options = {}) {
-    return this.request('PUT', path, data, options);
+    return this.request("PUT", path, data, options);
   },
 
   delete(path, options = {}) {
-    return this.request('DELETE', path, null, options);
+    return this.request("DELETE", path, null, options);
   },
 
   patch(path, data, options = {}) {
-    return this.request('PATCH', path, data, options);
+    return this.request("PATCH", path, data, options);
   },
 };
 
