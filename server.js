@@ -10,7 +10,7 @@ const cors = require('cors');
 const { initSocket } = require('./routes/chat'); // Assuming this is correctly set up
 const authMiddleware = require("./middleware/authentication");
 const admin = require("./services/firebaseAdmin"); // Firebase Admin SDK
-const logger = require('./utils/logger'); // Import the new logger
+const { logger } = require('./utils/logger'); // Import the new logger
 const correlationIdMiddleware = require('./middleware/correlationId');
 
 const app = express();
