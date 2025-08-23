@@ -6,7 +6,6 @@ import {
   Navigate,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import './styles/App.css';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import Chat from './pages/Chat';
