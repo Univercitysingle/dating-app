@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './firebase'; // Import Firebase to initialize it
 import './styles/tailwind.css'; // Import Tailwind CSS
 import App from './App';
 import reportWebVitals from './reportWebVitals';
