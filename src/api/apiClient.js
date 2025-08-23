@@ -14,7 +14,6 @@ const apiClient = {
 
     let baseUrl = process.env.REACT_APP_API_BASE_URL || '';
     if (!baseUrl) {
-      baseUrl = '';
       logger.warn('REACT_APP_API_BASE_URL not set! Using relative paths.');
     }
 
@@ -41,6 +40,19 @@ const apiClient = {
         status: response.status,
         headers: Array.from(response.headers.entries()),
       });
+
+      // Handle 403 (Forbidden) separately
+      if (response.status === 403) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: 'Access forbidden' };
+        }
+        logger.warn(`API 403 Forbidden (${config.method} ${url})`, errorData);
+        // Return the data but mark it as forbidden
+        return { forbidden: true, ...errorData };
+      }
 
       if (!response.ok) {
         let errorData;
