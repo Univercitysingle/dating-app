@@ -17,10 +17,9 @@ const correlationIdMiddleware = require("./middleware/correlationId");
 let admin;
 try {
   admin = require("./services/firebaseAdmin");
-  logger.info("✅ Firebase Admin initialized.");
 } catch (err) {
   logger.warn(
-    "⚠ Firebase Admin SDK not initialized (missing or invalid env vars). Running without Firebase."
+    "⚠ Firebase Admin SDK not initialized (missing env vars). Running without Firebase."
   );
 }
 
@@ -28,9 +27,11 @@ const app = express();
 const server = http.createServer(app);
 
 // -------------------- MIDDLEWARE --------------------
+
+// Add correlation ID to all requests
 app.use(correlationIdMiddleware);
 
-// CORS setup
+// CORS setup with preflight handling
 const corsOptions = {
   origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true,
@@ -63,7 +64,7 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - startTime;
-    req.log.info(`Response Sent: ${req.method} ${req.originalUrl}`, {
+    req.log.info(`Response: ${req.method} ${req.originalUrl}`, {
       statusCode: res.statusCode,
       durationMs: duration,
     });
@@ -72,22 +73,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Morgan logging → Winston
+// Morgan logging via Winston
 app.use(
   morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", {
     stream: { write: (msg) => logger.debug(msg.trim()) },
   })
 );
 
-// Rate limiting
+// Trust proxy for rate limiting
 app.set("trust proxy", 1);
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: { error: "Too many requests, please try again later." },
-  })
-);
+
+// Rate limiting
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // -------------------- DATABASE --------------------
 const mongoUri = process.env.MONGO_URI;
@@ -99,13 +96,10 @@ if (!mongoUri) {
 }
 
 mongoose
-  .connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => logger.info("✅ MongoDB connected successfully."))
   .catch((err) => {
-    logger.error("❌ MongoDB connection error", { error: err.message });
+    logger.error("❌ MongoDB connection error:", { error: err });
     process.exit(1);
   });
 
@@ -114,10 +108,11 @@ if (initSocket) {
   try {
     initSocket(server);
     logger.info("✅ Socket.IO initialized.");
-  } catch (err) {
-    logger.error(`❌ Failed to initialize Socket.IO: ${err.message}`, {
-      stack: err.stack,
-    });
+  } catch (socketError) {
+    logger.error(
+      `❌ Failed to initialize Socket.IO: ${socketError.message || socketError}`,
+      { stack: socketError.stack }
+    );
   }
 }
 
@@ -137,9 +132,10 @@ app.use("/api/reports", authMiddleware, require("./routes/reports"));
 app.use("/api/status", require("./routes/status"));
 
 // Admin routes
-app.use("/api/admin/users", require("./routes/adminUsers"));
+const adminUsersRouter = require("./routes/adminUsers");
+app.use("/api/admin/users", adminUsersRouter);
 
-// React frontend fallback
+// React frontend fallback for non-API routes
 app.get("*", (req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "index.html"));
 });
@@ -147,35 +143,35 @@ app.get("*", (req, res) => {
 // -------------------- GLOBAL ERROR HANDLER --------------------
 app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
-  let message = "An internal server error occurred. Please try again later.";
+  let responseErrorMessage = "An internal server error occurred. Please try again later.";
 
   if (process.env.NODE_ENV !== "production") {
-    message = err.message || "Internal Server Error (no message provided)";
+    responseErrorMessage = err.message || "Internal Server Error (No specific message)";
   } else if (err.isOperational) {
-    message = err.message;
+    responseErrorMessage = err.message;
   }
 
-  const errorPayload = { error: message };
+  const errorPayload = { error: responseErrorMessage };
   if (process.env.NODE_ENV !== "production" && err.details) {
     errorPayload.details = err.details;
   }
 
   const log = req.log || logger;
-  log.error(
-    `Global Error Handler: Status ${statusCode}, Message: ${err.message || "N/A"}`,
-    { stack: err.stack, payload: errorPayload }
-  );
+  log.error(`Global Error Handler: Status ${statusCode}, Message: ${err.message || "N/A"}`, {
+    stack: err.stack,
+    payload: errorPayload,
+  });
 
   if (!res.headersSent) {
     res.status(statusCode).json(errorPayload);
   } else {
-    log.error("Headers already sent. Delegating to Express default handler.");
+    log.error("Headers already sent. Delegating to default Express handler.");
     next(err);
   }
 });
 
 // -------------------- START SERVER --------------------
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.BACKEND_PORT || 5000;
 server.listen(PORT, () => {
   logger.info(
     `🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`

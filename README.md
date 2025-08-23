@@ -1,6 +1,7 @@
 # Dating App
 
-Backend hosted on Hugging Face,
-coding [https://jules.google/](https://jules.google.com/task/9436999224663644250)
-hosting on HuggingFace Space https://huggingface.co/spaces/Sarangat/jit
-local build environment win 11
+Backend hosted on Hugging Face, Frontend on Vercel.
+
+coding https://jules.google/
+front end https://vercel.com/enadoctemps-projects/dating-app
+backend https://railway.com/project/f6b46a0c-bf2a-455b-b804-471d7a37983b/service/6e440b81-0c06-4242-9f21-db598506e962?environmentId=88759e92-dc09-429f-9cac-fd6a40afd472

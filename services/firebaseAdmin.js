@@ -1,60 +1,32 @@
-const admin = require("firebase-admin");
-const { globalLogger: logger } = require("../utils/logger"); // assuming same logger setup
+const admin = require('firebase-admin');
 
-// -------------------- VALIDATE ENV --------------------
-const requiredEnvVars = [
-  "FIREBASE_PROJECT_ID",
-  "FIREBASE_CLIENT_EMAIL",
-  "FIREBASE_PRIVATE_KEY",
-];
-
-const missingVars = requiredEnvVars.filter((v) => !process.env[v]);
-
-if (missingVars.length > 0) {
-  logger.error("❌ Firebase Admin initialization failed: Missing env vars", {
-    missing: missingVars,
-  });
+// Ensure required env variables are set
+if (
+  !process.env.FIREBASE_PROJECT_ID ||
+  !process.env.FIREBASE_CLIENT_EMAIL ||
+  !process.env.FIREBASE_PRIVATE_KEY
+) {
   throw new Error(
-    `Missing Firebase environment variables: ${missingVars.join(", ")}`
+    'Missing Firebase environment variables. Please set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.'
   );
 }
 
-// -------------------- SERVICE ACCOUNT CONFIG --------------------
-let serviceAccount;
-try {
-  serviceAccount = {
-    type: "service_account",
-    project_id: process.env.FIREBASE_PROJECT_ID,
-    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    client_email: process.env.FIREBASE_CLIENT_EMAIL,
-    token_uri: "https://oauth2.googleapis.com/token",
-    auth_uri: "https://accounts.google.com/o/oauth2/auth",
-    auth_provider_x509_cert_url:
-      "https://www.googleapis.com/oauth2/v1/certs",
-  };
-} catch (err) {
-  logger.error("❌ Failed to construct Firebase service account", {
-    error: err.message,
-  });
-  throw err;
-}
+// Construct the service account object from env
+const serviceAccount = {
+  type: "service_account",
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+};
 
-// -------------------- INITIALIZE --------------------
-try {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    logger.info("✅ Firebase Admin initialized successfully.");
-  } else {
-    logger.debug("ℹ️ Firebase Admin already initialized, reusing existing app.");
-  }
-} catch (err) {
-  logger.error("❌ Firebase Admin initialization error", {
-    error: err.message,
-    stack: err.stack,
+// Avoid re-initialization in dev/hot-reload environments
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
   });
-  throw err;
 }
 
 module.exports = admin;
