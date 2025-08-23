@@ -8,7 +8,7 @@ const {
   uploadAudioBio, // To be created
   uploadVideoBioSnippet, // To be created
 } = require("../controllers/usersController");
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware = require("../middleware/authentication");
 const multer = require("multer");
 
 // Validation Parameters
