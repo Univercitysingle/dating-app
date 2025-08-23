@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import TinderCard from 'react-tinder-card';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import apiClient from '../api/apiClient';
 import SwipeCard from '../components/SwipeCard';
 import { Link } from 'react-router-dom';
@@ -68,7 +68,7 @@ const NoMoreProfiles = () => (
 
 
 const SwipeDeck = () => {
-  const [usersToSwipe, setUsersToSwipe] = useState([]);
+  const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
@@ -79,11 +79,11 @@ const SwipeDeck = () => {
     setNewMatchInfo(null);
     try {
       const { data } = await apiClient.get('/api/users/discover');
-      setUsersToSwipe(data || []);
+      setUsers(data || []);
     } catch (err) {
       console.error("Error fetching users for swipe deck:", err);
       setError(err.data?.message || err.message || "Failed to load users.");
-      setUsersToSwipe([]);
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
@@ -93,34 +93,25 @@ const SwipeDeck = () => {
     fetchUsersToSwipe();
   }, [fetchUsersToSwipe]);
 
-  const childRefs = useMemo(() => Array(usersToSwipe.length).fill(0).map(() => React.createRef()), [usersToSwipe]);
-
-  const onSwipe = async (direction, swipedUserId) => {
-    console.log(`You swiped ${direction} on ${swipedUserId}`);
+  const handleVote = async (userId, direction) => {
     try {
       const { data } = await apiClient.post('/api/swipes', {
-        targetUserId: swipedUserId,
-        direction: direction
+        targetUserId: userId,
+        direction: direction,
       });
 
       if (data && data.match) {
-        setNewMatchInfo(data.matchedUser || { id: swipedUserId, name: 'Your New Match!' });
+        setNewMatchInfo(data.matchedUser || { _id: userId, name: 'Your New Match!' });
       }
     } catch (swipeError) {
       console.error("Error recording swipe:", swipeError);
     }
+    setUsers((prevUsers) => prevUsers.slice(1));
   };
 
-  const onCardLeftScreenHandler = (userIdThatLeft) => {
-    console.log(userIdThatLeft + ' left the screen.');
-    setUsersToSwipe(prevUsers => prevUsers.filter(user => (user.id || user._id) !== userIdThatLeft));
-  };
-
-  const triggerSwipe = async (direction) => {
-    const currentCardIndex = usersToSwipe.length - 1;
-    if (currentCardIndex >= 0 && childRefs[currentCardIndex] && childRefs[currentCardIndex].current) {
-        await childRefs[currentCardIndex].current.swipe(direction);
-    }
+  const handleSwipe = () => {
+    // This function is called when the card animation is complete
+    // We don't need to do anything here anymore, as the card is already removed from the DOM by AnimatePresence
   };
 
   if (isLoading) {
@@ -139,30 +130,26 @@ const SwipeDeck = () => {
 
         <main className="flex-grow flex flex-col items-center justify-center">
             <div className="relative w-[90vw] h-[65vh] max-w-sm">
-                {usersToSwipe.length > 0 ? (
-                usersToSwipe.map((user, index) => (
-                    <TinderCard
-                    ref={childRefs[index]}
-                    className="absolute"
-                    key={user.id || user._id}
-                    onSwipe={(dir) => onSwipe(dir, user.id || user._id)}
-                    onCardLeftScreen={() => onCardLeftScreenHandler(user.id || user._id)}
-                    preventSwipe={['up', 'down']}
-                    >
-                    <SwipeCard user={user} />
-                    </TinderCard>
-                ))
-                ) : (
-                <NoMoreProfiles />
-                )}
+                <AnimatePresence>
+                    {users.length > 0 ? (
+                        <SwipeCard
+                            key={users[0]._id}
+                            user={users[0]}
+                            onVote={handleVote}
+                            onSwipe={handleSwipe}
+                        />
+                    ) : (
+                        <NoMoreProfiles />
+                    )}
+                </AnimatePresence>
             </div>
         </main>
 
         <footer className="flex-shrink-0">
-            {usersToSwipe.length > 0 && !newMatchInfo && (
+            {users.length > 0 && !newMatchInfo && (
                 <div className="flex justify-center items-center my-4 space-x-8">
                 <button
-                    onClick={() => triggerSwipe('left')}
+                    onClick={() => handleVote(users[0]._id, 'left')}
                     className="p-4 bg-neutral-50 rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
                     aria-label="Pass"
                 >
@@ -171,7 +158,7 @@ const SwipeDeck = () => {
                     </svg>
                 </button>
                 <button
-                    onClick={() => triggerSwipe('right')}
+                    onClick={() => handleVote(users[0]._id, 'right')}
                     className="p-5 bg-neutral-50 rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
                     aria-label="Like"
                 >
