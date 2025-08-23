@@ -1,6 +1,6 @@
 const winston = require('winston');
 
-const createLogger = (correlationId) => {
+const buildLogger = (correlationId) => {
   const logFormat = winston.format.combine(
     winston.format.colorize(),
     winston.format.timestamp(),
@@ -19,7 +19,7 @@ const createLogger = (correlationId) => {
   });
 };
 
-const globalLogger = createLogger('GLOBAL');
+const globalLogger = buildLogger('GLOBAL');
 
 globalLogger.stream = {
   write: function(message, encoding) {
@@ -28,6 +28,6 @@ globalLogger.stream = {
 };
 
 module.exports = {
-  createLogger,
-  logger: globalLogger,
+  buildLogger,
+  globalLogger,
 };
