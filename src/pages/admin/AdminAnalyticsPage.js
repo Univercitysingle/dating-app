@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,11 +32,19 @@ const AdminAnalyticsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // State for date filtering
+  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)));
+  const [endDate, setEndDate] = useState(new Date());
+
   useEffect(() => {
     const fetchAnalytics = async () => {
       setIsLoading(true);
       try {
-        const data = await apiClient.get('/api/admin/analytics/summary');
+        const queryParams = new URLSearchParams({
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        });
+        const data = await apiClient.get(`/api/admin/analytics/summary?${queryParams.toString()}`);
         logger.info("Fetched analytics summary:", data);
         setAnalyticsData(data);
       } catch (err) {
@@ -45,13 +55,13 @@ const AdminAnalyticsPage = () => {
       }
     };
     fetchAnalytics();
-  }, []);
+  }, [startDate, endDate]);
 
   const lineChartData = {
     labels: analyticsData?.signupsPerDay.map(d => d._id) || [],
     datasets: [
       {
-        label: 'New User Sign-ups (Last 30 Days)',
+        label: 'New User Sign-ups',
         data: analyticsData?.signupsPerDay.map(d => d.count) || [],
         borderColor: 'rgb(75, 192, 192)',
         backgroundColor: 'rgba(75, 192, 192, 0.5)',
@@ -87,7 +97,36 @@ const AdminAnalyticsPage = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      <h1 className="text-2xl font-semibold text-gray-800">Analytics Dashboard</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold text-gray-800">Analytics Dashboard</h1>
+        {/* Date Filter Section */}
+        <div className="flex items-center space-x-4">
+            <DatePicker
+                selected={startDate}
+                onChange={(date) => setStartDate(date)}
+                selectsStart
+                startDate={startDate}
+                endDate={endDate}
+                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+            />
+            <DatePicker
+                selected={endDate}
+                onChange={(date) => setEndDate(date)}
+                selectsEnd
+                startDate={startDate}
+                endDate={endDate}
+                minDate={startDate}
+                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+            />
+            <a
+                href={`/api/admin/analytics/export?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`}
+                download
+                className="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded shadow-md"
+            >
+                Export to CSV
+            </a>
+        </div>
+      </div>
 
       {/* Key Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

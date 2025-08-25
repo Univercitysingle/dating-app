@@ -15,4 +15,12 @@ router.get(
   adminAnalyticsController.getAnalyticsSummary
 );
 
+// GET /export - Export analytics data as CSV
+router.get(
+  '/export',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminAnalyticsController.exportAnalyticsCsv
+);
+
 module.exports = router;

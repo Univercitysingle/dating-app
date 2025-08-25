@@ -42,7 +42,10 @@
     "@aws-sdk/s3-request-presigner": "^3.574.0",
     "winston": "^3.13.0",
     "chart.js": "^4.4.2",
-    "react-chartjs-2": "^5.2.0"
+    "react-chartjs-2": "^5.2.0",
+    "react-datepicker": "^6.9.0",
+    "date-fns": "^3.6.0",
+    "papaparse": "^5.4.1"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",
