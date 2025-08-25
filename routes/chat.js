@@ -24,8 +24,9 @@ function initSocket(server) {
       const decoded = await admin.auth().verifyIdToken(token);
       socket.user = decoded;
       next();
-    } catch {
-      next(new Error("Authentication error"));
+    } catch (error) {
+      console.error("Socket authentication error:", error.message);
+      next(new Error("Authentication error: Invalid token"));
     }
   });
 

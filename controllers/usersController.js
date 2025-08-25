@@ -192,6 +192,29 @@ const uploadVideoBioSnippet = async (req, res) => {
   await handleFileUploadToS3(req, res, "video-bio-snippets");
 };
 
+const discoverUsers = async (req, res) => {
+  const log = req.log;
+  const currentUserUid = req.user.uid;
+  log.info(`UsersController: discoverUsers entered for UID: ${currentUserUid}`);
+
+  try {
+    // Find users that are not the current user and not blocked by the current user
+    const users = await User.find({
+      uid: { $ne: currentUserUid },
+      // Potentially add more filters here in the future (e.g., by preference, location)
+    }).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
+
+    // In a real app, you'd also filter out users who have already been matched or swiped on.
+    // This is a simplified version for now.
+
+    log.info(`UsersController: Found ${users.length} users to discover.`);
+    res.json(users);
+  } catch (error) {
+    log.error({ err: error }, `UsersController: Error fetching users for discovery for UID ${currentUserUid}`);
+    res.status(500).json({ error: "An unexpected error occurred while fetching users." });
+  }
+};
+
 module.exports = {
   getCurrentUserProfile,
   updateCurrentUserProfile,
@@ -199,4 +222,5 @@ module.exports = {
   blockUser,
   uploadAudioBio,
   uploadVideoBioSnippet,
+  discoverUsers,
 };
