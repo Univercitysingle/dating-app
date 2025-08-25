@@ -28,9 +28,11 @@ export function AuthProvider({ children }) {
 
   const login = async (token, userData = null) => {
     localStorage.setItem("authToken", token);
+    logger.info("AuthContext: login called.", { token, userData });
     if (userData) {
       // If user object is provided directly (e.g., for superadmin), use it.
       setUser(userData);
+      logger.info("AuthContext: User state set directly with provided data.", { userData });
     } else {
       // Otherwise, fetch from /me endpoint (standard flow)
       const currentUser = await apiClient.get('/api/users/me');

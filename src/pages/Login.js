@@ -96,6 +96,7 @@ function Login() {
           body: JSON.stringify({ email, password }),
         });
         const data = await response.json();
+        logger.info("Superadmin login API response:", { data });
         if (!response.ok) {
           throw new Error(data.error || 'Superadmin login failed');
         }

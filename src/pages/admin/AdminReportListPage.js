@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import logger from '../../utils/logger';
 
 const AdminReportListPage = () => {
   const [reports, setReports] = useState([]);
@@ -30,6 +31,11 @@ const AdminReportListPage = () => {
         throw new Error(errData.message || 'Failed to fetch reports');
       }
       const data = await response.json();
+      logger.info("Fetched reports data:", {
+        reports: data.reports,
+        totalPages: data.totalPages,
+        currentPage: data.currentPage
+      });
       setReports(data.reports || []);
       setTotalPages(data.totalPages || 1);
       setCurrentPage(data.currentPage || 1);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import logger from '../../utils/logger';
 
 // A simple component for displaying a statistic
 const StatCard = ({ title, value, loading }) => {
@@ -43,6 +44,7 @@ const AdminDashboardPage = () => {
         }
 
         const data = await response.json();
+        logger.info("Fetched dashboard stats:", data);
         setStats(data);
       } catch (err) {
         setError(err.message);

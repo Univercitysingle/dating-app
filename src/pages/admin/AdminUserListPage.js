@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import debounce from 'lodash.debounce';
+import logger from '../../utils/logger';
 
 const AdminUserListPage = () => {
   const [users, setUsers] = useState([]);
@@ -42,6 +43,11 @@ const AdminUserListPage = () => {
         throw new Error(errData.message || 'Failed to fetch users');
       }
       const data = await response.json();
+      logger.info("Fetched users data:", {
+        users: data.users,
+        totalPages: data.totalPages,
+        currentPage: data.currentPage
+      });
       setUsers(data.users || []);
       setTotalPages(data.totalPages || 1);
       setCurrentPage(data.currentPage || 1);
