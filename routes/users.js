@@ -7,6 +7,7 @@ const {
   blockUser,
   uploadAudioBio, // To be created
   uploadVideoBioSnippet, // To be created
+  discoverUsers,
 } = require("../controllers/usersController");
 const authMiddleware = require("../middleware/authentication");
 const multer = require("multer");
@@ -54,6 +55,9 @@ const uploadVideoBio = multer({
 
 // Get current user profile
 router.get("/me", authMiddleware, getCurrentUserProfile);
+
+// Get users for discovery swipe deck
+router.get("/discover", authMiddleware, discoverUsers);
 
 // Update profile
 router.put("/me", authMiddleware, updateCurrentUserProfile);

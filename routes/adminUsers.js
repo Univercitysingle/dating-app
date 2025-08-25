@@ -23,6 +23,15 @@ router.post(
   adminUsersController.createUser
 );
 
+// GET /api/admin/stats - Get dashboard statistics
+// This must be defined *before* the '/:userId' route
+router.get(
+  '/stats',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.getDashboardStats
+);
+
 // GET /api/admin/users/:userId - Get a specific user by ID
 router.get(
   '/:userId',

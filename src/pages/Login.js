@@ -51,45 +51,77 @@ function Login() {
     setSuccessMessage('');
   }, [isSignUp, showPhone, showReset]);
 
-  const handleEmailAuth = async () => {
+  const handleFirebaseEmailAuth = async () => {
+    // This function now only handles the Firebase logic
+    if (isSignUp) {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      if (userCredential && userCredential.user) {
+        await sendEmailVerification(userCredential.user);
+        await auth.signOut();
+        setSuccessMessage(
+          'Registration successful! A verification email has been sent. Please verify your email and then log in.'
+        );
+        setIsSignUp(false);
+        setEmail('');
+        setPassword('');
+      }
+    } else {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const token = await userCredential.user.getIdToken();
+      await login(token); // This uses the AuthContext login
+      navigate('/');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setIsLoading(true);
     setError('');
     setSuccessMessage('');
-    try {
-      if (isSignUp) {
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-        if (userCredential && userCredential.user) {
-          await sendEmailVerification(userCredential.user);
-          await auth.signOut();
-          setSuccessMessage(
-            'Registration successful! A verification email has been sent. Please verify your email and then log in.'
-          );
-          setIsSignUp(false);
-          setEmail('');
-          setPassword('');
+
+    // Superadmin check
+    if (email === 'sadmin' && !isSignUp) {
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await response.json();
+        logger.info("Superadmin login API response:", { data });
+        if (!response.ok) {
+          throw new Error(data.error || 'Superadmin login failed');
         }
-      } else {
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-        const token = await userCredential.user.getIdToken();
-        await login(token);
-        navigate('/');
+        // Use the new login function signature from AuthContext
+        await login(data.token, data.user);
+        navigate('/admin');
+      } catch (err) {
+        logger.error('Superadmin login error:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      logger.error('Email auth error:', err);
-      setError(
-        (err.code ? `${err.code}: ` : '') +
-          (err.message || (isSignUp ? 'Sign up failed' : 'Login failed'))
-      );
-    } finally {
-      setIsLoading(false);
+    } else {
+      // Fallback to Firebase for all other users
+      try {
+        await handleFirebaseEmailAuth();
+      } catch (err) {
+        logger.error('Firebase auth error:', err);
+        setError(
+          (err.code ? `${err.code}: ` : '') +
+            (err.message || (isSignUp ? 'Sign up failed' : 'Login failed'))
+        );
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -254,7 +286,7 @@ function Login() {
               />
             </div>
             <button
-              onClick={handleEmailAuth}
+              onClick={handleSubmit}
               disabled={isLoading}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-500 bg-opacity-75 rounded-md hover:bg-indigo-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 disabled:bg-gray-500 disabled:bg-opacity-50"
             >

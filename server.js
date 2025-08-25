@@ -32,8 +32,17 @@ const server = http.createServer(app);
 app.use(correlationIdMiddleware);
 
 // CORS setup with preflight handling
+const isProduction = process.env.NODE_ENV === 'production';
+const clientUrl = process.env.CLIENT_URL;
+
+if (isProduction && !clientUrl) {
+  logger.error('CLIENT_URL environment variable is not set in production. CORS will fail.');
+  // Exiting because this is a critical configuration issue
+  process.exit(1);
+}
+
 const corsOptions = {
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  origin: isProduction ? clientUrl : (clientUrl || "http://localhost:3000"),
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
@@ -44,6 +53,9 @@ const corsOptions = {
     "Origin",
   ],
 };
+
+logger.info(`CORS configured for origin: ${corsOptions.origin}`);
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -133,7 +145,11 @@ app.use("/api/status", require("./routes/status"));
 
 // Admin routes
 const adminUsersRouter = require("./routes/adminUsers");
+const adminReportsRouter = require("./routes/adminReports");
+const adminAnalyticsRouter = require("./routes/adminAnalytics");
 app.use("/api/admin/users", adminUsersRouter);
+app.use("/api/admin/reports", adminReportsRouter);
+app.use("/api/admin/analytics", adminAnalyticsRouter);
 
 // React frontend fallback for non-API routes
 app.get("*", (req, res) => {

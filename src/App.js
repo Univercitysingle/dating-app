@@ -16,7 +16,11 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdminUserListPage from './pages/admin/AdminUserListPage';
 import AdminUserEditPage from './pages/admin/AdminUserEditPage';
+import AdminReportListPage from './pages/admin/AdminReportListPage';
+import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
+import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import SwipeDeck from './pages/SwipeDeck';
+import MainLayout from './components/MainLayout';
 
 function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -71,44 +75,25 @@ function App() {
           />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          {/* User-facing protected routes */}
+          {/* User-facing protected routes with MainLayout */}
           <Route
-            path="/profile"
             element={
               <PrivateRoute>
-                <Profile />
+                <MainLayout />
               </PrivateRoute>
             }
-          />
-          <Route
-            path="/chat"
-            element={
-              <PrivateRoute>
-                <Chat />
-              </PrivateRoute>
-            }
-          />
+          >
+            <Route path="/discover" element={<SwipeDeck />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/profile" element={<Profile />} />
+          </Route>
+
+          {/* Standalone protected routes */}
           <Route
             path="/premium"
             element={
               <PrivateRoute>
                 <PremiumContent />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/discover"
-            element={
-              <PrivateRoute>
-                <SwipeDeck />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
               </PrivateRoute>
             }
           />
@@ -126,18 +111,14 @@ function App() {
             <Route path="users" element={<AdminUserListPage />} />
             <Route path="users/new" element={<AdminUserEditPage />} />
             <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
+            <Route path="reports" element={<AdminReportListPage />} />
+            <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
 
           {/* Default route */}
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="/" element={<Navigate to="/discover" />} />
+          <Route path="*" element={<Navigate to="/discover" />} />
         </Routes>
       </Router>
     </AuthProvider>
