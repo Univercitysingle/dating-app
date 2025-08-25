@@ -2,30 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import apiClient from '../api/apiClient';
 import SwipeCard from '../components/SwipeCard';
-import { Link } from 'react-router-dom';
-
-// A simple placeholder for the navigation bar
-const BottomNav = () => (
-  <nav className="w-full bg-neutral-50 dark:bg-neutral-900 shadow-t-md">
-    <div className="flex justify-around max-w-md mx-auto px-4 py-2">
-      <Link to="/discover" className="text-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-        </svg>
-      </Link>
-      <Link to="/matches" className="text-neutral-400 hover:text-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2V7a2 2 0 012-2h6l2-2h2l-2 2z" />
-        </svg>
-      </Link>
-      <Link to="/profile" className="text-neutral-400 hover:text-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      </Link>
-    </div>
-  </nav>
-);
+import { useNavigate } from 'react-router-dom';
 
 const MatchModal = ({ matchInfo, onContinue, onChat }) => (
     <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
@@ -72,6 +49,7 @@ const SwipeDeck = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
+  const navigate = useNavigate();
 
   const fetchUsersToSwipe = useCallback(async () => {
     setIsLoading(true);
@@ -128,60 +106,66 @@ const SwipeDeck = () => {
             <h1 className="text-2xl font-bold my-4 text-center text-neutral-700 dark:text-neutral-200">Discover</h1>
         </header>
 
-        <main className="flex-grow flex flex-col items-center justify-center">
-            <div className="relative w-[90vw] h-[65vh] max-w-sm">
+        <main className="flex-grow flex flex-col items-center justify-center pt-4">
+            <div className="relative w-[90vw] h-[70vh] max-w-sm">
                 <AnimatePresence>
-                    {users.map((user, index) => (
-                        // Only render the top card to be interactive, the rest are for show
-                        index === 0 ? (
-                            <SwipeCard
-                                key={user._id}
-                                user={user}
-                                onVote={(id, dir) => handleVote(id, dir)}
-                                onSwipe={handleSwipe}
-                            />
-                        ) : (
-                            <div key={user._id} className="absolute w-full h-full rounded-2xl bg-neutral-200 dark:bg-neutral-700" style={{ top: `${index * 4}px`, transform: `scale(${1 - index * 0.05})` }} />
-                        )
-                    ))}
+                    {users.length > 0 ? (
+                        users.slice(0, 3).reverse().map((user, index) => {
+                            const isTop = index === users.slice(0, 3).length - 1;
+                            return (
+                                <SwipeCard
+                                    key={user._id}
+                                    user={user}
+                                    onVote={isTop ? handleVote : () => {}}
+                                    onSwipe={isTop ? handleSwipe : () => {}}
+                                    // Apply stacking styles
+                                    style={{
+                                        zIndex: users.length - index,
+                                        transform: `scale(${1 - (users.slice(0, 3).length - 1 - index) * 0.05}) translateY(-${(users.slice(0, 3).length - 1 - index) * 10}px)`,
+                                        opacity: 1 - (users.slice(0, 3).length - 1 - index) * 0.1,
+                                    }}
+                                />
+                            );
+                        })
+                    ) : (
+                        <NoMoreProfiles />
+                    )}
                 </AnimatePresence>
-                {users.length === 0 && !isLoading && <NoMoreProfiles />}
             </div>
         </main>
 
-        <footer className="flex-shrink-0">
+        <footer className="flex-shrink-0 p-4">
             {users.length > 0 && !newMatchInfo && (
                 <div className="flex justify-center items-center my-4 space-x-8">
-                <button
-                    onClick={() => handleVote(users[0]?._id, 'left')}
-                    className="p-4 bg-neutral-50 rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
-                    aria-label="Pass"
-                    disabled={!users[0]}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="red" className="w-8 h-8">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                <button
-                    onClick={() => handleVote(users[0]?._id, 'right')}
-                    className="p-5 bg-neutral-50 rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
-                    aria-label="Like"
-                    disabled={!users[0]}
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="green" viewBox="0 0 24 24" strokeWidth={1.5} stroke="white" className="w-10 h-10">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                </button>
+                    <button
+                        onClick={() => handleVote(users[0]?._id, 'left')}
+                        className="p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
+                        aria-label="Pass"
+                        disabled={!users[0]}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="red" className="w-8 h-8">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={() => handleVote(users[0]?._id, 'right')}
+                        className="p-5 bg-white rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
+                        aria-label="Like"
+                        disabled={!users[0]}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="green" viewBox="0 0 24 24" strokeWidth={1.5} stroke="white" className="w-10 h-10">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                    </button>
                 </div>
             )}
-            <BottomNav />
         </footer>
 
         {newMatchInfo && (
             <MatchModal
                 matchInfo={newMatchInfo}
                 onContinue={() => setNewMatchInfo(null)}
-                onChat={() => { /* Implement navigation to chat */ alert(`Navigating to chat with ${newMatchInfo.name}`); setNewMatchInfo(null);}}
+                onChat={() => navigate(`/chat/${newMatchInfo._id}`)}
             />
         )}
     </div>

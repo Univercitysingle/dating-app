@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SwipeCard = ({ user, onVote, onSwipe }) => {
+const SwipeCard = ({ user, onVote, onSwipe, style }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -47,6 +47,7 @@ const SwipeCard = ({ user, onVote, onSwipe }) => {
       exit={{ x: 300, opacity: 0 }}
       transition={{ duration: 0.3 }}
       className="absolute w-full h-full"
+      style={style}
     >
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-card bg-neutral-800 border border-neutral-700">
         {/* Scrollable container for details */}
@@ -146,9 +147,11 @@ SwipeCard.propTypes = {
     age: PropTypes.number,
     images: PropTypes.arrayOf(PropTypes.string),
     bio: PropTypes.string,
+    interests: PropTypes.arrayOf(PropTypes.string),
   }),
   onVote: PropTypes.func.isRequired,
   onSwipe: PropTypes.func.isRequired,
+  style: PropTypes.object,
 };
 
 export default SwipeCard;
