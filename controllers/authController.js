@@ -6,39 +6,72 @@ const bcrypt = require('bcryptjs');
 const login = async (req, res) => {
   const log = req.log;
   try {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: "Token required" });
+    const { token, email, password } = req.body;
 
-    log.info(`Login attempt for token: ${token.substring(0, 10)}...`);
+    // Hardcoded superadmin login
+    if (email && password) {
+      if (
+        email === process.env.SUPER_ADMIN_EMAIL &&
+        password === process.env.SUPER_ADMIN_PASSWORD
+      ) {
+        log.info("Superadmin login attempt successful.");
+        const superadminUID = "superadmin_uid"; // A consistent, unique ID for the superadmin
+        const customToken = await admin.auth().createCustomToken(superadminUID, { role: 'superadmin' });
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const user = await findOrCreateUserFromToken(decodedToken);
+        const superadminUserObject = {
+          uid: superadminUID,
+          email: process.env.SUPER_ADMIN_EMAIL,
+          name: "Super Admin",
+          role: "superadmin",
+          isPremium: true, // Superadmins should have all privileges
+        };
 
-    if (!user) {
-      log.warn(`User provisioning failed for token: ${token.substring(0, 10)}...`);
-      return res.status(403).json({ error: "User provisioning failed. Email may not be verified or token details are insufficient." });
+        return res.json({
+          token: customToken,
+          user: superadminUserObject,
+        });
+      } else {
+        log.warn("Failed hardcoded login attempt.");
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
     }
 
-    const userObject = user.toObject();
+    // Firebase token login for regular users
+    if (token) {
+      log.info(`Login attempt for token: ${token.substring(0, 10)}...`);
 
-    const activeSubscription = await Subscription.findOne({
-      userId: userObject._id,
-      status: 'active',
-    });
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      const user = await findOrCreateUserFromToken(decodedToken);
 
-    userObject.isPremium = !!activeSubscription;
+      if (!user) {
+        log.warn(`User provisioning failed for token: ${token.substring(0, 10)}...`);
+        return res.status(403).json({ error: "User provisioning failed. Email may not be verified or token details are insufficient." });
+      }
 
-    const responsePayload = {
-      token,
-      user: userObject,
-    };
+      const userObject = user.toObject();
+      const activeSubscription = await Subscription.findOne({
+        userId: userObject._id,
+        status: 'active',
+      });
+      userObject.isPremium = !!activeSubscription;
 
-    if (user.mustSetPassword === true) {
-      responsePayload.requiresPasswordSetup = true;
+      const responsePayload = {
+        token,
+        user: userObject,
+      };
+
+      if (user.mustSetPassword === true) {
+        responsePayload.requiresPasswordSetup = true;
+      }
+
+      res.json(responsePayload);
+      log.info(`Login successful for UID: ${user.uid}. Role: ${user.role}. Must set password: ${user.mustSetPassword}`);
+      return;
     }
 
-    res.json(responsePayload);
-    log.info(`Login successful for UID: ${user.uid}. Role: ${user.role}. Must set password: ${user.mustSetPassword}`);
+    // If neither login method is attempted
+    return res.status(400).json({ error: "Request must contain either a Firebase token or email/password." });
+
   } catch (error) {
     log.error({ err: error }, "Error during login");
     if (error.code && error.code.startsWith('auth/')) {
