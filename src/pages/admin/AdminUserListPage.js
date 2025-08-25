@@ -97,6 +97,17 @@ const AdminUserListPage = () => {
     }
   };
 
+  const handleRoleChange = async (userId, newRole) => {
+    if (!window.confirm(`Are you sure you want to change this user's role to '${newRole}'?`)) return;
+    try {
+      await apiClient.put(`/api/admin/users/${userId}`, { role: newRole });
+      fetchUsers(currentPage, searchTerm, filterRole); // Refetch to show the new role
+      alert('User role updated successfully.');
+    } catch (err) {
+      alert(`Error updating role: ${err.message}`);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -162,6 +173,12 @@ const AdminUserListPage = () => {
                         <button onClick={() => handleToggleVisibility(user._id, user.isProfileVisible)} className={user.isProfileVisible ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}>
                           {user.isProfileVisible ? 'Hide' : 'Show'}
                         </button>
+                        {adminUser && adminUser.role === 'superadmin' && user.role === 'user' && (
+                           <button onClick={() => handleRoleChange(user._id, 'admin')} className="text-blue-600 hover:text-blue-900">Promote</button>
+                        )}
+                        {adminUser && adminUser.role === 'superadmin' && user.role === 'admin' && (
+                           <button onClick={() => handleRoleChange(user._id, 'user')} className="text-gray-600 hover:text-gray-900">Demote</button>
+                        )}
                         {adminUser && adminUser.role === 'superadmin' && (
                           <button onClick={() => handleDeleteUser(user._id)} className="text-red-600 hover:text-red-900">Delete</button>
                         )}
