@@ -20,4 +20,23 @@ const uploadToS3 = (buffer, filename, mimetype) => {
   return s3.upload(params).promise();
 };
 
-module.exports = { uploadToS3 };
+const getPresignedUploadUrl = (key, contentType) => {
+  const params = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    Expires: 60 * 5, // 5 minutes
+    ACL: 'public-read',
+  };
+
+  return new Promise((resolve, reject) => {
+    s3.getSignedUrl('putObject', params, (err, url) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve({ url, key });
+    });
+  });
+};
+
+module.exports = { uploadToS3, getPresignedUploadUrl };

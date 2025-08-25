@@ -143,6 +143,7 @@ app.use("/api/chat", authMiddleware, require("./routes/chat").router);
 app.use("/api/video", authMiddleware, require("./routes/video"));
 app.use("/api/reports", authMiddleware, require("./routes/reports"));
 app.use("/api/status", require("./routes/status"));
+app.use('/api/upload', require('./routes/upload'));
 
 // Admin routes
 const adminUsersRouter = require("./routes/adminUsers");
