@@ -6,11 +6,12 @@ const SwipeCard = ({ user, onVote, onSwipe, style }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  if (!user) {
+  if (!user || !user._id) {
+    // Cannot render a card without a unique ID for the key.
     return null;
   }
 
-  const { name, age, photos, bio, interests } = user;
+  const { name, age, photos, bio, interests = [] } = user;
   const imageSources =
     photos && photos.length > 0
       ? photos
@@ -125,7 +126,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style }) => {
                 <p className="mb-4">{bio || 'No bio yet.'}</p>
                 <h4 className="font-bold text-lg">Interests</h4>
                 <div className="flex flex-wrap gap-2">
-                  {(interests || []).map((interest) => (
+                  {Array.isArray(interests) && interests.map((interest) => (
                     <span key={interest} className="px-3 py-1 bg-primary/20 text-primary-light rounded-full text-sm">
                       {interest}
                     </span>

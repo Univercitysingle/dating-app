@@ -214,6 +214,7 @@ const discoverUsers = async (req, res) => {
     let query = {
       uid: { $ne: currentUserUid, $nin: [...interactedUserIds, ...(currentUser.blocked || [])] },
       isProfileVisible: true,
+      role: 'user', // Only show regular users
       $or: [
         { suspendedUntil: { $eq: null } },
         { suspendedUntil: { $lt: new Date() } }
