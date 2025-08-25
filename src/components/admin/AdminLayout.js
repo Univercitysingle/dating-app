@@ -54,6 +54,14 @@ const AdminLayout = () => {
                 Report Moderation
               </Link>
             </li>
+            <li>
+              <Link
+                to="/admin/analytics"
+                className="block px-3 py-2 rounded-md hover:bg-gray-700"
+              >
+                Analytics
+              </Link>
+            </li>
           </ul>
         </nav>
         <div className="mt-auto">
