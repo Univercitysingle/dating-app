@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import logger from '../../utils/logger';
+import apiClient from '../../api/apiClient';
 
 // A simple component for displaying a statistic
 const StatCard = ({ title, value, loading }) => {
@@ -24,31 +25,21 @@ const AdminDashboardPage = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      if (!adminUser || !adminUser.token) {
-        setError("Authentication token not available.");
+      // The apiClient will handle the token, so we just need to ensure an admin user is logged in.
+      if (!adminUser) {
+        setError("Authentication failed.");
         setIsLoading(false);
         return;
       }
 
       try {
         setIsLoading(true);
-        const response = await fetch('/api/admin/users/stats', {
-          headers: {
-            'Authorization': `Bearer ${adminUser.token}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || 'Failed to fetch dashboard stats');
-        }
-
-        const data = await response.json();
+        const data = await apiClient.get('/api/admin/users/stats');
         logger.info("Fetched dashboard stats:", data);
         setStats(data);
       } catch (err) {
         setError(err.message);
-        console.error("Fetch stats error:", err);
+        logger.error("Fetch stats error:", err);
       } finally {
         setIsLoading(false);
       }

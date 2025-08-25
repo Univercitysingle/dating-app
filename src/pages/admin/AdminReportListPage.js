@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import logger from '../../utils/logger';
+import apiClient from '../../api/apiClient';
 
 const AdminReportListPage = () => {
   const [reports, setReports] = useState([]);
@@ -8,7 +9,6 @@ const AdminReportListPage = () => {
   const [error, setError] = useState(null);
   const { user: adminUser } = useAuth();
 
-  // State for filters and pagination
   const [filterStatus, setFilterStatus] = useState('pending_review');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -16,21 +16,14 @@ const AdminReportListPage = () => {
   const fetchReports = useCallback(async (page, status) => {
     setIsLoading(true);
     setError(null);
-    if (!adminUser || !adminUser.token) {
+    if (!adminUser) {
       setError("Authentication failed.");
       setIsLoading(false);
       return;
     }
     try {
       const queryParams = new URLSearchParams({ page, status, limit: 10 });
-      const response = await fetch(`/api/admin/reports?${queryParams.toString()}`, {
-        headers: { 'Authorization': `Bearer ${adminUser.token}` },
-      });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Failed to fetch reports');
-      }
-      const data = await response.json();
+      const data = await apiClient.get(`/api/admin/reports?${queryParams.toString()}`);
       logger.info("Fetched reports data:", {
         reports: data.reports,
         totalPages: data.totalPages,
@@ -47,30 +40,21 @@ const AdminReportListPage = () => {
   }, [adminUser]);
 
   useEffect(() => {
-    fetchReports(currentPage, filterStatus);
-  }, [currentPage, filterStatus, fetchReports]);
+    if (adminUser) {
+        fetchReports(currentPage, filterStatus);
+    }
+  }, [currentPage, filterStatus, fetchReports, adminUser]);
 
   const handleAction = async (reportId, action) => {
     const adminNotes = prompt(`Enter optional notes for action: '${action}'`);
-    if (adminNotes === null) return; // User cancelled prompt
+    if (adminNotes === null) return;
 
     if (!window.confirm(`Are you sure you want to perform action: '${action}' on report ${reportId}?`)) return;
 
     try {
-      const response = await fetch(`/api/admin/reports/${reportId}/action`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminUser.token}`,
-        },
-        body: JSON.stringify({ action, adminNotes }),
-      });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || `Failed to perform action`);
-      }
+      await apiClient.post(`/api/admin/reports/${reportId}/action`, { action, adminNotes });
       alert(`Action '${action}' successful.`);
-      fetchReports(currentPage, filterStatus); // Refresh the list
+      fetchReports(currentPage, filterStatus);
     } catch (err) {
       alert(`Error: ${err.message}`);
     }
@@ -86,7 +70,6 @@ const AdminReportListPage = () => {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-semibold text-gray-800 mb-6">Content & Report Moderation</h1>
 
-      {/* Filters */}
       <div className="mb-4">
         <label htmlFor="status-filter" className="mr-2 font-medium">Filter by status:</label>
         <select
@@ -142,7 +125,6 @@ const AdminReportListPage = () => {
               </tbody>
             </table>
           </div>
-          {/* Pagination */}
           <div className="mt-4 flex justify-between items-center">
             <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="px-4 py-2 bg-white border rounded-md">Previous</button>
             <span>Page {currentPage} of {totalPages}</span>

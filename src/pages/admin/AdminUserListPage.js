@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import debounce from 'lodash.debounce';
 import logger from '../../utils/logger';
+import apiClient from '../../api/apiClient';
 
 const AdminUserListPage = () => {
   const [users, setUsers] = useState([]);
@@ -16,13 +17,13 @@ const AdminUserListPage = () => {
   const [filterRole, setFilterRole] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [limit] = useState(10); // Or make this configurable
+  const [limit] = useState(10);
 
   const fetchUsers = useCallback(async (page, search, role) => {
     setIsLoading(true);
     setError(null);
-    if (!adminUser || !adminUser.token) {
-      setError("Authentication token not found.");
+    if (!adminUser) {
+      setError("Authentication failed.");
       setIsLoading(false);
       return;
     }
@@ -33,16 +34,7 @@ const AdminUserListPage = () => {
         ...(search && { search }),
         ...(role && { role }),
       });
-      const response = await fetch(`/api/admin/users?${queryParams.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${adminUser.token}`,
-        },
-      });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Failed to fetch users');
-      }
-      const data = await response.json();
+      const data = await apiClient.get(`/api/admin/users?${queryParams.toString()}`);
       logger.info("Fetched users data:", {
         users: data.users,
         totalPages: data.totalPages,
@@ -53,56 +45,41 @@ const AdminUserListPage = () => {
       setCurrentPage(data.currentPage || 1);
     } catch (err) {
       setError(err.message);
-      console.error("Fetch users error:", err);
+      logger.error("Fetch users error:", err);
     } finally {
       setIsLoading(false);
     }
   }, [adminUser, limit]);
 
-  // Debounced fetch for search input
   const debouncedFetch = useMemo(() => {
     return debounce((page, search, role) => fetchUsers(page, search, role), 300);
   }, [fetchUsers]);
 
   useEffect(() => {
     if (adminUser) {
-      // Use debounced fetch for search term changes, immediate for others
       if (searchTerm) {
-        debouncedFetch(1, searchTerm, filterRole); // Reset to page 1 on new search
+        debouncedFetch(1, searchTerm, filterRole);
       } else {
         fetchUsers(currentPage, searchTerm, filterRole);
       }
     }
-    // Cleanup debounce on unmount
     return () => debouncedFetch.cancel();
   }, [adminUser, currentPage, searchTerm, filterRole, debouncedFetch, fetchUsers]);
 
-
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
+  const handleSearchChange = (e) => setSearchTerm(e.target.value);
   const handleRoleChange = (e) => {
     setFilterRole(e.target.value);
-    setCurrentPage(1); // Reset to page 1 on filter change
+    setCurrentPage(1);
   };
-
   const handlePageChange = (newPage) => {
-    if (newPage > 0 && newPage <= totalPages) {
-      setCurrentPage(newPage);
-    }
+    if (newPage > 0 && newPage <= totalPages) setCurrentPage(newPage);
   };
-
 
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) return;
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${adminUser.token}` },
-      });
-      if (!response.ok) throw new Error('Failed to delete user');
-      fetchUsers(currentPage, searchTerm, filterRole); // Refetch current page
+      await apiClient.delete(`/api/admin/users/${userId}`);
+      fetchUsers(currentPage, searchTerm, filterRole);
       alert('User deleted successfully.');
     } catch (err) {
       alert(`Error deleting user: ${err.message}`);
@@ -112,16 +89,8 @@ const AdminUserListPage = () => {
   const handleToggleVisibility = async (userId, currentVisibility) => {
     if (!window.confirm(`Are you sure you want to ${currentVisibility ? 'hide' : 'show'} this user's profile?`)) return;
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminUser.token}`,
-        },
-        body: JSON.stringify({ isProfileVisible: !currentVisibility }),
-      });
-      if (!response.ok) throw new Error('Failed to update visibility');
-      fetchUsers(currentPage, searchTerm, filterRole); // Refetch current page
+      await apiClient.put(`/api/admin/users/${userId}`, { isProfileVisible: !currentVisibility });
+      fetchUsers(currentPage, searchTerm, filterRole);
       alert('User visibility updated successfully.');
     } catch (err) {
       alert(`Error updating visibility: ${err.message}`);
@@ -137,7 +106,6 @@ const AdminUserListPage = () => {
         </Link>
       </div>
 
-      {/* Filters */}
       <div className="mb-4 flex space-x-4">
         <input
           type="text"
@@ -166,7 +134,6 @@ const AdminUserListPage = () => {
         <>
           <div className="bg-white shadow-md rounded-lg overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              {/* Table Head */}
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
@@ -177,7 +144,6 @@ const AdminUserListPage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
-              {/* Table Body */}
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.length === 0 ? (
                   <tr><td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">No users found.</td></tr>
@@ -206,7 +172,6 @@ const AdminUserListPage = () => {
               </tbody>
             </table>
           </div>
-          {/* Pagination Controls */}
           <div className="mt-4 flex justify-between items-center">
             <button
               onClick={() => handlePageChange(currentPage - 1)}
