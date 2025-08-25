@@ -13,8 +13,17 @@ function Chat() {
   useEffect(() => {
     if (!user) return;
 
-    // The cookie is sent automatically by the browser, so no need to pass auth token here.
-    socketRef.current = io('/');
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      setError("No auth token found for chat connection.");
+      return;
+    }
+
+    socketRef.current = io('/', {
+      auth: {
+        token: token,
+      },
+    });
 
     socketRef.current.on('connect', () => {
       logger.info('Socket connected');
