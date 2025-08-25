@@ -2,6 +2,7 @@
 // For a production environment, it is strongly recommended to use a more secure method,
 // such as command-line arguments or environment variables, to provide the credentials.
 
+require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -17,24 +18,25 @@ const User = mongoose.model('User', userSchema);
 
 async function createAdmin() {
   if (!process.env.MONGO_URI) {
-    console.error('MONGO_URI environment variable is not set.');
+    console.error('MONGO_URI environment variable is not set. Please create a .env file and add the MONGO_URI variable.');
     process.exit(1);
   }
   await mongoose.connect(process.env.MONGO_URI);
 
-  const email = 'enadoctemp@gmail.com';
-  const password = 'pass@123';
+  const email = 'sadmin@dating.app';
+  const password = 'Pass%5431';
+  const name = 'sadmin';
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const exists = await User.findOne({ email, role: 'superadmin' });
   if (exists) {
-    console.log('Admin user with this email already exists.');
+    console.log(`Admin user with email '${email}' already exists.`);
     await mongoose.disconnect();
     return;
   }
 
   const admin = new User({
-    name: 'Admin',
+    name,
     email,
     password: hashedPassword,
     role: 'superadmin',
@@ -42,7 +44,7 @@ async function createAdmin() {
   });
 
   await admin.save();
-  console.log('Admin user created successfully!');
+  console.log(`Admin user '${name}' created successfully!`);
   await mongoose.disconnect();
 }
 
