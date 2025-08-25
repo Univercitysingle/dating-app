@@ -15,6 +15,14 @@ router.get(
   adminReportsController.listReports
 );
 
+// GET /:reportId - Get a single report by its ID
+router.get(
+  '/:reportId',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminReportsController.getReportById
+);
+
 // POST /:reportId/action - Perform a moderation action on a report
 router.post(
   '/:reportId/action',

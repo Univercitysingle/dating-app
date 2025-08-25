@@ -179,6 +179,9 @@ const AdminUserListPage = () => {
                         {adminUser && adminUser.role === 'superadmin' && user.role === 'admin' && (
                            <button onClick={() => handleRoleChange(user._id, 'user')} className="text-gray-600 hover:text-gray-900">Demote</button>
                         )}
+                        <button onClick={() => navigate(`/admin/reports?reportedUserUid=${user.uid}`)} className="text-purple-600 hover:text-purple-900">
+                          Reports
+                        </button>
                         {adminUser && adminUser.role === 'superadmin' && (
                           <button onClick={() => handleDeleteUser(user._id)} className="text-red-600 hover:text-red-900">Delete</button>
                         )}

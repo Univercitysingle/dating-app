@@ -17,6 +17,7 @@ import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdminUserListPage from './pages/admin/AdminUserListPage';
 import AdminUserEditPage from './pages/admin/AdminUserEditPage';
 import AdminReportListPage from './pages/admin/AdminReportListPage';
+import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
 import SwipeDeck from './pages/SwipeDeck';
 import MainLayout from './components/MainLayout';
 
@@ -110,6 +111,7 @@ function App() {
             <Route path="users/new" element={<AdminUserEditPage />} />
             <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
             <Route path="reports" element={<AdminReportListPage />} />
+            <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
           </Route>
 
           {/* Default route */}

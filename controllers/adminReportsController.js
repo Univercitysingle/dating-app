@@ -7,11 +7,14 @@ const listReports = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
-    const { status } = req.query;
+    const { status, reportedUserUid } = req.query;
 
     let query = {};
     if (status) {
       query.status = status;
+    }
+    if (reportedUserUid) {
+      query.reportedUserUid = reportedUserUid;
     }
 
     const reports = await Report.find(query)
@@ -46,8 +49,9 @@ const listReports = async (req, res) => {
 // Perform a moderation action on a report
 const performModerationAction = async (req, res) => {
   const { reportId } = req.params;
-  const { action, adminNotes } = req.body; // e.g., action: 'dismiss', 'suspend_user', 'ban_user'
-  const adminUserId = req.user._id; // Assuming auth middleware provides the admin user
+  // New payload can include duration for suspension, etc.
+  const { action, adminNotes, durationDays } = req.body;
+  const adminUserId = req.user._id;
 
   try {
     const report = await Report.findById(reportId);
@@ -68,15 +72,27 @@ const performModerationAction = async (req, res) => {
         break;
 
       case 'suspend_user':
-        reportedUser.isProfileVisible = false; // Example of suspension
-        // You might have a specific 'status' field on the User model like 'active', 'suspended'
+        if (!durationDays || isNaN(parseInt(durationDays, 10)) || durationDays <= 0) {
+          return res.status(400).json({ message: 'Valid duration in days is required for suspension.' });
+        }
+        const suspensionEndDate = new Date();
+        suspensionEndDate.setDate(suspensionEndDate.getDate() + parseInt(durationDays, 10));
+
+        reportedUser.suspendedUntil = suspensionEndDate;
+        reportedUser.isProfileVisible = false; // Also hide profile during suspension
         await reportedUser.save();
         report.status = 'resolved_user_suspended';
         break;
 
       case 'ban_user':
         // A "ban" could mean many things. Deleting the user is one option.
-        await User.findByIdAndDelete(reportedUser._id);
+        // For now, we'll just mark them as banned and hide them permanently.
+        // A more robust system might move them to a separate collection.
+        reportedUser.role = 'user'; // Demote them
+        reportedUser.isProfileVisible = false;
+        // Set suspension to a far-future date to effectively ban them
+        reportedUser.suspendedUntil = new Date('9999-12-31');
+        await reportedUser.save();
         report.status = 'resolved_user_banned';
         break;
 
@@ -94,7 +110,34 @@ const performModerationAction = async (req, res) => {
   }
 };
 
+const getReportById = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const report = await Report.findById(reportId)
+      .populate({
+        path: 'reporterUid',
+        model: 'User',
+        select: 'name email'
+      })
+      .populate({
+        path: 'reportedUserUid',
+        model: 'User',
+        select: 'name email isProfileVisible role suspendedUntil'
+      })
+      .lean();
+
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+    res.json(report);
+  } catch (error) {
+    console.error('Error getting report by ID:', error);
+    res.status(500).json({ message: 'Error getting report', error: error.message });
+  }
+};
+
 module.exports = {
   listReports,
   performModerationAction,
+  getReportById,
 };

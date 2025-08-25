@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema({
   education: { type: String, default: "" },
   relationshipGoals: { type: String, default: "" },
   lastActiveAt: { type: Date, default: Date.now },
+  suspendedUntil: { type: Date, default: null },
   location: {
     type: {
       type: String,

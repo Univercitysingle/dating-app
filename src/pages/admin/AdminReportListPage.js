@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logger from '../../utils/logger';
 import apiClient from '../../api/apiClient';
@@ -109,7 +110,11 @@ const AdminReportListPage = () => {
                 ) : (
                   reports.map(report => (
                     <tr key={report._id}>
-                      <td className="px-6 py-4">{report.reportedUserUid?.name || 'N/A'}</td>
+                      <td className="px-6 py-4">
+                        <Link to={`/admin/reports/${report._id}`} className="text-indigo-600 hover:underline">
+                          {report.reportedUserUid?.name || 'N/A'}
+                        </Link>
+                      </td>
                       <td className="px-6 py-4">{report.reporterUid?.name || 'N/A'}</td>
                       <td className="px-6 py-4 text-sm">{report.reason}</td>
                       <td className="px-6 py-4"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">{report.status}</span></td>
