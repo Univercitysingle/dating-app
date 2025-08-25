@@ -11,7 +11,7 @@ const SwipeCard = ({ user, onVote, onSwipe }) => {
   const primaryImage =
     images && images.length > 0
       ? images[0]
-      : 'https://via.placeholder.com/400x600?text=Profile+Image';
+      : 'https://placehold.co/400x600?text=Profile+Image';
 
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {

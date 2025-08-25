@@ -34,9 +34,10 @@ const findOrCreateUserFromToken = async (decodedToken) => {
     }
   }
 
-  // If no user found by email, create a new one, but only if email is verified
-  if (!decodedToken.email || !decodedToken.email_verified) {
-    return null; // Cannot create a user without a verified email
+  // If no user found by email, create a new one.
+  // The email_verified check has been removed as per user request to fix login issues.
+  if (!decodedToken.email) {
+    return null; // Still require an email to create a user.
   }
 
   const newUser = new User({
