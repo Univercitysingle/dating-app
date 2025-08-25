@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-
+import apiClient from '../api/apiClient';
 function HeroCaptureSection({ onUploadComplete }) {
   const [media, setMedia] = useState(null);
   const [mode, setMode] = useState('image'); // "image" or "video"
@@ -66,15 +66,11 @@ function HeroCaptureSection({ onUploadComplete }) {
     try {
       // 1. Get presigned URL from backend
       // Using query param for fileType as per the component guide
-      const res = await fetch(
+      const { url } = await apiClient.get(
         `/api/upload-url?type=${encodeURIComponent(
           file.type
         )}&fileName=${encodeURIComponent(file.name)}`
       );
-      if (!res.ok) {
-        throw new Error(`Failed to get presigned URL: ${res.statusText}`);
-      }
-      const { url } = await res.json(); // Assuming 'key' might not be directly needed by frontend if URL is complete
 
       // 2. Upload directly to S3
       const uploadResponse = await fetch(url, {

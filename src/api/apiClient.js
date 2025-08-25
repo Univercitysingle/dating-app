@@ -2,14 +2,11 @@ import logger from '../utils/logger';
 
 const apiClient = {
   async request(method, path, data = null, options = {}) {
-    const headers = new Headers({
-      'Content-Type': 'application/json',
-      ...options.headers,
-    });
+    const headers = new Headers(options.headers);
 
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem('authToken');
     if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
+      headers.set('Authorization', `Bearer ${token}`);
     }
 
     let baseUrl = process.env.REACT_APP_API_BASE_URL || '';
@@ -20,13 +17,20 @@ const apiClient = {
     const url = `${baseUrl}${path}`;
     const config = {
       method: method.toUpperCase(),
-      headers,
       ...options,
     };
 
-    if (data && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
-      config.body = JSON.stringify(data);
+    if (data) {
+      if (data instanceof FormData) {
+        // For FormData, we don't set Content-Type; the browser does it with the correct boundary.
+        config.body = data;
+      } else if (['POST', 'PUT', 'PATCH'].includes(config.method)) {
+        headers.set('Content-Type', 'application/json');
+        config.body = JSON.stringify(data);
+      }
     }
+
+    config.headers = headers;
 
     logger.debug(`API Request - ${config.method} ${url}`, {
       headers: Object.fromEntries(headers.entries()),

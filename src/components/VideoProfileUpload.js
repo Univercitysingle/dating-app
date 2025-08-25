@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import logger from '../utils/logger';
+import apiClient from '../api/apiClient';
 
 function VideoProfileUpload() {
   const [video, setVideo] = useState(null);
@@ -30,19 +31,19 @@ function VideoProfileUpload() {
     setStatus('Uploading...');
 
     try {
-      const res = await fetch('/api/video/upload-profile-video', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await apiClient.post('/api/video/upload-profile-video', formData);
+      // The apiClient will throw an error on non-OK responses, so we just check for success.
+      // Assuming the backend returns a `success` field in the JSON body.
+      if (data.videoUrl) {
         setStatus('Uploaded successfully');
+        // Optionally, you can pass the new video URL to a parent component
+        // onUploadSuccess(data.videoUrl);
       } else {
-        setStatus(`Upload failed: ${data.message || 'Server error'}`);
+        setStatus(`Upload failed: ${data.message || 'An unknown error occurred.'}`);
       }
     } catch (err) {
       logger.error('Upload failed:', err);
-      setStatus(`Upload failed: ${err.message}`);
+      setStatus(`Upload failed: ${err.message || 'Please try again.'}`);
     } finally {
       setIsLoading(false);
     }
