@@ -198,7 +198,7 @@ const discoverUsers = async (req, res) => {
   const currentUserUid = currentUser.uid;
   const maxDistance = req.query.maxDistance || 50000; // 50km in meters
 
-  log.info(`UsersController: discoverUsers entered for UID: ${currentUserUid}`);
+  log.info({ currentUser }, `UsersController: discoverUsers entered for UID: ${currentUserUid}`);
 
   try {
     // 1. Find users the current user has already interacted with
@@ -231,7 +231,7 @@ const discoverUsers = async (req, res) => {
     }
 
     // 4. Location filter
-    if (currentUser.location && currentUser.location.coordinates) {
+    if (currentUser.location && currentUser.location.coordinates && (currentUser.location.coordinates[0] !== 0 || currentUser.location.coordinates[1] !== 0)) {
       query.location = {
         $near: {
           $geometry: currentUser.location,
