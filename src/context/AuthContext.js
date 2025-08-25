@@ -26,10 +26,16 @@ export function AuthProvider({ children }) {
     fetchCurrentUser();
   }, []);
 
-  const login = async (token) => {
+  const login = async (token, userData = null) => {
     localStorage.setItem("authToken", token);
-    const currentUser = await apiClient.get('/api/users/me');
-    setUser(currentUser);
+    if (userData) {
+      // If user object is provided directly (e.g., for superadmin), use it.
+      setUser(userData);
+    } else {
+      // Otherwise, fetch from /me endpoint (standard flow)
+      const currentUser = await apiClient.get('/api/users/me');
+      setUser(currentUser);
+    }
   };
 
   const logout = async () => {
