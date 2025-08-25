@@ -187,7 +187,7 @@ app.use((err, req, res, next) => {
 });
 
 // -------------------- START SERVER --------------------
-const PORT = process.env.BACKEND_PORT || 5000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   logger.info(
     `🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`
