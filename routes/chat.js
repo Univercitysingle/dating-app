@@ -8,11 +8,17 @@ const { getChatHistory } = require('../controllers/chatController');
 let io;
 
 function initSocket(server) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const clientUrl = process.env.CLIENT_URL;
+
+  const corsOptions = {
+    origin: isProduction ? clientUrl : (clientUrl || "http://localhost:3000"),
+    methods: ["GET", "POST"],
+    credentials: true,
+  };
+
   io = socketIo(server, {
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"],
-    },
+    cors: corsOptions,
   });
 
   io.use(async (socket, next) => {
