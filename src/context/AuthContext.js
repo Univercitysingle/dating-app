@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import apiClient from '../api/apiClient';
 import logger from '../utils/logger';
 
@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
     fetchCurrentUser();
   }, []);
 
-  const login = async (token, userData = null) => {
+  const login = useCallback(async (token, userData = null) => {
     localStorage.setItem("authToken", token);
     logger.info("AuthContext: login called.", { token, userData });
     if (userData) {
@@ -38,9 +38,9 @@ export function AuthProvider({ children }) {
       const currentUser = await apiClient.get('/api/users/me');
       setUser(currentUser);
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await apiClient.post('/api/auth/logout');
     } catch (error) {
@@ -49,14 +49,14 @@ export function AuthProvider({ children }) {
       setUser(null);
       localStorage.removeItem("authToken");
     }
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     isLoading,
     login,
     logout,
-  };
+  }), [user, isLoading, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
