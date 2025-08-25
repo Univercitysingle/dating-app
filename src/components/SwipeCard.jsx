@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const SwipeCard = ({ user, onVote, onSwipe, style }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [exitDirection, setExitDirection] = useState(0);
 
   if (!user || !user._id) {
     // Cannot render a card without a unique ID for the key.
@@ -19,8 +20,10 @@ const SwipeCard = ({ user, onVote, onSwipe, style }) => {
 
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {
+      setExitDirection(300);
       onVote(user._id, 'right');
     } else if (info.offset.x < -100) {
+      setExitDirection(-300);
       onVote(user._id, 'left');
     }
   };
@@ -45,7 +48,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style }) => {
       onDragEnd={handleDragEnd}
       onAnimationComplete={onSwipe}
       animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 300, opacity: 0 }}
+      exit={{ x: exitDirection, opacity: 0 }}
       transition={{ duration: 0.3 }}
       className="absolute w-full h-full"
       style={style}
