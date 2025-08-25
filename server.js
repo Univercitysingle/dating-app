@@ -137,6 +137,7 @@ app.get("/status", (req, res) =>
 
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", authMiddleware, require("./routes/users"));
+app.use("/api/swipes", authMiddleware, require("./routes/swipes"));
 app.use("/api/matches", authMiddleware, require("./routes/matches"));
 app.use("/api/chat", authMiddleware, require("./routes/chat").router);
 app.use("/api/video", authMiddleware, require("./routes/video"));
