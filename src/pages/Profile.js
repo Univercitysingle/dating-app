@@ -5,19 +5,10 @@ import apiClient from '../api/apiClient';
 
 // Import all necessary components
 import VideoProfileUpload from '../components/VideoProfileUpload';
-import VideoCall from '../components/VideoCall';
 import InterestsDisplay from '../components/InterestsDisplay';
 import InterestsEditor from '../components/InterestsEditor';
 import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
-import AudioBioPlayer from '../components/AudioBioPlayer';
-import AudioBioUpload from '../components/AudioBioUpload';
-import VideoBioSnippetPlayer from '../components/VideoBioSnippetPlayer';
-import VideoBioSnippetUpload from '../components/VideoBioSnippetUpload';
-import PersonalityQuizDisplay from '../components/PersonalityQuizDisplay';
-import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
-import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
-import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
 import HeroCaptureSection from '../components/HeroCaptureSection';
 
 // Reusable components
@@ -43,7 +34,6 @@ function Profile() {
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
-  const [activeTab, setActiveTab] = useState('profile');
 
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
@@ -55,10 +45,8 @@ function Profile() {
   // State for save statuses
   const [saveStatus, setSaveStatus] = useState({
       details: '',
-      quiz: '',
-      social: '',
-      media: '',
       hero: '',
+      video: '',
   });
 
   const { logout } = useAuth();
@@ -115,17 +103,6 @@ function Profile() {
       handleSave('/api/users/me', { profilePrompts: prompts }, 'prompts');
   };
 
-  const handlePersonalityQuizSave = (quizResults) => {
-      handleSave('/api/users/me', { personalityQuizResults: quizResults }, 'quiz');
-  };
-
-  const handleSocialMediaLinksSave = (links) => {
-      handleSave('/api/users/me', { socialMediaLinks: links }, 'social');
-  };
-
-  const handleMediaUploadComplete = (fileUrl, fieldName) => {
-      handleSave('/api/users/me', { [fieldName]: fileUrl }, 'media');
-  };
 
   const handleHeroMediaUploadComplete = (mediaUrl) => {
     handleSave('/api/users/me', { heroMediaUrl: mediaUrl }, 'hero');
@@ -142,86 +119,6 @@ function Profile() {
   const isPremium = profile.tier === 'premium';
   const isVerified = profile.isVerified === true;
 
-  const renderContent = () => {
-      switch(activeTab) {
-          case 'profile':
-              return (
-                  <div className="space-y-6">
-                      {!isEditing && profile.aboutMe && (
-                        <SectionCard title="About Me">
-                            <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
-                        </SectionCard>
-                      )}
-                       <SectionCard title="Details">
-                            {isEditing ? (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label htmlFor="aboutMe" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">About Me</label>
-                                        <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
-                                    <div>
-                                        <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
-                                        <input type="text" id="education" value={editableFields.education} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
-                                    <div>
-                                        <label htmlFor="relationshipGoals" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Relationship Goals</label>
-                                        <input type="text" id="relationshipGoals" value={editableFields.relationshipGoals} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
-                                    <button onClick={handleDetailsSave} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save Details'}</button>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
-                                    <p><strong>Email:</strong> {profile.email}</p>
-                                    <p><strong>Gender:</strong> {profile.gender}</p>
-                                    <p><strong>Preference:</strong> {profile.preference}</p>
-                                    <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
-                                    <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
-                                </div>
-                            )}
-                        </SectionCard>
-                        <SectionCard title="Interests">
-                            {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
-                        </SectionCard>
-                        <SectionCard title="Profile Prompts">
-                            {isEditing ? <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} /> : <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />}
-                        </SectionCard>
-                        <SectionCard title="Personality Quiz">
-                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizDisplay quizResults={profile.personalityQuizResults || {}} />}
-                        </SectionCard>
-                        <SectionCard title="Social Media">
-                            {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
-                        </SectionCard>
-                  </div>
-              );
-          case 'media':
-              return (
-                  <div className="space-y-6">
-                      <SectionCard title="Profile Media">
-                          <HeroCaptureSection onUploadComplete={handleHeroMediaUploadComplete} />
-                          {saveStatus.hero && <p className="text-sm mt-2">{saveStatus.hero}</p>}
-                      </SectionCard>
-                      <SectionCard title="Video Profile">
-                          <VideoProfileUpload currentVideoUrl={profile.videoProfileUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'videoProfileUrl')} />
-                      </SectionCard>
-                       <SectionCard title="Audio Bio">
-                          {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
-                      </SectionCard>
-                       <SectionCard title="Video Snippet">
-                          {isEditing ? <VideoBioSnippetUpload currentVideoUrl={profile.videoBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'videoBioUrl')} /> : <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />}
-                      </SectionCard>
-                  </div>
-              );
-          case 'settings':
-              return (
-                  <SectionCard title="Settings">
-                      <VideoCall />
-                      <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
-                  </SectionCard>
-              );
-          default: return null;
-      }
-  }
-
   return (
     <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="container mx-auto p-4">
@@ -236,18 +133,78 @@ function Profile() {
                 </div>
             </div>
 
-            <div className="flex justify-between items-center mb-6">
-                <div className="flex space-x-1 bg-neutral-200 dark:bg-neutral-700 rounded-lg p-1">
-                    <button onClick={() => setActiveTab('profile')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'profile' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Profile</button>
-                    <button onClick={() => setActiveTab('media')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'media' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Media</button>
-                    <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'settings' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Settings</button>
-                </div>
+            <div className="flex justify-end items-center mb-6">
                 <button onClick={() => setIsEditing(!isEditing)} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">
                     {isEditing ? 'View Profile' : 'Edit Profile'}
                 </button>
             </div>
 
-            {renderContent()}
+            <div className="space-y-6">
+              {/* About Me Section */}
+              {!isEditing && profile.aboutMe && (
+                <SectionCard title="About Me">
+                    <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
+                </SectionCard>
+              )}
+
+              {/* Details Section */}
+              <SectionCard title="My Details">
+                  {isEditing ? (
+                      <div className="space-y-4">
+                          <div>
+                              <label htmlFor="aboutMe" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">About Me</label>
+                              <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                          </div>
+                          <div>
+                              <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
+                              <input type="text" id="education" value={editableFields.education} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                          </div>
+                          <div>
+                              <label htmlFor="relationshipGoals" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Relationship Goals</label>
+                              <input type="text" id="relationshipGoals" value={editableFields.relationshipGoals} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                          </div>
+                          <button onClick={handleDetailsSave} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save Details'}</button>
+                      </div>
+                  ) : (
+                      <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                          <p><strong>Email:</strong> {profile.email}</p>
+                          <p><strong>Gender:</strong> {profile.gender}</p>
+                          <p><strong>Preference:</strong> {profile.preference}</p>
+                          <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
+                          <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
+                      </div>
+                  )}
+              </SectionCard>
+
+              {/* Interests Section */}
+              <SectionCard title="Interests">
+                  {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
+              </SectionCard>
+
+              {/* Profile Prompts Section */}
+              <SectionCard title="Profile Prompts">
+                  {isEditing ? <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} /> : <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />}
+              </SectionCard>
+
+              {/* Media Upload Section (only in editing mode) */}
+              {isEditing && (
+                <>
+                  <SectionCard title="Update Hero Media">
+                      <HeroCaptureSection onUploadComplete={handleHeroMediaUploadComplete} />
+                      {saveStatus.hero && <p className="text-sm mt-2">{saveStatus.hero}</p>}
+                  </SectionCard>
+                  <SectionCard title="Update Video Profile">
+                      <VideoProfileUpload currentVideoUrl={profile.videoProfileUrl || ''} onUploadComplete={(url) => handleSave('/api/users/me', { videoProfileUrl: url }, 'video')} />
+                      {saveStatus.video && <p className="text-sm mt-2">{saveStatus.video}</p>}
+                  </SectionCard>
+                </>
+              )}
+
+              {/* Settings Section */}
+              <SectionCard title="Settings">
+                  <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
+              </SectionCard>
+            </div>
         </div>
     </div>
   );
