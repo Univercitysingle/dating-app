@@ -241,7 +241,10 @@ const discoverUsers = async (req, res) => {
       };
     }
 
-    const users = await User.find(query).limit(20).lean();
+    const users = await User.find(query)
+      .select('_id uid name age photos bio interests')
+      .limit(20)
+      .lean();
 
     log.info(`UsersController: Found ${users.length} users to discover for UID: ${currentUserUid}`);
     res.json(users);
