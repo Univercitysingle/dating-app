@@ -1,20 +1,58 @@
 const User = require('../models/User');
+const Report = require('../models/Report'); // Import the Report model
 const bcrypt = require('bcryptjs');
 
-// List all users with pagination
+// Get dashboard statistics
+const getDashboardStats = async (req, res) => {
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [totalUsers, newUsers, activeUsers, pendingReports] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ createdAt: { $gte: twentyFourHoursAgo } }),
+      User.countDocuments({ lastActiveAt: { $gte: twentyFourHoursAgo } }),
+      Report.countDocuments({ status: 'pending_review' })
+    ]);
+
+    res.json({
+      totalUsers,
+      newUsers,
+      activeUsers,
+      pendingReports
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({ message: 'Error fetching dashboard statistics', error: error.message });
+  }
+};
+
+// List all users with pagination, search, and filtering
 const listUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
+    const { search, role } = req.query;
 
-    const users = await User.find()
-      .select('-password') // Exclude password
+    let query = {};
+
+    if (search) {
+      const searchRegex = new RegExp(search, 'i'); // Case-insensitive search
+      query.$or = [{ name: searchRegex }, { email: searchRegex }];
+    }
+
+    if (role) {
+      query.role = role;
+    }
+
+    const users = await User.find(query)
+      .select('-password')
+      .sort({ createdAt: -1 }) // Sort by most recently created
       .skip(skip)
       .limit(limit)
-      .lean(); // Use lean for performance if not modifying docs
+      .lean();
 
-    const totalUsers = await User.countDocuments();
+    const totalUsers = await User.countDocuments(query);
 
     res.json({
       users,
@@ -197,6 +235,7 @@ const deleteUserById = async (req, res) => {
 };
 
 module.exports = {
+  getDashboardStats,
   listUsers,
   createUser,
   getUserById,

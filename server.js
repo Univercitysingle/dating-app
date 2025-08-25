@@ -145,7 +145,9 @@ app.use("/api/status", require("./routes/status"));
 
 // Admin routes
 const adminUsersRouter = require("./routes/adminUsers");
+const adminReportsRouter = require("./routes/adminReports");
 app.use("/api/admin/users", adminUsersRouter);
+app.use("/api/admin/reports", adminReportsRouter);
 
 // React frontend fallback for non-API routes
 app.get("*", (req, res) => {

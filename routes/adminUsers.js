@@ -47,4 +47,12 @@ router.delete(
   adminUsersController.deleteUserById
 );
 
+// GET /api/admin/stats - Get dashboard statistics
+router.get(
+  '/stats',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.getDashboardStats
+);
+
 module.exports = router;
