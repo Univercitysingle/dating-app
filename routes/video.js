@@ -7,7 +7,7 @@ const { getJitsiToken, uploadProfileVideo } = require("../controllers/videoContr
 // Validation Parameters
 // Using a common set of allowed video types, can be specialized if needed.
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-flv', 'video/webm', 'video/x-matroska', 'video/avi'];
-const MAX_PROFILE_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_PROFILE_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 
 // File filter for main profile video
 const profileVideoFileFilter = (req, file, cb) => {

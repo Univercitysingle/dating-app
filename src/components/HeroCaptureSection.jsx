@@ -67,7 +67,7 @@ function HeroCaptureSection({ onUploadComplete }) {
       // 1. Get presigned URL from backend
       // Using query param for fileType as per the component guide
       const { url } = await apiClient.get(
-        `/api/upload-url?type=${encodeURIComponent(
+        `/api/upload/upload-url?type=${encodeURIComponent(
           file.type
         )}&fileName=${encodeURIComponent(file.name)}`
       );
