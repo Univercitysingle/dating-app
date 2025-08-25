@@ -194,20 +194,55 @@ const uploadVideoBioSnippet = async (req, res) => {
 
 const discoverUsers = async (req, res) => {
   const log = req.log;
-  const currentUserUid = req.user.uid;
+  const currentUser = req.user;
+  const currentUserUid = currentUser.uid;
+  const maxDistance = req.query.maxDistance || 50000; // 50km in meters
+
   log.info(`UsersController: discoverUsers entered for UID: ${currentUserUid}`);
 
   try {
-    // Find users that are not the current user and not blocked by the current user
-    const users = await User.find({
-      uid: { $ne: currentUserUid },
-      // Potentially add more filters here in the future (e.g., by preference, location)
-    }).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
+    // 1. Find users the current user has already interacted with
+    const interactedMatches = await Match.find({
+      $or: [{ user1Uid: currentUserUid }, { user2Uid: currentUserUid }],
+    }).lean();
 
-    // In a real app, you'd also filter out users who have already been matched or swiped on.
-    // This is a simplified version for now.
+    const interactedUserIds = interactedMatches.map(match => {
+      return match.user1Uid === currentUserUid ? match.user2Uid : match.user1Uid;
+    });
 
-    log.info(`UsersController: Found ${users.length} users to discover.`);
+    // 2. Base query
+    let query = {
+      uid: { $ne: currentUserUid, $nin: [...interactedUserIds, ...(currentUser.blocked || [])] },
+      isProfileVisible: true,
+      $or: [
+        { suspendedUntil: { $eq: null } },
+        { suspendedUntil: { $lt: new Date() } }
+      ],
+      blocked: { $ne: currentUserUid } // They haven't blocked the current user
+    };
+
+    // 3. Gender preference filter
+    if (currentUser.preference && currentUser.preference !== 'everyone' && currentUser.gender) {
+      query.gender = currentUser.preference;
+      query.preference = { $in: [currentUser.gender, 'everyone'] };
+    } else if (currentUser.gender) {
+      // User is open to everyone, so find users who are open to this user's gender or everyone
+      query.preference = { $in: [currentUser.gender, 'everyone'] };
+    }
+
+    // 4. Location filter
+    if (currentUser.location && currentUser.location.coordinates) {
+      query.location = {
+        $near: {
+          $geometry: currentUser.location,
+          $maxDistance: maxDistance,
+        },
+      };
+    }
+
+    const users = await User.find(query).limit(20).lean();
+
+    log.info(`UsersController: Found ${users.length} users to discover for UID: ${currentUserUid}`);
     res.json(users);
   } catch (error) {
     log.error({ err: error }, `UsersController: Error fetching users for discovery for UID ${currentUserUid}`);
