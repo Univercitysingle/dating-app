@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 // Import controller functions
-const { login, setInitialPassword, logout } = require("../controllers/authController");
+const { login, setInitialPassword } = require("../controllers/authController");
 
 // Import middleware to protect routes
 const authMiddleware = require("../middleware/authentication");
@@ -19,10 +19,8 @@ router.get("/test", (req, res) => {
   res.send("Auth test route is working");
 });
 
-// @route   POST /api/auth/logout
-// @desc    Logout user and clear cookie
-// @access  Public
-router.post("/logout", logout);
+// Note: Logout is handled on the client-side by clearing the stored token.
+// There is no server-side endpoint for logout in a stateless token-based authentication system.
 
 // @route   POST /api/auth/set-initial-password
 // @desc    Set initial password for users flagged with mustSetPassword = true

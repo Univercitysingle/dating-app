@@ -1,35 +1,6 @@
 const admin = require("../services/firebaseAdmin");
-const User = require('../models/User');
+const { findOrCreateUserFromToken } = require('../utils/userUtils');
 const Subscription = require('../models/Subscription');
-
-const findAndUpdateUserByTokenDetails = async (decodedToken) => {
-  // This function is now part of the middleware
-  let user = await User.findOne({ uid: decodedToken.uid });
-
-  if (user) {
-    return user;
-  }
-
-  if (!decodedToken.email || !decodedToken.email_verified) {
-    return null;
-  }
-
-  user = await User.findOne({ email: decodedToken.email });
-
-  if (user) {
-    user.uid = decodedToken.uid;
-    await user.save();
-    return user;
-  }
-
-  const newUser = new User({
-    uid: decodedToken.uid,
-    email: decodedToken.email,
-    name: decodedToken.name || '',
-  });
-  await newUser.save();
-  return newUser;
-};
 
 module.exports = async function (req, res, next) {
   try {
@@ -46,7 +17,7 @@ module.exports = async function (req, res, next) {
     }
 
     const decodedToken = await admin.auth().verifyIdToken(token);
-    const dbUser = await findAndUpdateUserByTokenDetails(decodedToken);
+    const dbUser = await findOrCreateUserFromToken(decodedToken);
 
     if (!dbUser) {
       return res.status(403).json({ error: "User provisioning failed. Email may not be verified or token details are insufficient." });

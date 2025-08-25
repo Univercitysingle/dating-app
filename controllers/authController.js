@@ -1,5 +1,6 @@
 const admin = require("../services/firebaseAdmin");
-const User = require("../models/User");
+const { findOrCreateUserFromToken } = require('../utils/userUtils');
+const Subscription = require('../models/Subscription');
 const bcrypt = require('bcryptjs');
 
 const login = async (req, res) => {
@@ -11,29 +12,25 @@ const login = async (req, res) => {
     log.info(`Login attempt for token: ${token.substring(0, 10)}...`);
 
     const decodedToken = await admin.auth().verifyIdToken(token);
-    let user = await User.findOne({ uid: decodedToken.uid });
+    const user = await findOrCreateUserFromToken(decodedToken);
 
     if (!user) {
-      log.info(`User not found for UID: ${decodedToken.uid}. Creating new user.`);
-      user = new User({
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        name: decodedToken.name || "",
-      });
-      await user.save();
-      log.info(`New user created for UID: ${decodedToken.uid}.`);
+      log.warn(`User provisioning failed for token: ${token.substring(0, 10)}...`);
+      return res.status(403).json({ error: "User provisioning failed. Email may not be verified or token details are insufficient." });
     }
+
+    const userObject = user.toObject();
+
+    const activeSubscription = await Subscription.findOne({
+      userId: userObject._id,
+      status: 'active',
+    });
+
+    userObject.isPremium = !!activeSubscription;
 
     const responsePayload = {
       token,
-      user: {
-        uid: user.uid,
-        email: user.email,
-        name: user.name,
-        plan: user.plan,
-        videoProfile: user.videoProfile,
-        role: user.role,
-      },
+      user: userObject,
     };
 
     if (user.mustSetPassword === true) {
@@ -66,6 +63,7 @@ const setInitialPassword = async (req, res) => {
         return res.status(401).json({ error: "User not authenticated properly." });
     }
 
+    const User = require('../models/User');
     const user = await User.findOne({ uid: req.user.uid });
 
     if (!user) {
@@ -93,9 +91,4 @@ const setInitialPassword = async (req, res) => {
   }
 };
 
-const logout = (req, res) => {
-  res.clearCookie('token');
-  res.status(200).json({ message: 'Logged out successfully' });
-};
-
-module.exports = { login, setInitialPassword, logout };
+module.exports = { login, setInitialPassword };
