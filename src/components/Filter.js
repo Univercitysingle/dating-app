@@ -1,0 +1,116 @@
+import React, { useState } from 'react';
+
+const Filter = ({ onApply }) => {
+  const [minAge, setMinAge] = useState(18);
+  const [maxAge, setMaxAge] = useState(100);
+  const [maxDistance, setMaxDistance] = useState(100);
+  const [lifestyle, setLifestyle] = useState({
+    pets: '',
+    workout: '',
+    drinking: '',
+    smoking: '',
+  });
+
+  const handleLifestyleChange = (e) => {
+    const { name, value } = e.target;
+    setLifestyle((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleApply = () => {
+    const filters = {
+      minAge,
+      maxAge,
+      maxDistance,
+    };
+    for (const key in lifestyle) {
+      if (lifestyle[key]) {
+        filters[key] = lifestyle[key];
+      }
+    }
+    onApply(filters);
+  };
+
+  return (
+    <div className="p-4 bg-white rounded-lg shadow-md">
+      <h3 className="text-lg font-semibold mb-4">Filters</h3>
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="age-range" className="block text-sm font-medium text-gray-700">
+            Age Range: {minAge} - {maxAge}
+          </label>
+          <div className="flex space-x-4">
+            <input
+              type="range"
+              min="18"
+              max="100"
+              value={minAge}
+              onChange={(e) => setMinAge(e.target.value)}
+              className="w-full"
+            />
+            <input
+              type="range"
+              min="18"
+              max="100"
+              value={maxAge}
+              onChange={(e) => setMaxAge(e.target.value)}
+              className="w-full"
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="distance" className="block text-sm font-medium text-gray-700">
+            Max Distance: {maxDistance} km
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="100"
+            value={maxDistance}
+            onChange={(e) => setMaxDistance(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Lifestyle</label>
+          <div className="space-y-2">
+            <select name="pets" value={lifestyle.pets} onChange={handleLifestyleChange} className="w-full">
+              <option value="">Pets</option>
+              <option value="Dog person">Dog person</option>
+              <option value="Cat person">Cat person</option>
+              <option value="No pets">No pets</option>
+              <option value="All the pets">All the pets</option>
+            </select>
+            <select name="workout" value={lifestyle.workout} onChange={handleLifestyleChange} className="w-full">
+              <option value="">Workout</option>
+              <option value="Every day">Every day</option>
+              <option value="Often">Often</option>
+              <option value="Sometimes">Sometimes</option>
+              <option value="Never">Never</option>
+            </select>
+            <select name="drinking" value={lifestyle.drinking} onChange={handleLifestyleChange} className="w-full">
+              <option value="">Drinking</option>
+              <option value="Frequently">Frequently</option>
+              <option value="Socially">Socially</option>
+              <option value="Rarely">Rarely</option>
+              <option value="Never">Never</option>
+            </select>
+            <select name="smoking" value={lifestyle.smoking} onChange={handleLifestyleChange} className="w-full">
+              <option value="">Smoking</option>
+              <option value="Socially">Socially</option>
+              <option value="Sometimes">Sometimes</option>
+              <option value="Never">Never</option>
+            </select>
+          </div>
+        </div>
+        <button
+          onClick={handleApply}
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default Filter;

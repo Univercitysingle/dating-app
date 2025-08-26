@@ -86,7 +86,7 @@ function App() {
             }
           >
             <Route path="/discover" element={<SwipeDeck />} />
-            <Route path="/chat" element={<Chat />} />
+            <Route path="/chat/:chatId" element={<Chat />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
 

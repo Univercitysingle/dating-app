@@ -318,11 +318,43 @@ const discoverUsers = async (req, res) => {
       return match.user1Uid === currentUserUid ? match.user2Uid : match.user1Uid;
     });
 
-    // Find users that are not the current user and not blocked by the current user
-    const users = await User.find({
+    const { minAge, maxAge, maxDistance, lifestyle } = req.query;
+
+    const query = {
       uid: { $ne: currentUserUid, $nin: swipedUserIds },
-      // Potentially add more filters here in the future (e.g., by preference, location)
-    }).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
+    };
+
+    if (minAge && maxAge) {
+      query.age = { $gte: minAge, $lte: maxAge };
+    }
+
+    if (maxDistance) {
+      const user = await User.findOne({ uid: currentUserUid }).select('location');
+      if (user && user.location) {
+        query.location = {
+          $near: {
+            $geometry: user.location,
+            $maxDistance: maxDistance * 1000, // convert km to meters
+          },
+        };
+      }
+    }
+
+    if (req.query.pets) {
+      query['lifestyle.pets'] = req.query.pets;
+    }
+    if (req.query.workout) {
+      query['lifestyle.workout'] = req.query.workout;
+    }
+    if (req.query.drinking) {
+      query['lifestyle.drinking'] = req.query.drinking;
+    }
+    if (req.query.smoking) {
+      query['lifestyle.smoking'] = req.query.smoking;
+    }
+
+    // Find users that are not the current user and not blocked by the current user
+    const users = await User.find(query).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
 
     log.info(`UsersController: Found ${users.length} users to discover.`);
     res.json(users);

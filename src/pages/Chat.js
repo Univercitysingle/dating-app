@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import logger from '../utils/logger';
@@ -10,6 +11,7 @@ function Chat() {
   const [error, setError] = useState(null);
   const socketRef = useRef(null);
   const { user } = useAuth();
+  const { chatId } = useParams();
 
   useEffect(() => {
     if (!user) return;
@@ -29,7 +31,7 @@ function Chat() {
 
     socketRef.current.on('connect', () => {
       logger.info('Socket connected');
-      socketRef.current.emit('joinRoom', 'general');
+      socketRef.current.emit('joinRoom', chatId);
     });
 
     socketRef.current.on('message', (message) => {
@@ -46,13 +48,13 @@ function Chat() {
         socketRef.current.disconnect();
       }
     };
-  }, [user]);
+  }, [user, chatId]);
 
   const sendMessage = (e) => {
     e.preventDefault();
     if (!input.trim()) return;
     socketRef.current.emit('sendMessage', {
-      roomId: 'general',
+      roomId: chatId,
       message: input,
     });
     setInput('');

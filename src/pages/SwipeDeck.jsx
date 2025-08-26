@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import apiClient from '../api/apiClient';
 import SwipeCard from '../components/SwipeCard';
 import { useNavigate } from 'react-router-dom';
+import Filter from '../components/Filter';
 
 const MatchModal = ({ matchInfo, onContinue, onChat }) => (
     <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
@@ -49,14 +50,15 @@ const SwipeDeck = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
 
-  const fetchUsersToSwipe = useCallback(async () => {
+  const fetchUsersToSwipe = useCallback(async (filters = {}) => {
     setIsLoading(true);
     setError(null);
     setNewMatchInfo(null);
     try {
-      const { data } = await apiClient.get('/api/users/discover');
+      const { data } = await apiClient.get('/api/users/discover', { params: filters });
       setUsers(data || []);
     } catch (err) {
       console.error("Error fetching users for swipe deck:", err);
@@ -85,12 +87,17 @@ const SwipeDeck = () => {
     } catch (swipeError) {
       console.error("Error recording swipe:", swipeError);
     }
-    setUsers((prevUsers) => prevUsers.slice(1));
+    setUsers((prevUsers) => prevUsers.filter(u => u.uid !== userId));
   };
 
   const handleSwipe = () => {
     // This function is called when the card animation is complete
     // We don't need to do anything here anymore, as the card is already removed from the DOM by AnimatePresence
+  };
+
+  const handleApplyFilters = (filters) => {
+    fetchUsersToSwipe(filters);
+    setShowFilters(false);
   };
 
   if (isLoading) {
@@ -103,8 +110,13 @@ const SwipeDeck = () => {
 
   return (
     <div className="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900">
-        <header className="flex-shrink-0">
-            <h1 className="text-2xl font-bold my-4 text-center text-neutral-700 dark:text-neutral-200">Discover</h1>
+        <header className="flex-shrink-0 flex justify-between items-center p-4">
+            <h1 className="text-2xl font-bold text-center text-neutral-700 dark:text-neutral-200">Discover</h1>
+            <button onClick={() => setShowFilters(true)} className="p-2 bg-white rounded-full shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 4a2 2 0 100 4m0-4a2 2 0 110 4m-6 8v-2m0 4v.01M6 14a2 2 0 100-4m0 4a2 2 0 110-4m12 4v-2m0 4v.01M18 14a2 2 0 100-4m0 4a2 2 0 110-4M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
         </header>
 
         <main className="flex-grow flex flex-col items-center justify-center pt-4">
@@ -168,6 +180,12 @@ const SwipeDeck = () => {
                 onContinue={() => setNewMatchInfo(null)}
                 onChat={() => navigate(`/chat/${newMatchInfo._id}`)}
             />
+        )}
+
+        {showFilters && (
+            <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
+                <Filter onApply={handleApplyFilters} />
+            </div>
         )}
     </div>
   );
