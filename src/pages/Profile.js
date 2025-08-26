@@ -4,16 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 
 // Import all necessary components
-import VideoProfileUpload from '../components/VideoProfileUpload';
-import VideoCall from '../components/VideoCall';
 import InterestsDisplay from '../components/InterestsDisplay';
 import InterestsEditor from '../components/InterestsEditor';
 import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
 import AudioBioPlayer from '../components/AudioBioPlayer';
 import AudioBioUpload from '../components/AudioBioUpload';
-import VideoBioSnippetPlayer from '../components/VideoBioSnippetPlayer';
-import VideoBioSnippetUpload from '../components/VideoBioSnippetUpload';
 import PersonalityQuizDisplay from '../components/PersonalityQuizDisplay';
 import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
 import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
@@ -191,6 +187,9 @@ function Profile() {
                         <SectionCard title="Social Media">
                             {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
                         </SectionCard>
+                        <SectionCard title="Audio Bio">
+                            {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
+                        </SectionCard>
                   </div>
               );
           case 'media':
@@ -200,21 +199,11 @@ function Profile() {
                           <HeroCaptureSection onUploadComplete={handleHeroMediaUploadComplete} />
                           {saveStatus.hero && <p className="text-sm mt-2">{saveStatus.hero}</p>}
                       </SectionCard>
-                      <SectionCard title="Video Profile">
-                          <VideoProfileUpload currentVideoUrl={profile.videoProfileUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'videoProfileUrl')} />
-                      </SectionCard>
-                       <SectionCard title="Audio Bio">
-                          {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
-                      </SectionCard>
-                       <SectionCard title="Video Snippet">
-                          {isEditing ? <VideoBioSnippetUpload currentVideoUrl={profile.videoBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'videoBioUrl')} /> : <VideoBioSnippetPlayer videoUrl={profile.videoBioUrl || ''} />}
-                      </SectionCard>
                   </div>
               );
           case 'settings':
               return (
                   <SectionCard title="Settings">
-                      <VideoCall />
                       <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
                   </SectionCard>
               );

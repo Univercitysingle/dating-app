@@ -23,7 +23,7 @@ const updateCurrentUserProfile = async (req, res) => {
   const update = req.body;
   const allowedFields = [
     "name", "age", "gender", "preference", "bio", "photos",
-    "interests", "profilePrompts", "audioBioUrl", "videoBioUrl",
+    "interests", "profilePrompts", "audioBioUrl",
     "personalityQuizResults", "socialMediaLinks",
     "education", "relationshipGoals", "location",
     "lastActiveAt"
@@ -188,10 +188,6 @@ const uploadAudioBio = async (req, res) => {
   await handleFileUploadToS3(req, res, "audio-bios");
 };
 
-const uploadVideoBioSnippet = async (req, res) => {
-  await handleFileUploadToS3(req, res, "video-bio-snippets");
-};
-
 const discoverUsers = async (req, res) => {
   const log = req.log;
   const currentUserUid = req.user.uid;
@@ -221,6 +217,5 @@ module.exports = {
   unblockUser,
   blockUser,
   uploadAudioBio,
-  uploadVideoBioSnippet,
   discoverUsers,
 };
