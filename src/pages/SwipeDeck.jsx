@@ -73,13 +73,14 @@ const SwipeDeck = () => {
 
   const handleVote = async (userId, direction) => {
     try {
-      const { data } = await apiClient.post('/api/swipes', {
-        targetUserId: userId,
-        direction: direction,
-      });
-
-      if (data && data.match) {
-        setNewMatchInfo(data.matchedUser || { _id: userId, name: 'Your New Match!' });
+      if (direction === 'right') {
+        const { data } = await apiClient.post('/api/swipe/like', { userId });
+        if (data.status === 'matched') {
+          const matchedUser = users.find(u => u.uid === userId);
+          setNewMatchInfo(matchedUser);
+        }
+      } else {
+        await apiClient.post('/api/swipe/pass', { userId });
       }
     } catch (swipeError) {
       console.error("Error recording swipe:", swipeError);

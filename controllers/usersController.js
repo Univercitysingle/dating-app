@@ -309,14 +309,20 @@ const discoverUsers = async (req, res) => {
   log.info(`UsersController: discoverUsers entered for UID: ${currentUserUid}`);
 
   try {
+    // Find users that the current user has already swiped on
+    const swipedUsers = await Match.find({
+      $or: [{ user1Uid: currentUserUid }, { user2Uid: currentUserUid }],
+    }).select('user1Uid user2Uid');
+
+    const swipedUserIds = swipedUsers.map(match => {
+      return match.user1Uid === currentUserUid ? match.user2Uid : match.user1Uid;
+    });
+
     // Find users that are not the current user and not blocked by the current user
     const users = await User.find({
-      uid: { $ne: currentUserUid },
+      uid: { $ne: currentUserUid, $nin: swipedUserIds },
       // Potentially add more filters here in the future (e.g., by preference, location)
     }).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
-
-    // In a real app, you'd also filter out users who have already been matched or swiped on.
-    // This is a simplified version for now.
 
     log.info(`UsersController: Found ${users.length} users to discover.`);
     res.json(users);
