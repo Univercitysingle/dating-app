@@ -21,6 +21,10 @@ const matchSchema = new mongoose.Schema({
     type: [String],
     default: [],
     validate: [val => val.length <= 2, 'likedBy array can contain at most 2 UIDs']
+  },
+  superLike: {
+    type: Boolean,
+    default: false,
   }
 }, { timestamps: true });
 

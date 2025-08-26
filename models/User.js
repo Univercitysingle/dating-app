@@ -68,6 +68,14 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  superLikes: {
+    count: { type: Number, default: 1 },
+    refreshesAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+  },
+  undoSwipes: {
+    count: { type: Number, default: 3 },
+    refreshesAt: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+  },
   password: { // For locally managed passwords, e.g., for sadmin
     type: String,
     required: false, // Not all users (e.g., Firebase-only users) will have this
