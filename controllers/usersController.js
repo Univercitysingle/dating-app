@@ -28,7 +28,7 @@ const updateCurrentUserProfile = async (req, res) => {
       "preference", "bio", "photos",
       "interests", "profilePrompts", "audioBioUrl",
       "personalityQuizResults", "socialMediaLinks",
-      "education", "relationshipGoals", "location",
+      "education", "relationshipGoals", "location", "lifestyle",
       "lastActiveAt"
     ];
   } else {
@@ -36,7 +36,7 @@ const updateCurrentUserProfile = async (req, res) => {
       "name", "age", "gender", "preference", "bio", "photos",
       "interests", "profilePrompts", "audioBioUrl",
       "personalityQuizResults", "socialMediaLinks",
-      "education", "relationshipGoals", "location",
+      "education", "relationshipGoals", "location", "lifestyle",
       "lastActiveAt", "isOnboardingComplete"
     ];
   }

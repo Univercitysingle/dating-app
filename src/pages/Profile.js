@@ -17,6 +17,7 @@ import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
 import HeroCaptureSection from '../components/HeroCaptureSection';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
+import LifestyleEditor from '../components/LifestyleEditor';
 
 // Reusable components
 const PremiumBadge = () => (
@@ -58,6 +59,7 @@ function Profile() {
       social: '',
       media: '',
       hero: '',
+      lifestyle: '',
   });
 
   const { logout } = useAuth();
@@ -69,7 +71,7 @@ function Profile() {
         setProfile(data);
         setEditableFields({
             education: data.education || '',
-            relationshipGoals: data.relationshipGoals || '',
+            relationshipGoals: data.relationshipGoals || 'Figuring it out',
             aboutMe: data.aboutMe || '',
         });
         setFetchError(null);
@@ -120,6 +122,10 @@ function Profile() {
 
   const handleSocialMediaLinksSave = (links) => {
       handleSave('/api/users/me', { socialMediaLinks: links }, 'social');
+  };
+
+  const handleLifestyleSave = (lifestyle) => {
+      handleSave('/api/users/me', { lifestyle }, 'lifestyle');
   };
 
   const handleMediaUploadComplete = (fileUrl, fieldName) => {
@@ -177,7 +183,19 @@ function Profile() {
                                     </div>
                                     <div>
                                         <label htmlFor="relationshipGoals" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Relationship Goals</label>
-                                        <input type="text" id="relationshipGoals" value={editableFields.relationshipGoals} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                        <select
+                                            id="relationshipGoals"
+                                            value={editableFields.relationshipGoals}
+                                            onChange={handleFieldChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"
+                                        >
+                                            <option value="Long-term relationship">Long-term relationship</option>
+                                            <option value="Long-term, open to short">Long-term, open to short</option>
+                                            <option value="Short-term, open to long">Short-term, open to long</option>
+                                            <option value="Short-term fun">Short-term fun</option>
+                                            <option value="New friends">New friends</option>
+                                            <option value="Figuring it out">Figuring it out</option>
+                                        </select>
                                     </div>
                                     <button onClick={handleDetailsSave} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save Details'}</button>
                                 </div>
@@ -188,6 +206,17 @@ function Profile() {
                                     <p><strong>Preference:</strong> {profile.preference}</p>
                                     <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
                                     <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
+                                </div>
+                            )}
+                        </SectionCard>
+                        <SectionCard title="Lifestyle">
+                            {isEditing ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} onSave={handleLifestyleSave} /> : (
+                                <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                                    <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
+                                    <p><strong>Zodiac:</strong> {profile.lifestyle?.zodiac || 'N/A'}</p>
+                                    <p><strong>Workout:</strong> {profile.lifestyle?.workout || 'N/A'}</p>
+                                    <p><strong>Drinking:</strong> {profile.lifestyle?.drinking || 'N/A'}</p>
+                                    <p><strong>Smoking:</strong> {profile.lifestyle?.smoking || 'N/A'}</p>
                                 </div>
                             )}
                         </SectionCard>

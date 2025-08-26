@@ -23,7 +23,25 @@ const userSchema = new mongoose.Schema({
   personalityQuizResults: { type: mongoose.Schema.Types.Mixed, default: {} },
   socialMediaLinks: { type: Map, of: String, default: new Map() },
   education: { type: String, default: "" },
-  relationshipGoals: { type: String, default: "" },
+  relationshipGoals: {
+    type: String,
+    enum: [
+      'Long-term relationship',
+      'Long-term, open to short',
+      'Short-term, open to long',
+      'Short-term fun',
+      'New friends',
+      'Figuring it out',
+    ],
+    default: 'Figuring it out',
+  },
+  lifestyle: {
+    pets: { type: String, enum: ['Dog person', 'Cat person', 'No pets', 'All the pets'] },
+    zodiac: String,
+    workout: { type: String, enum: ['Every day', 'Often', 'Sometimes', 'Never'] },
+    drinking: { type: String, enum: ['Frequently', 'Socially', 'Rarely', 'Never'] },
+    smoking: { type: String, enum: ['Socially', 'Sometimes', 'Never'] },
+  },
   lastActiveAt: { type: Date, default: Date.now },
   suspendedUntil: { type: Date, default: null },
   location: {
