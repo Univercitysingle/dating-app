@@ -3,9 +3,9 @@ const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema({
   uid: { type: String, unique: true, sparse: true }, // Firebase UID, not required for all users
   email: { type: String, required: true, unique: true },
-  name: { type: String, default: "" },
-  age: Number,
-  gender: String,
+  name: { type: String, required: true, immutable: true },
+  age: { type: Number, required: true, immutable: true },
+  gender: { type: String, immutable: true },
   preference: String,
   bio: String,
   photos: [{
@@ -53,6 +53,10 @@ const userSchema = new mongoose.Schema({
   password: { // For locally managed passwords, e.g., for sadmin
     type: String,
     required: false, // Not all users (e.g., Firebase-only users) will have this
+  },
+  isOnboardingComplete: {
+    type: Boolean,
+    default: false,
   },
 }, { timestamps: true });
 

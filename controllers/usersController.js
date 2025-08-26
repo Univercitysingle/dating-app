@@ -21,13 +21,26 @@ const updateCurrentUserProfile = async (req, res) => {
   const log = req.log;
   log.info("UsersController: updateCurrentUserProfile entered for UID:", req.user ? req.user.uid : "UNKNOWN_UID");
   const update = req.body;
-  const allowedFields = [
-    "name", "age", "gender", "preference", "bio", "photos",
-    "interests", "profilePrompts", "audioBioUrl",
-    "personalityQuizResults", "socialMediaLinks",
-    "education", "relationshipGoals", "location",
-    "lastActiveAt"
-  ];
+
+  let allowedFields;
+  if (req.user.isOnboardingComplete) {
+    allowedFields = [
+      "preference", "bio", "photos",
+      "interests", "profilePrompts", "audioBioUrl",
+      "personalityQuizResults", "socialMediaLinks",
+      "education", "relationshipGoals", "location",
+      "lastActiveAt"
+    ];
+  } else {
+    allowedFields = [
+      "name", "age", "gender", "preference", "bio", "photos",
+      "interests", "profilePrompts", "audioBioUrl",
+      "personalityQuizResults", "socialMediaLinks",
+      "education", "relationshipGoals", "location",
+      "lastActiveAt", "isOnboardingComplete"
+    ];
+  }
+
   const sanitizedUpdate = {};
 
   for (const key of allowedFields) {
@@ -214,13 +227,13 @@ const uploadPhoto = async (req, res) => {
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
 
-    const user = await User.findOneAndUpdate(
+    await User.findOneAndUpdate(
       { uid: req.user.uid },
       { $push: { photos: { url: result.Location, order: req.user.photos.length } } },
       { new: true }
     );
 
-    res.json(user);
+    res.json({ success: true, fileUrl: result.Location });
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
     if (req.file && req.file.path) {
