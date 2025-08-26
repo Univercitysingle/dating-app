@@ -15,6 +15,8 @@ import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
 import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
 import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
 import HeroCaptureSection from '../components/HeroCaptureSection';
+import PhotoGallery from '../components/PhotoGallery';
+import PhotoEditor from '../components/PhotoEditor';
 
 // Reusable components
 const PremiumBadge = () => (
@@ -38,6 +40,7 @@ const SectionCard = ({ title, children }) => (
 function Profile() {
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
 
@@ -143,6 +146,7 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
+                      <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
                       {!isEditing && profile.aboutMe && (
                         <SectionCard title="About Me">
                             <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
@@ -235,6 +239,19 @@ function Profile() {
                     {isEditing ? 'View Profile' : 'Edit Profile'}
                 </button>
             </div>
+
+            {isEditingPhotos && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <PhotoEditor
+                        photos={profile.photos || []}
+                        onSave={(updatedUser) => {
+                            setProfile(updatedUser);
+                            setIsEditingPhotos(false);
+                        }}
+                        onCancel={() => setIsEditingPhotos(false)}
+                    />
+                </div>
+            )}
 
             {renderContent()}
         </div>

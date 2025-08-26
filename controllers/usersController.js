@@ -2,7 +2,7 @@ const User = require("../models/User");
 const Match = require('../models/Match');
 const fs = require("fs");
 const path = require("path");
-const { uploadToS3 } = require("../services/awsS3");
+const { uploadToS3, deleteFromS3 } = require("../services/awsS3");
 const multer = require("multer");
 
 const getCurrentUserProfile = async (req, res) => {
@@ -188,6 +188,108 @@ const uploadAudioBio = async (req, res) => {
   await handleFileUploadToS3(req, res, "audio-bios");
 };
 
+const uploadPhoto = async (req, res) => {
+  const log = req.log;
+  const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
+  log.info(`UsersController: uploadPhoto entered for User: ${userUidForLog}`);
+  try {
+    if (req.fileValidationError) {
+      log.warn(`UsersController: File validation error for photo by ${userUidForLog}: ${req.fileValidationError}`);
+      return res.status(400).json({ message: req.fileValidationError });
+    }
+    if (!req.file) {
+      log.warn(`UsersController: No file uploaded or rejected by filter for photo by ${userUidForLog}.`);
+      return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
+    }
+    log.info(`UsersController: File received for photo: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
+
+    const fileContent = fs.readFileSync(req.file.path);
+    const ext = path.extname(req.file.originalname);
+    const s3Filename = `photos/${userUidForLog}-${Date.now()}${ext}`;
+    log.info(`UsersController: Uploading to S3 as ${s3Filename}`);
+
+    const result = await uploadToS3(fileContent, s3Filename, req.file.mimetype);
+    log.info(`UsersController: S3 Upload successful for ${s3Filename}. Location: ${result.Location}`);
+
+    fs.unlinkSync(req.file.path);
+    log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
+
+    const user = await User.findOneAndUpdate(
+      { uid: req.user.uid },
+      { $push: { photos: { url: result.Location, order: req.user.photos.length } } },
+      { new: true }
+    );
+
+    res.json(user);
+  } catch (error) {
+    log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
+    if (req.file && req.file.path) {
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+          log.info(`UsersController: Cleaned up temporary file ${req.file.path} after error.`);
+        }
+      } catch (cleanupError) {
+        log.error({ err: cleanupError }, `UsersController: Failed to cleanup temporary photo file after error`);
+      }
+    }
+    if (!res.headersSent) {
+      return res.status(500).json({ message: error.message || `An unexpected error occurred during photo upload.` });
+    }
+  }
+};
+
+const updatePhotoOrder = async (req, res) => {
+  const log = req.log;
+  const { photos } = req.body;
+  log.info(`UsersController: updatePhotoOrder entered for UID: ${req.user.uid}`);
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { uid: req.user.uid },
+      { photos: photos },
+      { new: true }
+    );
+    if (!user) {
+      log.warn(`UsersController: User not found during updatePhotoOrder for UID: ${req.user.uid}`);
+      return res.status(404).json({ error: "User not found" });
+    }
+    log.info(`UsersController: Successfully updated photo order for UID: ${req.user.uid}.`);
+    res.json(user);
+  } catch (err) {
+    log.error({ err }, `UsersController: Error updating photo order for UID ${req.user.uid}`);
+    res.status(500).json({ error: "An unexpected error occurred while updating photo order." });
+  }
+};
+
+const deletePhoto = async (req, res) => {
+  const log = req.log;
+  const { photoUrl } = req.body;
+  log.info(`UsersController: deletePhoto entered for UID: ${req.user.uid}`);
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { uid: req.user.uid },
+      { $pull: { photos: { url: photoUrl } } },
+      { new: true }
+    );
+
+    if (!user) {
+      log.warn(`UsersController: User not found during deletePhoto for UID: ${req.user.uid}`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const s3Key = photoUrl.split(".com/")[1];
+    await deleteFromS3(s3Key);
+
+    log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
+    res.json(user);
+  } catch (err) {
+    log.error({ err }, `UsersController: Error deleting photo for UID ${req.user.uid}`);
+    res.status(500).json({ error: "An unexpected error occurred while deleting photo." });
+  }
+};
+
 const discoverUsers = async (req, res) => {
   const log = req.log;
   const currentUserUid = req.user.uid;
@@ -217,5 +319,8 @@ module.exports = {
   unblockUser,
   blockUser,
   uploadAudioBio,
+  uploadPhoto,
+  updatePhotoOrder,
+  deletePhoto,
   discoverUsers,
 };

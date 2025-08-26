@@ -8,7 +8,10 @@ const userSchema = new mongoose.Schema({
   gender: String,
   preference: String,
   bio: String,
-  photos: [String],
+  photos: [{
+    url: String,
+    order: Number,
+  }],
   blocked: [String],
   isVerified: { type: Boolean, default: false },
   plan: { type: String, enum: ["basic", "premium"], default: "basic" },
