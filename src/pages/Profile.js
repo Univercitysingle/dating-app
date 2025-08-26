@@ -10,7 +10,7 @@ import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
 import AudioBioPlayer from '../components/AudioBioPlayer';
 import AudioBioUpload from '../components/AudioBioUpload';
-import PersonalityQuizDisplay from '../components/PersonalityQuizDisplay';
+import PersonalityQuizSummary from '../components/PersonalityQuizSummary';
 import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
 import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
 import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
@@ -152,7 +152,7 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
-                      <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
+                      <PhotoGallery photos={profile.photos || []} prompts={profile.profilePrompts || []} onEdit={() => setIsEditingPhotos(true)} />
                       {!isEditing && profile.aboutMe && (
                         <SectionCard title="About Me">
                             <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
@@ -223,11 +223,8 @@ function Profile() {
                         <SectionCard title="Interests">
                             {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Profile Prompts">
-                            {isEditing ? <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} /> : <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />}
-                        </SectionCard>
                         <SectionCard title="Personality Quiz">
-                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizDisplay quizResults={profile.personalityQuizResults || {}} />}
+                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
                         </SectionCard>
                         <SectionCard title="Social Media">
                             {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
