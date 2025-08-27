@@ -33,7 +33,7 @@ const updateCurrentUserProfile = async (req, res) => {
     ];
   } else {
     allowedFields = [
-      "name", "age", "gender", "preference", "bio", "photos",
+      "name", "birthday", "gender", "preference", "bio", "photos",
       "interests", "profilePrompts", "audioBioUrl",
       "personalityQuizResults", "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle",
@@ -47,6 +47,19 @@ const updateCurrentUserProfile = async (req, res) => {
     if (update[key] !== undefined) sanitizedUpdate[key] = update[key];
   }
   log.info({ update: sanitizedUpdate }, "UsersController: Sanitized update data");
+
+  if (sanitizedUpdate.birthday) {
+    const today = new Date();
+    const birthDate = new Date(sanitizedUpdate.birthday);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      return res.status(400).json({ error: 'You must be at least 18 years old to register.' });
+    }
+  }
 
   if (!req.user || !req.user.uid) {
     log.error("UsersController: updateCurrentUserProfile - req.user or req.user.uid is missing.");

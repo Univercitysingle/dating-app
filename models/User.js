@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
   uid: { type: String, unique: true, sparse: true }, // Firebase UID, not required for all users
   email: { type: String, required: true, unique: true },
   name: { type: String, immutable: true },
-  age: { type: Number, immutable: true },
+  birthday: { type: Date, immutable: true },
   gender: { type: String, immutable: true },
   preference: String,
   bio: String,
@@ -85,6 +85,20 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
 }, { timestamps: true });
+
+userSchema.virtual('age').get(function() {
+  if (!this.birthday) {
+    return undefined;
+  }
+  const today = new Date();
+  const birthDate = new Date(this.birthday);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+});
 
 userSchema.index({ location: '2dsphere' });
 

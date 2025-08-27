@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 import PhotoUploader from '../components/PhotoUploader';
 import { auth } from '../firebase';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { subYears } from 'date-fns';
 
 const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [age, setAge] = useState('');
+  const [birthday, setBirthday] = useState(null);
   const [gender, setGender] = useState('');
   const [photo, setPhoto] = useState(null);
   const [location, setLocation] = useState(null);
@@ -21,7 +24,7 @@ const Register = () => {
     e.preventDefault();
     setError(null);
 
-    if (!name || !age || !gender || !photo) {
+    if (!name || !birthday || !gender || !photo) {
       setError('Please fill out all fields and upload a photo.');
       return;
     }
@@ -36,7 +39,7 @@ const Register = () => {
         '/api/users/me',
         {
           name,
-          age,
+          birthday,
           gender,
           photos: [{ url: photo, order: 0 }],
           location,
@@ -118,14 +121,13 @@ const Register = () => {
             />
           </div>
           <div>
-            <label htmlFor="age">Age</label>
-            <input
-              id="age"
-              name="age"
-              type="number"
-              required
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
+            <label htmlFor="birthday">Birthday</label>
+            <DatePicker
+              selected={birthday}
+              onChange={(date) => setBirthday(date)}
+              maxDate={subYears(new Date(), 18)}
+              showYearDropdown
+              dateFormat="yyyy/MM/dd"
               className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
           </div>
