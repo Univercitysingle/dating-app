@@ -75,6 +75,10 @@ function Login() {
         email,
         password
       );
+      if (!userCredential.user.emailVerified) {
+        setError('Please verify your email before logging in.');
+        return;
+      }
       const token = await userCredential.user.getIdToken();
       await login(token); // This uses the AuthContext login
       navigate('/');

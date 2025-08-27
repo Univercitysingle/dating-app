@@ -45,9 +45,12 @@ const Register = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Log in the user and navigate to the profile page
-      await login(token);
-      navigate('/profile');
+      // Send verification email
+      await user.sendEmailVerification();
+
+      // Log out the user and show a message
+      await auth.signOut();
+      setError('Registration successful! Please check your email for a verification link.');
     } catch (err) {
       setError(err.message || 'Failed to register.');
     }

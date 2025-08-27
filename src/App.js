@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import Chat from './pages/Chat';
+import Onboarding from './pages/Onboarding';
 import PremiumContent from './pages/PremiumContent';
 import SetInitialPasswordPage from './pages/SetInitialPasswordPage';
 import AdminLayout from './components/admin/AdminLayout';
@@ -35,6 +36,9 @@ function PrivateRoute({ children }) {
         </p>
       </div>
     );
+  }
+  if (user && !user.isOnboardingComplete) {
+    return <Navigate to="/onboarding" replace />;
   }
   return user ? children : <Navigate to="/login" replace />;
 }
@@ -71,6 +75,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route
             path="/set-initial-password"
             element={<SetInitialPasswordPage />}
