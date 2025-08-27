@@ -38,8 +38,14 @@ const Onboarding = () => {
           isOnboardingComplete: true,
         }
       );
-      setUser(updatedProfile);
-      navigate('/discover');
+      if (typeof setUser === 'function') {
+        setUser(updatedProfile);
+        navigate('/discover');
+      } else {
+        console.error("setUser is not a function in Onboarding.js. AuthContext value:", { user, setUser });
+        // Force a reload to try and get the latest context
+        window.location.reload();
+      }
     } catch (err) {
       setError(err.message || 'Failed to update profile.');
     }
