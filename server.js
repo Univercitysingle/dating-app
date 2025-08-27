@@ -41,8 +41,22 @@ if (isProduction && !clientUrl) {
   process.exit(1);
 }
 
+const allowedOrigins = [
+  clientUrl, // from .env
+  'http://localhost:3000',
+  'http://172.22.10.1:3000',
+].filter(Boolean);
+
 const corsOptions = {
-  origin: isProduction ? clientUrl : (clientUrl || "http://localhost:3000"),
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
