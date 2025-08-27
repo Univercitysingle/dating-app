@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
+import SuperLikeNotification from './SuperLikeNotification';
 
-const SwipeCard = ({ user, onVote, onSwipe, style }) => {
+const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -50,6 +51,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style }) => {
       style={style}
     >
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-card bg-neutral-800 border border-neutral-700">
+        {superLike && <SuperLikeNotification />}
         {/* Scrollable container for details */}
         <motion.div
           className="w-full h-full overflow-y-auto"

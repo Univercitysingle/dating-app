@@ -354,7 +354,20 @@ const discoverUsers = async (req, res) => {
     }
 
     // Find users that are not the current user and not blocked by the current user
-    const users = await User.find(query).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
+    const users = await User.find(query).sort({ lastActiveAt: -1 }).lean(); // Use .lean() for faster queries when you don't need Mongoose documents
+
+    const superLikes = await Match.find({
+      user2Uid: currentUserUid,
+      superLike: true,
+    }).select('user1Uid');
+
+    const superLikedByUserIds = superLikes.map(match => match.user1Uid);
+
+    users.forEach(user => {
+      if (superLikedByUserIds.includes(user.uid)) {
+        user.superLikedByCurrentUser = true;
+      }
+    });
 
     log.info(`UsersController: Found ${users.length} users to discover.`);
     res.json(users);

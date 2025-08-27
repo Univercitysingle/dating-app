@@ -141,6 +141,7 @@ const SwipeDeck = () => {
                                     user={user}
                                     onVote={isTop ? handleVote : () => {}}
                                     onSwipe={isTop ? handleSwipe : () => {}}
+                                    superLike={user.superLikedByCurrentUser}
                                     // Apply stacking styles
                                     style={{
                                         zIndex: users.length - index,
