@@ -2,10 +2,12 @@ import logger from '../utils/logger';
 
 const apiClient = {
   async request(method, path, data = null, options = {}) {
-    const headers = new Headers({
-      'Content-Type': 'application/json',
-      ...options.headers,
-    });
+    const headers = new Headers(options.headers || {});
+
+    // Set Content-Type for JSON, but not for FormData
+    if (!(data instanceof FormData)) {
+        headers.set('Content-Type', 'application/json');
+    }
 
     const token = localStorage.getItem("authToken");
     if (token) {
@@ -24,8 +26,12 @@ const apiClient = {
       ...options,
     };
 
-    if (data && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
-      config.body = JSON.stringify(data);
+    if (data) {
+      if (data instanceof FormData) {
+        config.body = data; // Let the browser set the Content-Type with boundary
+      } else if (['POST', 'PUT', 'PATCH'].includes(config.method)) {
+        config.body = JSON.stringify(data);
+      }
     }
 
     logger.debug(`API Request - ${config.method} ${url}`, {

@@ -16,11 +16,7 @@ const PhotoUploader = ({ onUploadComplete }) => {
     formData.append('photo', file);
 
     try {
-      const response = await apiClient.post('/api/users/photos', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await apiClient.post('/api/users/photos', formData);
       onUploadComplete(response.fileUrl);
     } catch (err) {
       setError(err.data?.message || 'Failed to upload photo.');
