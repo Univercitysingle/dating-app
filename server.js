@@ -60,7 +60,11 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 // Security headers & JSON parsing
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  })
+);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
