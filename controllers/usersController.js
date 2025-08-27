@@ -2,7 +2,7 @@ const User = require("../models/User");
 const Match = require('../models/Match');
 const fs = require("fs");
 const path = require("path");
-const { uploadToS3, deleteFromS3 } = require("../services/awsS3");
+const { saveFile, deleteFile } = require("../services/localStore");
 const multer = require("multer");
 
 const getCurrentUserProfile = async (req, res) => {
@@ -143,10 +143,10 @@ const blockUser = async (req, res) => {
   }
 };
 
-const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
+const handleFileUpload = async (req, res, fileTypePrefix) => {
   const log = req.log;
   const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
-  log.info(`UsersController: handleFileUploadToS3 entered for ${fileTypePrefix}, User: ${userUidForLog}`);
+  log.info(`UsersController: handleFileUpload entered for ${fileTypePrefix}, User: ${userUidForLog}`);
   try {
     if (req.fileValidationError) {
       log.warn(`UsersController: File validation error for ${fileTypePrefix} by ${userUidForLog}: ${req.fileValidationError}`);
@@ -160,11 +160,11 @@ const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
 
     const fileContent = fs.readFileSync(req.file.path);
     const ext = path.extname(req.file.originalname);
-    const s3Filename = `${fileTypePrefix}/${userUidForLog}-${Date.now()}${ext}`;
-    log.info(`UsersController: Uploading to S3 as ${s3Filename}`);
+    const filename = `${fileTypePrefix}-${userUidForLog}-${Date.now()}${ext}`;
+    log.info(`UsersController: Saving file as ${filename}`);
 
-    const result = await uploadToS3(fileContent, s3Filename, req.file.mimetype);
-    log.info(`UsersController: S3 Upload successful for ${s3Filename}. Location: ${result.Location}`);
+    const result = saveFile(fileContent, filename);
+    log.info(`UsersController: File saved successfully. Location: ${result.Location}`);
 
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
@@ -175,7 +175,7 @@ const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
 
     if (error instanceof multer.MulterError) {
       if (error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ message: `File too large. Max size for ${fileTypePrefix} is ${MAX_AUDIO_SIZE / (1024 * 1024)}MB.` });
+        return res.status(400).json({ message: `File too large. Max size for ${fileTypePrefix} is 5MB.` });
       }
       return res.status(400).json({ message: `File upload error: ${error.message}` });
     }
@@ -198,7 +198,7 @@ const handleFileUploadToS3 = async (req, res, fileTypePrefix) => {
 };
 
 const uploadAudioBio = async (req, res) => {
-  await handleFileUploadToS3(req, res, "audio-bios");
+  await handleFileUpload(req, res, "audio-bios");
 };
 
 const uploadPhoto = async (req, res) => {
@@ -218,11 +218,11 @@ const uploadPhoto = async (req, res) => {
 
     const fileContent = fs.readFileSync(req.file.path);
     const ext = path.extname(req.file.originalname);
-    const s3Filename = `photos/${userUidForLog}-${Date.now()}${ext}`;
-    log.info(`UsersController: Uploading to S3 as ${s3Filename}`);
+    const filename = `photos-${userUidForLog}-${Date.now()}${ext}`;
+    log.info(`UsersController: Saving file as ${filename}`);
 
-    const result = await uploadToS3(fileContent, s3Filename, req.file.mimetype);
-    log.info(`UsersController: S3 Upload successful for ${s3Filename}. Location: ${result.Location}`);
+    const result = saveFile(fileContent, filename);
+    log.info(`UsersController: File saved successfully. Location: ${result.Location}`);
 
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
@@ -292,8 +292,8 @@ const deletePhoto = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const s3Key = photoUrl.split(".com/")[1];
-    await deleteFromS3(s3Key);
+    const filename = path.basename(photoUrl);
+    deleteFile(filename);
 
     log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
     res.json(user);
