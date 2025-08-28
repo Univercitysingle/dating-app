@@ -98,6 +98,50 @@ const LifestyleEditor = ({ initialLifestyle, onSave }) => {
           <option value="Never">Never</option>
         </select>
       </div>
+        <div>
+          <label htmlFor="lookingFor" className="block text-sm font-medium text-gray-700">
+            Looking For
+          </label>
+          <select
+            id="lookingFor"
+            name="lookingFor"
+            value={lifestyle.lookingFor || ''}
+            onChange={handleChange}
+            className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          >
+            <option value="">Select...</option>
+            <option value="Relationship">Relationship</option>
+            <option value="Casual">Casual</option>
+            <option value="Friendship">Friendship</option>
+            <option value="Don't know yet">Don't know yet</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="religion" className="block text-sm font-medium text-gray-700">
+            Religion
+          </label>
+          <input
+            type="text"
+            id="religion"
+            name="religion"
+            value={lifestyle.religion || ''}
+            onChange={handleChange}
+            className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="politicalLeaning" className="block text-sm font-medium text-gray-700">
+            Political Leaning
+          </label>
+          <input
+            type="text"
+            id="politicalLeaning"
+            name="politicalLeaning"
+            value={lifestyle.politicalLeaning || ''}
+            onChange={handleChange}
+            className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
       <button
         onClick={handleSave}
         className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"

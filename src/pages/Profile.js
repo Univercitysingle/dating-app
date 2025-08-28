@@ -216,6 +216,9 @@ function Profile() {
                                     <p><strong>Workout:</strong> {profile.lifestyle?.workout || 'N/A'}</p>
                                     <p><strong>Drinking:</strong> {profile.lifestyle?.drinking || 'N/A'}</p>
                                     <p><strong>Smoking:</strong> {profile.lifestyle?.smoking || 'N/A'}</p>
+                                    <p><strong>Looking For:</strong> {profile.lifestyle?.lookingFor || 'N/A'}</p>
+                                    <p><strong>Religion:</strong> {profile.lifestyle?.religion || 'N/A'}</p>
+                                    <p><strong>Political Leaning:</strong> {profile.lifestyle?.politicalLeaning || 'N/A'}</p>
                                 </div>
                             )}
                         </SectionCard>
