@@ -11,8 +11,20 @@ function initSocket(server) {
   const isProduction = process.env.NODE_ENV === 'production';
   const clientUrl = process.env.CLIENT_URL;
 
+  const allowedOrigins = [
+    clientUrl,
+    "http://localhost:3000",
+    "http://172.22.10.1:3000"
+  ].filter(Boolean);
+
   const corsOptions = {
-    origin: isProduction ? clientUrl : (clientUrl || "http://localhost:3000"),
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true,
   };

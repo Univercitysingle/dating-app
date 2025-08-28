@@ -158,7 +158,7 @@ function Profile() {
                           {isEditing ? (
                               <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} />
                           ) : (
-                              <ProfilePromptsDisplay prompts={profile.profilePrompts || []} />
+                              <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
                           )}
                       </SectionCard>
 

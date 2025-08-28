@@ -24,17 +24,21 @@ module.exports = async function (req, res, next) {
     }
 
     const userObject = dbUser.toObject();
+    req.log.info({ user: userObject }, "User object after toObject()");
 
     const activeSubscription = await Subscription.findOne({
       userId: userObject._id,
       status: 'active',
     });
+    req.log.info({ subscription: activeSubscription }, "Active subscription found");
+
 
     userObject.isPremium = !!activeSubscription;
     req.user = userObject;
 
     next();
   } catch (error) {
+    req.log.error({ err: error }, "Error in auth middleware");
     if (error.code && error.code.startsWith('auth/')) {
       return res.status(401).json({ error: "Unauthorized: Invalid or expired Firebase token.", details: error.message });
     }

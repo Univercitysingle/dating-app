@@ -2,10 +2,10 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
   uid: { type: String, unique: true, sparse: true }, // Firebase UID, not required for all users
-  email: { type: String, required: true, unique: true },
-  name: { type: String, immutable: true },
-  birthday: { type: Date, immutable: true },
-  gender: { type: String, immutable: true },
+  email: { type: String, required: true, unique:true },
+  name: { type: String },
+  birthday: { type: Date },
+  gender: { type: String },
   preference: String,
   bio: String,
   photos: [{

@@ -124,4 +124,12 @@ const setInitialPassword = async (req, res) => {
   }
 };
 
-module.exports = { login, setInitialPassword };
+const logout = (req, res) => {
+  req.log.info("User logout endpoint hit.");
+  // In a stateless token-based auth system, the server doesn't need to do much.
+  // The client is responsible for destroying the token.
+  // This endpoint is here to provide a clean logout mechanism for the client.
+  res.status(200).json({ message: "Logged out successfully." });
+};
+
+module.exports = { login, logout, setInitialPassword };
