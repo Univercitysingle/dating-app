@@ -61,29 +61,19 @@ function Profile() {
       lifestyle: '',
   });
 
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const fetchProfile = useCallback(() => {
-    apiClient.get('/api/users/me')
-      .then((data) => {
-        setProfile(data);
-        setEditableFields({
-            education: data.education || '',
-            relationshipGoals: data.relationshipGoals || 'Figuring it out',
-            aboutMe: data.aboutMe || '',
-        });
-        setFetchError(null);
-      })
-      .catch((error) => {
-        console.error('Error fetching profile:', error);
-        setFetchError(error.data?.message || 'Failed to load profile');
-      });
-  }, []);
-
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if (user) {
+      setProfile(user);
+      setEditableFields({
+        education: user.education || '',
+        relationshipGoals: user.relationshipGoals || 'Figuring it out',
+        aboutMe: user.aboutMe || '',
+      });
+    }
+  }, [user]);
 
   const handleFieldChange = (e) => {
       const { id, value } = e.target;
@@ -151,31 +141,30 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
-                      <PhotoGallery photos={profile.photos || []} prompts={profile.profilePrompts || []} onEdit={() => setIsEditingPhotos(true)} />
-                      {!isEditing && profile.aboutMe && (
+                      <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
+
+                      {isEditing ? (
+                        <SectionCard title="About Me">
+                           <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                           <button onClick={handleDetailsSave} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save'}</button>
+                        </SectionCard>
+                      ) : profile.aboutMe && (
                         <SectionCard title="About Me">
                             <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
                         </SectionCard>
                       )}
+
+                      <SectionCard title="Profile Prompts">
+                          {isEditing ? (
+                              <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} />
+                          ) : (
+                              <ProfilePromptsDisplay prompts={profile.profilePrompts || []} />
+                          )}
+                      </SectionCard>
+
                        <SectionCard title="Details">
                             {isEditing ? (
                                 <div className="space-y-4">
-                                    <div>
-                                        <label htmlFor="name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Name</label>
-                                        <input type="text" id="name" value={profile.name} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
-                                    <div>
-                                        <label htmlFor="age" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Age</label>
-                                        <input type="text" id="age" value={profile.age} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
-                                    <div>
-                                        <label htmlFor="gender" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Gender</label>
-                                        <input type="text" id="gender" value={profile.gender} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
-                                    <div>
-                                        <label htmlFor="aboutMe" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">About Me</label>
-                                        <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                    </div>
                                     <div>
                                         <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
                                         <input type="text" id="education" value={editableFields.education} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
@@ -236,12 +225,6 @@ function Profile() {
                         </SectionCard>
                   </div>
               );
-          case 'media':
-              return (
-                  <div className="space-y-6">
-                      <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
-                  </div>
-              );
           case 'settings':
               return (
                   <SectionCard title="Settings">
@@ -269,7 +252,6 @@ function Profile() {
             <div className="flex justify-between items-center mb-6">
                 <div className="flex space-x-1 bg-neutral-200 dark:bg-neutral-700 rounded-lg p-1">
                     <button onClick={() => setActiveTab('profile')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'profile' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Profile</button>
-                    <button onClick={() => setActiveTab('media')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'media' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Media</button>
                     <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'settings' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Settings</button>
                 </div>
                 <button onClick={() => setIsEditing(!isEditing)} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">
