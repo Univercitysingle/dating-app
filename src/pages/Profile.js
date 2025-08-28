@@ -14,7 +14,6 @@ import PersonalityQuizSummary from '../components/PersonalityQuizSummary';
 import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
 import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
 import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
-import HeroCaptureSection from '../components/HeroCaptureSection';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
@@ -237,10 +236,7 @@ function Profile() {
           case 'media':
               return (
                   <div className="space-y-6">
-                      <SectionCard title="Profile Media">
-                          <HeroCaptureSection onUploadComplete={handleHeroMediaUploadComplete} />
-                          {saveStatus.hero && <p className="text-sm mt-2">{saveStatus.hero}</p>}
-                      </SectionCard>
+                      <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
                   </div>
               );
           case 'settings':
@@ -257,7 +253,7 @@ function Profile() {
     <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="container mx-auto p-4">
             <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden shadow-lg mb-6">
-                <img src={profile.heroMediaUrl || 'https://placehold.co/800x400?text=Your+Hero+Image'} alt="Hero" className="w-full h-full object-cover"/>
+                <img src={profile.photos?.[0]?.url || 'https://placehold.co/800x400?text=Your+Hero+Image'} alt="Hero" className="w-full h-full object-cover"/>
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-neutral-900/60 to-transparent">
                     <h1 className="text-3xl font-bold text-neutral-50">{profile.name}, {profile.age}</h1>
                     <div className="flex items-center mt-1">

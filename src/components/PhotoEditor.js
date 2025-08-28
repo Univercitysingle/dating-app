@@ -41,7 +41,8 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
             />
             <button
               onClick={() => handleDelete(photo.url)}
-              className="absolute top-1 right-1 px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-full hover:bg-red-700"
+              className="absolute top-1 right-1 px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-full hover:bg-red-700 disabled:bg-gray-400"
+              disabled={localPhotos.length <= 1}
             >
               X
             </button>

@@ -42,8 +42,7 @@ const findOrCreateUserFromToken = async (decodedToken) => {
   const newUser = new User({
     uid: decodedToken.uid,
     email: decodedToken.email,
-    name: decodedToken.name || 'New User',
-    age: 18,
+    name: decodedToken.name || '',
     // Add any other default fields for a new user here
   });
 
