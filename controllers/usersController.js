@@ -19,7 +19,8 @@ const getCurrentUserProfile = async (req, res) => {
 
 const updateCurrentUserProfile = async (req, res) => {
   const log = req.log;
-  log.info("UsersController: updateCurrentUserProfile entered for UID:", req.user ? req.user.uid : "UNKNOWN_UID");
+  const userUid = req.user ? req.user.uid : "UNKNOWN_UID";
+  log.info({ userUid }, "UsersController: updateCurrentUserProfile entered.");
   const update = req.body;
 
   let allowedFields;
