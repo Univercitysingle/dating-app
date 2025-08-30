@@ -53,6 +53,7 @@ const SwipeDeck = () => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [swipeError, setSwipeError] = useState(null);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
@@ -77,6 +78,15 @@ const SwipeDeck = () => {
     fetchUsersToSwipe();
   }, [fetchUsersToSwipe]);
 
+  useEffect(() => {
+    if (swipeError) {
+      const timer = setTimeout(() => {
+        setSwipeError(null);
+      }, 5000); // Clear after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [swipeError]);
+
   const handleVote = async (userId, direction) => {
     // Optimistic UI update
     setUsers((prevUsers) => prevUsers.filter(u => u.uid !== userId));
@@ -97,9 +107,9 @@ const SwipeDeck = () => {
       } else {
         await apiClient.post('/api/swipe/pass', { userId });
       }
-    } catch (swipeError) {
-      console.error("Error recording swipe:", swipeError);
-      setError(swipeError.data?.message || `Failed to record ${direction} action.`);
+    } catch (err) {
+      console.error("Error recording swipe:", err);
+      setSwipeError(err.data?.message || `Failed to record ${direction} action.`);
       // Note: In a real-world app, you might want to add the user back to the deck on failure.
     }
   };
@@ -117,7 +127,7 @@ const SwipeDeck = () => {
       }
     } catch (err) {
       console.error("Error undoing swipe:", err);
-      setError(err.data?.message || "Failed to undo swipe.");
+      setSwipeError(err.data?.message || "Failed to undo swipe.");
     }
   };
 
@@ -136,6 +146,11 @@ const SwipeDeck = () => {
 
   return (
     <div className="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900">
+        {swipeError && (
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+            {swipeError}
+          </div>
+        )}
         <header className="flex-shrink-0 flex justify-between items-center p-4">
             <h1 className="text-2xl font-bold text-center text-neutral-700 dark:text-neutral-200">Discover</h1>
             <button onClick={() => setShowFilters(true)} className="p-2 bg-white rounded-full shadow-md">

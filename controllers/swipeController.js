@@ -47,6 +47,7 @@ const like = async (req, res) => {
 
     res.json(match);
   } catch (error) {
+    console.error("Error in 'like' controller:", error);
     res.status(500).json({ error: 'An unexpected error occurred.' });
   }
 };
@@ -77,6 +78,7 @@ const pass = async (req, res) => {
 
     res.json(match);
   } catch (error) {
+    console.error("Error in 'pass' controller:", error);
     res.status(500).json({ error: 'An unexpected error occurred.' });
   }
 };
@@ -88,7 +90,6 @@ const superLike = async (req, res) => {
   try {
     const user = await User.findOne({ uid: currentUserUid });
 
-    // Defensive check and initialization
     if (!user.superLikes) {
       user.superLikes = { count: 1, refreshesAt: new Date(Date.now() + 24 * 60 * 60 * 1000) };
     }
@@ -127,6 +128,7 @@ const superLike = async (req, res) => {
 
     res.json(match);
   } catch (error) {
+    console.error("Error in 'superLike' controller:", error);
     res.status(500).json({ error: 'An unexpected error occurred.' });
   }
 };
@@ -137,7 +139,6 @@ const undoSwipe = async (req, res) => {
   try {
     const user = await User.findOne({ uid: currentUserUid });
 
-    // Defensive check and initialization
     if (!user.undoSwipes) {
       user.undoSwipes = { count: 3, refreshesAt: new Date(Date.now() + 24 * 60 * 60 * 1000) };
     }
@@ -157,28 +158,24 @@ const undoSwipe = async (req, res) => {
       return res.status(404).json({ error: 'Cannot find the match record for the swipe to undo.' });
     }
 
-    // Revert the match document
     if (action === 'like' || action === 'superlike') {
       matchToUndo.likedBy = matchToUndo.likedBy.filter(uid => uid !== currentUserUid);
       if (action === 'superlike') {
         matchToUndo.superLike = false;
-        // Defensive check for superLikes on user object
         if (!user.superLikes) {
             user.superLikes = { count: 0 };
         }
-        user.superLikes.count += 1; // Restore the super like
+        user.superLikes.count += 1;
       }
     }
-    matchToUndo.status = 'pending'; // Revert status for all actions
+    matchToUndo.status = 'pending';
 
-    // Update user and match documents
     user.undoSwipes.count -= 1;
-    user.lastSwipe = undefined; // Clear the last swipe
+    user.lastSwipe = undefined;
 
     await user.save();
     await matchToUndo.save();
 
-    // Find the undone user's profile to return to the frontend
     const undoneUser = await User.findOne({ uid: targetUserId }).lean();
 
     res.json({ undoneUser });
