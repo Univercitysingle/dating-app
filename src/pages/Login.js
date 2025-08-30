@@ -119,10 +119,14 @@ function Login() {
         await handleFirebaseEmailAuth();
       } catch (err) {
         logger.error('Firebase auth error:', err);
-        setError(
-          (err.code ? `${err.code}: ` : '') +
-            (err.message || (isSignUp ? 'Sign up failed' : 'Login failed'))
-        );
+        if (err.code === 'auth/invalid-credential') {
+          setError('Invalid email or password. Please try again.');
+        } else {
+          setError(
+            (err.code ? `${err.code}: ` : '') +
+              (err.message || (isSignUp ? 'Sign up failed' : 'Login failed'))
+          );
+        }
       } finally {
         setIsLoading(false);
       }
