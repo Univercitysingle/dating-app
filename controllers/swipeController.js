@@ -122,6 +122,11 @@ const superLike = async (req, res) => {
     }
 
     user.superLikes.count -= 1;
+
+    if (!user.location || !user.location.type) {
+      user.location = { type: 'Point', coordinates: [0, 0] };
+    }
+
     await user.save();
     await match.save();
     await recordSwipe(currentUserUid, userId, 'superlike', match._id);
@@ -172,6 +177,10 @@ const undoSwipe = async (req, res) => {
 
     user.undoSwipes.count -= 1;
     user.lastSwipe = undefined;
+
+    if (!user.location || !user.location.type) {
+      user.location = { type: 'Point', coordinates: [0, 0] };
+    }
 
     await user.save();
     await matchToUndo.save();
