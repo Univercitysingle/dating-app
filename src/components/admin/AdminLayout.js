@@ -1,9 +1,15 @@
 import React from 'react';
-import { Outlet, Navigate, Link } from 'react-router-dom';
+import { Outlet, Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const AdminLayout = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   if (isLoading) {
     return (
@@ -67,6 +73,12 @@ const AdminLayout = () => {
         <div className="mt-auto">
           <p className="text-sm">Logged in as: {user.email}</p>
           <p className="text-xs">Role: {user.role}</p>
+          <button
+            onClick={handleLogout}
+            className="w-full mt-4 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+          >
+            Logout
+          </button>
         </div>
       </aside>
 
