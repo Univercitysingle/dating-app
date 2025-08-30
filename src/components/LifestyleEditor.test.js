@@ -5,25 +5,30 @@ import LifestyleEditor from './LifestyleEditor';
 describe('LifestyleEditor', () => {
   const initialLifestyle = {
     pets: 'Dog person',
-    zodiac: 'Leo',
-    workout: 'Often',
-    drinking: 'Socially',
-    smoking: 'Never',
     lookingFor: 'Relationship',
     religion: 'Agnostic',
     politicalLeaning: 'Moderate',
   };
 
-  test('renders with initial lifestyle data', () => {
-    render(<LifestyleEditor initialLifestyle={initialLifestyle} onSave={() => {}} />);
+  const initialBadges = {
+    height: 180,
+    zodiac: 'Leo',
+    workout: 'Often',
+    drinking: 'Socially',
+    smoking: 'Never',
+  };
+
+  test('renders with initial lifestyle and badges data', () => {
+    render(<LifestyleEditor initialLifestyle={initialLifestyle} initialBadges={initialBadges} onSave={() => {}} />);
 
     expect(screen.getByLabelText('Pets')).toHaveValue(initialLifestyle.pets);
-    expect(screen.getByLabelText('Zodiac')).toHaveValue(initialLifestyle.zodiac);
-    expect(screen.getByLabelText('Workout')).toHaveValue(initialLifestyle.workout);
+    expect(screen.getByLabelText('Zodiac')).toHaveValue(initialBadges.zodiac);
+    expect(screen.getByLabelText('Workout')).toHaveValue(initialBadges.workout);
+    expect(screen.getByLabelText('Height (cm)')).toHaveValue(initialBadges.height);
   });
 
   test('updates state on input change', () => {
-    render(<LifestyleEditor initialLifestyle={{}} onSave={() => {}} />);
+    render(<LifestyleEditor initialLifestyle={{}} initialBadges={{}} onSave={() => {}} />);
 
     const petsSelect = screen.getByLabelText('Pets');
     fireEvent.change(petsSelect, { target: { value: 'Cat person' } });
@@ -34,18 +39,22 @@ describe('LifestyleEditor', () => {
     expect(zodiacInput).toHaveValue('Pisces');
   });
 
-  test('calls onSave with updated lifestyle data when save button is clicked', () => {
+  test('calls onSave with updated data when save button is clicked', () => {
     const handleSave = jest.fn();
-    render(<LifestyleEditor initialLifestyle={{}} onSave={handleSave} />);
+    render(<LifestyleEditor initialLifestyle={{}} initialBadges={{}} onSave={handleSave} />);
 
     fireEvent.change(screen.getByLabelText('Pets'), { target: { value: 'No pets' } });
-    fireEvent.change(screen.getByLabelText('Political Leaning'), { target: { value: 'Liberal' } });
+    fireEvent.change(screen.getByLabelText('Zodiac'), { target: { value: 'Aries' } });
 
-    fireEvent.click(screen.getByText('Save Lifestyle'));
+    fireEvent.click(screen.getByText('Save Lifestyle & Badges'));
 
     expect(handleSave).toHaveBeenCalledWith({
-      pets: 'No pets',
-      politicalLeaning: 'Liberal',
+      lifestyle: {
+        pets: 'No pets',
+      },
+      badges: {
+        zodiac: 'Aries',
+      }
     });
   });
 });

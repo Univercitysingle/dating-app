@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
 
-const LifestyleEditor = ({ initialLifestyle, onSave }) => {
+const LifestyleEditor = ({ initialLifestyle, initialBadges, onSave }) => {
   const [lifestyle, setLifestyle] = useState(initialLifestyle || {});
+  const [badges, setBadges] = useState(initialBadges || {});
 
-  const handleChange = (e) => {
+  const handleLifestyleChange = (e) => {
     const { name, value } = e.target;
     setLifestyle((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleBadgesChange = (e) => {
+    const { name, value } = e.target;
+    setBadges((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleSave = () => {
-    onSave(lifestyle);
+    onSave({ lifestyle, badges });
   };
 
   return (
     <div className="space-y-4">
+      {/* Lifestyle fields */}
       <div>
         <label htmlFor="pets" className="block text-sm font-medium text-gray-700">
           Pets
@@ -22,7 +29,7 @@ const LifestyleEditor = ({ initialLifestyle, onSave }) => {
           id="pets"
           name="pets"
           value={lifestyle.pets || ''}
-          onChange={handleChange}
+          onChange={handleLifestyleChange}
           className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
         >
           <option value="">Select...</option>
@@ -30,72 +37,6 @@ const LifestyleEditor = ({ initialLifestyle, onSave }) => {
           <option value="Cat person">Cat person</option>
           <option value="No pets">No pets</option>
           <option value="All the pets">All the pets</option>
-        </select>
-      </div>
-      <div>
-        <label htmlFor="zodiac" className="block text-sm font-medium text-gray-700">
-          Zodiac
-        </label>
-        <input
-          type="text"
-          id="zodiac"
-          name="zodiac"
-          value={lifestyle.zodiac || ''}
-          onChange={handleChange}
-          className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        />
-      </div>
-      <div>
-        <label htmlFor="workout" className="block text-sm font-medium text-gray-700">
-          Workout
-        </label>
-        <select
-          id="workout"
-          name="workout"
-          value={lifestyle.workout || ''}
-          onChange={handleChange}
-          className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        >
-          <option value="">Select...</option>
-          <option value="Every day">Every day</option>
-          <option value="Often">Often</option>
-          <option value="Sometimes">Sometimes</option>
-          <option value="Never">Never</option>
-        </select>
-      </div>
-      <div>
-        <label htmlFor="drinking" className="block text-sm font-medium text-gray-700">
-          Drinking
-        </label>
-        <select
-          id="drinking"
-          name="drinking"
-          value={lifestyle.drinking || ''}
-          onChange={handleChange}
-          className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        >
-          <option value="">Select...</option>
-          <option value="Frequently">Frequently</option>
-          <option value="Socially">Socially</option>
-          <option value="Rarely">Rarely</option>
-          <option value="Never">Never</option>
-        </select>
-      </div>
-      <div>
-        <label htmlFor="smoking" className="block text-sm font-medium text-gray-700">
-          Smoking
-        </label>
-        <select
-          id="smoking"
-          name="smoking"
-          value={lifestyle.smoking || ''}
-          onChange={handleChange}
-          className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-        >
-          <option value="">Select...</option>
-          <option value="Socially">Socially</option>
-          <option value="Sometimes">Sometimes</option>
-          <option value="Never">Never</option>
         </select>
       </div>
         <div>
@@ -106,7 +47,7 @@ const LifestyleEditor = ({ initialLifestyle, onSave }) => {
             id="lookingFor"
             name="lookingFor"
             value={lifestyle.lookingFor || ''}
-            onChange={handleChange}
+            onChange={handleLifestyleChange}
             className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
           >
             <option value="">Select...</option>
@@ -125,7 +66,7 @@ const LifestyleEditor = ({ initialLifestyle, onSave }) => {
             id="religion"
             name="religion"
             value={lifestyle.religion || ''}
-            onChange={handleChange}
+            onChange={handleLifestyleChange}
             className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
           />
         </div>
@@ -138,15 +79,100 @@ const LifestyleEditor = ({ initialLifestyle, onSave }) => {
             id="politicalLeaning"
             name="politicalLeaning"
             value={lifestyle.politicalLeaning || ''}
-            onChange={handleChange}
+            onChange={handleLifestyleChange}
             className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
           />
         </div>
+
+      {/* Badges fields */}
+      <hr className="my-6" />
+      <h3 className="text-lg font-medium leading-6 text-gray-900">Badges</h3>
+
+      <div>
+        <label htmlFor="height" className="block text-sm font-medium text-gray-700">
+          Height (cm)
+        </label>
+        <input
+          type="number"
+          id="height"
+          name="height"
+          value={badges.height || ''}
+          onChange={handleBadgesChange}
+          className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        />
+      </div>
+      <div>
+        <label htmlFor="zodiac" className="block text-sm font-medium text-gray-700">
+          Zodiac
+        </label>
+        <input
+          type="text"
+          id="zodiac"
+          name="zodiac"
+          value={badges.zodiac || ''}
+          onChange={handleBadgesChange}
+          className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        />
+      </div>
+      <div>
+        <label htmlFor="workout" className="block text-sm font-medium text-gray-700">
+          Workout
+        </label>
+        <select
+          id="workout"
+          name="workout"
+          value={badges.workout || ''}
+          onChange={handleBadgesChange}
+          className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        >
+          <option value="">Select...</option>
+          <option value="Every day">Every day</option>
+          <option value="Often">Often</option>
+          <option value="Sometimes">Sometimes</option>
+          <option value="Never">Never</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="drinking" className="block text-sm font-medium text-gray-700">
+          Drinking
+        </label>
+        <select
+          id="drinking"
+          name="drinking"
+          value={badges.drinking || ''}
+          onChange={handleBadgesChange}
+          className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        >
+          <option value="">Select...</option>
+          <option value="Frequently">Frequently</option>
+          <option value="Socially">Socially</option>
+          <option value="Rarely">Rarely</option>
+          <option value="Never">Never</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="smoking" className="block text-sm font-medium text-gray-700">
+          Smoking
+        </label>
+        <select
+          id="smoking"
+          name="smoking"
+          value={badges.smoking || ''}
+          onChange={handleBadgesChange}
+          className="block w-full px-3 py-2 mt-1 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        >
+          <option value="">Select...</option>
+          <option value="Socially">Socially</option>
+          <option value="Sometimes">Sometimes</option>
+          <option value="Never">Never</option>
+        </select>
+      </div>
+
       <button
         onClick={handleSave}
         className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
       >
-        Save Lifestyle
+        Save Lifestyle & Badges
       </button>
     </div>
   );

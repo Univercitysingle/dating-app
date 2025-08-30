@@ -37,13 +37,16 @@ const userSchema = new mongoose.Schema({
   },
   lifestyle: {
     pets: { type: String, enum: ['Dog person', 'Cat person', 'No pets', 'All the pets'] },
+    lookingFor: { type: String, enum: ['Relationship', 'Casual', 'Friendship', 'Don\'t know yet'] },
+    religion: String,
+    politicalLeaning: String,
+  },
+  badges: {
+    height: { type: Number }, // in cm
     zodiac: String,
     workout: { type: String, enum: ['Every day', 'Often', 'Sometimes', 'Never'] },
     drinking: { type: String, enum: ['Frequently', 'Socially', 'Rarely', 'Never'] },
     smoking: { type: String, enum: ['Socially', 'Sometimes', 'Never'] },
-    lookingFor: { type: String, enum: ['Relationship', 'Casual', 'Friendship', 'Don\'t know yet'] },
-    religion: String,
-    politicalLeaning: String,
   },
   lastActiveAt: { type: Date, default: Date.now },
   suspendedUntil: { type: Date, default: null },

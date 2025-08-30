@@ -17,6 +17,7 @@ import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
+import BadgesDisplay from '../components/BadgesDisplay';
 
 // Reusable components
 const PremiumBadge = () => (
@@ -113,8 +114,8 @@ function Profile() {
       handleSave('/api/users/me', { socialMediaLinks: links }, 'social');
   };
 
-  const handleLifestyleSave = (lifestyle) => {
-      handleSave('/api/users/me', { lifestyle }, 'lifestyle');
+  const handleLifestyleSave = (data) => {
+      handleSave('/api/users/me', data, 'lifestyle');
   };
 
   const handleMediaUploadComplete = (fileUrl, fieldName) => {
@@ -198,17 +199,17 @@ function Profile() {
                             )}
                         </SectionCard>
                         <SectionCard title="Lifestyle">
-                            {isEditing ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} onSave={handleLifestyleSave} /> : (
-                                <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
-                                    <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
-                                    <p><strong>Zodiac:</strong> {profile.lifestyle?.zodiac || 'N/A'}</p>
-                                    <p><strong>Workout:</strong> {profile.lifestyle?.workout || 'N/A'}</p>
-                                    <p><strong>Drinking:</strong> {profile.lifestyle?.drinking || 'N/A'}</p>
-                                    <p><strong>Smoking:</strong> {profile.lifestyle?.smoking || 'N/A'}</p>
-                                    <p><strong>Looking For:</strong> {profile.lifestyle?.lookingFor || 'N/A'}</p>
-                                    <p><strong>Religion:</strong> {profile.lifestyle?.religion || 'N/A'}</p>
-                                    <p><strong>Political Leaning:</strong> {profile.lifestyle?.politicalLeaning || 'N/A'}</p>
-                                </div>
+                            {isEditing ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} initialBadges={profile.badges || {}} onSave={handleLifestyleSave} /> : (
+                                <>
+                                    <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                                        <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
+                                        <p><strong>Looking For:</strong> {profile.lifestyle?.lookingFor || 'N/A'}</p>
+                                        <p><strong>Religion:</strong> {profile.lifestyle?.religion || 'N/A'}</p>
+                                        <p><strong>Political Leaning:</strong> {profile.lifestyle?.politicalLeaning || 'N/A'}</p>
+                                    </div>
+                                    <hr className="my-4" />
+                                    <BadgesDisplay badges={profile.badges} />
+                                </>
                             )}
                         </SectionCard>
                         <SectionCard title="Interests">

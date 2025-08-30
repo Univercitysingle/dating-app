@@ -29,7 +29,7 @@ const updateCurrentUserProfile = async (req, res) => {
       "preference", "bio", "photos",
       "interests", "profilePrompts", "audioBioUrl",
       "personalityQuizResults", "socialMediaLinks",
-      "education", "relationshipGoals", "location", "lifestyle",
+      "education", "relationshipGoals", "location", "lifestyle", "badges",
       "lastActiveAt"
     ];
   } else {
@@ -37,7 +37,7 @@ const updateCurrentUserProfile = async (req, res) => {
       "name", "birthday", "gender", "preference", "bio", "photos",
       "interests", "profilePrompts", "audioBioUrl",
       "personalityQuizResults", "socialMediaLinks",
-      "education", "relationshipGoals", "location", "lifestyle",
+      "education", "relationshipGoals", "location", "lifestyle", "badges",
       "lastActiveAt", "isOnboardingComplete"
     ];
   }
@@ -45,7 +45,14 @@ const updateCurrentUserProfile = async (req, res) => {
   const sanitizedUpdate = {};
 
   for (const key of allowedFields) {
-    if (update[key] !== undefined) sanitizedUpdate[key] = update[key];
+    if (update[key] !== undefined) {
+      if (typeof update[key] === 'object' && !Array.isArray(update[key]) && update[key] !== null) {
+        // Merge objects instead of replacing them
+        sanitizedUpdate[key] = { ...req.user[key], ...update[key] };
+      } else {
+        sanitizedUpdate[key] = update[key];
+      }
+    }
   }
   log.info({ update: sanitizedUpdate }, "UsersController: Sanitized update data");
 
