@@ -7,16 +7,7 @@ const { getChatHistory } = require('../controllers/chatController');
 
 let io;
 
-function initSocket(server) {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const clientUrl = process.env.CLIENT_URL;
-
-  const allowedOrigins = [
-    clientUrl,
-    "http://localhost:3000",
-    "http://172.22.10.1:3000"
-  ].filter(Boolean);
-
+function initSocket(server, allowedOrigins) {
   const corsOptions = {
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {

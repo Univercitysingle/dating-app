@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import { API_URL } from '../utils/constants';
 
 const apiClient = {
   async request(method, path, data = null, options = {}) {
@@ -14,12 +15,7 @@ const apiClient = {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    let baseUrl = process.env.REACT_APP_API_BASE_URL || '';
-    if (!baseUrl) {
-      logger.warn('REACT_APP_API_BASE_URL not set! Using relative paths.');
-    }
-
-    const url = `${baseUrl}${path}`;
+    const url = `${API_URL}${path}`;
     const config = {
       method: method.toUpperCase(),
       headers,

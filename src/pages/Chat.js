@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import logger from '../utils/logger';
 import ChatMessage from '../components/ChatMessage';
+import { API_URL } from '../utils/constants';
 
 function Chat() {
   const [messages, setMessages] = useState([]);
@@ -22,7 +23,6 @@ function Chat() {
       return;
     }
 
-    const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
     socketRef.current = io(API_URL, {
       auth: {
         token: token,

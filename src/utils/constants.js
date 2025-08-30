@@ -1,3 +1,7 @@
+export const API_URL = process.env.NODE_ENV === 'production'
+  ? process.env.REACT_APP_API_BASE_URL || ''
+  : 'http://localhost:5000';
+
 export const PREDEFINED_PERSONALITY_TYPES = [
   "The Adventurer",
   "The Analyst",

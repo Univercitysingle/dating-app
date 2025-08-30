@@ -153,7 +153,7 @@ mongoose
 // -------------------- SOCKET.IO --------------------
 if (initSocket) {
   try {
-    initSocket(server);
+    initSocket(server, allowedOrigins);
     logger.info("✅ Socket.IO initialized.");
   } catch (socketError) {
     logger.error(
