@@ -62,7 +62,7 @@ const SwipeDeck = () => {
     setError(null);
     setNewMatchInfo(null);
     try {
-      const { data } = await apiClient.get('/api/users/discover', { params: filters });
+      const data = await apiClient.get('/api/users/discover', { params: filters });
       setUsers(data || []);
     } catch (err) {
       console.error("Error fetching users for swipe deck:", err);
