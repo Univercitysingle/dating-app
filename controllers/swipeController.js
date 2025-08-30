@@ -87,7 +87,12 @@ const superLike = async (req, res) => {
 
   try {
     const user = await User.findOne({ uid: currentUserUid });
-    if (!user.superLikes || user.superLikes.count <= 0) {
+
+    // Defensive check and initialization
+    if (!user.superLikes) {
+      user.superLikes = { count: 1, refreshesAt: new Date(Date.now() + 24 * 60 * 60 * 1000) };
+    }
+    if (user.superLikes.count <= 0) {
       return res.status(400).json({ error: 'No super likes remaining.' });
     }
 
@@ -132,7 +137,11 @@ const undoSwipe = async (req, res) => {
   try {
     const user = await User.findOne({ uid: currentUserUid });
 
-    if (!user.undoSwipes || user.undoSwipes.count <= 0) {
+    // Defensive check and initialization
+    if (!user.undoSwipes) {
+      user.undoSwipes = { count: 3, refreshesAt: new Date(Date.now() + 24 * 60 * 60 * 1000) };
+    }
+    if (user.undoSwipes.count <= 0) {
       return res.status(400).json({ error: 'No undo swipes remaining.' });
     }
 
@@ -153,6 +162,10 @@ const undoSwipe = async (req, res) => {
       matchToUndo.likedBy = matchToUndo.likedBy.filter(uid => uid !== currentUserUid);
       if (action === 'superlike') {
         matchToUndo.superLike = false;
+        // Defensive check for superLikes on user object
+        if (!user.superLikes) {
+            user.superLikes = { count: 0 };
+        }
         user.superLikes.count += 1; // Restore the super like
       }
     }
