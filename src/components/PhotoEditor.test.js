@@ -48,7 +48,7 @@ describe('PhotoEditor', () => {
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith('/api/users/photos', { data: { photoUrl: 'photo1.jpg' } });
+      expect(apiClient.delete).toHaveBeenCalledWith('/api/users/photos', { photoUrl: 'photo1.jpg' });
     });
 
     await waitFor(() => {

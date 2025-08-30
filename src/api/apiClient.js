@@ -25,7 +25,7 @@ const apiClient = {
     if (data) {
       if (data instanceof FormData) {
         config.body = data; // Let the browser set the Content-Type with boundary
-      } else if (['POST', 'PUT', 'PATCH'].includes(config.method)) {
+      } else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method)) {
         config.body = JSON.stringify(data);
       }
     }
@@ -100,8 +100,8 @@ const apiClient = {
     return this.request('PUT', path, data, options);
   },
 
-  delete(path, options = {}) {
-    return this.request('DELETE', path, null, options);
+  delete(path, data, options = {}) {
+    return this.request('DELETE', path, data, options);
   },
 
   patch(path, data, options = {}) {
