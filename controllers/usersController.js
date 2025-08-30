@@ -344,11 +344,13 @@ const deletePhoto = async (req, res) => {
       return res.status(404).json({ error: "Photo not found in user's profile." });
     }
 
+    const sizeToDecrement = typeof photoToDelete.size === 'number' ? photoToDelete.size : 0;
+
     const updatedUser = await User.findOneAndUpdate(
       { uid: req.user.uid },
       {
         $pull: { photos: { url: photoUrl } },
-        $inc: { totalPhotoSize: -photoToDelete.size },
+        $inc: { totalPhotoSize: -sizeToDecrement },
       },
       { new: true }
     );
