@@ -7,6 +7,7 @@ const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
 const http = require("http");
 const cors = require("cors");
+const os = require('os');
 
 const { initSocket } = require("./routes/chat");
 const authMiddleware = require("./middleware/authentication");
@@ -33,29 +34,43 @@ app.use(correlationIdMiddleware);
 
 // CORS setup with preflight handling
 const isProduction = process.env.NODE_ENV === 'production';
-const clientUrl = process.env.CLIENT_URL;
 
-if (isProduction && !clientUrl) {
-  logger.error('CLIENT_URL environment variable is not set in production. CORS will fail.');
-  // Exiting because this is a critical configuration issue
-  process.exit(1);
+let allowedOrigins = [];
+
+if (process.env.CORS_ALLOWED_ORIGINS) {
+  allowedOrigins = process.env.CORS_ALLOWED_ORIGINS.split(',').map(origin => origin.trim());
 }
 
-const allowedOrigins = [
-  clientUrl, // from .env
-  'http://localhost:3000',
-  'http://172.22.10.1:3000',
-].filter(Boolean);
+if (!isProduction) {
+  // Add localhost for development
+  allowedOrigins.push('http://localhost:3000', 'http://localhost:3001', 'http://localhost:8080');
+
+  // Add local network IP
+  const interfaces = os.networkInterfaces();
+  Object.keys(interfaces).forEach((ifname) => {
+    interfaces[ifname].forEach((iface) => {
+      if ('IPv4' !== iface.family || iface.internal !== false) {
+        // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
+        return;
+      }
+      allowedOrigins.push(`http://${iface.address}:3000`);
+      allowedOrigins.push(`http://${iface.address}:3001`);
+      allowedOrigins.push(`http://${iface.address}:8080`);
+    });
+  });
+}
+
 
 const corsOptions = {
   origin: (origin, callback) => {
     // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+      callback(new Error(msg), false);
     }
-    return callback(null, true);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
