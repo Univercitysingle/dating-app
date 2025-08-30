@@ -80,14 +80,14 @@ const SwipeDeck = () => {
   const handleVote = async (userId, direction) => {
     try {
       if (direction === 'right') {
-        const { data } = await apiClient.post('/api/swipe/like', { userId });
-        if (data.status === 'matched') {
+        const response = await apiClient.post('/api/swipe/like', { userId });
+        if (response && response.status === 'matched') {
           const matchedUser = users.find(u => u.uid === userId);
           setNewMatchInfo(matchedUser);
         }
       } else if (direction === 'superlike') {
-        const { data } = await apiClient.post('/api/swipe/superlike', { userId });
-        if (data.status === 'matched') {
+        const response = await apiClient.post('/api/swipe/superlike', { userId });
+        if (response && response.status === 'matched') {
           const matchedUser = users.find(u => u.uid === userId);
           setNewMatchInfo(matchedUser);
         }
@@ -103,6 +103,18 @@ const SwipeDeck = () => {
   const handleSwipe = () => {
     // This function is called when the card animation is complete
     // We don't need to do anything here anymore, as the card is already removed from the DOM by AnimatePresence
+  };
+
+  const handleUndo = async () => {
+    try {
+      const response = await apiClient.post('/api/swipe/undo');
+      if (response && response.undoneUser) {
+        setUsers((prevUsers) => [response.undoneUser, ...prevUsers]);
+      }
+    } catch (err) {
+      console.error("Error undoing swipe:", err);
+      setError(err.data?.message || "Failed to undo swipe.");
+    }
   };
 
   const handleApplyFilters = (filters) => {
@@ -192,7 +204,7 @@ const SwipeDeck = () => {
                         </svg>
                     </button>
                     <button
-                        onClick={() => apiClient.post('/api/swipe/undo')}
+                        onClick={handleUndo}
                         className="p-4 bg-white rounded-full shadow-lg hover:bg-yellow-100 transition-all transform hover:scale-110"
                         aria-label="Undo"
                     >

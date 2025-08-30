@@ -95,6 +95,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  lastSwipe: {
+    action: { type: String, enum: ['like', 'pass', 'superlike'] },
+    targetUserId: { type: String },
+    matchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
+    timestamp: { type: Date }
+  },
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true }, timestamps: true });
 
 userSchema.virtual('age').get(function() {

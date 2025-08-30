@@ -1,6 +1,20 @@
 const Match = require('../models/Match');
 const User = require('../models/User');
 
+const recordSwipe = async (currentUserUid, targetUserId, action, matchId) => {
+  await User.findOneAndUpdate(
+    { uid: currentUserUid },
+    {
+      lastSwipe: {
+        action,
+        targetUserId,
+        matchId,
+        timestamp: new Date(),
+      },
+    }
+  );
+};
+
 const like = async (req, res) => {
   const { userId } = req.body;
   const currentUserUid = req.user.uid;
@@ -29,6 +43,8 @@ const like = async (req, res) => {
     }
 
     await match.save();
+    await recordSwipe(currentUserUid, userId, 'like', match._id);
+
     res.json(match);
   } catch (error) {
     res.status(500).json({ error: 'An unexpected error occurred.' });
@@ -57,6 +73,8 @@ const pass = async (req, res) => {
     match.status = 'unmatched';
 
     await match.save();
+    await recordSwipe(currentUserUid, userId, 'pass', match._id);
+
     res.json(match);
   } catch (error) {
     res.status(500).json({ error: 'An unexpected error occurred.' });
@@ -69,7 +87,7 @@ const superLike = async (req, res) => {
 
   try {
     const user = await User.findOne({ uid: currentUserUid });
-    if (user.superLikes.count <= 0) {
+    if (!user.superLikes || user.superLikes.count <= 0) {
       return res.status(400).json({ error: 'No super likes remaining.' });
     }
 
@@ -100,6 +118,8 @@ const superLike = async (req, res) => {
     user.superLikes.count -= 1;
     await user.save();
     await match.save();
+    await recordSwipe(currentUserUid, userId, 'superlike', match._id);
+
     res.json(match);
   } catch (error) {
     res.status(500).json({ error: 'An unexpected error occurred.' });
@@ -111,28 +131,48 @@ const undoSwipe = async (req, res) => {
 
   try {
     const user = await User.findOne({ uid: currentUserUid });
-    if (user.undoSwipes.count <= 0) {
+
+    if (!user.undoSwipes || user.undoSwipes.count <= 0) {
       return res.status(400).json({ error: 'No undo swipes remaining.' });
     }
 
-    const lastMatch = await Match.findOne({
-      $or: [{ user1Uid: currentUserUid }, { user2Uid: currentUserUid }],
-    }).sort({ updatedAt: -1 });
-
-    if (!lastMatch) {
+    if (!user.lastSwipe || !user.lastSwipe.action) {
       return res.status(404).json({ error: 'No swipe to undo.' });
     }
 
-    lastMatch.status = 'pending';
-    lastMatch.likedBy = lastMatch.likedBy.filter(uid => uid !== currentUserUid);
-    lastMatch.superLike = false;
+    const { action, matchId, targetUserId } = user.lastSwipe;
 
+    const matchToUndo = await Match.findById(matchId);
+
+    if (!matchToUndo) {
+      return res.status(404).json({ error: 'Cannot find the match record for the swipe to undo.' });
+    }
+
+    // Revert the match document
+    if (action === 'like' || action === 'superlike') {
+      matchToUndo.likedBy = matchToUndo.likedBy.filter(uid => uid !== currentUserUid);
+      if (action === 'superlike') {
+        matchToUndo.superLike = false;
+        user.superLikes.count += 1; // Restore the super like
+      }
+    }
+    matchToUndo.status = 'pending'; // Revert status for all actions
+
+    // Update user and match documents
     user.undoSwipes.count -= 1;
+    user.lastSwipe = undefined; // Clear the last swipe
+
     await user.save();
-    await lastMatch.save();
-    res.json(lastMatch);
+    await matchToUndo.save();
+
+    // Find the undone user's profile to return to the frontend
+    const undoneUser = await User.findOne({ uid: targetUserId }).lean();
+
+    res.json({ undoneUser });
+
   } catch (error) {
-    res.status(500).json({ error: 'An unexpected error occurred.' });
+    console.error("Undo swipe error:", error);
+    res.status(500).json({ error: 'An unexpected error occurred during undo.' });
   }
 };
 
