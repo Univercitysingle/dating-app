@@ -78,6 +78,9 @@ const SwipeDeck = () => {
   }, [fetchUsersToSwipe]);
 
   const handleVote = async (userId, direction) => {
+    // Optimistic UI update
+    setUsers((prevUsers) => prevUsers.filter(u => u.uid !== userId));
+
     try {
       if (direction === 'right') {
         const response = await apiClient.post('/api/swipe/like', { userId });
@@ -96,8 +99,9 @@ const SwipeDeck = () => {
       }
     } catch (swipeError) {
       console.error("Error recording swipe:", swipeError);
+      setError(swipeError.data?.message || `Failed to record ${direction} action.`);
+      // Note: In a real-world app, you might want to add the user back to the deck on failure.
     }
-    setUsers((prevUsers) => prevUsers.filter(u => u.uid !== userId));
   };
 
   const handleSwipe = () => {
@@ -174,7 +178,7 @@ const SwipeDeck = () => {
             {users.length > 0 && !newMatchInfo && (
                 <div className="flex justify-center items-center my-4 space-x-4">
                     <button
-                        onClick={() => handleVote(users[0]?._id, 'left')}
+                        onClick={() => handleVote(users[0]?.uid, 'left')}
                         className="p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
                         aria-label="Pass"
                         disabled={!users[0]}
@@ -184,7 +188,7 @@ const SwipeDeck = () => {
                         </svg>
                     </button>
                     <button
-                        onClick={() => handleVote(users[0]?._id, 'superlike')}
+                        onClick={() => handleVote(users[0]?.uid, 'superlike')}
                         className="p-4 bg-white rounded-full shadow-lg hover:bg-blue-100 transition-all transform hover:scale-110"
                         aria-label="Super Like"
                         disabled={!users[0]}
@@ -194,7 +198,7 @@ const SwipeDeck = () => {
                         </svg>
                     </button>
                     <button
-                        onClick={() => handleVote(users[0]?._id, 'right')}
+                        onClick={() => handleVote(users[0]?.uid, 'right')}
                         className="p-5 bg-white rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
                         aria-label="Like"
                         disabled={!users[0]}
