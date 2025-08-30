@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import SuperLikeNotification from './SuperLikeNotification';
 
 const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [exitX, setExitX] = useState(0);
+
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-30, 30]);
+  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
+  const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
   if (!user) {
     return null;
@@ -19,9 +25,11 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
 
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {
-      onVote(user._id, 'right');
+      setExitX(300);
+      onVote(user.uid, 'right');
     } else if (info.offset.x < -100) {
-      onVote(user._id, 'left');
+      setExitX(-300);
+      onVote(user.uid, 'left');
     }
   };
 
@@ -41,16 +49,29 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   return (
     <motion.div
       drag="x"
-      dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
       onAnimationComplete={onSwipe}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 300, opacity: 0 }}
+      exit={{ x: exitX, opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="absolute w-full h-full"
-      style={style}
+      style={{ x, rotate, ...style }}
+      className="absolute w-full h-full cursor-grab"
+      whileTap={{ cursor: 'grabbing' }}
     >
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-card bg-neutral-800 border border-neutral-700">
+        {/* Overlays for Like/Nope */}
+        <motion.div
+          style={{ opacity: likeOpacity }}
+          className="absolute top-1/4 left-8 text-6xl font-extrabold text-green-500 border-4 border-green-500 p-4 rounded-xl -rotate-24 transform"
+        >
+          LIKE
+        </motion.div>
+        <motion.div
+          style={{ opacity: nopeOpacity }}
+          className="absolute top-1/4 right-8 text-6xl font-extrabold text-red-500 border-4 border-red-500 p-4 rounded-xl rotate-24 transform"
+        >
+          NOPE
+        </motion.div>
+
         {superLike && <SuperLikeNotification />}
         {/* Scrollable container for details */}
         <motion.div
