@@ -142,7 +142,7 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
-                      <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
+                      <PhotoGallery photos={profile.photos || []} prompts={profile.profilePrompts || []} onEdit={() => setIsEditingPhotos(true)} />
 
                       {isEditing ? (
                         <SectionCard title="About Me">

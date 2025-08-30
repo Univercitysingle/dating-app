@@ -1,7 +1,8 @@
 import React from 'react';
 
-const PhotoGallery = ({ photos, prompts, onEdit }) => {
+const PhotoGallery = ({ photos, prompts: promptsProp, onEdit }) => {
   const items = [];
+  const prompts = promptsProp || [];
   photos.forEach((photo, index) => {
     items.push(
       <div key={`photo-${index}`} className="relative">
