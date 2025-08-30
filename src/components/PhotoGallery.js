@@ -1,4 +1,5 @@
 import React from 'react';
+import { API_URL } from '../utils/constants';
 
 const PhotoGallery = ({ photos, prompts: promptsProp, onEdit }) => {
   const items = [];
@@ -7,7 +8,7 @@ const PhotoGallery = ({ photos, prompts: promptsProp, onEdit }) => {
     items.push(
       <div key={`photo-${index}`} className="relative">
         <img
-          src={photo.url}
+          src={`${API_URL}${photo.url}`}
           alt={`User photo ${index + 1}`}
           className="object-cover w-full h-32 rounded-lg"
         />
