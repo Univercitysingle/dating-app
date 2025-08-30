@@ -40,7 +40,10 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
   return (
     <div className="p-4 bg-white rounded-lg shadow-md">
       <h3 className="text-lg font-semibold mb-4">Edit Photos</h3>
-      <PhotoUploader onUploadComplete={handleUploadComplete} />
+      <PhotoUploader
+        onUploadComplete={handleUploadComplete}
+        isDisabled={localPhotos.length >= 6}
+      />
       <div className="grid grid-cols-3 gap-4">
         {localPhotos.map((photo, index) => (
           <div key={index} className="relative">

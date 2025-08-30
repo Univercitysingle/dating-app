@@ -226,6 +226,7 @@ const uploadPhoto = async (req, res) => {
   const log = req.log;
   const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
   log.info(`UsersController: uploadPhoto entered for User: ${userUidForLog}`);
+
   try {
     if (req.fileValidationError) {
       log.warn(`UsersController: File validation error for photo by ${userUidForLog}: ${req.fileValidationError}`);
@@ -235,6 +236,21 @@ const uploadPhoto = async (req, res) => {
       log.warn(`UsersController: No file uploaded or rejected by filter for photo by ${userUidForLog}.`);
       return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
     }
+
+    const user = await User.findOne({ uid: req.user.uid });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Validation checks
+    if (user.photos.length >= 6) {
+      return res.status(400).json({ message: "You have reached the maximum of 6 photos." });
+    }
+    const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB
+    if (user.totalPhotoSize + req.file.size > MAX_TOTAL_SIZE) {
+      return res.status(400).json({ message: "Uploading this photo would exceed your total storage limit of 25MB." });
+    }
+
     log.info(`UsersController: File received for photo: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
 
     const fileContent = fs.readFileSync(req.file.path);
@@ -248,9 +264,18 @@ const uploadPhoto = async (req, res) => {
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
 
+    const newPhoto = {
+      url: result.Location,
+      order: user.photos.length,
+      size: req.file.size,
+    };
+
     await User.findOneAndUpdate(
       { uid: req.user.uid },
-      { $push: { photos: { url: result.Location, order: req.user.photos.length } } },
+      {
+        $push: { photos: newPhoto },
+        $inc: { totalPhotoSize: req.file.size },
+      },
       { new: true }
     );
 
@@ -302,22 +327,37 @@ const deletePhoto = async (req, res) => {
   log.info(`UsersController: deletePhoto entered for UID: ${req.user.uid}`);
 
   try {
-    const user = await User.findOneAndUpdate(
-      { uid: req.user.uid },
-      { $pull: { photos: { url: photoUrl } } },
-      { new: true }
-    );
+    const user = await User.findOne({ uid: req.user.uid });
 
     if (!user) {
       log.warn(`UsersController: User not found during deletePhoto for UID: ${req.user.uid}`);
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Validation checks
+    if (user.photos.length <= 1) {
+      return res.status(400).json({ message: "You must have at least one photo." });
+    }
+
+    const photoToDelete = user.photos.find(p => p.url === photoUrl);
+    if (!photoToDelete) {
+      return res.status(404).json({ error: "Photo not found in user's profile." });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { uid: req.user.uid },
+      {
+        $pull: { photos: { url: photoUrl } },
+        $inc: { totalPhotoSize: -photoToDelete.size },
+      },
+      { new: true }
+    );
+
     const filename = path.basename(photoUrl);
     deleteFile(filename);
 
     log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
-    res.json(user);
+    res.json(updatedUser);
   } catch (err) {
     log.error({ err }, `UsersController: Error deleting photo for UID ${req.user.uid}`);
     res.status(500).json({ error: "An unexpected error occurred while deleting photo." });

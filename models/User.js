@@ -11,7 +11,12 @@ const userSchema = new mongoose.Schema({
   photos: [{
     url: String,
     order: Number,
+    size: Number, // size in bytes
   }],
+  totalPhotoSize: {
+    type: Number,
+    default: 0
+  },
   blocked: [String],
   isVerified: { type: Boolean, default: false },
   plan: { type: String, enum: ["basic", "premium"], default: "basic" },
