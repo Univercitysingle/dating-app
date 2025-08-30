@@ -83,7 +83,7 @@ const corsOptions = {
   ],
 };
 
-logger.info(`CORS configured for origin: ${corsOptions.origin}`);
+logger.info({ message: "CORS allowed origins configured", origins: allowedOrigins });
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
