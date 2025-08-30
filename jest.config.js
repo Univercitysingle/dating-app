@@ -8,4 +8,7 @@ module.exports = {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   testPathIgnorePatterns: ['/node_modules/', '/tests/'],
+  testEnvironmentOptions: {
+    customExportConditions: ["node", "node-addons"],
+  },
 };

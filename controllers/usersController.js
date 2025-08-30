@@ -23,30 +23,39 @@ const updateCurrentUserProfile = async (req, res) => {
   log.info({ userUid }, "UsersController: updateCurrentUserProfile entered.");
   const update = req.body;
 
-  let allowedFields;
-  if (req.user.isOnboardingComplete) {
-    allowedFields = [
-      "preference", "bio", "photos",
-      "interests", "profilePrompts", "audioBioUrl",
-      "personalityQuizResults", "socialMediaLinks",
-      "education", "relationshipGoals", "location", "lifestyle",
-      "lastActiveAt"
-    ];
-  } else {
-    allowedFields = [
-      "name", "birthday", "gender", "preference", "bio", "photos",
-      "interests", "profilePrompts", "audioBioUrl",
-      "personalityQuizResults", "socialMediaLinks",
-      "education", "relationshipGoals", "location", "lifestyle",
-      "lastActiveAt", "isOnboardingComplete"
-    ];
-  }
+  const allowedFields = [
+    "preference", "bio", "photos",
+    "interests", "profilePrompts", "audioBioUrl",
+    "personalityQuizResults", "socialMediaLinks",
+    "education", "relationshipGoals", "location", "lifestyle",
+    "lastActiveAt"
+  ];
+
+  const onboardingFields = ["name", "birthday", "gender", "isOnboardingComplete"];
 
   const sanitizedUpdate = {};
 
-  for (const key of allowedFields) {
+  const allAllowedFields = req.user.isOnboardingComplete ? allowedFields : [...allowedFields, ...onboardingFields];
+
+  for (const key of allAllowedFields) {
     if (update[key] !== undefined) sanitizedUpdate[key] = update[key];
   }
+
+  if (req.user.isOnboardingComplete) {
+    if (update.name && !req.user.nameLastUpdatedAt) {
+        sanitizedUpdate.name = update.name;
+        sanitizedUpdate.nameLastUpdatedAt = new Date();
+    }
+    if (update.birthday && !req.user.birthdayLastUpdatedAt) {
+        sanitizedUpdate.birthday = update.birthday;
+        sanitizedUpdate.birthdayLastUpdatedAt = new Date();
+    }
+    if (update.gender && !req.user.genderLastUpdatedAt) {
+        sanitizedUpdate.gender = update.gender;
+        sanitizedUpdate.genderLastUpdatedAt = new Date();
+    }
+  }
+
   log.info({ update: sanitizedUpdate }, "UsersController: Sanitized update data");
 
   if (sanitizedUpdate.birthday) {
@@ -122,10 +131,15 @@ const blockUser = async (req, res) => {
     return res.status(400).json({ error: "Cannot block yourself." });
   }
 
+  const session = await User.startSession();
+  session.startTransaction();
+
   try {
-    const userToBlockDoc = await User.findOne({ uid: userIdToBlock }).select('_id');
+    const userToBlockDoc = await User.findOne({ uid: userIdToBlock }).session(session).select('_id');
     if (!userToBlockDoc) {
       log.warn(`UsersController: User to block (${userIdToBlock}) not found.`);
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ error: "User to block not found." });
     }
     log.info(`UsersController: User to block (${userIdToBlock}) found. Proceeding with block.`);
@@ -133,11 +147,13 @@ const blockUser = async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { uid: currentUserUid },
       { $addToSet: { blocked: userIdToBlock } },
-      { new: true }
+      { new: true, session }
     );
 
     if (!updatedUser) {
       log.warn(`UsersController: Current user ${currentUserUid} not found during block operation.`);
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ error: "Current user not found during update." });
     }
 
@@ -147,31 +163,39 @@ const blockUser = async (req, res) => {
     log.info(`UsersController: Updating match status for users ${u1} and ${u2} to 'unmatched'.`);
     await Match.findOneAndUpdate(
       { user1Uid: u1, user2Uid: u2 },
-      { $set: { status: 'unmatched', likedBy: [] } }
+      { $set: { status: 'unmatched', likedBy: [] } },
+      { session }
     );
+
+    await session.commitTransaction();
+    session.endSession();
+
     log.info(`UsersController: User ${userIdToBlock} successfully blocked by UID: ${currentUserUid}.`);
     res.status(200).json({ message: `User ${userIdToBlock} successfully blocked.` });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     log.error({ err: error }, `UsersController: Error blocking user ${userIdToBlock} by UID ${currentUserUid}`);
     res.status(500).json({ error: "An unexpected error occurred while blocking user." });
   }
 };
 
-const handleFileUpload = async (req, res, fileTypePrefix) => {
+const handleFileUpload = async (req, fileTypePrefix) => {
   const log = req.log;
   const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
   log.info(`UsersController: handleFileUpload entered for ${fileTypePrefix}, User: ${userUidForLog}`);
-  try {
-    if (req.fileValidationError) {
-      log.warn(`UsersController: File validation error for ${fileTypePrefix} by ${userUidForLog}: ${req.fileValidationError}`);
-      return res.status(400).json({ message: req.fileValidationError });
-    }
-    if (!req.file) {
-      log.warn(`UsersController: No file uploaded or rejected by filter for ${fileTypePrefix} by ${userUidForLog}.`);
-      return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
-    }
-    log.info(`UsersController: File received for ${fileTypePrefix}: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
 
+  if (req.fileValidationError) {
+    log.warn(`UsersController: File validation error for ${fileTypePrefix} by ${userUidForLog}: ${req.fileValidationError}`);
+    return { error: { status: 400, message: req.fileValidationError } };
+  }
+  if (!req.file) {
+    log.warn(`UsersController: No file uploaded or rejected by filter for ${fileTypePrefix} by ${userUidForLog}.`);
+    return { error: { status: 400, message: "No file uploaded or file was rejected by filter." } };
+  }
+  log.info(`UsersController: File received for ${fileTypePrefix}: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
+
+  try {
     const fileContent = fs.readFileSync(req.file.path);
     const ext = path.extname(req.file.originalname);
     const filename = `${fileTypePrefix}-${userUidForLog}-${Date.now()}${ext}`;
@@ -183,15 +207,15 @@ const handleFileUpload = async (req, res, fileTypePrefix) => {
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
 
-    res.json({ success: true, fileUrl: result.Location });
+    return { fileUrl: result.Location };
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in ${fileTypePrefix} upload for UID ${userUidForLog}`);
 
     if (error instanceof multer.MulterError) {
       if (error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ message: `File too large. Max size for ${fileTypePrefix} is 5MB.` });
+        return { error: { status: 400, message: `File too large. Max size for ${fileTypePrefix} is 5MB.` } };
       }
-      return res.status(400).json({ message: `File upload error: ${error.message}` });
+      return { error: { status: 400, message: `File upload error: ${error.message}` } };
     }
 
     if (req.file && req.file.path) {
@@ -205,64 +229,45 @@ const handleFileUpload = async (req, res, fileTypePrefix) => {
       }
     }
 
-    if (!res.headersSent) {
-      return res.status(500).json({ message: error.message || `An unexpected error occurred during ${fileTypePrefix} upload.` });
-    }
+    return { error: { status: 500, message: error.message || `An unexpected error occurred during ${fileTypePrefix} upload.` } };
   }
 };
 
 const uploadAudioBio = async (req, res) => {
-  await handleFileUpload(req, res, "audio-bios");
+  const { fileUrl, error } = await handleFileUpload(req, "audio-bios");
+
+  if (error) {
+    return res.status(error.status).json({ message: error.message });
+  }
+
+  res.json({ success: true, fileUrl });
 };
 
 const uploadPhoto = async (req, res) => {
   const log = req.log;
   const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
   log.info(`UsersController: uploadPhoto entered for User: ${userUidForLog}`);
+
+  const { fileUrl, error } = await handleFileUpload(req, "photos");
+
+  if (error) {
+    return res.status(error.status).json({ message: error.message });
+  }
+
   try {
-    if (req.fileValidationError) {
-      log.warn(`UsersController: File validation error for photo by ${userUidForLog}: ${req.fileValidationError}`);
-      return res.status(400).json({ message: req.fileValidationError });
-    }
-    if (!req.file) {
-      log.warn(`UsersController: No file uploaded or rejected by filter for photo by ${userUidForLog}.`);
-      return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
-    }
-    log.info(`UsersController: File received for photo: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
-
-    const fileContent = fs.readFileSync(req.file.path);
-    const ext = path.extname(req.file.originalname);
-    const filename = `photos-${userUidForLog}-${Date.now()}${ext}`;
-    log.info(`UsersController: Saving file as ${filename}`);
-
-    const result = saveFile(fileContent, filename);
-    log.info(`UsersController: File saved successfully. Location: ${result.Location}`);
-
-    fs.unlinkSync(req.file.path);
-    log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
-
     await User.findOneAndUpdate(
       { uid: req.user.uid },
-      { $push: { photos: { url: result.Location, order: req.user.photos.length } } },
+      { $push: { photos: { url: fileUrl, order: req.user.photos.length } } },
       { new: true }
     );
 
-    res.json({ success: true, fileUrl: result.Location });
-  } catch (error) {
-    log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
-    if (req.file && req.file.path) {
-      try {
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-          log.info(`UsersController: Cleaned up temporary file ${req.file.path} after error.`);
-        }
-      } catch (cleanupError) {
-        log.error({ err: cleanupError }, `UsersController: Failed to cleanup temporary photo file after error`);
-      }
-    }
-    if (!res.headersSent) {
-      return res.status(500).json({ message: error.message || `An unexpected error occurred during photo upload.` });
-    }
+    res.json({ success: true, fileUrl });
+  } catch (dbError) {
+    log.error({ err: dbError }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
+    // If the database update fails, we should delete the uploaded file.
+    const filename = path.basename(fileUrl);
+    deleteFile(filename);
+    res.status(500).json({ message: "An unexpected error occurred during photo upload." });
   }
 };
 
@@ -295,22 +300,30 @@ const deletePhoto = async (req, res) => {
   log.info(`UsersController: deletePhoto entered for UID: ${req.user.uid}`);
 
   try {
-    const user = await User.findOneAndUpdate(
-      { uid: req.user.uid },
-      { $pull: { photos: { url: photoUrl } } },
-      { new: true }
-    );
+    const user = await User.findOne({ uid: req.user.uid });
 
     if (!user) {
       log.warn(`UsersController: User not found during deletePhoto for UID: ${req.user.uid}`);
       return res.status(404).json({ error: "User not found" });
     }
 
+    const photoExists = user.photos.some(photo => photo.url === photoUrl);
+    if (!photoExists) {
+        log.warn(`UsersController: Photo not found for user during deletePhoto for UID: ${req.user.uid}`);
+        return res.status(404).json({ error: "Photo not found" });
+    }
+
+    const updatedUser = await User.findOneAndUpdate(
+      { uid: req.user.uid },
+      { $pull: { photos: { url: photoUrl } } },
+      { new: true }
+    );
+
     const filename = path.basename(photoUrl);
     deleteFile(filename);
 
     log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
-    res.json(user);
+    res.json(updatedUser);
   } catch (err) {
     log.error({ err }, `UsersController: Error deleting photo for UID ${req.user.uid}`);
     res.status(500).json({ error: "An unexpected error occurred while deleting photo." });

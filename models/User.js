@@ -87,6 +87,9 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  nameLastUpdatedAt: { type: Date },
+  birthdayLastUpdatedAt: { type:Date },
+  genderLastUpdatedAt: { type: Date },
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true }, timestamps: true });
 
 userSchema.virtual('age').get(function() {
