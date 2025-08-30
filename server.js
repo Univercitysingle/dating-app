@@ -93,11 +93,12 @@ app.use(
   helmet({
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
     strictTransportSecurity: process.env.NODE_ENV === 'production' ? undefined : false,
+    crossOriginResourcePolicy: false,
   })
 );
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
-app.use('/uploads', cors(corsOptions), express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // -------------------- REQUEST/RESPONSE LOGGING --------------------
 app.use((req, res, next) => {
