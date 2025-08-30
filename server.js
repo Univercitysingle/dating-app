@@ -97,7 +97,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', cors(corsOptions), express.static(path.join(__dirname, 'uploads')));
 
 // -------------------- REQUEST/RESPONSE LOGGING --------------------
 app.use((req, res, next) => {
