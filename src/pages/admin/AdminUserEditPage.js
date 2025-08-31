@@ -23,6 +23,7 @@ const AdminUserEditPage = () => {
     bio: '',
     lastLoginIp: '',
     lastLoginDevice: '',
+    mobileNumber: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -50,6 +51,7 @@ const AdminUserEditPage = () => {
         bio: data.bio || '',
         lastLoginIp: data.lastLoginIp || '',
         lastLoginDevice: data.lastLoginDevice || '',
+        mobileNumber: data.mobileNumber || '',
       });
     } catch (err) {
       setError(err.message);
@@ -148,6 +150,12 @@ const AdminUserEditPage = () => {
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
             <input type="email" name="email" id="email" value={userData.email} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
+          </div>
+        }
+        { (adminUser?.role === 'superadmin') &&
+          <div>
+            <label htmlFor="mobileNumber" className="block text-sm font-medium text-gray-700">Mobile Number</label>
+            <input type="tel" name="mobileNumber" id="mobileNumber" value={userData.mobileNumber} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
           </div>
         }
         {isNewUser && (

@@ -149,6 +149,7 @@ const AdminUserListPage = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   { (adminUser?.role === 'superadmin' || adminUser?.role === 'admin') && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th> }
+                  { adminUser?.role === 'superadmin' && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile Number</th> }
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visible</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Active</th>
@@ -164,6 +165,7 @@ const AdminUserListPage = () => {
                     <tr key={user._id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.name || 'N/A'}</td>
                       { (adminUser?.role === 'superadmin' || adminUser?.role === 'admin') && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td> }
+                      { adminUser?.role === 'superadmin' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.mobileNumber}</td> }
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.isProfileVisible ? 'Yes' : 'No'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -171,6 +173,7 @@ const AdminUserListPage = () => {
                       </td>
                       { adminUser?.role === 'superadmin' && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.lastLoginIp}</td> }
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <button onClick={() => navigate(`/admin/users/${user._id}/profile`)} className="text-blue-600 hover:text-blue-900">View</button>
                         <button onClick={() => navigate(`/admin/users/${user._id}/edit`)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
                         <button onClick={() => handleToggleVisibility(user._id, user.isProfileVisible)} className={user.isProfileVisible ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}>
                           {user.isProfileVisible ? 'Hide' : 'Show'}

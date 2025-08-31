@@ -18,6 +18,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdminUserListPage from './pages/admin/AdminUserListPage';
 import AdminUserEditPage from './pages/admin/AdminUserEditPage';
+import AdminUserProfileViewPage from './pages/admin/AdminUserProfileViewPage';
 import AdminReportListPage from './pages/admin/AdminReportListPage';
 import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
@@ -118,6 +119,7 @@ function App() {
             <Route path="users" element={<AdminUserListPage />} />
             <Route path="users/new" element={<AdminUserEditPage />} />
             <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
+            <Route path="users/:userId/profile" element={<AdminUserProfileViewPage />} />
             <Route path="reports" element={<AdminReportListPage />} />
             <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
