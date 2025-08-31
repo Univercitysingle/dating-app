@@ -8,7 +8,7 @@ const AudioBioPlayer = ({ audioUrl }) => {
 
   useEffect(() => {
     if (waveformRef.current) {
-      wavesurfer.current = WaveSurfer.create({
+      const wavesurferInstance = WaveSurfer.create({
         container: waveformRef.current,
         waveColor: '#A0A0A0', // A neutral gray
         progressColor: '#3B82F6', // A nice blue from the theme
@@ -19,15 +19,20 @@ const AudioBioPlayer = ({ audioUrl }) => {
         responsive: true,
       });
 
+      wavesurfer.current = wavesurferInstance;
+
       if (audioUrl) {
-        wavesurfer.current.load(audioUrl);
+        wavesurferInstance.load(audioUrl);
       }
 
-      wavesurfer.current.on('play', () => setIsPlaying(true));
-      wavesurfer.current.on('pause', () => setIsPlaying(false));
-      wavesurfer.current.on('finish', () => setIsPlaying(false));
+      wavesurferInstance.on('play', () => setIsPlaying(true));
+      wavesurferInstance.on('pause', () => setIsPlaying(false));
+      wavesurferInstance.on('finish', () => setIsPlaying(false));
 
-      return () => wavesurfer.current.destroy();
+      return () => {
+        wavesurferInstance.unAll();
+        wavesurferInstance.destroy();
+      };
     }
   }, [audioUrl]);
 
