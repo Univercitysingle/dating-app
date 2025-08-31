@@ -97,8 +97,6 @@ app.use(
   })
 );
 app.use(express.json());
-const cookieParser = require('cookie-parser');
-app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -180,7 +178,6 @@ app.use("/api/matches", authMiddleware, require("./routes/matches"));
 app.use("/api/chat", authMiddleware, require("./routes/chat").router);
 app.use("/api/reports", authMiddleware, require("./routes/reports"));
 app.use("/api/status", require("./routes/status"));
-app.use("/api/spotify", require("./routes/spotify"));
 
 // Admin routes
 const adminUsersRouter = require("./routes/adminUsers");

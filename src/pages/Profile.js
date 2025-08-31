@@ -18,8 +18,6 @@ import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
 import BadgesDisplay from '../components/BadgesDisplay';
-import SpotifyConnect from '../components/SpotifyConnect';
-import TopArtists from '../components/TopArtists';
 import { API_URL } from '../utils/constants';
 
 // Reusable components
@@ -50,11 +48,11 @@ const SectionCard = ({ title, onEdit, isEditing, children }) => (
 
 function Profile() {
   const [profile, setProfile] = useState(null);
-  const [editingSections, setEditingSections] = useState({});
+  const [isEditing, setIsEditing] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
-  const [topArtists, setTopArtists] = useState([]);
 
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
@@ -78,10 +76,6 @@ function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const toggleEdit = (section) => {
-    setEditingSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
   useEffect(() => {
     if (user) {
       setProfile(user);
@@ -90,12 +84,6 @@ function Profile() {
         relationshipGoals: user.relationshipGoals || 'Figuring it out',
         aboutMe: user.aboutMe || '',
       });
-
-      if (user.spotifyRefreshToken) {
-        apiClient.get('/api/spotify/top-artists')
-          .then(data => setTopArtists(data))
-          .catch(err => console.error('Error fetching top artists:', err));
-      }
     }
   }, [user]);
 
@@ -111,9 +99,7 @@ function Profile() {
           setProfile(updatedProfile);
           setSaveStatus(prev => ({...prev, [statusKey]: 'Saved successfully!'}));
           setTimeout(() => setSaveStatus(prev => ({...prev, [statusKey]: ''})), 3000);
-          if (editingSections[statusKey]) {
-            toggleEdit(statusKey);
-          }
+          setIsEditing(false);
       } catch (error) {
           console.error(`Error saving ${statusKey}:`, error);
           setSaveStatus(prev => ({...prev, [statusKey]: `Error: ${error.data?.message || 'Failed to save'}`}));
@@ -170,8 +156,8 @@ function Profile() {
                   <div className="space-y-6">
                       <PhotoGallery photos={profile.photos || []} prompts={profile.profilePrompts || []} onEdit={() => setIsEditingPhotos(true)} />
 
-                      <SectionCard title="About Me" onEdit={() => toggleEdit('aboutMe')} isEditing={editingSections['aboutMe']}>
-                          {editingSections['aboutMe'] ? (
+                      <SectionCard title="About Me" isEditing={isEditing}>
+                          {isEditing ? (
                               <div>
                                  <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
                                  <button onClick={() => handleSave('/api/users/me', { aboutMe: editableFields.aboutMe }, 'aboutMe')} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.aboutMe || 'Save'}</button>
@@ -181,16 +167,16 @@ function Profile() {
                           )}
                       </SectionCard>
 
-                      <SectionCard title="Profile Prompts" onEdit={() => toggleEdit('prompts')} isEditing={editingSections['prompts']}>
-                          {editingSections['prompts'] ? (
+                      <SectionCard title="Profile Prompts" isEditing={isEditing}>
+                          {isEditing ? (
                               <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} />
                           ) : (
                               <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
                           )}
                       </SectionCard>
 
-                       <SectionCard title="Details" onEdit={() => toggleEdit('details')} isEditing={editingSections['details']}>
-                            {editingSections['details'] ? (
+                       <SectionCard title="Details" isEditing={isEditing}>
+                            {isEditing ? (
                                 <div className="space-y-4">
                                     <div>
                                         <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
@@ -224,8 +210,8 @@ function Profile() {
                                 </div>
                             )}
                         </SectionCard>
-                        <SectionCard title="Lifestyle" onEdit={() => toggleEdit('lifestyle')} isEditing={editingSections['lifestyle']}>
-                            {editingSections['lifestyle'] ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} initialBadges={profile.badges || {}} onSave={handleLifestyleSave} /> : (
+                        <SectionCard title="Lifestyle" isEditing={isEditing}>
+                            {isEditing ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} initialBadges={profile.badges || {}} onSave={handleLifestyleSave} /> : (
                                 <>
                                     <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
                                         <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
@@ -238,25 +224,17 @@ function Profile() {
                                 </>
                             )}
                         </SectionCard>
-                        <SectionCard title="Interests" onEdit={() => toggleEdit('interests')} isEditing={editingSections['interests']}>
-                            {editingSections['interests'] ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
+                        <SectionCard title="Interests" isEditing={isEditing}>
+                            {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Personality Quiz" onEdit={() => toggleEdit('quiz')} isEditing={editingSections['quiz']}>
-                            {editingSections['quiz'] ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
+                        <SectionCard title="Personality Quiz" isEditing={isEditing}>
+                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
                         </SectionCard>
-                        <SectionCard title="Social Media" onEdit={() => toggleEdit('social')} isEditing={editingSections['social']}>
-                            {editingSections['social'] ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
+                        <SectionCard title="Social Media" isEditing={isEditing}>
+                            {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
                         </SectionCard>
-                        <SectionCard title="Audio Bio" onEdit={() => toggleEdit('media')} isEditing={editingSections['media']}>
-                            {editingSections['media'] ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
-                        </SectionCard>
-
-                        <SectionCard title="My Top Artists">
-                          {!profile.spotifyRefreshToken ? (
-                            <SpotifyConnect />
-                          ) : (
-                            <TopArtists artists={topArtists} />
-                          )}
+                        <SectionCard title="Audio Bio" isEditing={isEditing}>
+                            {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
                         </SectionCard>
                   </div>
               );
@@ -284,11 +262,36 @@ function Profile() {
                 </div>
             </div>
 
-            <div className="flex justify-between items-center mb-6">
-                <div className="flex space-x-1 bg-neutral-200 dark:bg-neutral-700 rounded-lg p-1">
-                    <button onClick={() => setActiveTab('profile')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'profile' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Profile</button>
-                    <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'settings' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Settings</button>
-                </div>
+            <div className="flex justify-end items-center mb-6">
+              <div className="relative">
+                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700" aria-label="menu">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-800 rounded-md shadow-lg z-20">
+                    <button
+                      onClick={() => {
+                        setIsEditing(true);
+                        setIsMenuOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                    >
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('settings');
+                        setIsMenuOpen(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                    >
+                      Settings
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {isEditingPhotos && (

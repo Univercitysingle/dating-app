@@ -7,5 +7,8 @@ module.exports = {
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
+  transformIgnorePatterns: [
+    '/node_modules/(?!wavesurfer.js|axios)/'
+  ],
   testPathIgnorePatterns: ['/node_modules/'],
 };

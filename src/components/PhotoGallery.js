@@ -1,44 +1,65 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { API_URL } from '../utils/constants';
 
-const PhotoGallery = ({ photos, prompts: promptsProp, onEdit }) => {
-  const items = [];
-  const prompts = promptsProp || [];
-  photos.forEach((photo, index) => {
-    items.push(
-      <div key={`photo-${index}`} className="relative">
-        <img
-          src={`${API_URL}${photo.url}`}
-          alt={`User photo ${index + 1}`}
-          className="object-cover w-full h-32 rounded-lg"
-        />
-      </div>
-    );
-    if ((index + 1) % 2 === 0 && prompts[(index + 1) / 2 - 1]) {
-      const prompt = prompts[(index + 1) / 2 - 1];
-      items.push(
-        <div key={`prompt-${index}`} className="p-4 bg-gray-100 rounded-lg">
-          <h4 className="font-semibold">{prompt.prompt}</h4>
-          <p>{prompt.answer}</p>
-        </div>
-      );
-    }
-  });
+const PhotoGallery = ({ photos, onEdit }) => {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
-  return (
-    <div className="p-4 bg-white rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Photos & Prompts</h3>
+  const handleNext = () => {
+    setCurrentPhotoIndex((prevIndex) => (prevIndex + 1) % photos.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentPhotoIndex((prevIndex) => (prevIndex - 1 + photos.length) % photos.length);
+  };
+
+  if (!photos || photos.length === 0) {
+    return (
+      <div className="relative w-full h-96 bg-neutral-200 dark:bg-neutral-800 rounded-lg flex items-center justify-center">
+        <p className="text-neutral-500">No photos to display.</p>
         <button
           onClick={onEdit}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          className="absolute top-4 right-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
-          Edit
+          Add Photos
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {items}
+    );
+  }
+
+  return (
+    <div className="relative w-full h-96 rounded-lg overflow-hidden shadow-lg">
+      {/* Image Indicators */}
+      <div className="absolute top-2 left-2 right-2 flex space-x-1 z-10">
+        {photos.map((_, index) => (
+          <div
+            key={index}
+            className={`h-1 flex-1 rounded-full ${
+              index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
+            }`}
+          />
+        ))}
       </div>
+
+      {/* Main Image */}
+      <img
+        src={`${API_URL}${photos[currentPhotoIndex].url}`}
+        alt={`User photo ${currentPhotoIndex + 1}`}
+        className="w-full h-full object-cover"
+      />
+
+      {/* Navigation Overlays */}
+      <div className="absolute inset-0 flex">
+        <div className="w-1/2 h-full" onClick={handlePrev} />
+        <div className="w-1/2 h-full" onClick={handleNext} />
+      </div>
+
+      {/* Edit Button */}
+      <button
+        onClick={onEdit}
+        className="absolute top-4 right-4 px-4 py-2 text-sm font-medium text-white bg-black/50 rounded-md hover:bg-black/75"
+      >
+        Edit
+      </button>
     </div>
   );
 };

@@ -101,11 +101,6 @@ const userSchema = new mongoose.Schema({
     matchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
     timestamp: { type: Date }
   },
-  spotifyRefreshToken: { type: String },
-  spotifyTopArtists: [{
-    artistName: String,
-    artistImage: String,
-  }],
 }, { toJSON: { virtuals: true }, toObject: { virtuals: true }, timestamps: true });
 
 userSchema.virtual('age').get(function() {
