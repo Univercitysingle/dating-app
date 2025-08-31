@@ -15,17 +15,16 @@ const authMiddleware = require("../middleware/authentication");
 const multer = require("multer");
 
 // Validation Parameters
-const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac', 'audio/m4a'];
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 const MAX_AUDIO_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // File filter for audio
 const audioFileFilter = (req, file, cb) => {
-  if (ALLOWED_AUDIO_TYPES.includes(file.mimetype)) {
+  if (file.mimetype.startsWith('audio/')) {
     cb(null, true);
   } else {
-    req.fileValidationError = 'Invalid audio file type. Allowed types: ' + ALLOWED_AUDIO_TYPES.join(', ');
+    req.fileValidationError = 'Invalid file type. Only audio files are allowed.';
     cb(null, false);
   }
 };
