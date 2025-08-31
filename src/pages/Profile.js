@@ -12,8 +12,6 @@ import AudioBioPlayer from '../components/AudioBioPlayer';
 import AudioBioUpload from '../components/AudioBioUpload';
 import PersonalityQuizSummary from '../components/PersonalityQuizSummary';
 import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
-import SocialMediaLinksDisplay from '../components/SocialMediaLinksDisplay';
-import SocialMediaLinksEditor from '../components/SocialMediaLinksEditor';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
@@ -122,10 +120,6 @@ function Profile() {
       handleSave('/api/users/me', { personalityQuizResults: quizResults }, 'quiz');
   };
 
-  const handleSocialMediaLinksSave = (links) => {
-      handleSave('/api/users/me', { socialMediaLinks: links }, 'social');
-  };
-
   const handleLifestyleSave = (data) => {
       handleSave('/api/users/me', data, 'lifestyle');
   };
@@ -227,9 +221,6 @@ function Profile() {
                         </SectionCard>
                         <SectionCard title="Personality Quiz" isEditing={isEditing}>
                             {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
-                        </SectionCard>
-                        <SectionCard title="Social Media" isEditing={isEditing}>
-                            {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
                         </SectionCard>
                         <SectionCard title="Audio Bio" isEditing={isEditing}>
                             {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}

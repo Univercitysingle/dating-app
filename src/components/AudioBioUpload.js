@@ -16,24 +16,24 @@ const AudioBioUpload = ({ currentAudioUrl, onUploadComplete }) => {
       return;
     }
 
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setStatus('Error: Not authenticated.');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setStatus('Uploading audio...');
 
     const formData = new FormData();
     formData.append('audio-bio', file); // Field name must match backend (multer)
 
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || !user.token) {
-      setStatus('Error: Not authenticated.');
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await fetch('/api/users/upload-audio-bio', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${user.token}`,
+          Authorization: `Bearer ${token}`,
           // 'Content-Type': 'multipart/form-data' is set automatically by browser for FormData
         },
         body: formData,

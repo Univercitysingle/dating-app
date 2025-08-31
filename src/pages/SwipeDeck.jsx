@@ -32,7 +32,7 @@ const MatchModal = ({ matchInfo, onContinue, onChat }) => (
                 onClick={onContinue}
                 className="mt-4 px-8 py-2 text-white text-md"
             >
-                Keep Swapping
+                Keep Swiping
             </button>
         </div>
     </div>
@@ -49,16 +49,16 @@ const NoMoreProfiles = () => (
 );
 
 
-const SwapDeck = () => {
+const SwipeDeck = () => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [swapError, setSwapError] = useState(null);
+  const [swipeError, setSwipeError] = useState(null);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
 
-  const fetchUsersToSwap = useCallback(async (filters = {}) => {
+  const fetchUsersToSwipe = useCallback(async (filters = {}) => {
     setIsLoading(true);
     setError(null);
     setNewMatchInfo(null);
@@ -66,7 +66,7 @@ const SwapDeck = () => {
       const data = await apiClient.get('/api/users/discover', { params: filters });
       setUsers(data || []);
     } catch (err) {
-      console.error("Error fetching users for swap deck:", err);
+      console.error("Error fetching users for swipe deck:", err);
       setError(err.data?.message || err.message || "Failed to load users.");
       setUsers([]);
     } finally {
@@ -75,17 +75,17 @@ const SwapDeck = () => {
   }, []);
 
   useEffect(() => {
-    fetchUsersToSwap();
-  }, [fetchUsersToSwap]);
+    fetchUsersToSwipe();
+  }, [fetchUsersToSwipe]);
 
   useEffect(() => {
-    if (swapError) {
+    if (swipeError) {
       const timer = setTimeout(() => {
-        setSwapError(null);
+        setSwipeError(null);
       }, 5000); // Clear after 5 seconds
       return () => clearTimeout(timer);
     }
-  }, [swapError]);
+  }, [swipeError]);
 
   const handleVote = async (userId, direction) => {
     // Optimistic UI update
@@ -108,13 +108,13 @@ const SwapDeck = () => {
         await apiClient.post('/api/swipe/pass', { userId });
       }
     } catch (err) {
-      console.error("Error recording swap:", err);
-      setSwapError(err.data?.message || `Failed to record ${direction} action.`);
+      console.error("Error recording swipe:", err);
+      setSwipeError(err.data?.message || `Failed to record ${direction} action.`);
       // Note: In a real-world app, you might want to add the user back to the deck on failure.
     }
   };
 
-  const handleSwap = () => {
+  const handleSwipe = () => {
     // This function is called when the card animation is complete
     // We don't need to do anything here anymore, as the card is already removed from the DOM by AnimatePresence
   };
@@ -126,13 +126,13 @@ const SwapDeck = () => {
         setUsers((prevUsers) => [response.undoneUser, ...prevUsers]);
       }
     } catch (err) {
-      console.error("Error undoing swap:", err);
-      setSwapError(err.data?.message || "Failed to undo swap.");
+      console.error("Error undoing swipe:", err);
+      setSwipeError(err.data?.message || "Failed to undo swipe.");
     }
   };
 
   const handleApplyFilters = (filters) => {
-    fetchUsersToSwap(filters);
+    fetchUsersToSwipe(filters);
     setShowFilters(false);
   };
 
@@ -146,9 +146,9 @@ const SwapDeck = () => {
 
   return (
     <div className="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900">
-        {swapError && (
+        {swipeError && (
           <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
-            {swapError}
+            {swipeError}
           </div>
         )}
         <header className="flex-shrink-0 flex justify-between items-center p-4">
@@ -171,7 +171,7 @@ const SwapDeck = () => {
                                     key={user._id}
                                     user={user}
                                     onVote={isTop ? handleVote : () => {}}
-                                    onSwap={isTop ? handleSwap : () => {}}
+                                    onSwipe={isTop ? handleSwipe : () => {}}
                                     superLike={user.superLikedByCurrentUser}
                                     // Apply stacking styles
                                     style={{
@@ -252,4 +252,4 @@ const SwapDeck = () => {
   );
 };
 
-export default SwapDeck;
+export default SwipeDeck;

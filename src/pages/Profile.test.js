@@ -25,7 +25,6 @@ const mockUser = {
   profilePrompts: [],
   interests: [],
   personalityQuizResults: {},
-  socialMediaLinks: {},
   audioBioUrl: '',
   lifestyle: {},
   badges: {},
@@ -86,5 +85,14 @@ describe('Profile page', () => {
     fireEvent.click(settingsButton);
     // After clicking settings, the logout button should be visible
     expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument();
+  });
+
+  it('does not render the Social Media section', () => {
+    render(
+      <BrowserRouter>
+        <Profile />
+      </BrowserRouter>
+    );
+    expect(screen.queryByText('Social Media')).not.toBeInTheDocument();
   });
 });

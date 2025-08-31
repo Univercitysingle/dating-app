@@ -26,7 +26,6 @@ const userSchema = new mongoose.Schema({
   profilePrompts: { type: [{ prompt: String, answer: String }], default: [] },
   audioBioUrl: { type: String, default: "" },
   personalityQuizResults: { type: mongoose.Schema.Types.Mixed, default: {} },
-  socialMediaLinks: { type: Map, of: String, default: new Map() },
   education: { type: String, default: "" },
   relationshipGoals: {
     type: String,

@@ -4,21 +4,21 @@ import InterstitialAd from '../components/InterstitialAd'; // Import the ad comp
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 
 // Placeholder UserCard component - expanded slightly for interaction
-const UserCard = ({ user, onSwap }) => {
-  const [swapFeedback, setSwapFeedback] = useState(''); // '', 'liked', 'disliked'
+const UserCard = ({ user, onSwipe }) => {
+  const [swipeFeedback, setSwipeFeedback] = useState(''); // '', 'liked', 'disliked'
 
-  const handleButtonClick = (swapType) => {
-    setSwapFeedback(swapType);
+  const handleButtonClick = (swipeType) => {
+    setSwipeFeedback(swipeType);
     setTimeout(() => {
-      onSwap(swapType, user.uid);
-      // swapFeedback will reset on next card render because this instance is replaced
+      onSwipe(swipeType, user.uid);
+      // swipeFeedback will reset on next card render because this instance is replaced
     }, 300); // 300ms for visual feedback
   };
 
   return (
   <div className={`bg-white shadow-lg rounded-lg p-4 m-2 w-full md:w-1/2 lg:w-1/3 xl:w-1/4 flex flex-col transition-all duration-150 ease-in-out
-                  ${swapFeedback === 'liked' ? 'border-4 border-green-500 transform scale-105' : ''}
-                  ${swapFeedback === 'disliked' ? 'border-4 border-red-500 transform scale-105' : ''}
+                  ${swipeFeedback === 'liked' ? 'border-4 border-green-500 transform scale-105' : ''}
+                  ${swipeFeedback === 'disliked' ? 'border-4 border-red-500 transform scale-105' : ''}
                   `}>
     <h3 className="text-xl font-semibold text-gray-800">{user.name}, {user.age}</h3>
     {user.photos && user.photos.length > 0 && (
@@ -37,18 +37,18 @@ const UserCard = ({ user, onSwap }) => {
       )}
       {user.lastActiveAt && <p>Last Active: {new Date(user.lastActiveAt).toLocaleDateString()}</p>}
     </div>
-    {/* Placeholder swap buttons */}
+    {/* Placeholder swipe buttons */}
     <div className="mt-auto pt-3 flex justify-around">
       <button
         onClick={() => handleButtonClick('dislike')}
-        disabled={swapFeedback !== ''} // Disable buttons after click until card advances
+        disabled={swipeFeedback !== ''} // Disable buttons after click until card advances
         className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
       >
         Dislike
       </button>
       <button
         onClick={() => handleButtonClick('like')}
-        disabled={swapFeedback !== ''} // Disable buttons after click until card advances
+        disabled={swipeFeedback !== ''} // Disable buttons after click until card advances
         className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
       >
         Like
@@ -68,9 +68,9 @@ function MatchesPage() {
   const [error, setError] = useState(null);
 
   // Ad-related state
-  const [swapCountSinceLastAd, setSwapCountSinceLastAd] = useState(0);
+  const [swipeCountSinceLastAd, setSwipeCountSinceLastAd] = useState(0);
   const [isAdVisible, setIsAdVisible] = useState(false);
-  const SWAPS_PER_AD = 10; // Show ad every 10 swaps for free users
+  const SWIPES_PER_AD = 10; // Show ad every 10 swipes for free users
 
   const fetchMatches = useCallback(async (currentFilters) => {
     setIsLoading(true);
@@ -122,17 +122,17 @@ function MatchesPage() {
     // fetchMatches is called by useEffect due to filterParams change
   };
 
-  const handleSwapAction = (swapType, swappedUserId) => {
-    console.log(`Swapped ${swapType} on user ${swappedUserId}`);
+  const handleSwipeAction = (swipeType, swipedUserId) => {
+    console.log(`Swiped ${swipeType} on user ${swipedUserId}`);
 
     // Ad logic for non-premium users
     if (currentUser && !currentUser.isPremium) {
-      const newSwapCount = swapCountSinceLastAd + 1;
-      if (newSwapCount >= SWAPS_PER_AD) {
+      const newSwipeCount = swipeCountSinceLastAd + 1;
+      if (newSwipeCount >= SWIPES_PER_AD) {
         setIsAdVisible(true);
-        setSwapCountSinceLastAd(0);
+        setSwipeCountSinceLastAd(0);
       } else {
-        setSwapCountSinceLastAd(newSwapCount);
+        setSwipeCountSinceLastAd(newSwipeCount);
       }
     }
 
@@ -174,7 +174,7 @@ function MatchesPage() {
       {!isLoading && !error && currentMatch && (
         <div className="mt-6 w-full flex justify-center">
            {/* User object from rankedMatches is actually { user: UserProfile, matchScore: Number } */}
-          <UserCard user={currentMatch.user} onSwap={handleSwapAction} />
+          <UserCard user={currentMatch.user} onSwipe={handleSwipeAction} />
         </div>
       )}
     </div>
