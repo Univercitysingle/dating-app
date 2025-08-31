@@ -30,7 +30,7 @@ const AudioBioUpload = ({ currentAudioUrl, onUploadComplete }) => {
     formData.append('audio-bio', file); // Field name must match backend (multer)
 
     try {
-      const response = await fetch('/api/users/upload-audio-bio', {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/api/users/upload-audio-bio`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
