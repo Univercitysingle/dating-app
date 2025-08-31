@@ -1,78 +1,43 @@
-import React, { useEffect, useRef, useState } from "react";
-import WaveSurfer from "wavesurfer.js";
+import React, { useEffect, useRef, useState } from 'react';
+import WaveSurfer from 'wavesurfer.js';
 
 const AudioBioPlayer = ({ audioUrl }) => {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [waveformReady, setWaveformReady] = useState(false);
 
   useEffect(() => {
-    if (!waveformRef.current || !audioUrl) return;
-
-    let ws;
-    try {
-      ws = WaveSurfer.create({
+    if (waveformRef.current) {
+      const wavesurferInstance = WaveSurfer.create({
         container: waveformRef.current,
-        waveColor: "violet",
-        progressColor: "purple",
-        cursorWidth: 1,
-        barWidth: 2,
-        barHeight: 1,
-        barGap: 2,
-        height: 100,
+        waveColor: '#A0A0A0', // A neutral gray
+        progressColor: '#3B82F6', // A nice blue from the theme
+        cursorWidth: 2,
+        barWidth: 3,
+        barRadius: 3,
+        height: 60,
         responsive: true,
       });
-      wavesurfer.current = ws;
-      console.log("WaveSurfer instance created");
-    } catch (err) {
-      console.error("Failed to create WaveSurfer:", err);
-      return;
-    }
 
-    try {
-      ws.load(audioUrl);
-      console.log("WaveSurfer loading audio:", audioUrl);
-    } catch (err) {
-      console.error("Failed to load audio:", err);
-    }
+      wavesurfer.current = wavesurferInstance;
 
-    ws.on("ready", () => {
-      setWaveformReady(true);
-      console.log("WaveSurfer ready");
-    });
-
-    ws.on("play", () => setIsPlaying(true));
-    ws.on("pause", () => setIsPlaying(false));
-
-    return () => {
-      if (wavesurfer.current) {
-        try {
-          if (!wavesurfer.current.isDestroyed) {
-            wavesurfer.current.destroy();
-            console.log("WaveSurfer destroyed");
-          }
-        } catch (err) {
-          if (err.name === "AbortError") {
-            console.log("WaveSurfer destroy aborted (expected in StrictMode)");
-          } else {
-            console.error("WaveSurfer destroy error:", err);
-          }
-        } finally {
-          wavesurfer.current = null;
-        }
+      if (audioUrl) {
+        wavesurferInstance.load(audioUrl);
       }
-    };
+
+      wavesurferInstance.on('play', () => setIsPlaying(true));
+      wavesurferInstance.on('pause', () => setIsPlaying(false));
+      wavesurferInstance.on('finish', () => setIsPlaying(false));
+
+      return () => {
+        wavesurferInstance.unAll();
+        wavesurferInstance.destroy();
+      };
+    }
   }, [audioUrl]);
 
   const handlePlayPause = () => {
-    if (wavesurfer.current) {
-      try {
-        wavesurfer.current.playPause();
-      } catch (err) {
-        console.error("PlayPause error:", err);
-      }
-    }
+    wavesurfer.current.playPause();
   };
 
   if (!audioUrl) {
@@ -82,20 +47,23 @@ const AudioBioPlayer = ({ audioUrl }) => {
   }
 
   return (
-    <div className="my-4">
-      <div ref={waveformRef} />
-      {waveformReady ? (
-        <button
-          onClick={handlePlayPause}
-          className="mt-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-        >
-          {isPlaying ? "Pause" : "Play"}
-        </button>
-      ) : (
-        <audio controls src={audioUrl} className="mt-2 w-full">
-          Your browser does not support this audio format.
-        </audio>
-      )}
+    <div className="flex items-center space-x-4">
+      <button
+        onClick={handlePlayPause}
+        className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        aria-label={isPlaying ? 'Pause audio bio' : 'Play audio bio'}
+      >
+        {isPlaying ? (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6" />
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+          </svg>
+        )}
+      </button>
+      <div ref={waveformRef} className="flex-grow" />
     </div>
   );
 };

@@ -11,6 +11,7 @@ const Onboarding = () => {
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState(null);
   const [gender, setGender] = useState('');
+  const [personalityType, setPersonalityType] = useState('');
   const [photo, setPhoto] = useState(null);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
@@ -21,8 +22,8 @@ const Onboarding = () => {
     e.preventDefault();
     setError(null);
 
-    if (!name || !birthday || !gender || !photo) {
-      setError('Please fill out all fields and upload a photo.');
+    if (!name || !birthday || !gender || !photo || !personalityType) {
+      setError('Please fill out all fields, upload a photo, and select a personality type.');
       return;
     }
 
@@ -35,6 +36,7 @@ const Onboarding = () => {
           gender,
           photos: [{ url: photo, order: 0 }],
           location,
+          personalityType,
           isOnboardingComplete: true,
         }
       );
@@ -114,6 +116,25 @@ const Onboarding = () => {
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="personalityType">Personality Type</label>
+            <select
+              id="personalityType"
+              name="personalityType"
+              required
+              value={personalityType}
+              onChange={(e) => setPersonalityType(e.target.value)}
+              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              <option value="">Select Personality Type</option>
+              {[
+                'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+                'ISTP', 'ISFP', 'INFP', 'INTP',
+                'ESTP', 'ESFP', 'ENFP', 'ENTP',
+                'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
+              ].map(type => <option key={type} value={type}>{type}</option>)}
             </select>
           </div>
           <PhotoUploader onUploadComplete={(url) => setPhoto(url)} />

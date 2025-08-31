@@ -27,16 +27,16 @@ const updateCurrentUserProfile = async (req, res) => {
   if (req.user.isOnboardingComplete) {
     allowedFields = [
       "preference", "bio", "photos",
-      "interests", "profilePrompts", "audioBioUrl",
-      "personalityQuizResults", "socialMediaLinks",
+      "interests", "profilePrompts", "audioBioUrl", "personalityType",
+      "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle", "badges",
       "lastActiveAt"
     ];
   } else {
     allowedFields = [
       "name", "birthday", "gender", "preference", "bio", "photos",
-      "interests", "profilePrompts", "audioBioUrl",
-      "personalityQuizResults", "socialMediaLinks",
+      "interests", "profilePrompts", "audioBioUrl", "personalityType",
+      "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle", "badges",
       "lastActiveAt", "isOnboardingComplete"
     ];

@@ -10,8 +10,6 @@ import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
 import AudioBioPlayer from '../components/AudioBioPlayer';
 import AudioBioUpload from '../components/AudioBioUpload';
-import PersonalityQuizSummary from '../components/PersonalityQuizSummary';
-import PersonalityQuizEditor from '../components/PersonalityQuizEditor';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
@@ -57,12 +55,13 @@ function Profile() {
       education: '',
       relationshipGoals: '',
       bio: '',
+      personalityType: '',
   });
 
   // State for save statuses
   const [saveStatus, setSaveStatus] = useState({
       details: '',
-      quiz: '',
+      personalityType: '',
       social: '',
       media: '',
       hero: '',
@@ -82,6 +81,7 @@ function Profile() {
         education: user.education || '',
         relationshipGoals: user.relationshipGoals || 'Figuring it out',
         bio: user.bio || '',
+        personalityType: user.personalityType || '',
       });
     }
   }, [user]);
@@ -117,9 +117,6 @@ function Profile() {
       handleSave('/api/users/me', { profilePrompts: prompts }, 'prompts');
   };
 
-  const handlePersonalityQuizSave = (quizResults) => {
-      handleSave('/api/users/me', { personalityQuizResults: quizResults }, 'quiz');
-  };
 
   const handleLifestyleSave = (data) => {
       handleSave('/api/users/me', data, 'lifestyle');
@@ -220,8 +217,25 @@ function Profile() {
                         <SectionCard title="Interests" isEditing={isEditing}>
                             {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Personality Quiz" isEditing={isEditing}>
-                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
+                        <SectionCard title="Personality Type" isEditing={isEditing}>
+                          {isEditing ? (
+                            <select
+                              id="personalityType"
+                              value={editableFields.personalityType || ''}
+                              onChange={handleFieldChange}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"
+                            >
+                              <option value="">Select your personality type</option>
+                              {[
+                                'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+                                'ISTP', 'ISFP', 'INFP', 'INTP',
+                                'ESTP', 'ESFP', 'ENFP', 'ENTP',
+                                'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
+                              ].map(type => <option key={type} value={type}>{type}</option>)}
+                            </select>
+                          ) : (
+                            <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
+                          )}
                         </SectionCard>
                         <SectionCard title="Audio Bio" isEditing={isEditing}>
                             <div style={{ display: isEditing ? 'none' : 'block' }}>

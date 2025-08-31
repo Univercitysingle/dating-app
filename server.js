@@ -8,9 +8,6 @@ const morgan = require("morgan");
 const http = require("http");
 const cors = require("cors");
 const os = require('os');
-const multer = require("multer");
-const fs = require("fs");
-const ffmpeg = require("fluent-ffmpeg");
 
 const { initSocket } = require("./routes/chat");
 const authMiddleware = require("./middleware/authentication");
@@ -32,11 +29,12 @@ const server = http.createServer(app);
 
 // -------------------- MIDDLEWARE --------------------
 
-// Correlation ID
+// Add correlation ID to all requests
 app.use(correlationIdMiddleware);
 
-// CORS
+// CORS setup with preflight handling
 const isProduction = process.env.NODE_ENV === 'production';
+
 let allowedOrigins = [];
 
 if (process.env.CORS_ALLOWED_ORIGINS) {
@@ -44,12 +42,17 @@ if (process.env.CORS_ALLOWED_ORIGINS) {
 }
 
 if (!isProduction) {
+  // Add localhost for development
   allowedOrigins.push('http://localhost:3000', 'http://localhost:3001', 'http://localhost:8080');
 
+  // Add local network IP
   const interfaces = os.networkInterfaces();
   Object.keys(interfaces).forEach((ifname) => {
     interfaces[ifname].forEach((iface) => {
-      if ('IPv4' !== iface.family || iface.internal !== false) return;
+      if ('IPv4' !== iface.family || iface.internal !== false) {
+        // skip over internal (i.e. 127.0.0.1) and non-ipv4 addresses
+        return;
+      }
       allowedOrigins.push(`http://${iface.address}:3000`);
       allowedOrigins.push(`http://${iface.address}:3001`);
       allowedOrigins.push(`http://${iface.address}:8080`);
@@ -57,22 +60,35 @@ if (!isProduction) {
   });
 }
 
+
 const corsOptions = {
   origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) callback(null, true);
-    else callback(new Error("CORS not allowed"), false);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      callback(new Error(msg), false);
+    }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
 };
 
 logger.info({ message: "CORS allowed origins configured", origins: allowedOrigins });
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-// Security & JSON
+// Security headers & JSON parsing
 app.use(
   helmet({
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
@@ -82,11 +98,9 @@ app.use(
 );
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
-
-// Serve uploads folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// -------------------- LOGGING --------------------
+// -------------------- REQUEST/RESPONSE LOGGING --------------------
 app.use((req, res, next) => {
   req.log = buildLogger(req.correlationId || "GLOBAL");
   const startTime = Date.now();
@@ -107,20 +121,25 @@ app.use((req, res, next) => {
   next();
 });
 
+// Morgan logging via Winston
 app.use(
   morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", {
     stream: { write: (msg) => logger.debug(msg.trim()) },
   })
 );
 
-// Rate limiting
+// Trust proxy for rate limiting
 app.set("trust proxy", 1);
+
+// Rate limiting
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // -------------------- DATABASE --------------------
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
-  logger.error("❌ MongoDB connection string missing!");
+  logger.error(
+    "❌ MongoDB connection string is missing! Set MONGO_URI in your environment."
+  );
   process.exit(1);
 }
 
@@ -138,52 +157,19 @@ if (initSocket) {
     initSocket(server, allowedOrigins);
     logger.info("✅ Socket.IO initialized.");
   } catch (socketError) {
-    logger.error(`❌ Failed to initialize Socket.IO: ${socketError.message || socketError}`, {
-      stack: socketError.stack,
-    });
+    logger.error(
+      `❌ Failed to initialize Socket.IO: ${socketError.message || socketError}`,
+      { stack: socketError.stack }
+    );
   }
 }
-
-// -------------------- AUDIO UPLOAD --------------------
-
-// Multer config
-const upload = multer({ dest: "uploads/" });
-
-// Convert to MP3
-const convertToMP3 = (inputPath, outputPath) =>
-  new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
-      .outputOptions("-b:a 96k")
-      .toFormat("mp3")
-      .save(outputPath)
-      .on("end", () => resolve(outputPath))
-      .on("error", (err) => reject(err));
-  });
-
-// Upload endpoint
-app.post("/api/upload-audio", upload.single("audio"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const originalPath = req.file.path;
-    const outputFileName = `audio-${Date.now()}.mp3`;
-    const outputPath = path.join("uploads", outputFileName);
-
-    await convertToMP3(originalPath, outputPath);
-    fs.unlinkSync(originalPath);
-
-    const url = `${req.protocol}://${req.get("host")}/uploads/${outputFileName}`;
-    res.json({ url });
-  } catch (err) {
-    console.error("Audio upload error:", err);
-    res.status(500).json({ error: "Audio upload failed" });
-  }
-});
 
 // -------------------- ROUTES --------------------
 app.get("/", (req, res) => res.send("API is running..."));
 app.get("/health", (req, res) => res.status(200).send("OK"));
-app.get("/status", (req, res) => res.sendFile(path.join(__dirname, "public", "status.html")));
+app.get("/status", (req, res) =>
+  res.sendFile(path.join(__dirname, "public", "status.html"))
+);
 
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", authMiddleware, require("./routes/users"));
@@ -194,11 +180,14 @@ app.use("/api/reports", authMiddleware, require("./routes/reports"));
 app.use("/api/status", require("./routes/status"));
 
 // Admin routes
-app.use("/api/admin/users", require("./routes/adminUsers"));
-app.use("/api/admin/reports", require("./routes/adminReports"));
-app.use("/api/admin/analytics", require("./routes/adminAnalytics"));
+const adminUsersRouter = require("./routes/adminUsers");
+const adminReportsRouter = require("./routes/adminReports");
+const adminAnalyticsRouter = require("./routes/adminAnalytics");
+app.use("/api/admin/users", adminUsersRouter);
+app.use("/api/admin/reports", adminReportsRouter);
+app.use("/api/admin/analytics", adminAnalyticsRouter);
 
-// React fallback
+// React frontend fallback for non-API routes
 app.get("*", (req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "index.html"));
 });
@@ -208,11 +197,16 @@ app.use((err, req, res, next) => {
   const statusCode = err.status || 500;
   let responseErrorMessage = "An internal server error occurred. Please try again later.";
 
-  if (process.env.NODE_ENV !== "production") responseErrorMessage = err.message || responseErrorMessage;
-  else if (err.isOperational) responseErrorMessage = err.message;
+  if (process.env.NODE_ENV !== "production") {
+    responseErrorMessage = err.message || "Internal Server Error (No specific message)";
+  } else if (err.isOperational) {
+    responseErrorMessage = err.message;
+  }
 
   const errorPayload = { error: responseErrorMessage };
-  if (process.env.NODE_ENV !== "production" && err.details) errorPayload.details = err.details;
+  if (process.env.NODE_ENV !== "production" && err.details) {
+    errorPayload.details = err.details;
+  }
 
   const log = req.log || logger;
   log.error(`Global Error Handler: Status ${statusCode}, Message: ${err.message || "N/A"}`, {
@@ -220,12 +214,18 @@ app.use((err, req, res, next) => {
     payload: errorPayload,
   });
 
-  if (!res.headersSent) res.status(statusCode).json(errorPayload);
-  else next(err);
+  if (!res.headersSent) {
+    res.status(statusCode).json(errorPayload);
+  } else {
+    log.error("Headers already sent. Delegating to default Express handler.");
+    next(err);
+  }
 });
 
 // -------------------- START SERVER --------------------
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`);
+  logger.info(
+    `🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`
+  );
 });

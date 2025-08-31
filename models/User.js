@@ -25,7 +25,15 @@ const userSchema = new mongoose.Schema({
   interests: { type: [String], default: [] },
   profilePrompts: { type: [{ prompt: String, answer: String }], default: [] },
   audioBioUrl: { type: String, default: "" },
-  personalityQuizResults: { type: mongoose.Schema.Types.Mixed, default: {} },
+  personalityType: {
+    type: String,
+    enum: [
+      'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
+      'ISTP', 'ISFP', 'INFP', 'INTP',
+      'ESTP', 'ESFP', 'ENFP', 'ENTP',
+      'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
+    ],
+  },
   education: { type: String, default: "" },
   relationshipGoals: {
     type: String,
