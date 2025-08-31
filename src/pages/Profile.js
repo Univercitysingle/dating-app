@@ -56,7 +56,7 @@ function Profile() {
   const [editableFields, setEditableFields] = useState({
       education: '',
       relationshipGoals: '',
-      aboutMe: '',
+      bio: '',
   });
 
   // State for save statuses
@@ -68,7 +68,8 @@ function Profile() {
       hero: '',
       lifestyle: '',
       interests: '',
-      prompts: ''
+      prompts: '',
+      bio: ''
   });
 
   const { user, logout } = useAuth();
@@ -80,7 +81,7 @@ function Profile() {
       setEditableFields({
         education: user.education || '',
         relationshipGoals: user.relationshipGoals || 'Figuring it out',
-        aboutMe: user.aboutMe || '',
+        bio: user.bio || '',
       });
     }
   }, [user]);
@@ -151,11 +152,11 @@ function Profile() {
                       <SectionCard title="About Me" isEditing={isEditing}>
                           {isEditing ? (
                               <div>
-                                 <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                 <button onClick={() => handleSave('/api/users/me', { aboutMe: editableFields.aboutMe }, 'aboutMe')} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.aboutMe || 'Save'}</button>
+                                 <textarea id="bio" value={editableFields.bio} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                 <button onClick={() => handleSave('/api/users/me', { bio: editableFields.bio }, 'bio')} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.bio || 'Save'}</button>
                               </div>
                           ) : (
-                              <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe || 'Tell us about yourself...'}</p>
+                              <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.bio || 'Tell us about yourself...'}</p>
                           )}
                       </SectionCard>
 
