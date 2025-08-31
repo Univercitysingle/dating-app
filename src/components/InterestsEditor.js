@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import apiClient from '../api/apiClient';
 
 const InterestsEditor = ({ initialInterests = [], onSave }) => {
   const [interests, setInterests] = useState(initialInterests);
@@ -23,26 +24,8 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
 
   const handleSave = async () => {
     setStatus('Saving...');
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || !user.token) {
-      setStatus('Error: Not authenticated.');
-      return;
-    }
-
     try {
-      const response = await fetch('/api/users/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ interests }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save interests.');
-      }
+      await apiClient.put('/api/users/me', { interests });
 
       setStatus('Interests saved successfully!');
       if (onSave) {
@@ -51,7 +34,7 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
       // Optionally, clear status after a few seconds
       setTimeout(() => setStatus(''), 3000);
     } catch (error) {
-      setStatus(`Error: ${error.message}`);
+      setStatus(`Error: ${error.message || 'Failed to save interests.'}`);
       console.error('Failed to save interests:', error);
     }
   };
