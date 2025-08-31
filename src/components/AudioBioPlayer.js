@@ -43,30 +43,19 @@ const AudioBioPlayer = ({ audioUrl }) => {
       console.log('WaveSurfer ready');
     });
 
-    ws.on('play', () => {
-      setIsPlaying(true);
-      console.log('WaveSurfer play');
-    });
-
-    ws.on('pause', () => {
-      setIsPlaying(false);
-      console.log('WaveSurfer pause');
-    });
+    ws.on('play', () => setIsPlaying(true));
+    ws.on('pause', () => setIsPlaying(false));
 
     return () => {
       if (wavesurfer.current) {
         try {
-          // Only destroy if not already destroyed
           if (!wavesurfer.current.isDestroyed) {
             wavesurfer.current.destroy();
             console.log('WaveSurfer destroyed');
           }
         } catch (err) {
-          // Suppress the development-only AbortError
           if (err.name === 'AbortError') {
-            console.log(
-              'WaveSurfer destroy aborted (expected in React StrictMode)'
-            );
+            console.log('WaveSurfer destroy aborted (expected in StrictMode)');
           } else {
             console.error('WaveSurfer destroy error:', err);
           }
@@ -81,25 +70,19 @@ const AudioBioPlayer = ({ audioUrl }) => {
     if (wavesurfer.current) {
       try {
         wavesurfer.current.playPause();
-        console.log('PlayPause triggered');
       } catch (err) {
-        console.error('Error in playPause():', err);
+        console.error('PlayPause error:', err);
       }
     }
   };
 
   if (!audioUrl) {
-    return (
-      <p className="text-gray-500 italic text-sm">No audio bio available.</p>
-    );
+    return <p className="text-gray-500 italic text-sm">No audio bio available.</p>;
   }
 
   return (
     <div className="my-4">
-      {/* Waveform */}
       <div ref={waveformRef} />
-
-      {/* Controls */}
       {waveformReady ? (
         <button
           onClick={handlePlayPause}
@@ -108,7 +91,6 @@ const AudioBioPlayer = ({ audioUrl }) => {
           {isPlaying ? 'Pause' : 'Play'}
         </button>
       ) : (
-        // Fallback for unsupported formats or if WaveSurfer not ready
         <audio controls src={audioUrl} className="mt-2 w-full">
           Your browser does not support this audio format.
         </audio>
