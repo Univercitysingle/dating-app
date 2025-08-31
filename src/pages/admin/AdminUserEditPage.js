@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // Adjust as needed
+import apiClient from '../../api/apiClient';
 // Remove the next line if you don’t use it
 // import { PREDEFINED_PERSONALITY_TYPES } from '../../utils/constants';
 
