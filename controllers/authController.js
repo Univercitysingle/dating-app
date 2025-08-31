@@ -43,6 +43,12 @@ const login = async (req, res) => {
       const decodedToken = await admin.auth().verifyIdToken(token);
       const user = await findOrCreateUserFromToken(decodedToken);
 
+      if (user) {
+        user.lastLoginDevice = req.headers['user-agent'];
+        user.lastLoginIp = req.ip;
+        await user.save();
+      }
+
       if (!user) {
         log.warn(`User provisioning failed for token: ${token.substring(0, 10)}...`);
         return res.status(403).json({ error: "User provisioning failed. Email may not be verified or token details are insufficient." });

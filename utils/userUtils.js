@@ -52,10 +52,9 @@ const findOrCreateUserFromToken = async (decodedToken) => {
 
 const sanitizeUser = (user, currentUser) => {
   const isSuperAdmin = currentUser.role === 'superadmin';
-  const isAdmin = currentUser.role === 'admin';
   const isOwner = currentUser.uid === user.uid;
 
-  if (isSuperAdmin || isAdmin || isOwner) {
+  if (isSuperAdmin || isOwner) {
     return user.toObject ? user.toObject() : user;
   }
 

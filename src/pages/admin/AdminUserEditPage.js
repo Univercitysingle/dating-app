@@ -21,6 +21,8 @@ const AdminUserEditPage = () => {
     education: '',
     relationshipGoals: '',
     bio: '',
+    lastLoginIp: '',
+    lastLoginDevice: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -46,6 +48,8 @@ const AdminUserEditPage = () => {
         education: data.education || '',
         relationshipGoals: data.relationshipGoals || '',
         bio: data.bio || '',
+        lastLoginIp: data.lastLoginIp || '',
+        lastLoginDevice: data.lastLoginDevice || '',
       });
     } catch (err) {
       setError(err.message);
@@ -175,6 +179,19 @@ const AdminUserEditPage = () => {
           <input type="checkbox" name="isProfileVisible" id="isProfileVisible" checked={userData.isProfileVisible} onChange={handleChange} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"/>
           <label htmlFor="isProfileVisible" className="ml-2 block text-sm text-gray-900">Profile Visible</label>
         </div>
+
+        { (adminUser?.role === 'superadmin') &&
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Last Login IP</label>
+              <p className="mt-1 text-sm text-gray-900">{userData.lastLoginIp || 'N/A'}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Last Login Device</label>
+              <p className="mt-1 text-sm text-gray-900">{userData.lastLoginDevice || 'N/A'}</p>
+            </div>
+          </>
+        }
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
         {successMessage && <p className="text-green-500 text-sm">{successMessage}</p>}

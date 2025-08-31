@@ -62,6 +62,8 @@ const userSchema = new mongoose.Schema({
     smoking: { type: String, enum: ['Socially', 'Sometimes', 'Never'] },
   },
   lastActiveAt: { type: Date, default: Date.now },
+  lastLoginDevice: { type: String },
+  lastLoginIp: { type: String },
   suspendedUntil: { type: Date, default: null },
   location: {
     type: {
