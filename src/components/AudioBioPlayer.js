@@ -27,7 +27,7 @@ const AudioBioPlayer = ({ audioUrl }) => {
     try {
       ws.load(audioUrl);
     } catch (err) {
-      console.warn("WaveSurfer could not load audio:", err);
+      console.warn('WaveSurfer could not load audio:', err);
     }
 
     ws.on('ready', () => setWaveformReady(true));
@@ -37,10 +37,14 @@ const AudioBioPlayer = ({ audioUrl }) => {
     return () => {
       if (wavesurfer.current) {
         try {
-          wavesurfer.current.destroy();
-          wavesurfer.current = null;
+          // Guard against double destroy in React StrictMode
+          if (!wavesurfer.current.isDestroyed) {
+            wavesurfer.current.destroy();
+          }
         } catch (err) {
-          console.warn("WaveSurfer destroy skipped:", err);
+          console.warn('WaveSurfer destroy skipped:', err);
+        } finally {
+          wavesurfer.current = null;
         }
       }
     };
@@ -72,12 +76,8 @@ const AudioBioPlayer = ({ audioUrl }) => {
           {isPlaying ? 'Pause' : 'Play'}
         </button>
       ) : (
-        // Fallback <audio> if WaveSurfer fails or unsupported format
-        <audio
-          controls
-          src={audioUrl}
-          className="mt-2 w-full"
-        >
+        // Fallback if waveform not ready
+        <audio controls src={audioUrl} className="mt-2 w-full">
           Your browser does not support this audio format.
         </audio>
       )}
