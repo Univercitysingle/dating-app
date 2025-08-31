@@ -10,36 +10,55 @@ const AudioBioPlayer = ({ audioUrl }) => {
   useEffect(() => {
     if (!waveformRef.current || !audioUrl) return;
 
-    const ws = WaveSurfer.create({
-      container: waveformRef.current,
-      waveColor: 'violet',
-      progressColor: 'purple',
-      cursorWidth: 1,
-      barWidth: 2,
-      barHeight: 1,
-      barGap: 2,
-      height: 100,
-      responsive: true,
-    });
+    let ws;
 
-    wavesurfer.current = ws;
+    try {
+      ws = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: 'violet',
+        progressColor: 'purple',
+        cursorWidth: 1,
+        barWidth: 2,
+        barHeight: 1,
+        barGap: 2,
+        height: 100,
+        responsive: true,
+      });
+      wavesurfer.current = ws;
+      console.log('WaveSurfer instance created');
+    } catch (err) {
+      console.error('Failed to create WaveSurfer:', err);
+      return;
+    }
 
     try {
       ws.load(audioUrl);
+      console.log('WaveSurfer loading audio:', audioUrl);
     } catch (err) {
-      console.warn('WaveSurfer could not load audio:', err);
+      console.error('Failed to load audio:', err);
     }
 
-    ws.on('ready', () => setWaveformReady(true));
-    ws.on('play', () => setIsPlaying(true));
-    ws.on('pause', () => setIsPlaying(false));
+    ws.on('ready', () => {
+      setWaveformReady(true);
+      console.log('WaveSurfer ready');
+    });
+
+    ws.on('play', () => {
+      setIsPlaying(true);
+      console.log('WaveSurfer play');
+    });
+
+    ws.on('pause', () => {
+      setIsPlaying(false);
+      console.log('WaveSurfer pause');
+    });
 
     return () => {
       if (wavesurfer.current) {
         try {
-          // Guard against double destroy in React StrictMode
           if (!wavesurfer.current.isDestroyed) {
             wavesurfer.current.destroy();
+            console.log('WaveSurfer destroyed');
           }
         } catch (err) {
           console.warn('WaveSurfer destroy skipped:', err);
@@ -52,7 +71,12 @@ const AudioBioPlayer = ({ audioUrl }) => {
 
   const handlePlayPause = () => {
     if (wavesurfer.current) {
-      wavesurfer.current.playPause();
+      try {
+        wavesurfer.current.playPause();
+        console.log('PlayPause triggered');
+      } catch (err) {
+        console.error('Error in playPause():', err);
+      }
     }
   };
 
