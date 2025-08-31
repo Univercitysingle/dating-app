@@ -154,8 +154,6 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
-                      <PhotoGallery photos={profile.photos || []} prompts={profile.profilePrompts || []} onEdit={() => setIsEditingPhotos(true)} />
-
                       <SectionCard title="About Me" isEditing={isEditing}>
                           {isEditing ? (
                               <div>
@@ -251,10 +249,10 @@ function Profile() {
   return (
     <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="container mx-auto p-4">
-            <div className="relative w-full h-64 md:h-80 rounded-lg overflow-hidden shadow-lg mb-6">
-                <img src={profile.photos?.[0]?.url ? `${API_URL}${profile.photos[0].url}` : 'https://placehold.co/800x400?text=Your+Hero+Image'} alt="Hero" className="w-full h-full object-cover"/>
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-neutral-900/60 to-transparent">
-                    <h1 className="text-3xl font-bold text-neutral-50">{profile.name}, {profile.age}</h1>
+            <div className="relative w-full h-96 md:h-[70vh] rounded-lg overflow-hidden shadow-lg mb-6">
+              <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                    <h1 className="text-3xl font-bold text-white">{profile.name}, {profile.age}</h1>
                     <div className="flex items-center mt-1">
                         {isPremium && <PremiumBadge />}
                         {isVerified && <VerifiedBadge />}
@@ -271,15 +269,27 @@ function Profile() {
                 </button>
                 {isMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-800 rounded-md shadow-lg z-20">
-                    <button
-                      onClick={() => {
-                        setIsEditing(true);
-                        setIsMenuOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                    >
-                      Edit Profile
-                    </button>
+                    {isEditing ? (
+                      <button
+                        onClick={() => {
+                          setIsEditing(false);
+                          setIsMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                      >
+                        View Profile
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setIsEditing(true);
+                          setIsMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                      >
+                        Edit Profile
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setActiveTab('settings');
