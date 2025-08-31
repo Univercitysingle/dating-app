@@ -5,6 +5,8 @@ const path = require("path");
 const { saveFile, deleteFile } = require("../services/localStore");
 const multer = require("multer");
 
+const { sanitizeUser } = require('../utils/userUtils');
+
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
   log.info("UsersController: getCurrentUserProfile entered.");
@@ -14,7 +16,7 @@ const getCurrentUserProfile = async (req, res) => {
   }
 
   log.info(`UsersController: Sending user profile for UID: ${req.user.uid}.`);
-  res.json(req.user);
+  res.json(sanitizeUser(req.user, req.user));
 };
 
 const updateCurrentUserProfile = async (req, res) => {
@@ -432,8 +434,10 @@ const discoverUsers = async (req, res) => {
       }
     });
 
-    log.info(`UsersController: Found ${users.length} users to discover.`);
-    res.json(users);
+    const sanitizedUsers = users.map(user => sanitizeUser(user, req.user));
+
+    log.info(`UsersController: Found ${sanitizedUsers.length} users to discover.`);
+    res.json(sanitizedUsers);
   } catch (error) {
     log.error({ err: error }, `UsersController: Error fetching users for discovery for UID ${currentUserUid}`);
     res.status(500).json({ error: "An unexpected error occurred while fetching users." });

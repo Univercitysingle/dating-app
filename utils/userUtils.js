@@ -50,4 +50,20 @@ const findOrCreateUserFromToken = async (decodedToken) => {
   return newUser;
 };
 
-module.exports = { findOrCreateUserFromToken };
+const sanitizeUser = (user, currentUser) => {
+  const isSuperAdmin = currentUser.role === 'superadmin';
+  const isAdmin = currentUser.role === 'admin';
+  const isOwner = currentUser.uid === user.uid;
+
+  if (isSuperAdmin || isAdmin || isOwner) {
+    return user.toObject ? user.toObject() : user;
+  }
+
+  const sanitizedUser = user.toObject ? { ...user.toObject() } : { ...user };
+  delete sanitizedUser.email;
+  delete sanitizedUser.mobileNumber;
+
+  return sanitizedUser;
+}
+
+module.exports = { findOrCreateUserFromToken, sanitizeUser };

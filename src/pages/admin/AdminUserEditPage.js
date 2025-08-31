@@ -140,10 +140,12 @@ const AdminUserEditPage = () => {
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
           <input type="text" name="name" id="name" value={userData.name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
         </div>
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-          <input type="email" name="email" id="email" value={userData.email} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
-        </div>
+        { (adminUser?.role === 'superadmin' || adminUser?.role === 'admin') &&
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+            <input type="email" name="email" id="email" value={userData.email} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"/>
+          </div>
+        }
         {isNewUser && (
           <div>
             <label htmlFor="password_edit" className="block text-sm font-medium text-gray-700">Password</label>

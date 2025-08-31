@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Report = require('../models/Report'); // Import the Report model
 const bcrypt = require('bcryptjs');
+const { sanitizeUser } = require('../utils/userUtils');
 
 // Get dashboard statistics
 const getDashboardStats = async (req, res) => {
@@ -54,8 +55,10 @@ const listUsers = async (req, res) => {
 
     const totalUsers = await User.countDocuments(query);
 
+    const sanitizedUsers = users.map(user => sanitizeUser(user, req.user));
+
     res.json({
-      users,
+      users: sanitizedUsers,
       totalPages: Math.ceil(totalUsers / limit),
       currentPage: page,
       totalUsers,
@@ -145,7 +148,7 @@ const getUserById = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+    res.json(sanitizeUser(user, req.user));
   } catch (error) {
     console.error('Error getting user by ID:', error);
     res.status(500).json({ message: 'Error getting user', error: error.message });

@@ -148,7 +148,7 @@ const AdminUserListPage = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  { (adminUser?.role === 'superadmin' || adminUser?.role === 'admin') && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th> }
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visible</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Active</th>
@@ -162,7 +162,7 @@ const AdminUserListPage = () => {
                   users.map(user => (
                     <tr key={user._id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.name || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
+                      { (adminUser?.role === 'superadmin' || adminUser?.role === 'admin') && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td> }
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.isProfileVisible ? 'Yes' : 'No'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
