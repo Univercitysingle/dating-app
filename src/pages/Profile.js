@@ -223,7 +223,12 @@ function Profile() {
                             {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
                         </SectionCard>
                         <SectionCard title="Audio Bio" isEditing={isEditing}>
-                            {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
+                            <div style={{ display: isEditing ? 'none' : 'block' }}>
+                                <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
+                            </div>
+                            <div style={{ display: isEditing ? 'block' : 'none' }}>
+                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} />
+                            </div>
                         </SectionCard>
                   </div>
               );
