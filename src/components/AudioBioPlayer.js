@@ -56,12 +56,20 @@ const AudioBioPlayer = ({ audioUrl }) => {
     return () => {
       if (wavesurfer.current) {
         try {
+          // Only destroy if not already destroyed
           if (!wavesurfer.current.isDestroyed) {
             wavesurfer.current.destroy();
             console.log('WaveSurfer destroyed');
           }
         } catch (err) {
-          console.warn('WaveSurfer destroy skipped:', err);
+          // Suppress the development-only AbortError
+          if (err.name === 'AbortError') {
+            console.log(
+              'WaveSurfer destroy aborted (expected in React StrictMode)'
+            );
+          } else {
+            console.error('WaveSurfer destroy error:', err);
+          }
         } finally {
           wavesurfer.current = null;
         }
@@ -100,7 +108,7 @@ const AudioBioPlayer = ({ audioUrl }) => {
           {isPlaying ? 'Pause' : 'Play'}
         </button>
       ) : (
-        // Fallback if waveform not ready
+        // Fallback for unsupported formats or if WaveSurfer not ready
         <audio controls src={audioUrl} className="mt-2 w-full">
           Your browser does not support this audio format.
         </audio>
