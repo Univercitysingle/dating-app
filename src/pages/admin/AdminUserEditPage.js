@@ -30,17 +30,13 @@ const AdminUserEditPage = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   const fetchUserData = useCallback(async () => {
-    if (isNewUser || !adminUser || !adminUser.token) {
+    if (isNewUser) {
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        headers: { 'Authorization': `Bearer ${adminUser.token}` },
-      });
-      if (!response.ok) throw new Error('Failed to fetch user data');
-      const data = await response.json();
+      const data = await apiClient.get(`/api/admin/users/${userId}`);
       setUserData({
         name: data.name || '',
         email: data.email || '',
@@ -80,14 +76,8 @@ const AdminUserEditPage = () => {
     setError(null);
     setSuccessMessage('');
 
-    if (!adminUser || !adminUser.token) {
-      setError("Authentication error.");
-      setIsLoading(false);
-      return;
-    }
-
     const url = isNewUser ? '/api/admin/users' : `/api/admin/users/${userId}`;
-    const method = isNewUser ? 'POST' : 'PUT';
+    const method = isNewUser ? 'post' : 'put';
 
     const payload = { ...userData };
     if (!isNewUser || (isNewUser && !payload.password)) {
@@ -98,18 +88,7 @@ const AdminUserEditPage = () => {
     }
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminUser.token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.message || `Failed to ${isNewUser ? 'create' : 'update'} user`);
-      }
+      const responseData = await apiClient[method](url, payload);
       setSuccessMessage(`User ${isNewUser ? 'created' : 'updated'} successfully!`);
       if (isNewUser && responseData._id) {
         navigate(`/admin/users/${responseData._id}/edit`);
