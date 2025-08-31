@@ -6,6 +6,8 @@ const AudioBioPlayer = ({ audioUrl }) => {
   const wavesurfer = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  const abortControllerRef = useRef(new AbortController());
+
   // Initialize wavesurfer
   useEffect(() => {
     if (waveformRef.current) {
@@ -25,14 +27,22 @@ const AudioBioPlayer = ({ audioUrl }) => {
       wavesurfer.current.on('finish', () => setIsPlaying(false));
 
       // Destroy on component unmount
-      return () => wavesurfer.current.destroy();
+      return () => {
+        wavesurfer.current.destroy();
+      };
     }
   }, []); // Empty dependency array means this runs only once on mount
 
   // Load new audio when audioUrl changes
   useEffect(() => {
     if (audioUrl && wavesurfer.current) {
-      wavesurfer.current.load(audioUrl);
+      // Abort any ongoing fetch
+      abortControllerRef.current.abort();
+      // Create a new controller for the new fetch
+      const newController = new AbortController();
+      abortControllerRef.current = newController;
+
+      wavesurfer.current.load(audioUrl, undefined, newController.signal);
     }
   }, [audioUrl]);
 
