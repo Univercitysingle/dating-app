@@ -56,6 +56,10 @@ function Profile() {
       relationshipGoals: '',
       bio: '',
       personalityType: '',
+      interests: [],
+      profilePrompts: [],
+      lifestyle: {},
+      badges: {},
   });
 
   // State for save statuses
@@ -82,6 +86,10 @@ function Profile() {
         relationshipGoals: user.relationshipGoals || 'Figuring it out',
         bio: user.bio || '',
         personalityType: user.personalityType || '',
+        interests: user.interests || [],
+        profilePrompts: user.profilePrompts || [],
+        lifestyle: user.lifestyle || {},
+        badges: user.badges || {},
       });
     }
   }, [user]);
@@ -105,21 +113,8 @@ function Profile() {
       }
   };
 
-  const handleDetailsSave = () => {
+  const handleSaveAll = () => {
       handleSave('/api/users/me', editableFields, 'details');
-  };
-
-  const handleInterestsSaved = (interests) => {
-      handleSave('/api/users/me', { interests }, 'interests');
-  };
-
-  const handlePromptsSaved = (prompts) => {
-      handleSave('/api/users/me', { profilePrompts: prompts }, 'prompts');
-  };
-
-
-  const handleLifestyleSave = (data) => {
-      handleSave('/api/users/me', data, 'lifestyle');
   };
 
   const handleMediaUploadComplete = (fileUrl, fieldName) => {
@@ -150,7 +145,6 @@ function Profile() {
                           {isEditing ? (
                               <div>
                                  <textarea id="bio" value={editableFields.bio} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                 <button onClick={() => handleSave('/api/users/me', { bio: editableFields.bio }, 'bio')} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.bio || 'Save'}</button>
                               </div>
                           ) : (
                               <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.bio || 'Tell us about yourself...'}</p>
@@ -159,7 +153,7 @@ function Profile() {
 
                       <SectionCard title="Profile Prompts" isEditing={isEditing}>
                           {isEditing ? (
-                              <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} />
+                              <ProfilePromptsEditor initialPrompts={editableFields.profilePrompts} onChange={(profilePrompts) => setEditableFields(prev => ({...prev, profilePrompts}))} />
                           ) : (
                               <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
                           )}
@@ -188,7 +182,6 @@ function Profile() {
                                             <option value="Figuring it out">Figuring it out</option>
                                         </select>
                                     </div>
-                                    <button onClick={handleDetailsSave} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save Details'}</button>
                                 </div>
                             ) : (
                                 <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
@@ -201,7 +194,7 @@ function Profile() {
                             )}
                         </SectionCard>
                         <SectionCard title="Lifestyle" isEditing={isEditing}>
-                            {isEditing ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} initialBadges={profile.badges || {}} onSave={handleLifestyleSave} /> : (
+                            {isEditing ? <LifestyleEditor initialLifestyle={editableFields.lifestyle} initialBadges={editableFields.badges} onChange={({lifestyle, badges}) => setEditableFields(prev => ({...prev, lifestyle, badges}))} /> : (
                                 <>
                                     <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
                                         <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
@@ -215,7 +208,7 @@ function Profile() {
                             )}
                         </SectionCard>
                         <SectionCard title="Interests" isEditing={isEditing}>
-                            {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
+                            {isEditing ? <InterestsEditor initialInterests={editableFields.interests} onChange={(interests) => setEditableFields(prev => ({...prev, interests}))} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
                         <SectionCard title="Personality Type" isEditing={isEditing}>
                           {isEditing ? (
@@ -245,6 +238,13 @@ function Profile() {
                                 <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} />
                             </div>
                         </SectionCard>
+                        {isEditing && (
+                            <div className="flex justify-end mt-6">
+                                <button onClick={handleSaveAll} className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
+                                    {saveStatus.details || 'Save All Changes'}
+                                </button>
+                            </div>
+                        )}
                   </div>
               );
           case 'settings':

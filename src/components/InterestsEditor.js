@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 
-const InterestsEditor = ({ initialInterests = [], onSave }) => {
+const InterestsEditor = ({ initialInterests = [], onChange }) => {
   const [interests, setInterests] = useState(initialInterests);
   const [inputValue, setInputValue] = useState('');
   const [status, setStatus] = useState(''); // For loading/success/error messages
@@ -13,30 +13,17 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
 
   const handleAddInterest = () => {
     if (inputValue.trim() && !interests.includes(inputValue.trim())) {
-      setInterests([...interests, inputValue.trim()]);
+      const newInterests = [...interests, inputValue.trim()];
+      setInterests(newInterests);
+      onChange(newInterests);
       setInputValue('');
     }
   };
 
   const handleRemoveInterest = (interestToRemove) => {
-    setInterests(interests.filter((interest) => interest !== interestToRemove));
-  };
-
-  const handleSave = async () => {
-    setStatus('Saving...');
-    try {
-      await apiClient.put('/api/users/me', { interests });
-
-      setStatus('Interests saved successfully!');
-      if (onSave) {
-        onSave(interests); // Notify parent about the save
-      }
-      // Optionally, clear status after a few seconds
-      setTimeout(() => setStatus(''), 3000);
-    } catch (error) {
-      setStatus(`Error: ${error.message || 'Failed to save interests.'}`);
-      console.error('Failed to save interests:', error);
-    }
+    const newInterests = interests.filter((interest) => interest !== interestToRemove);
+    setInterests(newInterests);
+    onChange(newInterests);
   };
 
   return (
@@ -79,13 +66,6 @@ const InterestsEditor = ({ initialInterests = [], onSave }) => {
           </span>
         ))}
       </div>
-      <button
-        onClick={handleSave}
-        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md"
-      >
-        Save Interests
-      </button>
-      {status && <p className="mt-2 text-sm text-gray-600">{status}</p>}
     </div>
   );
 };

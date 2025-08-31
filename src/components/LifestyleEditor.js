@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 
-const LifestyleEditor = ({ initialLifestyle, initialBadges, onSave }) => {
+const LifestyleEditor = ({ initialLifestyle, initialBadges, onChange }) => {
   const [lifestyle, setLifestyle] = useState(initialLifestyle || {});
   const [badges, setBadges] = useState(initialBadges || {});
 
   const handleLifestyleChange = (e) => {
     const { name, value } = e.target;
-    setLifestyle((prev) => ({ ...prev, [name]: value }));
+    const newLifestyle = { ...lifestyle, [name]: value };
+    setLifestyle(newLifestyle);
+    onChange({ lifestyle: newLifestyle, badges });
   };
 
   const handleBadgesChange = (e) => {
     const { name, value } = e.target;
-    setBadges((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = () => {
-    onSave({ lifestyle, badges });
+    const newBadges = { ...badges, [name]: value };
+    setBadges(newBadges);
+    onChange({ lifestyle, badges: newBadges });
   };
 
   return (
@@ -168,12 +168,6 @@ const LifestyleEditor = ({ initialLifestyle, initialBadges, onSave }) => {
         </select>
       </div>
 
-      <button
-        onClick={handleSave}
-        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-      >
-        Save Lifestyle & Badges
-      </button>
     </div>
   );
 };

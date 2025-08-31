@@ -16,7 +16,7 @@ const PREDEFINED_PROMPTS = [
 
 const MAX_PROMPTS = 3;
 
-const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
+const ProfilePromptsEditor = ({ initialPrompts = [], onChange }) => {
   const [selectedPrompts, setSelectedPrompts] = useState([]);
   const [status, setStatus] = useState('');
 
@@ -32,41 +32,26 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
       selectedPrompts.length < MAX_PROMPTS &&
       !selectedPrompts.find((p) => p.prompt === prompt)
     ) {
-      setSelectedPrompts([...selectedPrompts, { prompt, answer: '' }]);
+      const newPrompts = [...selectedPrompts, { prompt, answer: '' }];
+      setSelectedPrompts(newPrompts);
+      onChange(newPrompts);
     }
   };
 
   const handleRemovePrompt = (promptToRemove) => {
-    setSelectedPrompts(
-      selectedPrompts.filter((p) => p.prompt !== promptToRemove)
+    const newPrompts = selectedPrompts.filter(
+      (p) => p.prompt !== promptToRemove
     );
+    setSelectedPrompts(newPrompts);
+    onChange(newPrompts);
   };
 
   const handleAnswerChange = (prompt, answer) => {
-    setSelectedPrompts(
-      selectedPrompts.map((p) => (p.prompt === prompt ? { ...p, answer } : p))
+    const newPrompts = selectedPrompts.map((p) =>
+      p.prompt === prompt ? { ...p, answer } : p
     );
-  };
-
-  const handleSave = async () => {
-    setStatus('Saving...');
-    const promptsToSave = selectedPrompts.filter(
-      (p) => p.answer && p.answer.trim() !== ''
-    );
-
-    try {
-      const savedData = await apiClient.put('/api/users/me', {
-        profilePrompts: promptsToSave,
-      });
-      setStatus('Prompts saved successfully!');
-      if (onSave) {
-        onSave(savedData.profilePrompts || promptsToSave);
-      }
-      setTimeout(() => setStatus(''), 3000);
-    } catch (error) {
-      setStatus(`Error: ${error.message}`);
-      logger.error('Failed to save prompts:', error);
-    }
+    setSelectedPrompts(newPrompts);
+    onChange(newPrompts);
   };
 
   const availablePrompts = PREDEFINED_PROMPTS.filter(
@@ -131,15 +116,6 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onSave }) => {
         ))}
       </div>
 
-      {selectedPrompts.length > 0 && (
-        <button
-          onClick={handleSave}
-          className="mt-6 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md shadow-sm"
-        >
-          Save Prompts
-        </button>
-      )}
-      {status && <p className="mt-3 text-sm text-gray-700">{status}</p>}
     </div>
   );
 };

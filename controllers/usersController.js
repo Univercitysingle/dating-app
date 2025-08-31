@@ -37,7 +37,7 @@ const updateCurrentUserProfile = async (req, res) => {
       "name", "birthday", "gender", "preference", "bio", "photos",
       "interests", "profilePrompts", "audioBioUrl", "personalityType",
       "socialMediaLinks",
-      "education", "relationshipGoals", "location", "lifestyle", "badges",
+      "education", "relationshipGoals", "location", "lifestyle", "badges", "mobileNumber",
       "lastActiveAt", "isOnboardingComplete"
     ];
   }
