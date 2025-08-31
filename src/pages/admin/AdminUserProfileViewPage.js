@@ -1,22 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import apiClient from '../api/apiClient';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../api/apiClient';
+import InterestsDisplay from '../../components/InterestsDisplay';
+import ProfilePromptsDisplay from '../../components/ProfilePromptsDisplay';
+import AudioBioPlayer from '../../components/AudioBioPlayer';
+import PhotoGallery from '../../components/PhotoGallery';
+import BadgesDisplay from '../../components/BadgesDisplay';
 
-// Import all necessary components
-import InterestsDisplay from '../components/InterestsDisplay';
-import InterestsEditor from '../components/InterestsEditor';
-import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
-import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
-import AudioBioPlayer from '../components/AudioBioPlayer';
-import AudioBioUpload from '../components/AudioBioUpload';
-import PhotoGallery from '../components/PhotoGallery';
-import PhotoEditor from '../components/PhotoEditor';
-import LifestyleEditor from '../components/LifestyleEditor';
-import BadgesDisplay from '../components/BadgesDisplay';
-import { API_URL } from '../utils/constants';
-
-// Reusable components
 const PremiumBadge = () => (
   <span className="ml-2 px-2 py-1 text-xs font-semibold text-accent-dark bg-accent rounded-full">Premium</span>
 );
@@ -28,21 +19,14 @@ const VerifiedBadge = () => (
   </span>
 );
 
-const SectionCard = ({ title, onEdit, isEditing, children }) => (
+const SectionCard = ({ title, children }) => (
     <div className="bg-neutral-100 dark:bg-neutral-800 p-6 rounded-lg shadow-sm">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-neutral-800 dark:text-neutral-50">{title}</h2>
-            {onEdit && (
-                 <button onClick={onEdit} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark text-sm">
-                    {isEditing ? 'Cancel' : 'Edit'}
-                </button>
-            )}
         </div>
         {children}
     </div>
 );
-
-import { useParams } from 'react-router-dom';
 
 function AdminUserProfileViewPage() {
   const [profile, setProfile] = useState(null);
@@ -71,64 +55,11 @@ function AdminUserProfileViewPage() {
   const isPremium = profile.tier === 'premium';
   const isVerified = profile.isVerified === true;
 
-  const renderContent = () => {
-      switch(activeTab) {
-          case 'profile':
-              return (
-                  <div className="space-y-6">
-                      <SectionCard title="About Me">
-                        <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.bio || 'Tell us about yourself...'}</p>
-                      </SectionCard>
-
-                      <SectionCard title="Profile Prompts">
-                        <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
-                      </SectionCard>
-
-                       <SectionCard title="Details">
-                          <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
-                              <p><strong>Email:</strong> {profile.email}</p>
-                              <p><strong>Gender:</strong> {profile.gender}</p>
-                              <p><strong>Preference:</strong> {profile.preference}</p>
-                              <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
-                              <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
-                          </div>
-                        </SectionCard>
-                        <SectionCard title="Lifestyle">
-                            <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
-                                <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
-                                <p><strong>Looking For:</strong> {profile.lifestyle?.lookingFor || 'N/A'}</p>
-                                <p><strong>Religion:</strong> {profile.lifestyle?.religion || 'N/A'}</p>
-                                <p><strong>Political Leaning:</strong> {profile.lifestyle?.politicalLeaning || 'N/A'}</p>
-                            </div>
-                            <hr className="my-4" />
-                            <BadgesDisplay badges={profile.badges} />
-                        </SectionCard>
-                        <SectionCard title="Interests">
-                            <InterestsDisplay interests={profile.interests || []} />
-                        </SectionCard>
-                        <SectionCard title="Personality Type">
-                          <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
-                        </SectionCard>
-                        <SectionCard title="Audio Bio">
-                            <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
-                        </SectionCard>
-                  </div>
-              );
-          case 'settings':
-              return (
-                  <SectionCard title="Settings">
-                      <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
-                  </SectionCard>
-              );
-          default: return null;
-      }
-  }
-
   return (
     <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="container mx-auto p-4">
             <div className="relative w-full h-96 md:h-[70vh] rounded-lg overflow-hidden shadow-lg mb-6">
-              <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
+              <PhotoGallery photos={profile.photos || []} />
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                     <h1 className="text-3xl font-bold text-white">{profile.name}, {profile.age}</h1>
                     <div className="flex items-center mt-1">
@@ -138,7 +69,44 @@ function AdminUserProfileViewPage() {
                 </div>
             </div>
 
-            {renderContent()}
+            <div className="space-y-6">
+                <SectionCard title="About Me">
+                  <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.bio || 'Tell us about yourself...'}</p>
+                </SectionCard>
+
+                <SectionCard title="Profile Prompts">
+                  <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
+                </SectionCard>
+
+                 <SectionCard title="Details">
+                    <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                        <p><strong>Email:</strong> {profile.email}</p>
+                        <p><strong>Gender:</strong> {profile.gender}</p>
+                        <p><strong>Preference:</strong> {profile.preference}</p>
+                        <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
+                        <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
+                    </div>
+                  </SectionCard>
+                  <SectionCard title="Lifestyle">
+                      <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                          <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
+                          <p><strong>Looking For:</strong> {profile.lifestyle?.lookingFor || 'N/A'}</p>
+                          <p><strong>Religion:</strong> {profile.lifestyle?.religion || 'N/A'}</p>
+                          <p><strong>Political Leaning:</strong> {profile.lifestyle?.politicalLeaning || 'N/A'}</p>
+                      </div>
+                      <hr className="my-4" />
+                      <BadgesDisplay badges={profile.badges} />
+                  </SectionCard>
+                  <SectionCard title="Interests">
+                      <InterestsDisplay interests={profile.interests || []} />
+                  </SectionCard>
+                  <SectionCard title="Personality Type">
+                    <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
+                  </SectionCard>
+                  <SectionCard title="Audio Bio">
+                      <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
+                  </SectionCard>
+            </div>
         </div>
     </div>
   );
