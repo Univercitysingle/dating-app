@@ -15,8 +15,8 @@ def run(playwright):
     # Wait for navigation to the discover page, which is the default after login
     expect(page).to_have_url(re.compile(r'.*/discover'))
 
-    # Take a screenshot of the SwipeDeck
-    page.screenshot(path="jules-scratch/verification/swipe-deck.png")
+    # Take a screenshot of the SwapDeck
+    page.screenshot(path="jules-scratch/verification/swap-deck.png")
 
     # Navigate to the profile page
     page.get_by_role("link", name="Profile").click()

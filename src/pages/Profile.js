@@ -32,16 +32,23 @@ const VerifiedBadge = () => (
   </span>
 );
 
-const SectionCard = ({ title, children }) => (
+const SectionCard = ({ title, onEdit, isEditing, children }) => (
     <div className="bg-neutral-100 dark:bg-neutral-800 p-6 rounded-lg shadow-sm">
-        <h2 className="text-xl font-bold mb-4 text-neutral-800 dark:text-neutral-50">{title}</h2>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-neutral-800 dark:text-neutral-50">{title}</h2>
+            {onEdit && (
+                 <button onClick={onEdit} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark text-sm">
+                    {isEditing ? 'Cancel' : 'Edit'}
+                </button>
+            )}
+        </div>
         {children}
     </div>
 );
 
 function Profile() {
   const [profile, setProfile] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingSections, setEditingSections] = useState({});
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
@@ -61,10 +68,16 @@ function Profile() {
       media: '',
       hero: '',
       lifestyle: '',
+      interests: '',
+      prompts: ''
   });
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const toggleEdit = (section) => {
+    setEditingSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   useEffect(() => {
     if (user) {
@@ -89,6 +102,9 @@ function Profile() {
           setProfile(updatedProfile);
           setSaveStatus(prev => ({...prev, [statusKey]: 'Saved successfully!'}));
           setTimeout(() => setSaveStatus(prev => ({...prev, [statusKey]: ''})), 3000);
+          if (editingSections[statusKey]) {
+            toggleEdit(statusKey);
+          }
       } catch (error) {
           console.error(`Error saving ${statusKey}:`, error);
           setSaveStatus(prev => ({...prev, [statusKey]: `Error: ${error.data?.message || 'Failed to save'}`}));
@@ -145,27 +161,27 @@ function Profile() {
                   <div className="space-y-6">
                       <PhotoGallery photos={profile.photos || []} prompts={profile.profilePrompts || []} onEdit={() => setIsEditingPhotos(true)} />
 
-                      {isEditing ? (
-                        <SectionCard title="About Me">
-                           <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                           <button onClick={handleDetailsSave} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.details || 'Save'}</button>
-                        </SectionCard>
-                      ) : profile.aboutMe && (
-                        <SectionCard title="About Me">
-                            <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe}</p>
-                        </SectionCard>
-                      )}
+                      <SectionCard title="About Me" onEdit={() => toggleEdit('aboutMe')} isEditing={editingSections['aboutMe']}>
+                          {editingSections['aboutMe'] ? (
+                              <div>
+                                 <textarea id="aboutMe" value={editableFields.aboutMe} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                 <button onClick={() => handleSave('/api/users/me', { aboutMe: editableFields.aboutMe }, 'aboutMe')} className="mt-2 px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark">{saveStatus.aboutMe || 'Save'}</button>
+                              </div>
+                          ) : (
+                              <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.aboutMe || 'Tell us about yourself...'}</p>
+                          )}
+                      </SectionCard>
 
-                      <SectionCard title="Profile Prompts">
-                          {isEditing ? (
+                      <SectionCard title="Profile Prompts" onEdit={() => toggleEdit('prompts')} isEditing={editingSections['prompts']}>
+                          {editingSections['prompts'] ? (
                               <ProfilePromptsEditor initialPrompts={profile.profilePrompts || []} onSave={handlePromptsSaved} />
                           ) : (
                               <ProfilePromptsDisplay profilePrompts={profile.profilePrompts || []} />
                           )}
                       </SectionCard>
 
-                       <SectionCard title="Details">
-                            {isEditing ? (
+                       <SectionCard title="Details" onEdit={() => toggleEdit('details')} isEditing={editingSections['details']}>
+                            {editingSections['details'] ? (
                                 <div className="space-y-4">
                                     <div>
                                         <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
@@ -199,8 +215,8 @@ function Profile() {
                                 </div>
                             )}
                         </SectionCard>
-                        <SectionCard title="Lifestyle">
-                            {isEditing ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} initialBadges={profile.badges || {}} onSave={handleLifestyleSave} /> : (
+                        <SectionCard title="Lifestyle" onEdit={() => toggleEdit('lifestyle')} isEditing={editingSections['lifestyle']}>
+                            {editingSections['lifestyle'] ? <LifestyleEditor initialLifestyle={profile.lifestyle || {}} initialBadges={profile.badges || {}} onSave={handleLifestyleSave} /> : (
                                 <>
                                     <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
                                         <p><strong>Pets:</strong> {profile.lifestyle?.pets || 'N/A'}</p>
@@ -213,17 +229,17 @@ function Profile() {
                                 </>
                             )}
                         </SectionCard>
-                        <SectionCard title="Interests">
-                            {isEditing ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
+                        <SectionCard title="Interests" onEdit={() => toggleEdit('interests')} isEditing={editingSections['interests']}>
+                            {editingSections['interests'] ? <InterestsEditor initialInterests={profile.interests || []} onSave={handleInterestsSaved} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Personality Quiz">
-                            {isEditing ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
+                        <SectionCard title="Personality Quiz" onEdit={() => toggleEdit('quiz')} isEditing={editingSections['quiz']}>
+                            {editingSections['quiz'] ? <PersonalityQuizEditor currentQuizResults={profile.personalityQuizResults || {}} onSave={handlePersonalityQuizSave} /> : <PersonalityQuizSummary quizResults={profile.personalityQuizResults || {}} />}
                         </SectionCard>
-                        <SectionCard title="Social Media">
-                            {isEditing ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
+                        <SectionCard title="Social Media" onEdit={() => toggleEdit('social')} isEditing={editingSections['social']}>
+                            {editingSections['social'] ? <SocialMediaLinksEditor initialLinks={profile.socialMediaLinks || {}} onSave={handleSocialMediaLinksSave} /> : <SocialMediaLinksDisplay socialMediaLinks={profile.socialMediaLinks || {}} />}
                         </SectionCard>
-                        <SectionCard title="Audio Bio">
-                            {isEditing ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
+                        <SectionCard title="Audio Bio" onEdit={() => toggleEdit('media')} isEditing={editingSections['media']}>
+                            {editingSections['media'] ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
                         </SectionCard>
                   </div>
               );
@@ -256,9 +272,6 @@ function Profile() {
                     <button onClick={() => setActiveTab('profile')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'profile' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Profile</button>
                     <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'settings' ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-50' : 'text-neutral-600 dark:text-neutral-300'}`}>Settings</button>
                 </div>
-                <button onClick={() => setIsEditing(!isEditing)} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">
-                    {isEditing ? 'View Profile' : 'Edit Profile'}
-                </button>
             </div>
 
             {isEditingPhotos && (
