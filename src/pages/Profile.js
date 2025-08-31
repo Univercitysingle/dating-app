@@ -18,6 +18,8 @@ import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
 import BadgesDisplay from '../components/BadgesDisplay';
+import SpotifyConnect from '../components/SpotifyConnect';
+import TopArtists from '../components/TopArtists';
 import { API_URL } from '../utils/constants';
 
 // Reusable components
@@ -52,6 +54,7 @@ function Profile() {
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
+  const [topArtists, setTopArtists] = useState([]);
 
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
@@ -87,6 +90,12 @@ function Profile() {
         relationshipGoals: user.relationshipGoals || 'Figuring it out',
         aboutMe: user.aboutMe || '',
       });
+
+      if (user.spotifyRefreshToken) {
+        apiClient.get('/api/spotify/top-artists')
+          .then(data => setTopArtists(data))
+          .catch(err => console.error('Error fetching top artists:', err));
+      }
     }
   }, [user]);
 
@@ -240,6 +249,14 @@ function Profile() {
                         </SectionCard>
                         <SectionCard title="Audio Bio" onEdit={() => toggleEdit('media')} isEditing={editingSections['media']}>
                             {editingSections['media'] ? <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} /> : <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />}
+                        </SectionCard>
+
+                        <SectionCard title="My Top Artists">
+                          {!profile.spotifyRefreshToken ? (
+                            <SpotifyConnect />
+                          ) : (
+                            <TopArtists artists={topArtists} />
+                          )}
                         </SectionCard>
                   </div>
               );
