@@ -122,7 +122,7 @@ const ProfilePromptsEditor = ({ initialPrompts = [], onChange }) => {
 
 ProfilePromptsEditor.propTypes = {
   initialPrompts: PropTypes.array,
-  onSave: PropTypes.func.isRequired,
+  onChange: PropTypes.func.isRequired,
 };
 
 export default ProfilePromptsEditor;

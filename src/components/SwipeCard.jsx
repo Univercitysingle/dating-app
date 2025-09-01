@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import SuperLikeNotification from './SuperLikeNotification';
+import { API_URL } from '../utils/constants';
 
 const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -17,10 +18,10 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
     return null;
   }
 
-  const { name, age, images, bio, interests } = user;
+  const { name, age, photos, bio, interests } = user;
   const imageSources =
-    images && images.length > 0
-      ? images
+    photos && photos.length > 0
+      ? photos.map(p => p.url.startsWith('http') ? p.url : `${API_URL}${p.url}`)
       : ['https://placehold.co/400x600?text=Profile+Image'];
 
   const handleDragEnd = (event, info) => {
@@ -168,7 +169,9 @@ SwipeCard.propTypes = {
     _id: PropTypes.string.isRequired,
     name: PropTypes.string,
     age: PropTypes.number,
-    images: PropTypes.arrayOf(PropTypes.string),
+    photos: PropTypes.arrayOf(PropTypes.shape({
+        url: PropTypes.string.isRequired,
+    })),
     bio: PropTypes.string,
     interests: PropTypes.arrayOf(PropTypes.string),
   }),

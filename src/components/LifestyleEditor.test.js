@@ -19,7 +19,7 @@ describe('LifestyleEditor', () => {
   };
 
   test('renders with initial lifestyle and badges data', () => {
-    render(<LifestyleEditor initialLifestyle={initialLifestyle} initialBadges={initialBadges} onSave={() => {}} />);
+    render(<LifestyleEditor initialLifestyle={initialLifestyle} initialBadges={initialBadges} onChange={() => {}} />);
 
     expect(screen.getByLabelText('Pets')).toHaveValue(initialLifestyle.pets);
     expect(screen.getByLabelText('Zodiac')).toHaveValue(initialBadges.zodiac);
@@ -27,34 +27,25 @@ describe('LifestyleEditor', () => {
     expect(screen.getByLabelText('Height (cm)')).toHaveValue(initialBadges.height);
   });
 
-  test('updates state on input change', () => {
-    render(<LifestyleEditor initialLifestyle={{}} initialBadges={{}} onSave={() => {}} />);
+  test('updates state and calls onChange on input change', () => {
+    const handleChange = jest.fn();
+    render(<LifestyleEditor initialLifestyle={{}} initialBadges={{}} onChange={handleChange} />);
 
     const petsSelect = screen.getByLabelText('Pets');
-    fireEvent.change(petsSelect, { target: { value: 'Cat person' } });
+    fireEvent.change(petsSelect, { target: { name: 'pets', value: 'Cat person' } });
     expect(petsSelect).toHaveValue('Cat person');
+    expect(handleChange).toHaveBeenCalledWith({
+      lifestyle: { pets: 'Cat person' },
+      badges: {},
+    });
 
     const zodiacInput = screen.getByLabelText('Zodiac');
-    fireEvent.change(zodiacInput, { target: { value: 'Pisces' } });
+    fireEvent.change(zodiacInput, { target: { name: 'zodiac', value: 'Pisces' } });
     expect(zodiacInput).toHaveValue('Pisces');
-  });
-
-  test('calls onSave with updated data when save button is clicked', () => {
-    const handleSave = jest.fn();
-    render(<LifestyleEditor initialLifestyle={{}} initialBadges={{}} onSave={handleSave} />);
-
-    fireEvent.change(screen.getByLabelText('Pets'), { target: { value: 'No pets' } });
-    fireEvent.change(screen.getByLabelText('Zodiac'), { target: { value: 'Aries' } });
-
-    fireEvent.click(screen.getByText('Save Lifestyle & Badges'));
-
-    expect(handleSave).toHaveBeenCalledWith({
-      lifestyle: {
-        pets: 'No pets',
-      },
-      badges: {
-        zodiac: 'Aries',
-      }
+    // The state from the previous change should be preserved
+    expect(handleChange).toHaveBeenCalledWith({
+        lifestyle: { pets: 'Cat person' },
+        badges: { zodiac: 'Pisces' },
     });
   });
 });

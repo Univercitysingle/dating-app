@@ -30,7 +30,6 @@ const AudioBioPlayer = ({ audioUrl }) => {
       wavesurferInstance.on('finish', () => setIsPlaying(false));
 
       return () => {
-        wavesurferInstance.unAll();
         wavesurferInstance.destroy();
       };
     }

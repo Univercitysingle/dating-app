@@ -70,7 +70,7 @@ describe('Profile page', () => {
     const editButton = screen.getByText('Edit Profile');
     fireEvent.click(editButton);
     // After clicking edit, the save buttons should be visible
-    expect(screen.getAllByText('Save').length).toBeGreaterThan(0);
+    expect(screen.getByText('Save All Changes')).toBeInTheDocument();
   });
 
   it('switches to the settings tab when "Settings" is clicked', () => {
