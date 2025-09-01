@@ -4,8 +4,10 @@ const ipinfoWrapper = new IPinfoWrapper(process.env.IPINFO);
 
 const getGeolocation = async (ip) => {
     try {
-        const response = await ipinfoWrapper.lookupIp(ip);
-        return response;
+        if (ip) {
+            return await ipinfoWrapper.lookupIp(ip);
+        }
+        return await ipinfoWrapper.lookupIp();
     } catch (error) {
         console.error("Error fetching geolocation data from ipinfo.io:", error);
         return null;
