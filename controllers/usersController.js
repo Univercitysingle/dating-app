@@ -2,10 +2,26 @@ const User = require("../models/User");
 const Match = require('../models/Match');
 const fs = require("fs");
 const path = require("path");
-const { saveFile, deleteFile } = require("../services/localStore");
+const { uploadFile, deleteFile, getSignedDownloadUrl } = require("../services/s3Service");
 const multer = require("multer");
-
 const { sanitizeUser } = require('../utils/userUtils');
+
+const signUserFileUrls = async (user) => {
+  if (user.photos && user.photos.length > 0) {
+    user.photos = await Promise.all(
+      user.photos.map(async (photo) => {
+        if (photo.url) {
+          photo.url = await getSignedDownloadUrl(photo.url);
+        }
+        return photo;
+      })
+    );
+  }
+  if (user.audioBioUrl) {
+    user.audioBioUrl = await getSignedDownloadUrl(user.audioBioUrl);
+  }
+  return user;
+};
 
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
@@ -16,7 +32,9 @@ const getCurrentUserProfile = async (req, res) => {
   }
 
   log.info(`UsersController: Sending user profile for UID: ${req.user.uid}.`);
-  res.json(sanitizeUser(req.user, req.user));
+  let user = req.user.toObject ? req.user.toObject() : { ...req.user };
+  user = await signUserFileUrls(user);
+  res.json(sanitizeUser(user, req.user));
 };
 
 const updateCurrentUserProfile = async (req, res) => {
@@ -166,62 +184,46 @@ const blockUser = async (req, res) => {
   }
 };
 
-const handleFileUpload = async (req, res, fileTypePrefix) => {
+const uploadAudioBio = async (req, res) => {
   const log = req.log;
   const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
-  log.info(`UsersController: handleFileUpload entered for ${fileTypePrefix}, User: ${userUidForLog}`);
+  log.info(`UsersController: uploadAudioBio entered for User: ${userUidForLog}`);
+
   try {
     if (req.fileValidationError) {
-      log.warn(`UsersController: File validation error for ${fileTypePrefix} by ${userUidForLog}: ${req.fileValidationError}`);
+      log.warn(`UsersController: File validation error for audio bio by ${userUidForLog}: ${req.fileValidationError}`);
       return res.status(400).json({ message: req.fileValidationError });
     }
     if (!req.file) {
-      log.warn(`UsersController: No file uploaded or rejected by filter for ${fileTypePrefix} by ${userUidForLog}.`);
+      log.warn(`UsersController: No file uploaded or rejected by filter for audio bio by ${userUidForLog}.`);
       return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
     }
-    log.info(`UsersController: File received for ${fileTypePrefix}: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
+
+    log.info(`UsersController: File received for audio bio: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
 
     const fileContent = fs.readFileSync(req.file.path);
     const ext = path.extname(req.file.originalname);
-    const filename = `${fileTypePrefix}-${userUidForLog}-${Date.now()}${ext}`;
-    log.info(`UsersController: Saving file as ${filename}`);
+    const key = `audio-bios-${userUidForLog}-${Date.now()}${ext}`;
+    log.info(`UsersController: Uploading audio bio to S3 with key: ${key}`);
 
-    const result = saveFile(fileContent, filename);
-    log.info(`UsersController: File saved successfully. Location: ${result.Location}`);
+    const fileUrl = await uploadFile(key, fileContent, req.file.mimetype);
+    log.info({ fileUrl }, "UsersController: Audio bio uploaded to S3 successfully.");
 
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
 
-    res.json({ success: true, fileUrl: result.Location });
+    await User.findOneAndUpdate({ uid: req.user.uid }, { audioBioUrl: key });
+
+    res.json({ success: true, fileUrl: key });
   } catch (error) {
-    log.error({ err: error }, `UsersController: Error in ${fileTypePrefix} upload for UID ${userUidForLog}`);
-
-    if (error instanceof multer.MulterError) {
-      if (error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ message: `File too large. Max size for ${fileTypePrefix} is 5MB.` });
-      }
-      return res.status(400).json({ message: `File upload error: ${error.message}` });
+    log.error({ err: error }, `UsersController: Error in audio bio upload for UID ${userUidForLog}`);
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
     }
-
-    if (req.file && req.file.path) {
-      try {
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-          log.info(`UsersController: Cleaned up temporary file ${req.file.path} after error.`);
-        }
-      } catch (cleanupError) {
-        log.error({ err: cleanupError }, `UsersController: Failed to cleanup temporary ${fileTypePrefix} file after error`);
-      }
-    }
-
     if (!res.headersSent) {
-      return res.status(500).json({ message: error.message || `An unexpected error occurred during ${fileTypePrefix} upload.` });
+      res.status(500).json({ message: error.message || "An unexpected error occurred during audio bio upload." });
     }
   }
-};
-
-const uploadAudioBio = async (req, res) => {
-  await handleFileUpload(req, res, "audio-bios");
 };
 
 const uploadPhoto = async (req, res) => {
@@ -244,11 +246,10 @@ const uploadPhoto = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Validation checks
     if (user.photos.length >= 6) {
       return res.status(400).json({ message: "You have reached the maximum of 6 photos." });
     }
-    const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB
+    const MAX_TOTAL_SIZE = 25 * 1024 * 1024;
     if (user.totalPhotoSize + req.file.size > MAX_TOTAL_SIZE) {
       return res.status(400).json({ message: "Uploading this photo would exceed your total storage limit of 25MB." });
     }
@@ -257,17 +258,17 @@ const uploadPhoto = async (req, res) => {
 
     const fileContent = fs.readFileSync(req.file.path);
     const ext = path.extname(req.file.originalname);
-    const filename = `photos-${userUidForLog}-${Date.now()}${ext}`;
-    log.info(`UsersController: Saving file as ${filename}`);
+    const key = `photos-${userUidForLog}-${Date.now()}${ext}`;
+    log.info(`UsersController: Uploading photo to S3 with key: ${key}`);
 
-    const result = saveFile(fileContent, filename);
-    log.info(`UsersController: File saved successfully. Location: ${result.Location}`);
+    await uploadFile(key, fileContent, req.file.mimetype);
+    log.info({ key }, "UsersController: Photo uploaded to S3 successfully.");
 
     fs.unlinkSync(req.file.path);
     log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
 
     const newPhoto = {
-      url: result.Location,
+      url: key,
       order: user.photos.length,
       size: req.file.size,
     };
@@ -281,21 +282,14 @@ const uploadPhoto = async (req, res) => {
       { new: true }
     );
 
-    res.json({ success: true, fileUrl: result.Location });
+    res.json({ success: true, fileUrl: key });
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
-    if (req.file && req.file.path) {
-      try {
-        if (fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-          log.info(`UsersController: Cleaned up temporary file ${req.file.path} after error.`);
-        }
-      } catch (cleanupError) {
-        log.error({ err: cleanupError }, `UsersController: Failed to cleanup temporary photo file after error`);
-      }
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
     }
     if (!res.headersSent) {
-      return res.status(500).json({ message: error.message || `An unexpected error occurred during photo upload.` });
+      res.status(500).json({ message: error.message || "An unexpected error occurred during photo upload." });
     }
   }
 };
@@ -357,8 +351,9 @@ const deletePhoto = async (req, res) => {
       { new: true }
     );
 
-    const filename = path.basename(photoUrl);
-    deleteFile(filename);
+    const key = photoUrl;
+    await deleteFile(key);
+    log.info({ key }, "UsersController: Successfully deleted photo from S3.");
 
     log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
     res.json(updatedUser);
@@ -434,7 +429,8 @@ const discoverUsers = async (req, res) => {
       }
     });
 
-    const sanitizedUsers = users.map(user => sanitizeUser(user, req.user));
+    const usersWithSignedUrls = await Promise.all(users.map(user => signUserFileUrls(user)));
+    const sanitizedUsers = usersWithSignedUrls.map(user => sanitizeUser(user, req.user));
 
     log.info(`UsersController: Found ${sanitizedUsers.length} users to discover.`);
     res.json(sanitizedUsers);
@@ -447,10 +443,11 @@ const discoverUsers = async (req, res) => {
 const getUserProfile = async (req, res) => {
     const { userId } = req.params;
     try {
-        const user = await User.findOne({ uid: userId }).lean();
+        let user = await User.findOne({ uid: userId }).lean();
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
+        user = await signUserFileUrls(user);
         res.json(sanitizeUser(user, req.user));
     } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -472,26 +469,30 @@ const getLikes = async (req, res) => {
 
         if (plan === 'basic') {
             const users = await User.find({ uid: { $in: likedByUserIds } }).select('uid photos').lean();
-            const blurredUsers = users.map(user => ({
-                uid: user.uid,
-                isBlurred: true,
-                photoUrl: user.photos?.[0]?.url,
+            const blurredUsers = await Promise.all(users.map(async (user) => {
+                const photoUrl = user.photos?.[0]?.url ? await getSignedDownloadUrl(user.photos[0].url) : null;
+                return {
+                    uid: user.uid,
+                    isBlurred: true,
+                    photoUrl: photoUrl,
+                };
             }));
             return res.json(blurredUsers);
         }
 
         const users = await User.find({ uid: { $in: likedByUserIds } }).lean();
 
-        const usersWithLikeType = users.map(user => {
+        const usersWithLikeType = await Promise.all(users.map(async (user) => {
             const match = matches.find(m =>
                 (m.user1Uid === uid && m.user2Uid === user.uid) ||
                 (m.user1Uid === user.uid && m.user2Uid === uid)
             );
+            const userWithSignedUrls = await signUserFileUrls(user);
             return {
-                ...user,
+                ...userWithSignedUrls,
                 likeType: match.superLike ? 'superlike' : 'like',
             };
-        });
+        }));
 
         res.json(usersWithLikeType.map(user => sanitizeUser(user, req.user)));
     } catch (error) {
