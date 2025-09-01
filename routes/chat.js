@@ -68,7 +68,7 @@ function initSocket(server, allowedOrigins, adminInstance) {
         if (sender.plan === 'basic') {
           const messagesCount = await ChatMessage.countDocuments({ roomId, senderUid });
           if (messagesCount >= 2) {
-            const thirdMessage = await ChatMessage.findOne({ roomId, senderUid }).sort({ timestamp: -1 }).skip(1);
+            const thirdMessage = await ChatMessage.findOne({ roomId, senderUid }).sort({ timestamp: 1 }).skip(1);
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
