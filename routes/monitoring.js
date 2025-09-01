@@ -1,8 +1,9 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const monitoringController = require('../controllers/monitoringController');
-const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
+const monitoringController = require("../controllers/monitoringController");
+const adminAuthMiddleware = require("../middleware/adminAuthMiddleware");
 
-router.get('/', adminAuthMiddleware, monitoringController.getMonitoringData);
+// Protect route with adminAuthMiddleware
+router.get("/", adminAuthMiddleware, monitoringController.getMonitoringData);
 
 module.exports = router;
