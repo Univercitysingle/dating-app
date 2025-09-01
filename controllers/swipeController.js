@@ -1,5 +1,7 @@
 const Match = require('../models/Match');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { getIO } = require('../routes/chat');
 
 const recordSwipe = async (currentUserUid, targetUserId, action, matchId) => {
   await User.findOneAndUpdate(
@@ -40,6 +42,28 @@ const like = async (req, res) => {
 
     if (match.likedBy.length === 2) {
       match.status = 'matched';
+      // Create a match notification for the other user
+      const notification = await Notification.create({
+        recipientUid: userId,
+        senderUid: currentUserUid,
+        type: 'match',
+      });
+      getIO().to(userId).emit('new_notification', notification);
+
+      // Delete the original like/superlike notification
+      await Notification.findOneAndDelete({
+          recipientUid: currentUserUid,
+          senderUid: userId,
+          type: { $in: ['like', 'superlike'] },
+      });
+
+    } else {
+        const notification = await Notification.create({
+            recipientUid: userId,
+            senderUid: currentUserUid,
+            type: 'like',
+        });
+        getIO().to(userId).emit('new_notification', notification);
     }
 
     await match.save();
@@ -53,35 +77,42 @@ const like = async (req, res) => {
 };
 
 const pass = async (req, res) => {
-  const { userId } = req.body;
-  const currentUserUid = req.user.uid;
+    const { userId } = req.body;
+    const currentUserUid = req.user.uid;
 
-  try {
-    let match = await Match.findOne({
-      $or: [
-        { user1Uid: currentUserUid, user2Uid: userId },
-        { user1Uid: userId, user2Uid: currentUserUid },
-      ],
+    try {
+      let match = await Match.findOne({
+        $or: [
+          { user1Uid: currentUserUid, user2Uid: userId },
+          { user1Uid: userId, user2Uid: currentUserUid },
+        ],
+      });
+
+      if (!match) {
+        match = new Match({
+          user1Uid: currentUserUid,
+          user2Uid: userId,
+        });
+      }
+
+      match.status = 'unmatched';
+
+      await match.save();
+      await recordSwipe(currentUserUid, userId, 'pass', match._id);
+
+      // Delete the original like/superlike notification
+      await Notification.findOneAndDelete({
+        recipientUid: currentUserUid,
+        senderUid: userId,
+        type: { $in: ['like', 'superlike'] },
     });
 
-    if (!match) {
-      match = new Match({
-        user1Uid: currentUserUid,
-        user2Uid: userId,
-      });
+      res.json(match);
+    } catch (error) {
+      console.error("Error in 'pass' controller:", error);
+      res.status(500).json({ error: 'An unexpected error occurred.' });
     }
-
-    match.status = 'unmatched';
-
-    await match.save();
-    await recordSwipe(currentUserUid, userId, 'pass', match._id);
-
-    res.json(match);
-  } catch (error) {
-    console.error("Error in 'pass' controller:", error);
-    res.status(500).json({ error: 'An unexpected error occurred.' });
-  }
-};
+  };
 
 const superLike = async (req, res) => {
   const { userId } = req.body;
@@ -119,6 +150,25 @@ const superLike = async (req, res) => {
 
     if (match.likedBy.length === 2) {
       match.status = 'matched';
+      const notification = await Notification.create({
+        recipientUid: userId,
+        senderUid: currentUserUid,
+        type: 'match',
+      });
+      getIO().to(userId).emit('new_notification', notification);
+       // Delete the original like/superlike notification
+       await Notification.findOneAndDelete({
+        recipientUid: currentUserUid,
+        senderUid: userId,
+        type: { $in: ['like', 'superlike'] },
+    });
+    } else {
+        const notification = await Notification.create({
+            recipientUid: userId,
+            senderUid: currentUserUid,
+            type: 'superlike',
+        });
+        getIO().to(userId).emit('new_notification', notification);
     }
 
     user.superLikes.count -= 1;

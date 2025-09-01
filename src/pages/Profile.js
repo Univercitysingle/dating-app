@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 
@@ -43,6 +43,8 @@ const SectionCard = ({ title, onEdit, isEditing, children }) => (
 );
 
 function Profile() {
+  const { userId } = useParams();
+  const { user: currentUser, logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -75,24 +77,35 @@ function Profile() {
       bio: ''
   });
 
-  const { user, logout } = useAuth();
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      setProfile(user);
-      setEditableFields({
-        education: user.education || '',
-        relationshipGoals: user.relationshipGoals || 'Figuring it out',
-        bio: user.bio || '',
-        personalityType: user.personalityType || '',
-        interests: user.interests || [],
-        profilePrompts: user.profilePrompts || [],
-        lifestyle: user.lifestyle || {},
-        badges: user.badges || {},
-      });
+    const fetchProfile = async () => {
+        try {
+            const data = await apiClient.get(`/api/users/${userId}`);
+            setProfile(data);
+        } catch (error) {
+            setFetchError(error.message || 'Failed to fetch profile.');
+        }
+    };
+
+    if (userId) {
+        fetchProfile();
+    } else if (currentUser) {
+        setProfile(currentUser);
+        setEditableFields({
+            education: currentUser.education || '',
+            relationshipGoals: currentUser.relationshipGoals || 'Figuring it out',
+            bio: currentUser.bio || '',
+            personalityType: currentUser.personalityType || '',
+            interests: currentUser.interests || [],
+            profilePrompts: currentUser.profilePrompts || [],
+            lifestyle: currentUser.lifestyle || {},
+            badges: currentUser.badges || {},
+          });
     }
-  }, [user]);
+  }, [userId, currentUser]);
 
   const handleFieldChange = (e) => {
       const { id, value } = e.target;
@@ -130,9 +143,28 @@ function Profile() {
     navigate('/login');
   };
 
+  const handleLikeBack = async () => {
+    try {
+      await apiClient.post('/api/swipe/like', { userId: profile.uid });
+      navigate('/matches');
+    } catch (error) {
+      console.error('Error liking back:', error);
+    }
+  };
+
+  const handleDecline = async () => {
+    try {
+      await apiClient.post('/api/swipe/pass', { userId: profile.uid });
+      navigate('/matches');
+    } catch (error) {
+      console.error('Error declining:', error);
+    }
+  };
+
   if (fetchError) return <p className="text-red-500 p-4">Error: {fetchError}</p>;
   if (!profile) return <p className="p-4">Loading profile...</p>;
 
+  const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
   const isPremium = profile.tier === 'premium';
   const isVerified = profile.isVerified === true;
 
@@ -141,7 +173,7 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
-                      <SectionCard title="About Me" isEditing={isEditing}>
+                      <SectionCard title="About Me" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                           {isEditing ? (
                               <div>
                                  <textarea id="bio" value={editableFields.bio} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
@@ -151,7 +183,7 @@ function Profile() {
                           )}
                       </SectionCard>
 
-                      <SectionCard title="Profile Prompts" isEditing={isEditing}>
+                      <SectionCard title="Profile Prompts" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                           {isEditing ? (
                               <ProfilePromptsEditor initialPrompts={editableFields.profilePrompts} onChange={(profilePrompts) => setEditableFields(prev => ({...prev, profilePrompts}))} />
                           ) : (
@@ -159,7 +191,7 @@ function Profile() {
                           )}
                       </SectionCard>
 
-                       <SectionCard title="Details" isEditing={isEditing}>
+                       <SectionCard title="Details" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                             {isEditing ? (
                                 <div className="space-y-4">
                                     <div>
@@ -193,7 +225,7 @@ function Profile() {
                                 </div>
                             )}
                         </SectionCard>
-                        <SectionCard title="Lifestyle" isEditing={isEditing}>
+                        <SectionCard title="Lifestyle" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                             {isEditing ? <LifestyleEditor initialLifestyle={editableFields.lifestyle} initialBadges={editableFields.badges} onChange={({lifestyle, badges}) => setEditableFields(prev => ({...prev, lifestyle, badges}))} /> : (
                                 <>
                                     <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
@@ -207,10 +239,10 @@ function Profile() {
                                 </>
                             )}
                         </SectionCard>
-                        <SectionCard title="Interests" isEditing={isEditing}>
+                        <SectionCard title="Interests" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                             {isEditing ? <InterestsEditor initialInterests={editableFields.interests} onChange={(interests) => setEditableFields(prev => ({...prev, interests}))} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Personality Type" isEditing={isEditing}>
+                        <SectionCard title="Personality Type" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                           {isEditing ? (
                             <select
                               id="personalityType"
@@ -230,7 +262,7 @@ function Profile() {
                             <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
                           )}
                         </SectionCard>
-                        <SectionCard title="Audio Bio" isEditing={isEditing}>
+                        <SectionCard title="Audio Bio" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
                             <div style={{ display: isEditing ? 'none' : 'block' }}>
                                 <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
                             </div>
@@ -238,7 +270,7 @@ function Profile() {
                                 <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} />
                             </div>
                         </SectionCard>
-                        {isEditing && (
+                        {isEditing && isOwnProfile && (
                             <div className="flex justify-end mt-6">
                                 <button onClick={handleSaveAll} className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
                                     {saveStatus.details || 'Save All Changes'}
@@ -261,7 +293,7 @@ function Profile() {
     <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
         <div className="container mx-auto p-4">
             <div className="relative w-full h-96 md:h-[70vh] rounded-lg overflow-hidden shadow-lg mb-6">
-              <PhotoGallery photos={profile.photos || []} onEdit={() => setIsEditingPhotos(true)} />
+              <PhotoGallery photos={profile.photos || []} onEdit={isOwnProfile ? () => setIsEditingPhotos(true) : null} />
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                     <h1 className="text-3xl font-bold text-white">{profile.name}, {profile.age}</h1>
                     <div className="flex items-center mt-1">
@@ -272,47 +304,55 @@ function Profile() {
             </div>
 
             <div className="flex justify-end items-center mb-6">
-              <div className="relative">
-                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700" aria-label="menu">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                  </svg>
-                </button>
-                {isMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-800 rounded-md shadow-lg z-20">
-                    {isEditing ? (
-                      <button
-                        onClick={() => {
-                          setIsEditing(false);
-                          setIsMenuOpen(false);
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                      >
-                        View Profile
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setIsEditing(true);
-                          setIsMenuOpen(false);
-                        }}
-                        className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                      >
-                        Edit Profile
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setActiveTab('settings');
-                        setIsMenuOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                    >
-                      Settings
-                    </button>
-                  </div>
+                {!isOwnProfile && (
+                    <div className="flex space-x-4">
+                        <button onClick={handleLikeBack} className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Accept</button>
+                        <button onClick={handleDecline} className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Decline</button>
+                    </div>
                 )}
-              </div>
+              {isOwnProfile && (
+                <div className="relative">
+                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700" aria-label="menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                    </button>
+                    {isMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-800 rounded-md shadow-lg z-20">
+                        {isEditing ? (
+                        <button
+                            onClick={() => {
+                            setIsEditing(false);
+                            setIsMenuOpen(false);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        >
+                            View Profile
+                        </button>
+                        ) : (
+                        <button
+                            onClick={() => {
+                            setIsEditing(true);
+                            setIsMenuOpen(false);
+                            }}
+                            className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        >
+                            Edit Profile
+                        </button>
+                        )}
+                        <button
+                        onClick={() => {
+                            setActiveTab('settings');
+                            setIsMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                        >
+                        Settings
+                        </button>
+                    </div>
+                    )}
+                </div>
+              )}
             </div>
 
             {isEditingPhotos && (

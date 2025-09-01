@@ -444,6 +444,20 @@ const discoverUsers = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const user = await User.findOne({ uid: userId }).lean();
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(sanitizeUser(user, req.user));
+    } catch (error) {
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ error: 'An unexpected error occurred.' });
+    }
+};
+
 module.exports = {
   getCurrentUserProfile,
   updateCurrentUserProfile,
@@ -454,4 +468,5 @@ module.exports = {
   updatePhotoOrder,
   deletePhoto,
   discoverUsers,
+  getUserProfile,
 };

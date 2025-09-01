@@ -10,6 +10,7 @@ const {
   updatePhotoOrder,
   deletePhoto,
   discoverUsers,
+  getUserProfile,
 } = require("../controllers/usersController");
 const authMiddleware = require("../middleware/authentication");
 const multer = require("multer");
@@ -58,6 +59,9 @@ router.get("/me", authMiddleware, getCurrentUserProfile);
 
 // Get users for discovery swipe deck
 router.get("/discover", authMiddleware, discoverUsers);
+
+// Get a specific user's profile
+router.get("/:userId", authMiddleware, getUserProfile);
 
 // Update profile
 router.put("/me", authMiddleware, updateCurrentUserProfile);

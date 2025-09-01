@@ -41,6 +41,7 @@ function initSocket(server, allowedOrigins) {
 
   io.on("connection", (socket) => {
     console.log("User connected:", socket.user.uid);
+    socket.join(socket.user.uid); // Join a room with the user's UID
 
     socket.on("joinRoom", (roomId) => {
       socket.join(roomId);
@@ -96,4 +97,11 @@ router.get("/init-socket", (req, res) => {
 
 router.get("/history/:roomId", getChatHistory);
 
-module.exports = { router, initSocket };
+const getIO = () => {
+    if (!io) {
+      throw new Error("Socket.io not initialized!");
+    }
+    return io;
+  };
+
+module.exports = { router, initSocket, getIO };

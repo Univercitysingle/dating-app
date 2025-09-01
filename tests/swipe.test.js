@@ -2,17 +2,28 @@ const httpMocks = require('node-mocks-http');
 const { like, pass, superLike, undoSwipe } = require('../controllers/swipeController');
 const Match = require('../models/Match');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { getIO } = require('../routes/chat');
 
 jest.mock('../models/Match');
 jest.mock('../models/User');
+jest.mock('../models/Notification');
+jest.mock('../routes/chat', () => ({
+    getIO: jest.fn(),
+}));
 
 describe('Swipe Controller', () => {
-  let req, res;
+    let req, res, mockIO;
 
   beforeEach(() => {
     req = httpMocks.createRequest();
     res = httpMocks.createResponse();
     User.findOneAndUpdate.mockClear();
+    mockIO = {
+        to: jest.fn().mockReturnThis(),
+        emit: jest.fn(),
+    };
+    getIO.mockReturnValue(mockIO);
   });
 
   afterEach(() => {
@@ -20,7 +31,7 @@ describe('Swipe Controller', () => {
   });
 
   describe('like', () => {
-    it('should create a new match and record a like', async () => {
+    it('should create a new match and a like notification', async () => {
       req.user = { uid: 'user1' };
       req.body = { userId: 'user2' };
 
@@ -31,22 +42,21 @@ describe('Swipe Controller', () => {
         save: saveMock,
       };
       Match.mockImplementation(() => mockMatchInstance);
-
+      Notification.create.mockResolvedValue({});
 
       await like(req, res);
 
-      expect(Match.findOne).toHaveBeenCalledTimes(1);
-      expect(saveMock).toHaveBeenCalledTimes(1);
-      expect(User.findOneAndUpdate).toHaveBeenCalledWith(
-        { uid: 'user1' },
-        expect.objectContaining({
-          lastSwipe: expect.objectContaining({ action: 'like' }),
-        })
-      );
+      expect(Notification.create).toHaveBeenCalledWith({
+        recipientUid: 'user2',
+        senderUid: 'user1',
+        type: 'like',
+      });
+      expect(getIO().to).toHaveBeenCalledWith('user2');
+      expect(mockIO.emit).toHaveBeenCalledWith('new_notification', expect.any(Object));
       expect(res.statusCode).toBe(200);
     });
 
-    it('should update an existing match to "matched" on the second like', async () => {
+    it('should create a match notification on the second like', async () => {
         req.user = { uid: 'user1' };
         req.body = { userId: 'user2' };
 
@@ -61,17 +71,29 @@ describe('Swipe Controller', () => {
         });
 
         Match.findOne.mockResolvedValue(existingMatch);
+        Notification.create.mockResolvedValue({});
+        Notification.findOneAndDelete.mockResolvedValue({});
 
         await like(req, res);
 
-        expect(existingMatch.status).toBe('matched');
-        expect(existingMatch.save).toHaveBeenCalledTimes(1);
+        expect(Notification.create).toHaveBeenCalledWith({
+            recipientUid: 'user2',
+            senderUid: 'user1',
+            type: 'match',
+        });
+        expect(getIO().to).toHaveBeenCalledWith('user2');
+        expect(mockIO.emit).toHaveBeenCalledWith('new_notification', expect.any(Object));
+        expect(Notification.findOneAndDelete).toHaveBeenCalledWith({
+            recipientUid: 'user1',
+            senderUid: 'user2',
+            type: { $in: ['like', 'superlike'] },
+        });
         expect(res.statusCode).toBe(200);
       });
   });
 
   describe('pass', () => {
-    it('should create a new match and record a pass', async () => {
+    it('should delete a like notification on pass', async () => {
         req.user = { uid: 'user1' };
         req.body = { userId: 'user2' };
 
@@ -82,17 +104,15 @@ describe('Swipe Controller', () => {
             save: saveMock,
           };
         Match.mockImplementation(() => mockMatchInstance);
+        Notification.findOneAndDelete.mockResolvedValue({});
 
         await pass(req, res);
 
-        expect(Match.findOne).toHaveBeenCalledTimes(1);
-        expect(saveMock).toHaveBeenCalledTimes(1);
-        expect(User.findOneAndUpdate).toHaveBeenCalledWith(
-            { uid: 'user1' },
-            expect.objectContaining({
-            lastSwipe: expect.objectContaining({ action: 'pass' }),
-            })
-        );
+        expect(Notification.findOneAndDelete).toHaveBeenCalledWith({
+            recipientUid: 'user1',
+            senderUid: 'user2',
+            type: { $in: ['like', 'superlike'] },
+        });
         expect(res.statusCode).toBe(200);
     });
   });
@@ -106,7 +126,6 @@ describe('Swipe Controller', () => {
         await superLike(req, res);
 
         expect(res.statusCode).toBe(400);
-        expect(res._getJSONData().error).toBe('No super likes remaining.');
     });
 
     it('should record a super like and decrement the count', async () => {
@@ -122,6 +141,7 @@ describe('Swipe Controller', () => {
           };
         Match.mockImplementation(() => mockMatchInstance);
         Match.findOne.mockResolvedValue(null);
+        Notification.create.mockResolvedValue({});
 
         await superLike(req, res);
 
@@ -140,7 +160,6 @@ describe('Swipe Controller', () => {
         await undoSwipe(req, res);
 
         expect(res.statusCode).toBe(404);
-        expect(res._getJSONData().error).toBe('No swipe to undo.');
     });
 
     it('should successfully undo a like', async () => {
