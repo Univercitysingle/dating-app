@@ -270,6 +270,14 @@ function Profile() {
                               Manage Subscription
                           </button>
                       )}
+                      {!isPremium && (
+                          <button
+                              onClick={() => navigate('/premium')}
+                              className="mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+                          >
+                              Go Premium
+                          </button>
+                      )}
                       <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
                   </SectionCard>
               );
