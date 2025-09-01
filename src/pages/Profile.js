@@ -156,6 +156,24 @@ function Profile() {
                           )}
                       </SectionCard>
 
+                      {isOwnProfile && (
+                          <SectionCard title="Subscription">
+                              {isPremium ? (
+                                  <p className="text-neutral-600 dark:text-neutral-300">You are on the Premium plan.</p>
+                              ) : (
+                                  <div>
+                                      <p className="text-neutral-600 dark:text-neutral-300 mb-4">Upgrade to Premium to see who likes you and more!</p>
+                                      <button
+                                          onClick={() => navigate('/premium')}
+                                          className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+                                      >
+                                          Upgrade Now
+                                      </button>
+                                  </div>
+                              )}
+                          </SectionCard>
+                      )}
+
                       <SectionCard title="Profile Prompts">
                           {isEditing ? (
                               <ProfilePromptsEditor initialPrompts={editableFields.profilePrompts} onChange={(profilePrompts) => setEditableFields(prev => ({...prev, profilePrompts}))} />
