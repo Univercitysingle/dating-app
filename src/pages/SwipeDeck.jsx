@@ -181,7 +181,7 @@ const SwipeDeck = () => {
                                     style={{
                                         zIndex: users.length - index,
                                         transform: `scale(${1 - (users.slice(0, 3).length - 1 - index) * 0.05}) translateY(-${(users.slice(0, 3).length - 1 - index) * 10}px)`,
-                                        opacity: 1 - (users.slice(0, 3).length - 1 - index) * 0.1,
+                                        opacity: 1 - (users.slice(0, 3).length - 1 - index) * 0.05,
                                     }}
                                 />
                             );
