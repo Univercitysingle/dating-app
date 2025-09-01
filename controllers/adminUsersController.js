@@ -105,9 +105,11 @@ const createUser = async (req, res) => {
       mustSetPassword: mustSetPassword !== undefined ? mustSetPassword : false,
     };
 
-    if (uid) { // If admin provides a UID (e.g. from Firebase)
+    if (uid) {
         newUserPayload.uid = uid;
-    } else if (!password && !mustSetPassword) {
+    }
+
+    if (!uid && !password && !mustSetPassword) {
         // If no UID and no password and not mustSetPassword, this user can't login.
         // This case might need more thought based on product requirements.
         // For now, let's assume an admin might create a user this way and set password later.
