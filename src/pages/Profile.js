@@ -28,15 +28,10 @@ const VerifiedBadge = () => (
   </span>
 );
 
-const SectionCard = ({ title, onEdit, isEditing, children }) => (
+const SectionCard = ({ title, children }) => (
     <div className="bg-neutral-100 dark:bg-neutral-800 p-6 rounded-lg shadow-sm">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-neutral-800 dark:text-neutral-50">{title}</h2>
-            {onEdit && (
-                 <button onClick={onEdit} className="px-4 py-2 bg-secondary text-white rounded-md hover:bg-secondary-dark text-sm">
-                    {isEditing ? 'Cancel' : 'Edit'}
-                </button>
-            )}
         </div>
         {children}
     </div>
@@ -65,17 +60,7 @@ function Profile() {
   });
 
   // State for save statuses
-  const [saveStatus, setSaveStatus] = useState({
-      details: '',
-      personalityType: '',
-      social: '',
-      media: '',
-      hero: '',
-      lifestyle: '',
-      interests: '',
-      prompts: '',
-      bio: ''
-  });
+  const [saveStatus, setSaveStatus] = useState('');
 
 
   const navigate = useNavigate();
@@ -112,30 +97,18 @@ function Profile() {
       setEditableFields(prev => ({...prev, [id]: value}));
   }
 
-  const handleSave = async (endpoint, data, statusKey) => {
-      setSaveStatus(prev => ({...prev, [statusKey]: 'Saving...'}));
+  const handleSaveAll = async () => {
+      setSaveStatus('Saving...');
       try {
-          const updatedProfile = await apiClient.put(endpoint, data);
+          const updatedProfile = await apiClient.put('/api/users/me', editableFields);
           setProfile(updatedProfile);
-          setSaveStatus(prev => ({...prev, [statusKey]: 'Saved successfully!'}));
-          setTimeout(() => setSaveStatus(prev => ({...prev, [statusKey]: ''})), 3000);
+          setSaveStatus('Saved successfully!');
+          setTimeout(() => setSaveStatus(''), 3000);
           setIsEditing(false);
       } catch (error) {
-          console.error(`Error saving ${statusKey}:`, error);
-          setSaveStatus(prev => ({...prev, [statusKey]: `Error: ${error.data?.message || 'Failed to save'}`}));
+          console.error(`Error saving profile:`, error);
+          setSaveStatus(`Error: ${error.data?.message || 'Failed to save'}`);
       }
-  };
-
-  const handleSaveAll = () => {
-      handleSave('/api/users/me', editableFields, 'details');
-  };
-
-  const handleMediaUploadComplete = (fileUrl, fieldName) => {
-      handleSave('/api/users/me', { [fieldName]: fileUrl }, 'media');
-  };
-
-  const handleHeroMediaUploadComplete = (mediaUrl) => {
-    handleSave('/api/users/me', { heroMediaUrl: mediaUrl }, 'hero');
   };
 
   const handleLogout = async () => {
@@ -173,7 +146,7 @@ function Profile() {
           case 'profile':
               return (
                   <div className="space-y-6">
-                      <SectionCard title="About Me" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                      <SectionCard title="About Me">
                           {isEditing ? (
                               <div>
                                  <textarea id="bio" value={editableFields.bio} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
@@ -183,7 +156,7 @@ function Profile() {
                           )}
                       </SectionCard>
 
-                      <SectionCard title="Profile Prompts" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                      <SectionCard title="Profile Prompts">
                           {isEditing ? (
                               <ProfilePromptsEditor initialPrompts={editableFields.profilePrompts} onChange={(profilePrompts) => setEditableFields(prev => ({...prev, profilePrompts}))} />
                           ) : (
@@ -191,7 +164,7 @@ function Profile() {
                           )}
                       </SectionCard>
 
-                       <SectionCard title="Details" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                       <SectionCard title="Details">
                             {isEditing ? (
                                 <div className="space-y-4">
                                     <div>
@@ -225,7 +198,7 @@ function Profile() {
                                 </div>
                             )}
                         </SectionCard>
-                        <SectionCard title="Lifestyle" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                        <SectionCard title="Lifestyle">
                             {isEditing ? <LifestyleEditor initialLifestyle={editableFields.lifestyle} initialBadges={editableFields.badges} onChange={({lifestyle, badges}) => setEditableFields(prev => ({...prev, lifestyle, badges}))} /> : (
                                 <>
                                     <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
@@ -239,10 +212,10 @@ function Profile() {
                                 </>
                             )}
                         </SectionCard>
-                        <SectionCard title="Interests" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                        <SectionCard title="Interests">
                             {isEditing ? <InterestsEditor initialInterests={editableFields.interests} onChange={(interests) => setEditableFields(prev => ({...prev, interests}))} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Personality Type" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                        <SectionCard title="Personality Type">
                           {isEditing ? (
                             <select
                               id="personalityType"
@@ -262,18 +235,18 @@ function Profile() {
                             <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
                           )}
                         </SectionCard>
-                        <SectionCard title="Audio Bio" onEdit={isOwnProfile ? () => setIsEditing(!isEditing) : null} isEditing={isEditing}>
+                        <SectionCard title="Audio Bio">
                             <div style={{ display: isEditing ? 'none' : 'block' }}>
                                 <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
                             </div>
                             <div style={{ display: isEditing ? 'block' : 'none' }}>
-                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => handleMediaUploadComplete(url, 'audioBioUrl')} />
+                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => setEditableFields(prev => ({...prev, audioBioUrl: url}))} />
                             </div>
                         </SectionCard>
                         {isEditing && isOwnProfile && (
                             <div className="flex justify-end mt-6">
                                 <button onClick={handleSaveAll} className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
-                                    {saveStatus.details || 'Save All Changes'}
+                                    {saveStatus || 'Save All Changes'}
                                 </button>
                             </div>
                         )}
