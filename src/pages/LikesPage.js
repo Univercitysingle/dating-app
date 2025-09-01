@@ -12,9 +12,13 @@ const LikesPage = () => {
         const fetchLikes = async () => {
             try {
                 const response = await apiClient.get('/api/users/likes');
-                setUsers(response.data);
+                if (response.forbidden) {
+                    setError(response.error || 'This feature is for premium users only.');
+                } else {
+                    setUsers(response);
+                }
             } catch (err) {
-                setError(err.response?.data?.error || 'An error occurred');
+                setError(err.message || 'An error occurred');
             } finally {
                 setLoading(false);
             }
