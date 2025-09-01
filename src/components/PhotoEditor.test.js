@@ -11,9 +11,9 @@ jest.mock('./PhotoUploader', () => () => <div data-testid="photo-uploader-mock">
 
 describe('PhotoEditor', () => {
   const initialPhotos = [
-    { url: 'photo1.jpg', order: 1 },
-    { url: 'photo2.jpg', order: 2 },
-    { url: 'photo3.jpg', order: 3 },
+    { url: '/photo1.jpg', order: 1 },
+    { url: '/photo2.jpg', order: 2 },
+    { url: '/photo3.jpg', order: 3 },
   ];
 
   const onSave = jest.fn();
@@ -41,18 +41,21 @@ describe('PhotoEditor', () => {
     const remainingPhotos = initialPhotos.slice(1);
     apiClient.delete.mockResolvedValue({ photos: remainingPhotos });
 
-    render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
+    const { rerender } = render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
 
     // Click the delete button on the first photo
     const deleteButtons = screen.getAllByText('X');
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith('/api/users/photos', { photoUrl: 'photo1.jpg' });
+      expect(apiClient.delete).toHaveBeenCalledWith(`/api/users/photos?photoUrl=${encodeURIComponent('/photo1.jpg')}`);
     });
 
+    // Rerender with the new photos from the mocked API response
+    rerender(<PhotoEditor photos={remainingPhotos} onSave={onSave} onCancel={onCancel} />);
+
     await waitFor(() => {
-      // After deleting, there should be 2 photos left
+      // After deleting and rerendering, there should be 2 photos left
       expect(screen.getAllByRole('img')).toHaveLength(2);
     });
   });

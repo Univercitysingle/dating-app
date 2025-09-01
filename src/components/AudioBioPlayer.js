@@ -22,7 +22,13 @@ const AudioBioPlayer = ({ audioUrl }) => {
       wavesurfer.current = wavesurferInstance;
 
       if (audioUrl) {
-        wavesurferInstance.load(audioUrl);
+        // HACK: The audioBioUrl is coming from the backend with an incorrect hostname and
+        // a double slash. This is a client-side workaround to fix the URL before it's
+        // passed to wavesurfer.
+        const correctedUrl = audioUrl
+          .replace('s3.us-east.amazonaws.com', 's3.us-east-005.backblazeb2.com')
+          .replace(/(?<!:)\/\//g, '/');
+        wavesurferInstance.load(correctedUrl);
       }
 
       wavesurferInstance.on('play', () => setIsPlaying(true));
