@@ -2,7 +2,6 @@ const si = require('systeminformation');
 const mongoose = require('mongoose');
 
 const getMonitoringDataForSocket = async () => {
-  console.log('Fetching monitoring data...');
   const cpuData = await si.cpu();
   const memData = await si.mem();
   const fsSizeData = await si.fsSize();

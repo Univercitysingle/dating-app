@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getMonitoringData } = require('../controllers/monitoringController');
+const monitoringController = require('../controllers/monitoringController');
 const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
 
-router.get('/', adminAuthMiddleware, getMonitoringData);
+router.get('/', adminAuthMiddleware, monitoringController.getMonitoringData);
 
 module.exports = router;

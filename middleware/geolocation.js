@@ -20,7 +20,7 @@ const geolocationMiddleware = async (req, res, next) => {
 
     try {
         const geo = await getGeolocation(ip);
-        if (geo) {
+        if (geo && geo.loc) {
             const { city, region, country, loc } = geo;
             const [latitude, longitude] = loc.split(',').map(Number);
 
