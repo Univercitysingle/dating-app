@@ -7,7 +7,7 @@ const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 function PremiumContent() {
     const handleSubscribe = async () => {
         try {
-            const { data: { sessionId } } = await apiClient.post('/payments/create-subscription', {
+            const { data: { sessionId } } = await apiClient.post('/api/payments/create-subscription', {
                 priceId: 'YOUR_STRIPE_PRICE_ID', // Replace with your actual Price ID
             });
 

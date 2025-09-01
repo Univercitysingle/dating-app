@@ -277,7 +277,7 @@ function Profile() {
                           <button
                               onClick={async () => {
                                   try {
-                                      const { data: { url } } = await apiClient.get('/payments/manage-subscription');
+                                      const { data: { url } } = await apiClient.get('/api/payments/manage-subscription');
                                       window.location.href = url;
                                   } catch (error) {
                                       console.error('Error creating customer portal session:', error);
