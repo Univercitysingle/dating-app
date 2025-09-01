@@ -11,7 +11,7 @@ const LikesPage = () => {
     useEffect(() => {
         const fetchLikes = async () => {
             try {
-                const response = await apiClient.get('/users/likes');
+                const response = await apiClient.get('/api/users/likes');
                 setUsers(response.data);
             } catch (err) {
                 setError(err.response?.data?.error || 'An error occurred');
