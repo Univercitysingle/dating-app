@@ -63,7 +63,7 @@ router.get("/me", authMiddleware, getCurrentUserProfile);
 router.get("/discover", authMiddleware, discoverUsers);
 
 // Get users who liked the current user
-router.get("/likes", authMiddleware, subscriptionCheck, getLikes);
+router.get("/likes", authMiddleware, getLikes);
 
 // Get a specific user's profile
 router.get("/:userId", authMiddleware, getUserProfile);

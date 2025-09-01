@@ -459,7 +459,7 @@ const getUserProfile = async (req, res) => {
 };
 
 const getLikes = async (req, res) => {
-    const { uid } = req.user;
+    const { uid, plan } = req.user;
     try {
         const matches = await Match.find({
             $or: [{ user1Uid: uid }, { user2Uid: uid }],
@@ -469,6 +469,16 @@ const getLikes = async (req, res) => {
         const likedByUserIds = matches
             .filter(match => !match.likedBy.includes(uid))
             .map(match => (match.user1Uid === uid ? match.user2Uid : match.user1Uid));
+
+        if (plan === 'basic') {
+            const users = await User.find({ uid: { $in: likedByUserIds } }).select('uid photos').lean();
+            const blurredUsers = users.map(user => ({
+                uid: user.uid,
+                isBlurred: true,
+                photoUrl: user.photos?.[0]?.url,
+            }));
+            return res.json(blurredUsers);
+        }
 
         const users = await User.find({ uid: { $in: likedByUserIds } }).lean();
 
