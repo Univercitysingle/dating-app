@@ -226,8 +226,28 @@ app.use((err, req, res, next) => {
 
 // -------------------- START SERVER --------------------
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   logger.info(
     `🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`
   );
+
+  const interfaces = os.networkInterfaces();
+  Object.keys(interfaces).forEach((ifname) => {
+    interfaces[ifname].forEach((iface) => {
+      if ('IPv4' !== iface.family || iface.internal !== false) {
+        return;
+      }
+      logger.info(`  - Private IP: http://${iface.address}:${PORT}`);
+    });
+  });
+
+  try {
+    const { getGeolocation } = require('./services/ipinfoService');
+    const publicIpInfo = await getGeolocation();
+    if (publicIpInfo && publicIpInfo.ip) {
+      logger.info(`  - Public IP:  http://${publicIpInfo.ip}:${PORT}`);
+    }
+  } catch (error) {
+    logger.warn('Could not determine public IP address.', error);
+  }
 });

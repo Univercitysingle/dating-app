@@ -75,6 +75,9 @@ const userSchema = new mongoose.Schema({
       type: [Number], // [longitude, latitude]
       default: [0, 0],
     },
+    city: { type: String, default: "" },
+    region: { type: String, default: "" },
+    country: { type: String, default: "" },
   },
   role: {
     type: String,

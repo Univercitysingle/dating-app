@@ -6,11 +6,12 @@ const { login, logout, setInitialPassword } = require("../controllers/authContro
 
 // Import middleware to protect routes
 const authMiddleware = require("../middleware/authentication");
+const geolocationMiddleware = require("../middleware/geolocation");
 
 // @route   POST /api/auth/login
 // @desc    Verify Firebase token and create user if not exists
 // @access  Public
-router.post("/login", login);
+router.post("/login", authMiddleware, geolocationMiddleware, login);
 
 // @route   POST /api/auth/logout
 // @desc    Logs user out
