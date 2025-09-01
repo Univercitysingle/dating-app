@@ -20,7 +20,7 @@ const Filter = ({ onApply }) => {
     const filters = {
       minAge,
       maxAge,
-      maxDistance,
+      maxDistance: parseInt(maxDistance, 10),
     };
     for (const key in lifestyle) {
       if (lifestyle[key]) {
@@ -28,6 +28,24 @@ const Filter = ({ onApply }) => {
       }
     }
     onApply(filters);
+  };
+
+  const handleMinAgeChange = (e) => {
+    const value = parseInt(e.target.value, 10);
+    if (value > maxAge) {
+      setMinAge(maxAge);
+    } else {
+      setMinAge(value);
+    }
+  };
+
+  const handleMaxAgeChange = (e) => {
+    const value = parseInt(e.target.value, 10);
+    if (value < minAge) {
+      setMaxAge(minAge);
+    } else {
+      setMaxAge(value);
+    }
   };
 
   return (
@@ -44,7 +62,7 @@ const Filter = ({ onApply }) => {
               min="18"
               max="100"
               value={minAge}
-              onChange={(e) => setMinAge(e.target.value)}
+              onChange={handleMinAgeChange}
               className="w-full"
             />
             <input
@@ -52,7 +70,7 @@ const Filter = ({ onApply }) => {
               min="18"
               max="100"
               value={maxAge}
-              onChange={(e) => setMaxAge(e.target.value)}
+              onChange={handleMaxAgeChange}
               className="w-full"
             />
           </div>
