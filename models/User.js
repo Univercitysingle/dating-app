@@ -78,6 +78,7 @@ const userSchema = new mongoose.Schema({
     city: { type: String, default: "" },
     region: { type: String, default: "" },
     country: { type: String, default: "" },
+    locationLastUpdatedAt: { type: Date },
   },
   role: {
     type: String,

@@ -11,6 +11,7 @@ const os = require('os');
 
 const { initSocket } = require("./routes/chat");
 const authMiddleware = require("./middleware/authentication");
+const geolocationMiddleware = require("./middleware/geolocation");
 const { globalLogger: logger, buildLogger } = require("./utils/logger");
 const correlationIdMiddleware = require("./middleware/correlationId");
 
@@ -172,14 +173,22 @@ app.get("/status", (req, res) =>
 );
 
 app.use("/api/auth", require("./routes/auth"));
-app.use("/api/users", authMiddleware, require("./routes/users"));
-app.use("/api/swipe", authMiddleware, require("./routes/swipe"));
-app.use("/api/matches", authMiddleware, require("./routes/matches"));
-app.use("/api/chat", authMiddleware, require("./routes/chat").router);
-app.use("/api/reports", authMiddleware, require("./routes/reports"));
-app.use("/api/notifications", authMiddleware, require("./routes/notifications"));
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/status", require("./routes/status"));
+
+// Authenticated routes
+const authenticatedRouter = express.Router();
+authenticatedRouter.use(authMiddleware);
+authenticatedRouter.use(geolocationMiddleware);
+
+authenticatedRouter.use("/users", require("./routes/users"));
+authenticatedRouter.use("/swipe", require("./routes/swipe"));
+authenticatedRouter.use("/matches", require("./routes/matches"));
+authenticatedRouter.use("/chat", require("./routes/chat").router);
+authenticatedRouter.use("/reports", require("./routes/reports"));
+authenticatedRouter.use("/notifications", require("./routes/notifications"));
+
+app.use("/api", authenticatedRouter);
 
 // Admin routes
 const adminUsersRouter = require("./routes/adminUsers");

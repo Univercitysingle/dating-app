@@ -6,6 +6,13 @@ const geolocationMiddleware = async (req, res, next) => {
         return next();
     }
 
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    if (req.user.location && req.user.location.locationLastUpdatedAt && req.user.location.locationLastUpdatedAt > twentyFourHoursAgo) {
+        return next();
+    }
+
     const ip = req.ip;
     if (!ip) {
         return next();
@@ -25,6 +32,7 @@ const geolocationMiddleware = async (req, res, next) => {
                     'location.region': region,
                     'location.country': country,
                     'location.coordinates': [longitude, latitude],
+                    'location.locationLastUpdatedAt': now,
                 }
             );
         }
