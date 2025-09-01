@@ -68,14 +68,6 @@ const AdminLayout = () => {
                 Analytics
               </Link>
             </li>
-            <li>
-              <Link
-                to="/admin/monitoring"
-                className="block px-3 py-2 rounded-md hover:bg-gray-700"
-              >
-                Monitoring
-              </Link>
-            </li>
           </ul>
         </nav>
         <div className="mt-auto">

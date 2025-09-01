@@ -22,7 +22,6 @@ import AdminUserProfileViewPage from './pages/admin/AdminUserProfileViewPage';
 import AdminReportListPage from './pages/admin/AdminReportListPage';
 import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
-import MonitoringDashboard from './pages/admin/MonitoringDashboard';
 import SwipeDeck from './pages/SwipeDeck';
 import LikesPage from './pages/LikesPage';
 import MainLayout from './components/MainLayout';
@@ -126,7 +125,6 @@ function App() {
             <Route path="reports" element={<AdminReportListPage />} />
             <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
-            <Route path="monitoring" element={<MonitoringDashboard />} />
           </Route>
 
           {/* Default route */}

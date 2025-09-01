@@ -194,11 +194,9 @@ app.use("/api", authenticatedRouter);
 const adminUsersRouter = require("./routes/adminUsers");
 const adminReportsRouter = require("./routes/adminReports");
 const adminAnalyticsRouter = require("./routes/adminAnalytics");
-const monitoringRouter = require("./routes/monitoring");
 app.use("/api/admin/users", adminUsersRouter);
 app.use("/api/admin/reports", adminReportsRouter);
 app.use("/api/admin/analytics", adminAnalyticsRouter);
-app.use("/api/admin/monitoring", monitoringRouter);
 
 // React frontend fallback for non-API routes
 app.get("*", (req, res) => {
