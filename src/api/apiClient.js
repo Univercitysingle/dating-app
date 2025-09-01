@@ -65,7 +65,7 @@ const apiClient = {
         }
 
         const error = new Error(
-          errorData.message || 'Network response was not ok.'
+          errorData.error || errorData.message || 'Network response was not ok.'
         );
         error.status = response.status;
         error.data = errorData;

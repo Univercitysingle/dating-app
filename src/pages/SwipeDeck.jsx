@@ -88,6 +88,10 @@ const SwipeDeck = () => {
   }, [swipeError]);
 
   const handleVote = async (userId, direction) => {
+    if (!userId) {
+      console.error("handleVote called with no userId");
+      return;
+    }
     // Optimistic UI update
     setUsers((prevUsers) => prevUsers.filter(u => u.uid !== userId));
 

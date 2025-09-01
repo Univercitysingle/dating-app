@@ -10,5 +10,5 @@ module.exports = {
   transformIgnorePatterns: [
     '/node_modules/(?!wavesurfer.js/).*\\.js$'
   ],
-  testPathIgnorePatterns: ['/node_modules/', '/tests/'],
+  testPathIgnorePatterns: ['/node_modules/'],
 };
