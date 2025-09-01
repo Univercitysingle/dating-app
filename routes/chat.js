@@ -5,6 +5,7 @@ const socketIo = require("socket.io");
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
 const { getChatHistory } = require('../controllers/chatController');
+const { getMonitoringDataForSocket } = require('../controllers/monitoringController');
 
 let io;
 
@@ -107,6 +108,23 @@ function initSocket(server, allowedOrigins, adminInstance) {
       console.log("User disconnected:", socket.user.uid);
     });
   });
+
+  const monitoringNamespace = io.of("/monitoring");
+  monitoringNamespace.on("connection", (socket) => {
+    console.log("Client connected to monitoring namespace");
+    socket.on("disconnect", () => {
+      console.log("Client disconnected from monitoring namespace");
+    });
+  });
+
+  setInterval(async () => {
+    try {
+      const data = await getMonitoringDataForSocket();
+      monitoringNamespace.emit("monitoring-data", data);
+    } catch (error) {
+      console.error("Failed to fetch and emit monitoring data:", error);
+    }
+  }, 5000);
 }
 
 router.get("/init-socket", (req, res) => {
