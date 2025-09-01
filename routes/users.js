@@ -62,6 +62,9 @@ router.get("/me", authMiddleware, getCurrentUserProfile);
 // Get users for discovery swipe deck
 router.get("/discover", authMiddleware, discoverUsers);
 
+// Get users who liked the current user
+router.get("/likes", authMiddleware, subscriptionCheck, getLikes);
+
 // Get a specific user's profile
 router.get("/:userId", authMiddleware, getUserProfile);
 
@@ -95,8 +98,5 @@ router.post("/unblock/:userIdToUnblock", authMiddleware, unblockUser);
 
 // Block a user
 router.post("/block/:userIdToBlock", authMiddleware, blockUser);
-
-// Get users who liked the current user
-router.get("/likes", authMiddleware, subscriptionCheck, getLikes);
 
 module.exports = router;
