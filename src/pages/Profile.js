@@ -255,6 +255,21 @@ function Profile() {
           case 'settings':
               return (
                   <SectionCard title="Settings">
+                      {isPremium && (
+                          <button
+                              onClick={async () => {
+                                  try {
+                                      const { data: { url } } = await apiClient.get('/payments/manage-subscription');
+                                      window.location.href = url;
+                                  } catch (error) {
+                                      console.error('Error creating customer portal session:', error);
+                                  }
+                              }}
+                              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                          >
+                              Manage Subscription
+                          </button>
+                      )}
                       <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
                   </SectionCard>
               );

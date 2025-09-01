@@ -458,6 +458,38 @@ const getUserProfile = async (req, res) => {
     }
 };
 
+const getLikes = async (req, res) => {
+    const { uid } = req.user;
+    try {
+        const matches = await Match.find({
+            $or: [{ user1Uid: uid }, { user2Uid: uid }],
+            status: 'pending',
+        }).lean();
+
+        const likedByUserIds = matches
+            .filter(match => !match.likedBy.includes(uid))
+            .map(match => (match.user1Uid === uid ? match.user2Uid : match.user1Uid));
+
+        const users = await User.find({ uid: { $in: likedByUserIds } }).lean();
+
+        const usersWithLikeType = users.map(user => {
+            const match = matches.find(m =>
+                (m.user1Uid === uid && m.user2Uid === user.uid) ||
+                (m.user1Uid === user.uid && m.user2Uid === uid)
+            );
+            return {
+                ...user,
+                likeType: match.superLike ? 'superlike' : 'like',
+            };
+        });
+
+        res.json(usersWithLikeType.map(user => sanitizeUser(user, req.user)));
+    } catch (error) {
+        console.error('Error fetching users who liked you:', error);
+        res.status(500).json({ error: 'An unexpected error occurred.' });
+    }
+};
+
 module.exports = {
   getCurrentUserProfile,
   updateCurrentUserProfile,
@@ -469,4 +501,5 @@ module.exports = {
   deletePhoto,
   discoverUsers,
   getUserProfile,
+  getLikes,
 };

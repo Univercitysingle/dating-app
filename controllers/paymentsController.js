@@ -51,6 +51,66 @@ const handleStripeWebhook = async (req, res) => {
   }
 };
 
+const { createCheckoutSession, createCustomerPortalSession } = require('../services/stripe');
+
+const createSubscription = async (req, res) => {
+    const { priceId } = req.body;
+    const { uid } = req.user;
+
+    try {
+        const user = await User.findOne({ uid });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        let customerId = user.stripeCustomerId;
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                email: user.email,
+                metadata: { userId: uid },
+            });
+            customerId = customer.id;
+            user.stripeCustomerId = customerId;
+            await user.save();
+        }
+
+        const session = await createCheckoutSession(
+            priceId,
+            customerId,
+            `${process.env.CLIENT_URL}/profile`,
+            `${process.env.CLIENT_URL}/premium`
+        );
+
+        res.json({ sessionId: session.id });
+    } catch (error) {
+        console.error('Error creating subscription:', error);
+        res.status(500).json({ error: 'An unexpected error occurred.' });
+    }
+};
+
+const manageSubscription = async (req, res) => {
+    const { uid } = req.user;
+
+    try {
+        const user = await User.findOne({ uid });
+        if (!user || !user.stripeCustomerId) {
+            return res.status(404).json({ error: 'User or subscription not found' });
+        }
+
+        const session = await createCustomerPortalSession(
+            user.stripeCustomerId,
+            `${process.env.CLIENT_URL}/profile`
+        );
+
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error('Error creating customer portal session:', error);
+        res.status(500).json({ error: 'An unexpected error occurred.' });
+    }
+};
+
 module.exports = {
   handleStripeWebhook,
+  createSubscription,
+  manageSubscription,
 };

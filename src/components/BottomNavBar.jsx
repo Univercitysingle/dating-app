@@ -25,6 +25,14 @@ const BottomNavBar = () => {
           <span className="text-xs">Discover</span>
         </NavLink>
         <NavLink
+          to="/likes"
+          className="flex flex-col items-center justify-center p-3 text-neutral-600 dark:text-neutral-300"
+          style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
+        >
+          <Icon path="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          <span className="text-xs">Likes</span>
+        </NavLink>
+        <NavLink
           to="/chat"
           className="flex flex-col items-center justify-center p-3 text-neutral-600 dark:text-neutral-300"
           style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}

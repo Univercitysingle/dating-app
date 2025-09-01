@@ -11,8 +11,10 @@ const {
   deletePhoto,
   discoverUsers,
   getUserProfile,
+  getLikes,
 } = require("../controllers/usersController");
 const authMiddleware = require("../middleware/authentication");
+const subscriptionCheck = require("../middleware/subscriptionCheck");
 const multer = require("multer");
 
 // Validation Parameters
@@ -93,5 +95,8 @@ router.post("/unblock/:userIdToUnblock", authMiddleware, unblockUser);
 
 // Block a user
 router.post("/block/:userIdToBlock", authMiddleware, blockUser);
+
+// Get users who liked the current user
+router.get("/likes", authMiddleware, subscriptionCheck, getLikes);
 
 module.exports = router;

@@ -1,12 +1,39 @@
-import React from "react";
+import React from 'react';
+import apiClient from '../api/apiClient';
+import { loadStripe } from '@stripe/stripe-js';
+
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function PremiumContent() {
-  return (
-    <div>
-      <h2>Premium Content</h2>
-      <p>This content is only accessible for premium users.</p>
-    </div>
-  );
+    const handleSubscribe = async () => {
+        try {
+            const { data: { sessionId } } = await apiClient.post('/payments/create-subscription', {
+                priceId: 'YOUR_STRIPE_PRICE_ID', // Replace with your actual Price ID
+            });
+
+            const stripe = await stripePromise;
+            const { error } = await stripe.redirectToCheckout({ sessionId });
+
+            if (error) {
+                console.error('Error redirecting to checkout:', error);
+            }
+        } catch (error) {
+            console.error('Error creating subscription:', error);
+        }
+    };
+
+    return (
+        <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Go Premium</h2>
+            <p className="mb-4">Unlock exclusive features by subscribing to our premium plan.</p>
+            <button
+                onClick={handleSubscribe}
+                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+                Subscribe Now
+            </button>
+        </div>
+    );
 }
 
 export default PremiumContent;

@@ -25,9 +25,34 @@ function constructEventFromWebhook(request) {
   );
 }
 
+async function createCheckoutSession(priceId, customerId, successUrl, cancelUrl) {
+    return await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+            {
+                price: priceId,
+                quantity: 1,
+            },
+        ],
+        mode: 'subscription',
+        customer: customerId,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+    });
+}
+
+async function createCustomerPortalSession(customerId, returnUrl) {
+    return await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: returnUrl,
+    });
+}
+
 module.exports = {
   stripe,
   createPaymentIntent,
   retrievePaymentIntent,
   constructEventFromWebhook,
+  createCheckoutSession,
+  createCustomerPortalSession,
 };
