@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 const http = require("http");
 const socketIo = require("socket.io");
-const ChatMessage = require('../models/ChatMessage'); // Keep for socket logic if needed, or remove if only controller uses it.
+const ChatMessage = require('../models/ChatMessage');
+const User = require('../models/User');
 const { getChatHistory } = require('../controllers/chatController');
 
 let io;
 
-function initSocket(server, allowedOrigins) {
+function initSocket(server, allowedOrigins, adminInstance) {
+  const admin = adminInstance || require("../services/firebaseAdmin");
   const corsOptions = {
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.indexOf(origin) !== -1) {
@@ -28,8 +30,6 @@ function initSocket(server, allowedOrigins) {
     try {
       const token = socket.handshake.auth.token;
       if (!token) return next(new Error("Authentication error"));
-      // Verify token logic here (Firebase)
-      const admin = require("../services/firebaseAdmin");
       const decoded = await admin.auth().verifyIdToken(token);
       socket.user = decoded;
       next();
@@ -48,30 +48,49 @@ function initSocket(server, allowedOrigins) {
       console.log(`${socket.user.uid} joined room ${roomId}`);
     });
 
-    socket.on("sendMessage", async ({ roomId, messageContent, receiverUid }) => { // Added receiverUid
+    socket.on("sendMessage", async ({ roomId, messageContent, receiverUid }) => {
       console.log(`Message received in room ${roomId} from ${socket.user.uid}: ${messageContent}`);
       if (!roomId || !messageContent || !receiverUid) {
-        // Consider emitting an error back to the sender
         console.error("sendMessage: missing roomId, messageContent, or receiverUid");
+        socket.emit("messageError", { error: "Missing required message data." });
         return;
       }
 
       const senderUid = socket.user.uid;
 
       try {
+        const sender = await User.findOne({ uid: senderUid });
+        if (!sender) {
+          socket.emit("messageError", { error: "Sender not found." });
+          return;
+        }
+
+        if (sender.plan === 'basic') {
+          const messagesCount = await ChatMessage.countDocuments({ roomId, senderUid });
+          if (messagesCount >= 2) {
+            const thirdMessage = await ChatMessage.findOne({ roomId, senderUid }).sort({ timestamp: -1 }).skip(1);
+            const now = new Date();
+            const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+            if (thirdMessage && thirdMessage.timestamp > twentyFourHoursAgo) {
+              socket.emit("messageError", {
+                error: "Free users are limited to 2 messages per 24 hours. Please subscribe or wait."
+              });
+              return;
+            }
+          }
+        }
+
         const chatMessage = new ChatMessage({
           roomId,
           senderUid,
-          receiverUid, // Assuming client sends this for clarity in 1-on-1
+          receiverUid,
           messageContent,
-          // timestamp is defaulted by schema
         });
         await chatMessage.save();
 
-        // Emit the message to the room (original functionality)
-        // It's good practice to emit the saved message, which includes the timestamp and _id
         io.to(roomId).emit("message", {
-          _id: chatMessage._id, // Send the persisted message ID
+          _id: chatMessage._id,
           roomId: chatMessage.roomId,
           senderUid: chatMessage.senderUid,
           receiverUid: chatMessage.receiverUid,
@@ -79,9 +98,8 @@ function initSocket(server, allowedOrigins) {
           timestamp: chatMessage.timestamp,
         });
       } catch (error) {
-        console.error("Failed to save chat message:", error);
-        // Consider emitting an error back to the sender
-        // socket.emit("messageError", { error: "Failed to send message" });
+        console.error("Failed to process or send chat message:", error);
+        socket.emit("messageError", { error: "Failed to send message due to a server error." });
       }
     });
 
