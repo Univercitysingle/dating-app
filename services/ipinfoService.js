@@ -1,4 +1,4 @@
-const IPinfoWrapper = require("node-ipinfo");
+const { IPinfoWrapper } = require("node-ipinfo");
 
 const ipinfoWrapper = new IPinfoWrapper(process.env.IPINFO);
 
