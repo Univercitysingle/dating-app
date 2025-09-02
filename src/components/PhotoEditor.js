@@ -47,10 +47,8 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
   };
 
   const handleUploadComplete = (newPhotoUrl) => {
-    // The API returns just the filename (S3 key). We prepend a slash to make it a
-    // root-relative path for rewriteCdnUrl to process correctly.
-    const relativePath = `/${newPhotoUrl}`;
-    const newPhoto = { url: relativePath, order: localPhotos.length };
+    // The API returns just the filename (S3 key). Store it directly.
+    const newPhoto = { url: newPhotoUrl, order: localPhotos.length };
     setLocalPhotos([...localPhotos, newPhoto]);
   };
 

@@ -9,14 +9,12 @@ export const rewriteCdnUrl = (originalUrl) => {
     // Reconstruct the URL with the new CDN hostname and clean up any double slashes
     return `https://${cdnHostname}${path}`.replace(/(?<!:)\/\//g, '/');
   } catch (error) {
-    // If the originalUrl is not a valid URL (e.g., a relative path already),
-    // we can assume it's a path and construct the URL.
-    // This handles cases where the URL might already be a relative path.
+    // If the originalUrl is not a valid URL, it could be a relative path or a bare key.
     if (originalUrl.startsWith('/')) {
+      // It's a relative path
       return `https://${cdnHostname}${originalUrl}`.replace(/(?<!:)\/\//g, '/');
     }
-    // If it's not a valid URL and not a relative path, return it as is or handle error.
-    console.error(`Invalid URL encountered in rewriteCdnUrl: ${originalUrl}`);
-    return originalUrl;
+    // Assume it's a bare key and construct the URL.
+    return `https://${cdnHostname}/${originalUrl}`.replace(/(?<!:)\/\//g, '/');
   }
 };
