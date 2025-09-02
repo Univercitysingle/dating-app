@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../api/apiClient';
 import InterestsDisplay from '../../components/InterestsDisplay';
 import ProfilePromptsDisplay from '../../components/ProfilePromptsDisplay';
-import AudioBioPlayer from '../../components/AudioBioPlayer';
 import PhotoGallery from '../../components/PhotoGallery';
 import BadgesDisplay from '../../components/BadgesDisplay';
 
@@ -102,9 +101,6 @@ function AdminUserProfileViewPage() {
                   </SectionCard>
                   <SectionCard title="Personality Type">
                     <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
-                  </SectionCard>
-                  <SectionCard title="Audio Bio">
-                      <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
                   </SectionCard>
             </div>
         </div>

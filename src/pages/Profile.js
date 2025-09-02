@@ -8,8 +8,6 @@ import InterestsDisplay from '../components/InterestsDisplay';
 import InterestsEditor from '../components/InterestsEditor';
 import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
-import AudioBioPlayer from '../components/AudioBioPlayer';
-import AudioBioUpload from '../components/AudioBioUpload';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
@@ -252,17 +250,6 @@ function Profile() {
                           ) : (
                             <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
                           )}
-                        </SectionCard>
-                        <SectionCard title="Audio Bio">
-                            <div style={{ display: isEditing ? 'none' : 'block' }}>
-                                <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
-                            </div>
-                            <div style={{ display: isEditing ? 'block' : 'none' }}>
-                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => {
-                                    const fullPath = `/audio-bios/${url}`;
-                                    setEditableFields(prev => ({...prev, audioBioUrl: fullPath}));
-                                }} />
-                            </div>
                         </SectionCard>
                         {isEditing && isOwnProfile && (
                             <div className="flex justify-end mt-6">
