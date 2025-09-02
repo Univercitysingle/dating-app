@@ -16,8 +16,7 @@ const Onboarding = () => {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [mobileNumber, setMobileNumber] = useState('');
-  const [heightFeet, setHeightFeet] = useState('');
-  const [heightInches, setHeightInches] = useState('');
+  const [height, setHeight] = useState('');
   const [education, setEducation] = useState('');
   const [relationshipGoals, setRelationshipGoals] = useState('');
   const [lookingFor, setLookingFor] = useState('');
@@ -28,12 +27,12 @@ const Onboarding = () => {
     e.preventDefault();
     setError(null);
 
-    if (!name || !birthday || !gender || !photo || !personalityType || !mobileNumber || !heightFeet || !heightInches || !education || !relationshipGoals || !lookingFor) {
+    if (!name || !birthday || !gender || !photo || !personalityType || !mobileNumber || !height || !education || !relationshipGoals || !lookingFor) {
       setError('Please fill out all fields, upload a photo, and select a personality type.');
       return;
     }
 
-    const heightInCm = Math.round((parseInt(heightFeet, 10) * 30.48) + (parseInt(heightInches, 10) * 2.54));
+    const heightInCm = Math.round(parseFloat(height) * 30.48);
 
     try {
       const updatedProfile = await apiClient.put(
@@ -158,49 +157,22 @@ const Onboarding = () => {
               name="mobileNumber"
               type="tel"
               required
-              maxLength="15"
               value={mobileNumber}
               onChange={(e) => setMobileNumber(e.target.value)}
               className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
           </div>
-          <div className="flex space-x-4">
-            <div>
-              <label htmlFor="heightFeet">Height (feet)</label>
-              <input
-                id="heightFeet"
-                name="heightFeet"
-                type="number"
-                required
-                value={heightFeet}
-                onChange={(e) => {
-                  if (e.target.value.length > 1) {
-                    e.target.value = e.target.value.slice(0, 1);
-                  }
-                  setHeightFeet(e.target.value.replace(/[^0-9]/g, ''));
-                }}
-                maxLength="1"
-                className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="heightInches">Height (inches)</label>
-              <input
-                id="heightInches"
-                name="heightInches"
-                type="number"
-                required
-                value={heightInches}
-                onChange={(e) => {
-                  if (e.target.value.length > 1) {
-                    e.target.value = e.target.value.slice(0, 1);
-                  }
-                  setHeightInches(e.target.value.replace(/[^0-9]/g, ''));
-                }}
-                maxLength="1"
-                className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
+          <div>
+            <label htmlFor="height">Height (in feet)</label>
+            <input
+              id="height"
+              name="height"
+              type="number"
+              required
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
           </div>
           <div>
             <label htmlFor="education">Education</label>

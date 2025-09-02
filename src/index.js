@@ -1,4 +1,3 @@
-import './utils/disableConsole';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './firebase'; // Import Firebase to initialize it

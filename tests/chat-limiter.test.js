@@ -45,16 +45,16 @@ describe("Chat Socket", () => {
   beforeEach(async () => {
     await User.deleteMany({});
     await ChatMessage.deleteMany({});
-    await new User({ uid: 'test-user', email: 'test@test.com', mobileNumber: '1234567890' }).save();
   });
 
   const setupUser = async (uid, plan) => {
-    const user = await User.findOneAndUpdate({ uid: uid }, { plan: plan }, { new: true, upsert: true });
+    const user = new User({ uid, plan, email: `${uid}@test.com` });
+    await user.save();
     return user;
   };
 
   test("should allow premium users to send more than 2 messages", (done) => {
-    const senderUid = "test-user";
+    const senderUid = "premiumUser";
     const receiverUid = "receiver";
     const roomId = "testRoomPremium";
 
@@ -77,7 +77,7 @@ describe("Chat Socket", () => {
   });
 
   test("should not allow basic users to send more than 2 messages within 24 hours", (done) => {
-    const senderUid = "test-user";
+    const senderUid = "basicUser";
     const receiverUid = "receiver";
     const roomId = "testRoomBasic";
 
@@ -97,7 +97,7 @@ describe("Chat Socket", () => {
   });
 
   test("should allow basic users to send a third message after 24 hours", (done) => {
-    const senderUid = "test-user";
+    const senderUid = "basicUser24h";
     const receiverUid = "receiver";
     const roomId = "testRoomBasic24h";
 

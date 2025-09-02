@@ -8,6 +8,8 @@ import InterestsDisplay from '../components/InterestsDisplay';
 import InterestsEditor from '../components/InterestsEditor';
 import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
+import AudioBioPlayer from '../components/AudioBioPlayer';
+import AudioBioUpload from '../components/AudioBioUpload';
 import PhotoGallery from '../components/PhotoGallery';
 import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
@@ -92,12 +94,6 @@ function Profile() {
 
   const handleFieldChange = (e) => {
       const { id, value } = e.target;
-      if (id === 'bio') {
-          const words = value.split(/\s+/);
-          if (words.length > 100) {
-              value = words.slice(0, 100).join(' ');
-          }
-      }
       setEditableFields(prev => ({...prev, [id]: value}));
   }
 
@@ -154,7 +150,6 @@ function Profile() {
                           {isEditing ? (
                               <div>
                                  <textarea id="bio" value={editableFields.bio} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
-                                 <p className="text-sm text-neutral-500 dark:text-neutral-400">{100 - editableFields.bio.split(/\s+/).filter(Boolean).length} words remaining</p>
                               </div>
                           ) : (
                               <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.bio || 'Tell us about yourself...'}</p>
@@ -257,6 +252,17 @@ function Profile() {
                           ) : (
                             <p className="text-neutral-600 dark:text-neutral-300">{profile.personalityType || 'N/A'}</p>
                           )}
+                        </SectionCard>
+                        <SectionCard title="Audio Bio">
+                            <div style={{ display: isEditing ? 'none' : 'block' }}>
+                                <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
+                            </div>
+                            <div style={{ display: isEditing ? 'block' : 'none' }}>
+                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => {
+                                    const fullPath = `/audio-bios/${url}`;
+                                    setEditableFields(prev => ({...prev, audioBioUrl: fullPath}));
+                                }} />
+                            </div>
                         </SectionCard>
                         {isEditing && isOwnProfile && (
                             <div className="flex justify-end mt-6">
