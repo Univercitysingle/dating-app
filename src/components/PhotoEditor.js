@@ -34,7 +34,10 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
   };
 
   const handleUploadComplete = (newPhotoUrl) => {
-    const newPhoto = { url: newPhotoUrl, order: localPhotos.length };
+    // The API returns just the filename, so we prepend the known path to construct
+    // a relative URL that our rewriteCdnUrl helper can process.
+    const fullPath = `/uploads/${newPhotoUrl}`;
+    const newPhoto = { url: fullPath, order: localPhotos.length };
     setLocalPhotos([...localPhotos, newPhoto]);
   };
 

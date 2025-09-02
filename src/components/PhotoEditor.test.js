@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import PhotoEditor from './PhotoEditor';
 import apiClient from '../api/apiClient';
 
@@ -7,7 +7,14 @@ import apiClient from '../api/apiClient';
 jest.mock('../api/apiClient');
 
 // Mock the PhotoUploader component
-jest.mock('./PhotoUploader', () => () => <div data-testid="photo-uploader-mock"></div>);
+const mockOnUploadComplete = jest.fn();
+jest.mock('./PhotoUploader', () => (props) => {
+  // Assign the prop to the mock function so we can access it in the test
+  if (props.onUploadComplete) {
+    mockOnUploadComplete.mockImplementation(props.onUploadComplete);
+  }
+  return <div data-testid="photo-uploader-mock" />;
+});
 
 describe('PhotoEditor', () => {
   const initialPhotos = [
@@ -82,6 +89,21 @@ describe('PhotoEditor', () => {
     // Also check if the onSave prop function is called
     await waitFor(() => {
         expect(onSave).toHaveBeenCalled();
+    });
+  });
+
+  test('adds a new photo when upload is complete', async () => {
+    render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
+
+    // Simulate the uploader calling the onUploadComplete callback
+    act(() => {
+      mockOnUploadComplete('new-photo.jpg');
+    });
+
+    await waitFor(() => {
+      const images = screen.getAllByRole('img');
+      expect(images).toHaveLength(4);
+      expect(images[3]).toHaveAttribute('src', 'https://dateme.enadoctemp.workers.dev/uploads/new-photo.jpg');
     });
   });
 });
