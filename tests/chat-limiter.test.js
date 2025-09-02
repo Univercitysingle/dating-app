@@ -48,7 +48,7 @@ describe("Chat Socket", () => {
   });
 
   const setupUser = async (uid, plan) => {
-    const user = new User({ uid, plan, email: `${uid}@test.com` });
+    const user = new User({ uid, plan, email: `${uid}@test.com`, mobileNumber: '1234567890' });
     await user.save();
     return user;
   };
