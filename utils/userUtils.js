@@ -43,6 +43,7 @@ const findOrCreateUserFromToken = async (decodedToken) => {
     uid: decodedToken.uid,
     email: decodedToken.email,
     name: decodedToken.name || '',
+    mobileNumber: '0000000000', // Add a placeholder mobile number
     // Add any other default fields for a new user here
   });
 
