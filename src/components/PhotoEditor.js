@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import PhotoUploader from './PhotoUploader';
-import { buildCdnUrlFromKey } from '../utils/userProfileProcessor';
-
 const PhotoEditor = ({ photos, onSave, onCancel }) => {
   const [localPhotos, setLocalPhotos] = useState(photos);
 
@@ -16,21 +14,8 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
 
   const handleDelete = async (photoUrl) => {
     try {
-      // The backend expects the object key (e.g., "photos/photo.jpg"), not the full URL.
-      // We extract the pathname from the full URL and remove the leading slash.
-      let objectKey;
-      try {
-        const url = new URL(photoUrl);
-        // pathname will be "/photos/photo.jpg", so we slice(1) to remove the leading "/"
-        objectKey = url.pathname.slice(1);
-      } catch (e) {
-        // If it's not a full URL, it's likely already a relative path.
-        // We still need to ensure it doesn't have a leading slash.
-        objectKey = photoUrl.startsWith('/') ? photoUrl.slice(1) : photoUrl;
-      }
-
-      // The backend expects the key in the request body.
-      const updatedUser = await apiClient.delete('/api/users/photos', { photoUrl: objectKey });
+      // The backend can now handle extracting the key from the full CDN URL.
+      const updatedUser = await apiClient.delete('/api/users/photos', { photoUrl });
       setLocalPhotos(updatedUser.photos);
     } catch (err) {
       console.error('Failed to delete photo:', err);
@@ -39,16 +24,21 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
 
   const handleSave = async () => {
     try {
-      const updatedUser = await apiClient.put('/api/users/photos/order', { photos: localPhotos });
+      // Before saving, we need to convert any full CDN URLs back to raw keys for storage.
+      const photosToSave = localPhotos.map(p => ({
+        ...p,
+        url: p.url.substring(p.url.lastIndexOf('/') + 1)
+      }));
+      const updatedUser = await apiClient.put('/api/users/photos/order', { photos: photosToSave });
       onSave(updatedUser);
     } catch (err) {
       console.error('Failed to save photo order:', err);
     }
   };
 
-  const handleUploadComplete = (newPhotoUrl) => {
-    // The API returns just the filename (S3 key). Store it directly.
-    const newPhoto = { url: newPhotoUrl, order: localPhotos.length };
+  const handleUploadComplete = (uploadResponse) => {
+    // The API response now includes the final CDN URL.
+    const newPhoto = { url: uploadResponse.cdnUrl, order: localPhotos.length };
     setLocalPhotos([...localPhotos, newPhoto]);
   };
 
@@ -63,7 +53,7 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
         {localPhotos.map((photo, index) => (
           <div key={index} className="relative">
             <img
-              src={buildCdnUrlFromKey(photo.url)}
+              src={photo.url}
               alt={`User photo ${index + 1}`}
               className="object-cover w-full h-32 rounded-lg"
             />

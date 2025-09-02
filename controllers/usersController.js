@@ -2,23 +2,26 @@ const User = require("../models/User");
 const Match = require('../models/Match');
 const fs = require("fs");
 const path = require("path");
-const { uploadFile, deleteFile, getSignedDownloadUrl } = require("../services/s3Service");
+const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
 
-const signUserFileUrls = async (user) => {
+const CDN_HOSTNAME = process.env.CDN_HOSTNAME || 'dateme.enadoctemp.workers.dev';
+
+const convertKeysToCdnUrls = (user) => {
+  if (!user) return user;
+
+  const isFullUrl = (url) => url && url.startsWith('http');
+
   if (user.photos && user.photos.length > 0) {
-    user.photos = await Promise.all(
-      user.photos.map(async (photo) => {
-        if (photo.url) {
-          photo.url = await getSignedDownloadUrl(photo.url);
-        }
-        return photo;
-      })
-    );
+    user.photos.forEach(photo => {
+      if (photo.url && !isFullUrl(photo.url)) {
+        photo.url = `https://${CDN_HOSTNAME}/${photo.url}`;
+      }
+    });
   }
-  if (user.audioBioUrl) {
-    user.audioBioUrl = await getSignedDownloadUrl(user.audioBioUrl);
+  if (user.audioBioUrl && !isFullUrl(user.audioBioUrl)) {
+    user.audioBioUrl = `https://${CDN_HOSTNAME}/${user.audioBioUrl}`;
   }
   return user;
 };
@@ -33,7 +36,7 @@ const getCurrentUserProfile = async (req, res) => {
 
   log.info(`UsersController: Sending user profile for UID: ${req.user.uid}.`);
   let user = req.user.toObject ? req.user.toObject() : { ...req.user };
-  user = await signUserFileUrls(user);
+  user = convertKeysToCdnUrls(user);
   res.json(sanitizeUser(user, req.user));
 };
 
@@ -214,7 +217,8 @@ const uploadAudioBio = async (req, res) => {
 
     await User.findOneAndUpdate({ uid: req.user.uid }, { audioBioUrl: key });
 
-    res.json({ success: true, fileUrl: key });
+    const cdnUrl = `https://${CDN_HOSTNAME}/${key}`;
+    res.json({ success: true, fileUrl: key, cdnUrl });
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in audio bio upload for UID ${userUidForLog}`);
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
@@ -282,7 +286,8 @@ const uploadPhoto = async (req, res) => {
       { new: true }
     );
 
-    res.json({ success: true, fileUrl: key });
+    const cdnUrl = `https://${CDN_HOSTNAME}/${key}`;
+    res.json({ success: true, fileUrl: key, cdnUrl });
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
@@ -319,8 +324,11 @@ const updatePhotoOrder = async (req, res) => {
 
 const deletePhoto = async (req, res) => {
   const log = req.log;
-  const { photoUrl } = req.body;
+  const { photoUrl } = req.body; // This could be a full CDN URL or a bare key
   log.info(`UsersController: deletePhoto entered for UID: ${req.user.uid}`);
+
+  // Extract the key from the URL. The key is the last part of the path.
+  const key = photoUrl.substring(photoUrl.lastIndexOf('/') + 1);
 
   try {
     const user = await User.findOne({ uid: req.user.uid });
@@ -335,8 +343,10 @@ const deletePhoto = async (req, res) => {
       return res.status(400).json({ message: "You must have at least one photo." });
     }
 
-    const photoToDelete = user.photos.find(p => p.url === photoUrl);
+    // Find the photo in the user's document by the raw key
+    const photoToDelete = user.photos.find(p => p.url === key);
     if (!photoToDelete) {
+      log.warn({ key, photos: user.photos }, `Photo not found in user's profile.`);
       return res.status(404).json({ error: "Photo not found in user's profile." });
     }
 
@@ -345,18 +355,18 @@ const deletePhoto = async (req, res) => {
     const updatedUser = await User.findOneAndUpdate(
       { uid: req.user.uid },
       {
-        $pull: { photos: { url: photoUrl } },
+        $pull: { photos: { url: key } }, // Pull using the key
         $inc: { totalPhotoSize: -sizeToDecrement },
       },
       { new: true }
     );
 
-    const key = photoUrl;
     await deleteFile(key);
     log.info({ key }, "UsersController: Successfully deleted photo from S3.");
 
     log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
-    res.json(updatedUser);
+    // Return the updated user profile with all URLs correctly processed
+    res.json(convertKeysToCdnUrls(updatedUser.toObject()));
   } catch (err) {
     log.error({ err }, `UsersController: Error deleting photo for UID ${req.user.uid}`);
     res.status(500).json({ error: "An unexpected error occurred while deleting photo." });
@@ -429,8 +439,8 @@ const discoverUsers = async (req, res) => {
       }
     });
 
-    const usersWithSignedUrls = await Promise.all(users.map(user => signUserFileUrls(user)));
-    const sanitizedUsers = usersWithSignedUrls.map(user => sanitizeUser(user, req.user));
+    const usersWithCdnUrls = users.map(user => convertKeysToCdnUrls(user));
+    const sanitizedUsers = usersWithCdnUrls.map(user => sanitizeUser(user, req.user));
 
     log.info(`UsersController: Found ${sanitizedUsers.length} users to discover.`);
     res.json(sanitizedUsers);
@@ -447,7 +457,7 @@ const getUserProfile = async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        user = await signUserFileUrls(user);
+        user = convertKeysToCdnUrls(user);
         res.json(sanitizeUser(user, req.user));
     } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -469,8 +479,8 @@ const getLikes = async (req, res) => {
 
         if (plan === 'basic') {
             const users = await User.find({ uid: { $in: likedByUserIds } }).select('uid photos').lean();
-            const blurredUsers = await Promise.all(users.map(async (user) => {
-                const photoUrl = user.photos?.[0]?.url ? await getSignedDownloadUrl(user.photos[0].url) : null;
+            const blurredUsers = users.map(user => {
+                const photoUrl = user.photos?.[0]?.url ? `https://${CDN_HOSTNAME}/${user.photos[0].url}` : null;
                 return {
                     uid: user.uid,
                     isBlurred: true,
@@ -482,17 +492,17 @@ const getLikes = async (req, res) => {
 
         const users = await User.find({ uid: { $in: likedByUserIds } }).lean();
 
-        const usersWithLikeType = await Promise.all(users.map(async (user) => {
+        const usersWithLikeType = users.map(user => {
             const match = matches.find(m =>
                 (m.user1Uid === uid && m.user2Uid === user.uid) ||
                 (m.user1Uid === user.uid && m.user2Uid === uid)
             );
-            const userWithSignedUrls = await signUserFileUrls(user);
+            const userWithCdnUrls = convertKeysToCdnUrls(user);
             return {
-                ...userWithSignedUrls,
+                ...userWithCdnUrls,
                 likeType: match.superLike ? 'superlike' : 'like',
             };
-        }));
+        });
 
         res.json(usersWithLikeType.map(user => sanitizeUser(user, req.user)));
     } catch (error) {

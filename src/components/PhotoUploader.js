@@ -17,7 +17,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
 
     try {
       const response = await apiClient.post('/api/users/photos', formData);
-      onUploadComplete(response.fileUrl);
+      onUploadComplete(response);
     } catch (err) {
       setError(err.data?.message || 'Failed to upload photo.');
     } finally {
