@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import PhotoUploader from './PhotoUploader';
+
 const PhotoEditor = ({ photos, onSave, onCancel }) => {
   const [localPhotos, setLocalPhotos] = useState(photos);
 

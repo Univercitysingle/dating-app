@@ -55,7 +55,8 @@ describe('PhotoEditor', () => {
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith('/api/users/photos', { photoUrl: 'photo1.jpg' });
+      // The full URL should be sent to the backend now
+      expect(apiClient.delete).toHaveBeenCalledWith('/api/users/photos', { photoUrl: 'https://example.com/photo1.jpg' });
     });
 
     // Rerender with the new photos from the mocked API response
@@ -76,14 +77,16 @@ describe('PhotoEditor', () => {
   test('calls apiClient.put with the correct photo order on save', async () => {
     render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
 
-    // Note: Reordering logic is not implemented in this simplified test,
-    // as it would require a drag-and-drop library. We will just test if the save
-    // button calls the API with the current order.
+    // The component should extract the keys from the URLs before sending
+    const expectedPhotosPayload = initialPhotos.map(p => ({
+      ...p,
+      url: p.url.substring(p.url.lastIndexOf('/') + 1)
+    }));
 
     fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
-      expect(apiClient.put).toHaveBeenCalledWith('/api/users/photos/order', { photos: initialPhotos });
+      expect(apiClient.put).toHaveBeenCalledWith('/api/users/photos/order', { photos: expectedPhotosPayload });
     });
 
     // Also check if the onSave prop function is called
@@ -95,9 +98,13 @@ describe('PhotoEditor', () => {
   test('adds a new photo when upload is complete', async () => {
     render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
 
-    // Simulate the uploader calling the onUploadComplete callback
+    // Simulate the uploader calling the onUploadComplete callback with the new API response structure
     act(() => {
-      mockOnUploadComplete('new-photo.jpg');
+      mockOnUploadComplete({
+        success: true,
+        fileUrl: 'new-photo.jpg',
+        cdnUrl: 'https://dateme.enadoctemp.workers.dev/new-photo.jpg'
+      });
     });
 
     await waitFor(() => {

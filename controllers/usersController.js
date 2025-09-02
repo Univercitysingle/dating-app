@@ -488,7 +488,7 @@ const getLikes = async (req, res) => {
                     isBlurred: true,
                     photoUrl: photoUrl,
                 };
-            }));
+            });
             return res.json(blurredUsers);
         }
 
