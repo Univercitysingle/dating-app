@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { API_URL } from '../utils/constants';
-
 const PhotoGallery = ({ photos, onEdit }) => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
@@ -42,7 +40,7 @@ const PhotoGallery = ({ photos, onEdit }) => {
 
       {/* Main Image */}
       <img
-        src={`${API_URL}${photos[currentPhotoIndex].url}`}
+        src={`https://dateme.enadoctemp.workers.dev${photos[currentPhotoIndex].url}`}
         alt={`User photo ${currentPhotoIndex + 1}`}
         className="w-full h-full object-cover"
       />

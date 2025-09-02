@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import PhotoUploader from './PhotoUploader';
-import { API_URL } from '../utils/constants';
 
 const PhotoEditor = ({ photos, onSave, onCancel }) => {
   const [localPhotos, setLocalPhotos] = useState(photos);
@@ -49,7 +48,7 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
         {localPhotos.map((photo, index) => (
           <div key={index} className="relative">
             <img
-              src={`${API_URL}${photo.url}`}
+              src={`https://dateme.enadoctemp.workers.dev${photo.url}`}
               alt={`User photo ${index + 1}`}
               className="object-cover w-full h-32 rounded-lg"
             />

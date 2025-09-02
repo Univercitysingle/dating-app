@@ -13,7 +13,7 @@ jest.mock('wavesurfer.js', () => ({
 
 describe('AudioBioPlayer', () => {
   it('renders the play button and waveform container', () => {
-    render(<AudioBioPlayer audioUrl="test.mp3" />);
+    render(<AudioBioPlayer audioUrl="https://example.com/test.mp3" />);
     expect(screen.getByLabelText('Play audio bio')).toBeInTheDocument();
     expect(document.querySelector('.flex-grow')).toBeInTheDocument();
   });

@@ -22,12 +22,11 @@ const AudioBioPlayer = ({ audioUrl }) => {
       wavesurfer.current = wavesurferInstance;
 
       if (audioUrl) {
-        // HACK: The audioBioUrl is coming from the backend with an incorrect hostname and
-        // a double slash. This is a client-side workaround to fix the URL before it's
-        // passed to wavesurfer.
-        const correctedUrl = audioUrl
-          .replace('s3.us-east.amazonaws.com', 's3.us-east-005.backblazeb2.com')
-          .replace(/(?<!:)\/\//g, '/');
+        // HACK: The audioBioUrl is coming from the backend. This client-side
+        // workaround rewrites the URL to use the Cloudflare CDN worker and
+        // cleans up any extra slashes in the path.
+        const path = new URL(audioUrl).pathname;
+        const correctedUrl = `https://dateme.enadoctemp.workers.dev${path}`.replace(/(?<!:)\/\//g, '/');
         wavesurferInstance.load(correctedUrl);
       }
 
