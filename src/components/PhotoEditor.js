@@ -16,7 +16,7 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
 
   const handleDelete = async (photoUrl) => {
     try {
-      // Pass photoUrl as a query parameter, which is a more common pattern for DELETE requests.
+      // The backend expects the full photoUrl to identify the photo for deletion.
       const updatedUser = await apiClient.delete(`/api/users/photos?photoUrl=${encodeURIComponent(photoUrl)}`);
       setLocalPhotos(updatedUser.photos);
     } catch (err) {

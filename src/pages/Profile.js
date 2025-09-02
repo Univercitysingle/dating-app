@@ -258,7 +258,10 @@ function Profile() {
                                 <AudioBioPlayer audioUrl={profile.audioBioUrl || ''} />
                             </div>
                             <div style={{ display: isEditing ? 'block' : 'none' }}>
-                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => setEditableFields(prev => ({...prev, audioBioUrl: url}))} />
+                                <AudioBioUpload currentAudioUrl={profile.audioBioUrl || ''} onUploadComplete={(url) => {
+                                    const fullPath = `/audio-bios/${url}`;
+                                    setEditableFields(prev => ({...prev, audioBioUrl: fullPath}));
+                                }} />
                             </div>
                         </SectionCard>
                         {isEditing && isOwnProfile && (
