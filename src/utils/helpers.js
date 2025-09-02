@@ -3,6 +3,12 @@ export const rewriteCdnUrl = (originalUrl) => {
     return '';
   }
   const cdnHostname = 'dateme.enadoctemp.workers.dev';
+
+  // If the URL already points to the CDN, return it as is to prevent corruption.
+  if (originalUrl.includes(cdnHostname)) {
+    return originalUrl;
+  }
+
   try {
     const url = new URL(originalUrl);
     const path = url.pathname;
