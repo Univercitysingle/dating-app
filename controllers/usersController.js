@@ -2,6 +2,7 @@ const User = require("../models/User");
 const Match = require('../models/Match');
 const fs = require("fs");
 const path = require("path");
+const sharp = require("sharp");
 const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
@@ -215,12 +216,18 @@ const uploadPhoto = async (req, res) => {
 
     log.info(`UsersController: File received for photo: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
 
-    const fileContent = fs.readFileSync(req.file.path);
+    const resizedImageBuffer = await sharp(req.file.path)
+      .resize({
+        width: 600,
+        withoutEnlargement: true,
+      })
+      .toBuffer();
+
     const ext = path.extname(req.file.originalname);
     const key = `photos-${userUidForLog}-${Date.now()}${ext}`;
     log.info(`UsersController: Uploading photo to S3 with key: ${key}`);
 
-    await uploadFile(key, fileContent, req.file.mimetype);
+    await uploadFile(key, resizedImageBuffer, req.file.mimetype);
     log.info({ key }, "UsersController: Photo uploaded to S3 successfully.");
 
     fs.unlinkSync(req.file.path);
@@ -229,14 +236,14 @@ const uploadPhoto = async (req, res) => {
     const newPhoto = {
       url: key,
       order: user.photos.length,
-      size: req.file.size,
+      size: resizedImageBuffer.length,
     };
 
     await User.findOneAndUpdate(
       { uid: req.user.uid },
       {
         $push: { photos: newPhoto },
-        $inc: { totalPhotoSize: req.file.size },
+        $inc: { totalPhotoSize: resizedImageBuffer.length },
       },
       { new: true }
     );
