@@ -4,23 +4,20 @@ export const rewriteCdnUrl = (originalUrl) => {
   }
   const cdnHostname = 'dateme.enadoctemp.workers.dev';
 
-  // If the URL already points to the CDN, return it as is to prevent corruption.
-  if (originalUrl.includes(cdnHostname)) {
-    return originalUrl;
+  // Extract the key, which is the last part of the path, regardless of URL format.
+  let key;
+  try {
+    // This will handle full URLs, including signed or CDN URLs.
+    // It correctly parses the pathname, ignoring host, port, and query params.
+    const url = new URL(originalUrl);
+    const pathParts = url.pathname.split('/');
+    key = pathParts[pathParts.length - 1];
+  } catch (error) {
+    // This will handle bare keys or simple relative paths that fail the URL constructor.
+    const pathParts = originalUrl.split('/');
+    key = pathParts[pathParts.length - 1];
   }
 
-  try {
-    const url = new URL(originalUrl);
-    const path = url.pathname;
-    // Reconstruct the URL with the new CDN hostname and clean up any double slashes
-    return `https://${cdnHostname}${path}`.replace(/(?<!:)\/\//g, '/');
-  } catch (error) {
-    // If the originalUrl is not a valid URL, it could be a relative path or a bare key.
-    if (originalUrl.startsWith('/')) {
-      // It's a relative path
-      return `https://${cdnHostname}${originalUrl}`.replace(/(?<!:)\/\//g, '/');
-    }
-    // Assume it's a bare key and construct the URL.
-    return `https://${cdnHostname}/${originalUrl}`.replace(/(?<!:)\/\//g, '/');
-  }
+  // Reconstruct a clean, canonical CDN URL from the extracted key.
+  return `https://${cdnHostname}/${key}`;
 };
