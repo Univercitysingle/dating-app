@@ -21,7 +21,7 @@ const mockUser = {
   preference: 'Woman',
   education: 'University',
   relationshipGoals: 'Long-term relationship',
-  photos: [{ url: 'photo1.jpg' }],
+  photos: [{ url: 'https://example.com/photo1.jpg' }],
   profilePrompts: [],
   interests: [],
   personalityQuizResults: {},

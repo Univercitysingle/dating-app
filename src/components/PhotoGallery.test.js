@@ -4,9 +4,9 @@ import PhotoGallery from './PhotoGallery';
 
 describe('PhotoGallery', () => {
   const photos = [
-    { url: 'photo1.jpg' },
-    { url: 'photo2.jpg' },
-    { url: 'photo3.jpg' },
+    { url: 'https://example.com/photo1.jpg' },
+    { url: 'https://example.com/photo2.jpg' },
+    { url: 'https://example.com/photo3.jpg' },
   ];
 
   it('renders the first photo by default', () => {

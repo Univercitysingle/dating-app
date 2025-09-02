@@ -11,9 +11,9 @@ jest.mock('./PhotoUploader', () => () => <div data-testid="photo-uploader-mock">
 
 describe('PhotoEditor', () => {
   const initialPhotos = [
-    { url: '/photo1.jpg', order: 1 },
-    { url: '/photo2.jpg', order: 2 },
-    { url: '/photo3.jpg', order: 3 },
+    { url: 'https://example.com/photo1.jpg', order: 1 },
+    { url: 'https://example.com/photo2.jpg', order: 2 },
+    { url: 'https://example.com/photo3.jpg', order: 3 },
   ];
 
   const onSave = jest.fn();
@@ -48,7 +48,7 @@ describe('PhotoEditor', () => {
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith(`/api/users/photos?photoUrl=${encodeURIComponent('/photo1.jpg')}`);
+      expect(apiClient.delete).toHaveBeenCalledWith(`/api/users/photos?photoUrl=${encodeURIComponent('https://example.com/photo1.jpg')}`);
     });
 
     // Rerender with the new photos from the mocked API response
@@ -61,7 +61,7 @@ describe('PhotoEditor', () => {
   });
 
   test('does not allow deleting the last photo', () => {
-    render(<PhotoEditor photos={[{ url: 'photo1.jpg', order: 1 }]} onSave={onSave} onCancel={onCancel} />);
+    render(<PhotoEditor photos={[{ url: 'https://example.com/photo1.jpg', order: 1 }]} onSave={onSave} onCancel={onCancel} />);
     const deleteButton = screen.getByText('X');
     expect(deleteButton).toBeDisabled();
   });

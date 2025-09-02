@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
+import { rewriteCdnUrl } from '../utils/helpers';
 
 const AudioBioPlayer = ({ audioUrl }) => {
   const waveformRef = useRef(null);
@@ -22,12 +23,7 @@ const AudioBioPlayer = ({ audioUrl }) => {
       wavesurfer.current = wavesurferInstance;
 
       if (audioUrl) {
-        // HACK: The audioBioUrl is coming from the backend. This client-side
-        // workaround rewrites the URL to use the Cloudflare CDN worker and
-        // cleans up any extra slashes in the path.
-        const path = new URL(audioUrl).pathname;
-        const correctedUrl = `https://dateme.enadoctemp.workers.dev${path}`.replace(/(?<!:)\/\//g, '/');
-        wavesurferInstance.load(correctedUrl);
+        wavesurferInstance.load(rewriteCdnUrl(audioUrl));
       }
 
       wavesurferInstance.on('play', () => setIsPlaying(true));
