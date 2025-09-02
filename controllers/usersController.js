@@ -324,11 +324,11 @@ const updatePhotoOrder = async (req, res) => {
 
 const deletePhoto = async (req, res) => {
   const log = req.log;
-  const { photoUrl } = req.body; // This could be a full CDN URL or a bare key
+  const { photoUrl } = req.body; // This is the full CDN URL of the photo to delete.
   log.info(`UsersController: deletePhoto entered for UID: ${req.user.uid}`);
 
-  // Extract the key from the URL. The key is the last part of the path.
-  const key = photoUrl.substring(photoUrl.lastIndexOf('/') + 1);
+  // Extract the base key from the incoming CDN URL.
+  const keyToDelete = photoUrl.substring(photoUrl.lastIndexOf('/') + 1);
 
   try {
     const user = await User.findOne({ uid: req.user.uid });
@@ -338,34 +338,36 @@ const deletePhoto = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Validation checks
     if (user.photos.length <= 1) {
       return res.status(400).json({ message: "You must have at least one photo." });
     }
 
-    // Find the photo in the user's document by the raw key
-    const photoToDelete = user.photos.find(p => p.url === key);
+    // Find the photo by matching the end of the stored URL, to handle corrupted data.
+    const photoToDelete = user.photos.find(p => p.url && p.url.endsWith(keyToDelete));
+
     if (!photoToDelete) {
-      log.warn({ key, photos: user.photos }, `Photo not found in user's profile.`);
+      log.warn({ keyToDelete, photos: user.photos }, `Photo not found in user's profile.`);
       return res.status(404).json({ error: "Photo not found in user's profile." });
     }
 
     const sizeToDecrement = typeof photoToDelete.size === 'number' ? photoToDelete.size : 0;
 
+    // Extract the actual key from the (potentially corrupted) URL in the DB for S3 deletion.
+    const s3Key = photoToDelete.url.substring(photoToDelete.url.lastIndexOf('/') + 1);
+
     const updatedUser = await User.findOneAndUpdate(
       { uid: req.user.uid },
       {
-        $pull: { photos: { url: key } }, // Pull using the key
+        $pull: { photos: { _id: photoToDelete._id } }, // Pull by the photo's unique _id
         $inc: { totalPhotoSize: -sizeToDecrement },
       },
       { new: true }
     );
 
-    await deleteFile(key);
-    log.info({ key }, "UsersController: Successfully deleted photo from S3.");
+    await deleteFile(s3Key);
+    log.info({ key: s3Key }, "UsersController: Successfully deleted photo from S3.");
 
     log.info(`UsersController: Successfully deleted photo for UID: ${req.user.uid}.`);
-    // Return the updated user profile with all URLs correctly processed
     res.json(convertKeysToCdnUrls(updatedUser.toObject()));
   } catch (err) {
     log.error({ err }, `UsersController: Error deleting photo for UID ${req.user.uid}`);
