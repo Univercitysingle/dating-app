@@ -20,9 +20,6 @@ const convertKeysToCdnUrls = (user) => {
       }
     });
   }
-  if (user.audioBioUrl && !isFullUrl(user.audioBioUrl)) {
-    user.audioBioUrl = `https://${CDN_HOSTNAME}/${user.audioBioUrl}`;
-  }
   return user;
 };
 
@@ -50,7 +47,7 @@ const updateCurrentUserProfile = async (req, res) => {
   if (req.user.isOnboardingComplete) {
     allowedFields = [
       "preference", "bio", "photos",
-      "interests", "profilePrompts", "audioBioUrl", "personalityType",
+      "interests", "profilePrompts", "personalityType",
       "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle", "badges",
       "lastActiveAt"
@@ -58,7 +55,7 @@ const updateCurrentUserProfile = async (req, res) => {
   } else {
     allowedFields = [
       "name", "birthday", "gender", "preference", "bio", "photos",
-      "interests", "profilePrompts", "audioBioUrl", "personalityType",
+      "interests", "profilePrompts", "personalityType",
       "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle", "badges", "mobileNumber",
       "lastActiveAt", "isOnboardingComplete"
@@ -187,48 +184,6 @@ const blockUser = async (req, res) => {
   }
 };
 
-const uploadAudioBio = async (req, res) => {
-  const log = req.log;
-  const userUidForLog = req.user ? req.user.uid : "UNKNOWN_UID_FILE_UPLOAD";
-  log.info(`UsersController: uploadAudioBio entered for User: ${userUidForLog}`);
-
-  try {
-    if (req.fileValidationError) {
-      log.warn(`UsersController: File validation error for audio bio by ${userUidForLog}: ${req.fileValidationError}`);
-      return res.status(400).json({ message: req.fileValidationError });
-    }
-    if (!req.file) {
-      log.warn(`UsersController: No file uploaded or rejected by filter for audio bio by ${userUidForLog}.`);
-      return res.status(400).json({ message: "No file uploaded or file was rejected by filter." });
-    }
-
-    log.info(`UsersController: File received for audio bio: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
-
-    const fileContent = fs.readFileSync(req.file.path);
-    const ext = path.extname(req.file.originalname);
-    const key = `audio-bios-${userUidForLog}-${Date.now()}${ext}`;
-    log.info(`UsersController: Uploading audio bio to S3 with key: ${key}`);
-
-    const fileUrl = await uploadFile(key, fileContent, req.file.mimetype);
-    log.info({ fileUrl }, "UsersController: Audio bio uploaded to S3 successfully.");
-
-    fs.unlinkSync(req.file.path);
-    log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
-
-    await User.findOneAndUpdate({ uid: req.user.uid }, { audioBioUrl: key });
-
-    const cdnUrl = `https://${CDN_HOSTNAME}/${key}`;
-    res.json({ success: true, fileUrl: key, cdnUrl });
-  } catch (error) {
-    log.error({ err: error }, `UsersController: Error in audio bio upload for UID ${userUidForLog}`);
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    if (!res.headersSent) {
-      res.status(500).json({ message: error.message || "An unexpected error occurred during audio bio upload." });
-    }
-  }
-};
 
 const uploadPhoto = async (req, res) => {
   const log = req.log;
@@ -518,7 +473,6 @@ module.exports = {
   updateCurrentUserProfile,
   unblockUser,
   blockUser,
-  uploadAudioBio,
   uploadPhoto,
   updatePhotoOrder,
   deletePhoto,

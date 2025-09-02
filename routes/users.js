@@ -5,7 +5,6 @@ const {
   updateCurrentUserProfile,
   unblockUser,
   blockUser,
-  uploadAudioBio,
   uploadPhoto,
   updatePhotoOrder,
   deletePhoto,
@@ -22,16 +21,6 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 const MAX_AUDIO_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
-// File filter for audio
-const audioFileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('audio/')) {
-    cb(null, true);
-  } else {
-    req.fileValidationError = 'Invalid file type. Only audio files are allowed.';
-    cb(null, false);
-  }
-};
-
 // File filter for images
 const imageFileFilter = (req, file, cb) => {
   if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
@@ -41,13 +30,6 @@ const imageFileFilter = (req, file, cb) => {
     cb(null, false);
   }
 };
-
-// Configure multer for audio bio uploads
-const uploadAudio = multer({
-  dest: "uploads/",
-  fileFilter: audioFileFilter,
-  limits: { fileSize: MAX_AUDIO_SIZE },
-});
 
 // Configure multer for photo uploads
 const uploadImage = multer({
@@ -70,14 +52,6 @@ router.get("/:userId", authMiddleware, getUserProfile);
 
 // Update profile
 router.put("/me", authMiddleware, updateCurrentUserProfile);
-
-// Upload Audio Bio
-router.post(
-  "/upload-audio-bio",
-  authMiddleware,
-  uploadAudio.single("audio-bio"),
-  uploadAudioBio
-);
 
 // Upload Photo
 router.post(
