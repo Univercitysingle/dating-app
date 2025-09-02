@@ -55,7 +55,7 @@ describe('PhotoEditor', () => {
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(apiClient.delete).toHaveBeenCalledWith(`/api/users/photos?photoUrl=${encodeURIComponent('https://example.com/photo1.jpg')}`);
+      expect(apiClient.delete).toHaveBeenCalledWith('/api/users/photos', { photoUrl: 'photo1.jpg' });
     });
 
     // Rerender with the new photos from the mocked API response

@@ -16,8 +16,21 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
 
   const handleDelete = async (photoUrl) => {
     try {
-      // The backend expects the full photoUrl to identify the photo for deletion.
-      const updatedUser = await apiClient.delete(`/api/users/photos?photoUrl=${encodeURIComponent(photoUrl)}`);
+      // The backend expects the object key (e.g., "photos/photo.jpg"), not the full URL.
+      // We extract the pathname from the full URL and remove the leading slash.
+      let objectKey;
+      try {
+        const url = new URL(photoUrl);
+        // pathname will be "/photos/photo.jpg", so we slice(1) to remove the leading "/"
+        objectKey = url.pathname.slice(1);
+      } catch (e) {
+        // If it's not a full URL, it's likely already a relative path.
+        // We still need to ensure it doesn't have a leading slash.
+        objectKey = photoUrl.startsWith('/') ? photoUrl.slice(1) : photoUrl;
+      }
+
+      // The backend expects the key in the request body.
+      const updatedUser = await apiClient.delete('/api/users/photos', { photoUrl: objectKey });
       setLocalPhotos(updatedUser.photos);
     } catch (err) {
       console.error('Failed to delete photo:', err);
