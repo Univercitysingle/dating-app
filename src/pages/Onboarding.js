@@ -222,7 +222,7 @@ const Onboarding = () => {
               <option value="Don't know yet">Don't know yet</option>
             </select>
           </div>
-          <PhotoUploader onUploadComplete={(url) => setPhoto(url)} />
+          <PhotoUploader onUploadComplete={(response) => setPhoto(response.fileUrl)} />
           <button
             type="button"
             onClick={handleLocation}
