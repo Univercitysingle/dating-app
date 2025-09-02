@@ -20,6 +20,7 @@ describe('Filter component', () => {
       maxAge: 100,
       maxDistance: 100,
       lookingFor: 'Everyone',
+      relationshipType: '',
     });
   });
 

@@ -375,6 +375,9 @@ const discoverUsers = async (req, res) => {
       }
     }
 
+    if (req.query.relationshipType) {
+      query['lifestyle.lookingFor'] = req.query.relationshipType;
+    }
     if (req.query.pets) {
       query['lifestyle.pets'] = req.query.pets;
     }

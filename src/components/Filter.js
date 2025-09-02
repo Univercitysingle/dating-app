@@ -11,6 +11,7 @@ const Filter = ({ onApply }) => {
     smoking: '',
   });
   const [lookingFor, setLookingFor] = useState('Everyone');
+  const [relationshipType, setRelationshipType] = useState('');
 
   const handleLifestyleChange = (e) => {
     const { name, value } = e.target;
@@ -23,6 +24,7 @@ const Filter = ({ onApply }) => {
       maxAge,
       maxDistance: parseInt(maxDistance, 10),
       lookingFor,
+      relationshipType,
     };
     for (const key in lifestyle) {
       if (lifestyle[key]) {
@@ -89,6 +91,24 @@ const Filter = ({ onApply }) => {
             onChange={(e) => setMaxDistance(e.target.value)}
             className="w-full"
           />
+        </div>
+        <div>
+          <label htmlFor="relationshipType" className="block text-sm font-medium text-gray-700">
+            Relationship Type
+          </label>
+          <select
+            id="relationshipType"
+            name="relationshipType"
+            value={relationshipType}
+            onChange={(e) => setRelationshipType(e.target.value)}
+            className="w-full"
+          >
+            <option value="">All</option>
+            <option value="Relationship">Relationship</option>
+            <option value="Casual">Casual</option>
+            <option value="Friendship">Friendship</option>
+            <option value="Don't know yet">Don't know yet</option>
+          </select>
         </div>
         <div>
           <label htmlFor="lookingFor" className="block text-sm font-medium text-gray-700">
