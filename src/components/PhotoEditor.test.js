@@ -103,7 +103,7 @@ describe('PhotoEditor', () => {
     await waitFor(() => {
       const images = screen.getAllByRole('img');
       expect(images).toHaveLength(4);
-      expect(images[3]).toHaveAttribute('src', 'https://dateme.enadoctemp.workers.dev/uploads/new-photo.jpg');
+      expect(images[3]).toHaveAttribute('src', 'https://dateme.enadoctemp.workers.dev/new-photo.jpg');
     });
   });
 });
