@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
-import { rewriteCdnUrl } from '../utils/helpers';
 
 const AudioBioPlayer = ({ audioUrl }) => {
   const waveformRef = useRef(null);
@@ -23,7 +22,7 @@ const AudioBioPlayer = ({ audioUrl }) => {
       wavesurfer.current = wavesurferInstance;
 
       if (audioUrl) {
-        wavesurferInstance.load(rewriteCdnUrl(audioUrl));
+        wavesurferInstance.load(audioUrl);
       }
 
       wavesurferInstance.on('play', () => setIsPlaying(true));

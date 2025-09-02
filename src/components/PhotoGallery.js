@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { rewriteCdnUrl } from '../utils/helpers';
 
 const PhotoGallery = ({ photos, onEdit }) => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -42,7 +41,7 @@ const PhotoGallery = ({ photos, onEdit }) => {
 
       {/* Main Image */}
       <img
-        src={rewriteCdnUrl(photos[currentPhotoIndex].url)}
+        src={photos[currentPhotoIndex].url}
         alt={`User photo ${currentPhotoIndex + 1}`}
         className="w-full h-full object-cover"
       />

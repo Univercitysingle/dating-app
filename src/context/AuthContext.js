@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import logger from '../utils/logger';
+import { processUserProfile } from '../utils/userProfileProcessor';
 
 const AuthContext = createContext();
 
@@ -8,15 +9,25 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // New function to process user before setting state
+  const processAndSetUser = (newUser) => {
+    if (newUser) {
+      const processedUser = processUserProfile(newUser);
+      setUser(processedUser);
+    } else {
+      setUser(null);
+    }
+  };
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       const token = localStorage.getItem("authToken");
       if (token) {
         try {
           const currentUser = await apiClient.get('/api/users/me');
-          setUser(currentUser);
+          processAndSetUser(currentUser); // Use the new function
         } catch (error) {
-          setUser(null);
+          processAndSetUser(null); // Use the new function
           localStorage.removeItem("authToken");
         }
       }
@@ -31,12 +42,12 @@ export function AuthProvider({ children }) {
     logger.info("AuthContext: login called.", { token, userData });
     if (userData) {
       // If user object is provided directly (e.g., for superadmin), use it.
-      setUser(userData);
+      processAndSetUser(userData); // Use the new function
       logger.info("AuthContext: User state set directly with provided data.", { userData });
     } else {
       // Otherwise, fetch from /me endpoint (standard flow)
       const currentUser = await apiClient.get('/api/users/me');
-      setUser(currentUser);
+      processAndSetUser(currentUser); // Use the new function
     }
   };
 
@@ -46,14 +57,14 @@ export function AuthProvider({ children }) {
     } catch (error) {
       logger.error('Logout failed:', error);
     } finally {
-      setUser(null);
+      processAndSetUser(null); // Use the new function
       localStorage.removeItem("authToken");
     }
   };
 
   const value = {
     user,
-    setUser,
+    setUser: processAndSetUser, // Export the wrapped function
     isLoading,
     login,
     logout,

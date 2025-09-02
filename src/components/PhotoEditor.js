@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import PhotoUploader from './PhotoUploader';
-import { rewriteCdnUrl } from '../utils/helpers';
+import { buildCdnUrlFromKey } from '../utils/userProfileProcessor';
 
 const PhotoEditor = ({ photos, onSave, onCancel }) => {
   const [localPhotos, setLocalPhotos] = useState(photos);
@@ -63,7 +63,7 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
         {localPhotos.map((photo, index) => (
           <div key={index} className="relative">
             <img
-              src={rewriteCdnUrl(photo.url)}
+              src={buildCdnUrlFromKey(photo.url)}
               alt={`User photo ${index + 1}`}
               className="object-cover w-full h-32 rounded-lg"
             />
