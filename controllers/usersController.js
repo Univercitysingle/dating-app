@@ -345,11 +345,19 @@ const discoverUsers = async (req, res) => {
       return match.user1Uid === currentUserUid ? match.user2Uid : match.user1Uid;
     });
 
-    const { minAge, maxAge, maxDistance, lifestyle } = req.query;
+    const { minAge, maxAge, maxDistance, lifestyle, lookingFor } = req.query;
 
     const query = {
       uid: { $ne: currentUserUid, $nin: swipedUserIds },
     };
+
+    if (lookingFor === 'Men') {
+      query.gender = 'Male';
+    } else if (lookingFor === 'Women') {
+      query.gender = 'Female';
+    } else if (lookingFor === 'Other') {
+      query.gender = 'Other';
+    }
 
     if (minAge && maxAge) {
       query.age = { $gte: minAge, $lte: maxAge };

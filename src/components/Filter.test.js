@@ -19,6 +19,7 @@ describe('Filter component', () => {
       minAge: 18,
       maxAge: 100,
       maxDistance: 100,
+      lookingFor: 'Everyone',
     });
   });
 
