@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import apiClient from '../api/apiClient';
 import logger from '../utils/logger';
 
@@ -26,21 +26,19 @@ export function AuthProvider({ children }) {
     fetchCurrentUser();
   }, []);
 
-  const login = async (token, userData = null) => {
+  const login = useCallback(async (token, userData = null) => {
     localStorage.setItem("authToken", token);
     logger.info("AuthContext: login called.", { token, userData });
     if (userData) {
-      // If user object is provided directly (e.g., for superadmin), use it.
       setUser(userData);
       logger.info("AuthContext: User state set directly with provided data.", { userData });
     } else {
-      // Otherwise, fetch from /me endpoint (standard flow)
       const currentUser = await apiClient.get('/api/users/me');
       setUser(currentUser);
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await apiClient.post('/api/auth/logout');
     } catch (error) {
@@ -49,7 +47,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       localStorage.removeItem("authToken");
     }
-  };
+  }, []);
 
   const value = useMemo(() => ({
     user,
@@ -57,7 +55,7 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     logout,
-  }), [user, isLoading]);
+  }), [user, isLoading, login, logout]);
 
   console.log("AuthContext value:", value);
 
