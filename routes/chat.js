@@ -4,7 +4,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
-const { getChatHistory } = require('../controllers/chatController');
+const { getChatHistory, getConversations } = require('../controllers/chatController');
 
 let io;
 const onlineUsers = new Map();
@@ -131,6 +131,7 @@ router.get("/init-socket", (req, res) => {
 });
 
 router.get("/history/:roomId", getChatHistory);
+router.get("/conversations", getConversations);
 
 const getIO = () => {
     if (!io) {

@@ -33,20 +33,12 @@ const BottomNavBar = () => {
           <span className="text-xs">Likes</span>
         </NavLink>
         <NavLink
-          to="/matches"
-          className="flex flex-col items-center justify-center p-3 text-neutral-600 dark:text-neutral-300"
-          style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
-        >
-          <Icon path="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 016-6h6a6 6 0 016 6v1h-3" />
-          <span className="text-xs">Matches</span>
-        </NavLink>
-        <NavLink
-          to="/chat"
+          to="/conversations"
           className="flex flex-col items-center justify-center p-3 text-neutral-600 dark:text-neutral-300"
           style={({ isActive }) => (isActive ? activeLinkStyle : undefined)}
         >
           <Icon path="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          <span className="text-xs">Chat</span>
+          <span className="text-xs">Conversations</span>
         </NavLink>
         <NavLink
           to="/profile"

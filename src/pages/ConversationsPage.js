@@ -13,20 +13,20 @@ const UserCard = ({ user }) => (
     </div>
 );
 
-function MatchesPage() {
+function ConversationsPage() {
   const { user: currentUser } = useAuth();
-  const [matches, setMatches] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchMatches = useCallback(async () => {
+  const fetchConversations = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get('/api/matches/confirmed');
-      setMatches(data || []);
+      const data = await apiClient.get('/api/chat/conversations');
+      setConversations(data || []);
     } catch (err) {
-      setError(err.message || 'Failed to fetch matches.');
+      setError(err.message || 'Failed to fetch conversations.');
     } finally {
       setIsLoading(false);
     }
@@ -34,35 +34,27 @@ function MatchesPage() {
 
   useEffect(() => {
     if (currentUser) {
-      fetchMatches();
+      fetchConversations();
     }
-  }, [currentUser, fetchMatches]);
-
-  const getChatId = (targetUid) => {
-    if (!currentUser || !currentUser.uid) return null;
-    return [currentUser.uid, targetUid].sort().join('-');
-  };
+  }, [currentUser, fetchConversations]);
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Matches</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Conversations</h1>
       {isLoading && <p className="text-center">Loading...</p>}
       {error && <p className="text-center text-red-500">{error}</p>}
       {!isLoading && !error && (
         <div>
-          {matches.length > 0 ? (
+          {conversations.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {matches.map((match) => {
-                const chatId = getChatId(match.uid);
-                return (
-                  <Link to={chatId ? `/chat/${chatId}` : '#'} key={match.uid}>
-                    <UserCard user={match} />
-                  </Link>
-                );
-              })}
+              {conversations.map((convo) => (
+                <Link to={`/chat/${convo.roomId}`} key={convo.roomId}>
+                  <UserCard user={convo.otherUser} />
+                </Link>
+              ))}
             </div>
           ) : (
-            <p className="text-gray-500">You have no matches yet. Keep swiping!</p>
+            <p className="text-gray-500">You have no conversations yet.</p>
           )}
         </div>
       )}
@@ -70,4 +62,4 @@ function MatchesPage() {
   );
 }
 
-export default MatchesPage;
+export default ConversationsPage;

@@ -59,7 +59,46 @@ const getChatHistory = async (req, res) => {
   }
 };
 
+const getConversations = async (req, res) => {
+  try {
+    const userId = req.user.uid;
+
+    // Find all unique roomIds for the user
+    const rooms = await ChatMessage.distinct('roomId', {
+      $or: [{ senderUid: userId }, { receiverUid: userId }],
+    });
+
+    const conversations = await Promise.all(
+      rooms.map(async (roomId) => {
+        const participants = roomId.split('-');
+        const otherUserId = participants.find((p) => p !== userId);
+
+        if (!otherUserId) return null;
+
+        const otherUser = await User.findOne({ uid: otherUserId }).select('name photos age bio');
+        if (!otherUser) return null;
+
+        const lastMessage = await ChatMessage.findOne({ roomId }).sort({ timestamp: -1 });
+
+        return {
+          roomId,
+          otherUser,
+          lastMessage,
+        };
+      })
+    );
+
+    const validConversations = conversations.filter(c => c !== null);
+
+    res.json(validConversations);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'An unexpected error occurred while fetching conversations.' });
+  }
+};
+
 module.exports = {
   getChatHistory,
   canViewChatHistory,
+  getConversations,
 };
