@@ -7,7 +7,7 @@ const User = require('../models/User'); // Ensure User model is imported
  * @param {string} roomId - The ID of the room.
  * @returns {Promise<boolean>} - True if the user can view chat history, false otherwise.
  */
-const canViewChatHistory = async (userId, roomId) => {
+async function canViewChatHistory(userId, roomId) {
   try {
     const user = await User.findOne({ uid: userId });
     if (user && user.role === 'superadmin') {

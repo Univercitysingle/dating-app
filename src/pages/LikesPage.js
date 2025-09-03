@@ -63,8 +63,6 @@ const LikesPage = () => {
                                         </div>
                                     </div>
                                 ) : (
-                                    <Link to={`/profile/${user.uid}`}>
-                                        <img src={user.photos[0]?.url || 'https://via.placeholder.com/150'} alt={user.name} className="w-full h-48 object-cover" />
                                     <div>
                                         <Link to={`/profile/${user.uid}`}>
                                             <img src={user.photos[0]?.url || 'https://via.placeholder.com/150'} alt={user.name} className="w-full h-48 object-cover" />
