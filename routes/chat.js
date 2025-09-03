@@ -100,6 +100,9 @@ function initSocket(server, allowedOrigins, adminInstance) {
         };
 
         io.to(roomId).emit("message", messagePayload);
+        if (receiverUid !== senderUid) {
+          io.to(receiverUid).emit("message", messagePayload);
+        }
       } catch (error) {
         console.error("Failed to process or send chat message:", error);
         socket.emit("messageError", { error: "Failed to send message due to a server error." });

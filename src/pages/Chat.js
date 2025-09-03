@@ -35,7 +35,12 @@ function Chat() {
     });
 
     socketRef.current.on('message', (message) => {
-      setMessages((msgs) => [...msgs, message]);
+      setMessages((msgs) => {
+        if (msgs.some((m) => m._id === message._id)) {
+          return msgs;
+        }
+        return [...msgs, message];
+      });
     });
 
     socketRef.current.on('connect_error', (err) => {
