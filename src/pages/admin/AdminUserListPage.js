@@ -108,6 +108,15 @@ const AdminUserListPage = () => {
     }
   };
 
+  const handleChat = (targetUid) => {
+    if (!adminUser || !adminUser.uid) {
+      alert("Your user ID is not available, cannot start chat.");
+      return;
+    }
+    const chatId = [adminUser.uid, targetUid].sort().join('-');
+    navigate(`/chat/${chatId}`);
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -175,6 +184,7 @@ const AdminUserListPage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button onClick={() => navigate(`/admin/users/${user._id}/profile`)} className="text-blue-600 hover:text-blue-900">View</button>
                         <button onClick={() => navigate(`/admin/users/${user._id}/edit`)} className="text-indigo-600 hover:text-indigo-900">Edit</button>
+                        <button onClick={() => handleChat(user.uid)} className="text-green-600 hover:text-green-900">Chat</button>
                         <button onClick={() => handleToggleVisibility(user._id, user.isProfileVisible)} className={user.isProfileVisible ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}>
                           {user.isProfileVisible ? 'Hide' : 'Show'}
                         </button>

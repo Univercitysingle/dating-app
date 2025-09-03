@@ -53,9 +53,19 @@ function Chat() {
   const sendMessage = (e) => {
     e.preventDefault();
     if (!input.trim()) return;
+
+    const uids = chatId.split('-');
+    const receiverUid = uids.find(uid => uid !== user.uid);
+
+    if (!receiverUid) {
+      setError("Could not determine the recipient of the message.");
+      return;
+    }
+
     socketRef.current.emit('sendMessage', {
       roomId: chatId,
-      message: input,
+      messageContent: input,
+      receiverUid: receiverUid,
     });
     setInput('');
   };

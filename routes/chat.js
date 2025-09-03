@@ -31,7 +31,13 @@ function initSocket(server, allowedOrigins, adminInstance) {
       const token = socket.handshake.auth.token;
       if (!token) return next(new Error("Authentication error"));
       const decoded = await admin.auth().verifyIdToken(token);
-      socket.user = decoded;
+
+      const user = await User.findOne({ uid: decoded.uid });
+      if (!user) {
+        return next(new Error("User not found."));
+      }
+      socket.user = user;
+
       next();
     } catch (error) {
       console.error("Socket authentication error:", error.message);
@@ -41,7 +47,7 @@ function initSocket(server, allowedOrigins, adminInstance) {
 
   io.on("connection", (socket) => {
     console.log("User connected:", socket.user.uid);
-    socket.join(socket.user.uid); // Join a room with the user's UID
+    socket.join(socket.user.uid);
 
     socket.on("joinRoom", (roomId) => {
       socket.join(roomId);
@@ -56,16 +62,11 @@ function initSocket(server, allowedOrigins, adminInstance) {
         return;
       }
 
-      const senderUid = socket.user.uid;
+      const sender = socket.user;
+      const senderUid = sender.uid;
 
       try {
-        const sender = await User.findOne({ uid: senderUid });
-        if (!sender) {
-          socket.emit("messageError", { error: "Sender not found." });
-          return;
-        }
-
-        if (sender.plan === 'basic') {
+        if (sender.role !== 'superadmin' && sender.plan === 'basic') {
           const messagesCount = await ChatMessage.countDocuments({ roomId, senderUid });
           if (messagesCount >= 2) {
             const thirdMessage = await ChatMessage.findOne({ roomId, senderUid }).sort({ timestamp: 1 }).skip(1);
@@ -89,14 +90,16 @@ function initSocket(server, allowedOrigins, adminInstance) {
         });
         await chatMessage.save();
 
-        io.to(roomId).emit("message", {
+        const messagePayload = {
           _id: chatMessage._id,
           roomId: chatMessage.roomId,
           senderUid: chatMessage.senderUid,
           receiverUid: chatMessage.receiverUid,
           messageContent: chatMessage.messageContent,
           timestamp: chatMessage.timestamp,
-        });
+        };
+
+        io.to(roomId).emit("message", messagePayload);
       } catch (error) {
         console.error("Failed to process or send chat message:", error);
         socket.emit("messageError", { error: "Failed to send message due to a server error." });
