@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import apiClient from '../api/apiClient';
 import logger from '../utils/logger';
 
@@ -51,13 +51,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     setUser,
     isLoading,
     login,
     logout,
-  };
+  }), [user, isLoading]);
 
   console.log("AuthContext value:", value);
 

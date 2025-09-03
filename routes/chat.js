@@ -75,7 +75,9 @@ function initSocket(server, allowedOrigins, adminInstance) {
           receiverUid,
           messageContent,
         });
+        console.log("Saving chat message to database...");
         await chatMessage.save();
+        console.log("Chat message saved successfully.");
 
         const messagePayload = {
           _id: chatMessage._id,
@@ -86,9 +88,14 @@ function initSocket(server, allowedOrigins, adminInstance) {
           timestamp: chatMessage.timestamp,
         };
 
+        console.log(`Emitting 'message' to room: ${roomId}`);
         io.to(roomId).emit("message", messagePayload);
+        console.log(`'message' emitted to room: ${roomId}`);
+
         if (receiverUid !== senderUid) {
+          console.log(`Emitting 'message' to user: ${receiverUid}`);
           io.to(receiverUid).emit("message", messagePayload);
+          console.log(`'message' emitted to user: ${receiverUid}`);
         }
       } catch (error) {
         console.error("Failed to process or send chat message:", error);
