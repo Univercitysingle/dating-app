@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 
 const ChatMessage = ({ message }) => {
   const { user } = useAuth();
-  const isSender = user && message.user === user.name;
+  const isSender = user && message.senderUid === user.uid;
 
   return (
     <div className={`flex items-end ${isSender ? 'justify-end' : ''}`}>
@@ -14,7 +14,7 @@ const ChatMessage = ({ message }) => {
             : 'bg-gray-200 text-gray-800'
         }`}
       >
-        <p className="text-sm">{message.message}</p>
+        <p className="text-sm">{message.messageContent}</p>
         <p className="text-xs text-right mt-1">
           {new Date(message.timestamp).toLocaleTimeString()}
         </p>

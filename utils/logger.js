@@ -5,8 +5,14 @@ const buildLogger = (correlationId) => {
     winston.format.colorize(),
     winston.format.timestamp(),
     winston.format.align(),
+    winston.format.errors({ stack: true }),
     winston.format.printf(
-      info => `${info.timestamp} [${correlationId}] ${info.level}: ${info.message}`
+      (info) => {
+        const { timestamp, level, message, stack } = info;
+        const ts = timestamp.slice(0, 19).replace('T', ' ');
+        const log = `${ts} [${correlationId}] ${level}: ${message}`;
+        return stack ? `${log}\n${stack}` : log;
+      }
     )
   );
 

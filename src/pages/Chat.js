@@ -73,8 +73,8 @@ function Chat() {
       </header>
       <main className="flex-grow p-4 overflow-y-auto">
         <div className="space-y-4">
-          {messages.map((msg, idx) => (
-            <ChatMessage key={idx} message={msg} />
+          {messages.map((msg) => (
+            <ChatMessage key={msg._id} message={msg} />
           ))}
         </div>
       </main>

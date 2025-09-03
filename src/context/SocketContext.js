@@ -49,6 +49,13 @@ export const SocketProvider = ({ children }) => {
           });
         });
 
+        newSocket.on('chatHistory', ({ roomId, messages }) => {
+          setAllMessages(prevMessages => ({
+            ...prevMessages,
+            [roomId]: messages,
+          }));
+        });
+
         return () => newSocket.close();
       }
     }

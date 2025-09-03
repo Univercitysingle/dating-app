@@ -7,6 +7,7 @@ const User = require('../models/User');
 const { getChatHistory } = require('../controllers/chatController');
 
 let io;
+const onlineUsers = new Map();
 
 function initSocket(server, allowedOrigins, adminInstance) {
   const admin = adminInstance || require("../services/firebaseAdmin");
@@ -47,11 +48,20 @@ function initSocket(server, allowedOrigins, adminInstance) {
 
   io.on("connection", (socket) => {
     console.log("User connected:", socket.user.uid);
+    onlineUsers.set(socket.user.uid, socket.id);
     socket.join(socket.user.uid);
 
-    socket.on("joinRoom", (roomId, callback) => {
+    socket.on("joinRoom", async (roomId, callback) => {
       socket.join(roomId);
       console.log(`${socket.user.uid} joined room ${roomId}`);
+
+      try {
+        const messages = await ChatMessage.find({ roomId }).sort({ timestamp: 1 }).limit(50).exec();
+        socket.emit("chatHistory", { roomId, messages });
+      } catch (error) {
+        console.error(`Error fetching chat history for room ${roomId}:`, error);
+      }
+
       if (callback) {
         callback({ status: "ok" });
       }
@@ -92,10 +102,11 @@ function initSocket(server, allowedOrigins, adminInstance) {
         io.to(roomId).emit("message", messagePayload);
         console.log(`'message' emitted to room: ${roomId}`);
 
-        if (receiverUid !== senderUid) {
+        const receiverSocketId = onlineUsers.get(receiverUid);
+        if (receiverSocketId) {
           console.log(`Emitting 'message' to user: ${receiverUid}`);
-          io.to(receiverUid).emit("message", messagePayload);
-          io.to(receiverUid).emit("new_message_notification", {
+          io.to(receiverSocketId).emit("message", messagePayload);
+          io.to(receiverSocketId).emit("new_message_notification", {
             roomId: chatMessage.roomId,
             senderUid: chatMessage.senderUid,
             messageContent: chatMessage.messageContent,
@@ -110,6 +121,7 @@ function initSocket(server, allowedOrigins, adminInstance) {
 
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.user.uid);
+      onlineUsers.delete(socket.user.uid);
     });
   });
 }
