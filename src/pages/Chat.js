@@ -10,6 +10,7 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState(null);
+  const [isRoomJoined, setIsRoomJoined] = useState(false);
   const socketRef = useRef(null);
   const { user } = useAuth();
   const { chatId } = useParams();
@@ -31,7 +32,11 @@ function Chat() {
 
     socketRef.current.on('connect', () => {
       logger.info('Socket connected');
-      socketRef.current.emit('joinRoom', chatId);
+      socketRef.current.emit('joinRoom', chatId, (ack) => {
+        if (ack && ack.status === 'ok') {
+          setIsRoomJoined(true);
+        }
+      });
     });
 
     socketRef.current.on('message', (message) => {
@@ -101,11 +106,13 @@ function Chat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className="flex-grow p-2 border rounded-l-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            placeholder="Type a message..."
+            placeholder={isRoomJoined ? "Type a message..." : "Connecting to chat..."}
+            disabled={!isRoomJoined}
           />
           <button
             type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded-r-md"
+            className="bg-blue-500 text-white px-4 py-2 rounded-r-md disabled:bg-blue-300"
+            disabled={!isRoomJoined}
           >
             Send
           </button>

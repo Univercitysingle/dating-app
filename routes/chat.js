@@ -49,9 +49,12 @@ function initSocket(server, allowedOrigins, adminInstance) {
     console.log("User connected:", socket.user.uid);
     socket.join(socket.user.uid);
 
-    socket.on("joinRoom", (roomId) => {
+    socket.on("joinRoom", (roomId, callback) => {
       socket.join(roomId);
       console.log(`${socket.user.uid} joined room ${roomId}`);
+      if (callback) {
+        callback({ status: "ok" });
+      }
     });
 
     socket.on("sendMessage", async ({ roomId, messageContent, receiverUid }) => {
