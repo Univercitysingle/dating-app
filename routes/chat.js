@@ -12,7 +12,7 @@ function initSocket(server, allowedOrigins, adminInstance) {
   const admin = adminInstance || require("../services/firebaseAdmin");
   const corsOptions = {
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      if (allowedOrigins.includes('*') || !origin || allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -95,7 +95,12 @@ function initSocket(server, allowedOrigins, adminInstance) {
         if (receiverUid !== senderUid) {
           console.log(`Emitting 'message' to user: ${receiverUid}`);
           io.to(receiverUid).emit("message", messagePayload);
-          console.log(`'message' emitted to user: ${receiverUid}`);
+          io.to(receiverUid).emit("new_message_notification", {
+            roomId: chatMessage.roomId,
+            senderUid: chatMessage.senderUid,
+            messageContent: chatMessage.messageContent,
+          });
+          console.log(`'message' and 'new_message_notification' emitted to user: ${receiverUid}`);
         }
       } catch (error) {
         console.error("Failed to process or send chat message:", error);

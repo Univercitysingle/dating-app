@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { API_URL } from '../utils/constants';
+import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const SocketContext = createContext(null);
 
@@ -13,6 +15,7 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [allMessages, setAllMessages] = useState({});
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user && user.uid) {
@@ -38,10 +41,18 @@ export const SocketProvider = ({ children }) => {
           });
         });
 
+        newSocket.on('new_message_notification', (notification) => {
+          toast.info(`New message from ${notification.senderUid}`, {
+            onClick: () => {
+              navigate(`/chat/${notification.roomId}`);
+            },
+          });
+        });
+
         return () => newSocket.close();
       }
     }
-  }, [user?.uid]);
+  }, [user?.uid, navigate]);
 
   const addMessage = (newMessage) => {
     setAllMessages(prevMessages => {
