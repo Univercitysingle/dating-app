@@ -25,6 +25,7 @@ import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import SwipeDeck from './pages/SwipeDeck';
 import LikesPage from './pages/LikesPage';
+import MatchesPage from './pages/Matches';
 import MainLayout from './components/MainLayout';
 
 function PrivateRoute({ children }) {
@@ -96,6 +97,7 @@ function App() {
             >
               <Route path="/discover" element={<SwipeDeck />} />
               <Route path="/likes" element={<LikesPage />} />
+            <Route path="/matches" element={<MatchesPage />} />
               <Route path="/chat/:chatId" element={<Chat />} />
               <Route path="/profile" element={<Profile />} />
             </Route>

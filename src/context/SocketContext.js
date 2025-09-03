@@ -11,6 +11,7 @@ export const useSocket = () => {
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
+  const [allMessages, setAllMessages] = useState({});
   const { user } = useAuth();
 
   useEffect(() => {
@@ -24,13 +25,36 @@ export const SocketProvider = ({ children }) => {
         });
         setSocket(newSocket);
 
+        newSocket.on('message', (newMessage) => {
+          setAllMessages(prevMessages => {
+            const roomMessages = prevMessages[newMessage.roomId] || [];
+            if (roomMessages.some(m => m._id === newMessage._id)) {
+              return prevMessages;
+            }
+            return {
+              ...prevMessages,
+              [newMessage.roomId]: [...roomMessages, newMessage],
+            };
+          });
+        });
+
         return () => newSocket.close();
       }
     }
   }, [user?.uid]);
 
+  const addMessage = (newMessage) => {
+    setAllMessages(prevMessages => {
+        const roomMessages = prevMessages[newMessage.roomId] || [];
+        return {
+            ...prevMessages,
+            [newMessage.roomId]: [...roomMessages, newMessage],
+        };
+    });
+  };
+
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={{ socket, allMessages, addMessage }}>
       {children}
     </SocketContext.Provider>
   );

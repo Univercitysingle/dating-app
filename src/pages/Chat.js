@@ -6,13 +6,14 @@ import logger from '../utils/logger';
 import ChatMessage from '../components/ChatMessage';
 
 function Chat() {
-  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState(null);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const { user } = useAuth();
-  const socket = useSocket();
+  const { socket, allMessages, addMessage } = useSocket();
   const { chatId } = useParams();
+
+  const messages = allMessages[chatId] || [];
 
   useEffect(() => {
     if (socket) {
@@ -22,23 +23,6 @@ function Chat() {
           logger.info(`Successfully joined room: ${chatId}`);
         }
       });
-
-      const messageListener = (message) => {
-        if (message.roomId === chatId) {
-          setMessages((msgs) => {
-            if (msgs.some((m) => m._id === message._id)) {
-              return msgs;
-            }
-            return [...msgs, message];
-          });
-        }
-      };
-
-      socket.on('message', messageListener);
-
-      return () => {
-        socket.off('message', messageListener);
-      };
     }
   }, [socket, chatId]);
 
@@ -64,7 +48,7 @@ function Chat() {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((msgs) => [...msgs, message]);
+    addMessage(message);
 
     socket.emit('sendMessage', {
       roomId: chatId,
