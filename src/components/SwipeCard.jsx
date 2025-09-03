@@ -52,7 +52,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
       onDragEnd={handleDragEnd}
       onAnimationComplete={onSwipe}
       exit={{ x: exitX, opacity: 0 }}
-      transition={{ duration: 0.5, ease: [0.6, 0.05, -0.01, 0.9] }}
+      transition={{ duration: 0.5, ease: [0.6, 0.05, 0.01, 0.9] }}
       style={{ x, rotate, ...style }}
       className="absolute w-full h-full cursor-grab"
       whileTap={{ cursor: 'grabbing' }}
