@@ -77,8 +77,8 @@ function AdminRoute({ children }) {
 function App() {
   return (
     <AuthProvider>
-      <SocketProvider>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SocketProvider>
           <ToastContainer
             position="top-right"
             autoClose={5000}
@@ -148,8 +148,8 @@ function App() {
             <Route path="/" element={<Navigate to="/discover" />} />
             <Route path="*" element={<Navigate to="/discover" />} />
           </Routes>
-        </Router>
-      </SocketProvider>
+        </SocketProvider>
+      </Router>
     </AuthProvider>
   );
 }
