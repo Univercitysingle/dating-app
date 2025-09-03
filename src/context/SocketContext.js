@@ -14,7 +14,7 @@ export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
+    if (user && user.uid) {
       const token = localStorage.getItem("authToken");
       if (token) {
         const newSocket = io(API_URL, {
@@ -27,7 +27,7 @@ export const SocketProvider = ({ children }) => {
         return () => newSocket.close();
       }
     }
-  }, [user]);
+  }, [user?.uid]);
 
   return (
     <SocketContext.Provider value={socket}>

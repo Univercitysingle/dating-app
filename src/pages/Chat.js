@@ -54,6 +54,18 @@ function Chat() {
       return;
     }
 
+    const tempId = Date.now();
+    const message = {
+      _id: tempId,
+      roomId: chatId,
+      senderUid: user.uid,
+      receiverUid: receiverUid,
+      messageContent: input,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((msgs) => [...msgs, message]);
+
     socket.emit('sendMessage', {
       roomId: chatId,
       messageContent: input,
