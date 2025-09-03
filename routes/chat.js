@@ -69,22 +69,6 @@ function initSocket(server, allowedOrigins, adminInstance) {
       const senderUid = sender.uid;
 
       try {
-        if (sender.role !== 'superadmin' && sender.plan === 'basic') {
-          const messagesCount = await ChatMessage.countDocuments({ roomId, senderUid });
-          if (messagesCount >= 2) {
-            const thirdMessage = await ChatMessage.findOne({ roomId, senderUid }).sort({ timestamp: 1 }).skip(1);
-            const now = new Date();
-            const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-
-            if (thirdMessage && thirdMessage.timestamp > twentyFourHoursAgo) {
-              socket.emit("messageError", {
-                error: "Free users are limited to 2 messages per 24 hours. Please subscribe or wait."
-              });
-              return;
-            }
-          }
-        }
-
         const chatMessage = new ChatMessage({
           roomId,
           senderUid,
@@ -131,4 +115,11 @@ const getIO = () => {
     return io;
   };
 
-module.exports = { router, initSocket, getIO };
+const sendNotification = (userId, notification) => {
+  const io = getIO();
+  if (io) {
+    io.to(userId).emit('new_notification', notification);
+  }
+};
+
+module.exports = { router, initSocket, getIO, sendNotification };

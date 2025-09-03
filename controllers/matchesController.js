@@ -1,5 +1,7 @@
 const User = require("../models/User");
 const Match = require('../models/Match');
+const Notification = require('../models/Notification');
+const { sendNotification } = require('../routes/chat');
 const { getRankedMatches } = require('../services/matchAI'); // Corrected path (controllers and services are siblings)
 
 /**
@@ -134,6 +136,15 @@ const likeUser = async (req, res) => {
       match.status = finalStatus;
       await match.save();
     }
+
+    // Create and send notification
+    const notification = new Notification({
+      recipientUid: targetUserId,
+      senderUid: currentUserUid,
+      type: 'like',
+    });
+    await notification.save();
+    sendNotification(targetUserId, notification);
 
     res.status(200).json({
       status: match.status,

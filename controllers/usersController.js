@@ -452,19 +452,6 @@ const getLikes = async (req, res) => {
             .filter(match => !match.likedBy.includes(uid))
             .map(match => (match.user1Uid === uid ? match.user2Uid : match.user1Uid));
 
-        if (plan === 'basic') {
-            const users = await User.find({ uid: { $in: likedByUserIds } }).select('uid photos').lean();
-            const blurredUsers = users.map(user => {
-                const photoUrl = user.photos?.[0]?.url ? `https://${CDN_HOSTNAME}/${user.photos[0].url}` : null;
-                return {
-                    uid: user.uid,
-                    isBlurred: true,
-                    photoUrl: photoUrl,
-                };
-            });
-            return res.json(blurredUsers);
-        }
-
         const users = await User.find({ uid: { $in: likedByUserIds } }).lean();
 
         const usersWithLikeType = users.map(user => {

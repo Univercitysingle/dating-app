@@ -13,7 +13,6 @@ const {
   getLikes,
 } = require("../controllers/usersController");
 const authMiddleware = require("../middleware/authentication");
-const subscriptionCheck = require("../middleware/subscriptionCheck");
 const multer = require("multer");
 
 // Validation Parameters

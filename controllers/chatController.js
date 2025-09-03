@@ -13,11 +13,12 @@ const canViewChatHistory = async (userId, roomId) => {
     if (user && user.role === 'superadmin') {
       return true; // Super admin can access any chat history
     }
-    const isParticipant = await ChatMessage.exists({
-      roomId,
-      $or: [{ senderUid: userId }, { receiverUid: userId }],
-    });
-    return !!isParticipant;
+    const participants = roomId.split('-');
+    if (participants.includes(userId)) {
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error('Error in canViewChatHistory:', error);
     return false;

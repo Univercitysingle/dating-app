@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from '../components/MainLayout';
+import { useAuth } from '../context/AuthContext';
 
 const LikesPage = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const navigate = useNavigate();
+    const { user: currentUser } = useAuth();
+
+    const handleChat = (targetUid) => {
+        if (!currentUser || !currentUser.uid) {
+            alert("Your user ID is not available, cannot start chat.");
+            return;
+        }
+        const chatId = [currentUser.uid, targetUid].sort().join('-');
+        navigate(`/chat/${chatId}`);
+    };
 
     useEffect(() => {
         const fetchLikes = async () => {
@@ -53,11 +65,20 @@ const LikesPage = () => {
                                 ) : (
                                     <Link to={`/profile/${user.uid}`}>
                                         <img src={user.photos[0]?.url || 'https://via.placeholder.com/150'} alt={user.name} className="w-full h-48 object-cover" />
+                                    <div>
+                                        <Link to={`/profile/${user.uid}`}>
+                                            <img src={user.photos[0]?.url || 'https://via.placeholder.com/150'} alt={user.name} className="w-full h-48 object-cover" />
+                                            <div className="p-4">
+                                                <h2 className="text-lg font-semibold">{user.name}</h2>
+                                                <p className="text-gray-600">{user.age} years old</p>
+                                            </div>
+                                        </Link>
                                         <div className="p-4">
-                                            <h2 className="text-lg font-semibold">{user.name}</h2>
-                                            <p className="text-gray-600">{user.age} years old</p>
+                                            <button onClick={() => handleChat(user.uid)} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded shadow-md">
+                                                Chat
+                                            </button>
                                         </div>
-                                    </Link>
+                                    </div>
                                 )}
                                 {user.likeType === 'superlike' && !user.isBlurred && (
                                     <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full text-xs">
