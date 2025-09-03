@@ -1,68 +1,50 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import logger from '../utils/logger';
 import ChatMessage from '../components/ChatMessage';
-import { API_URL } from '../utils/constants';
 
 function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [error, setError] = useState(null);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
-  const socketRef = useRef(null);
   const { user } = useAuth();
+  const socket = useSocket();
   const { chatId } = useParams();
 
   useEffect(() => {
-    if (!user) return;
-
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setError("No auth token found for chat connection.");
-      return;
-    }
-
-    socketRef.current = io(API_URL, {
-      auth: {
-        token: token,
-      },
-    });
-
-    socketRef.current.on('connect', () => {
-      logger.info('Socket connected');
-      socketRef.current.emit('joinRoom', chatId, (ack) => {
+    if (socket) {
+      socket.emit('joinRoom', chatId, (ack) => {
         if (ack && ack.status === 'ok') {
           setIsRoomJoined(true);
+          logger.info(`Successfully joined room: ${chatId}`);
         }
       });
-    });
 
-    socketRef.current.on('message', (message) => {
-      setMessages((msgs) => {
-        if (msgs.some((m) => m._id === message._id)) {
-          return msgs;
+      const messageListener = (message) => {
+        if (message.roomId === chatId) {
+          setMessages((msgs) => {
+            if (msgs.some((m) => m._id === message._id)) {
+              return msgs;
+            }
+            return [...msgs, message];
+          });
         }
-        return [...msgs, message];
-      });
-    });
+      };
 
-    socketRef.current.on('connect_error', (err) => {
-      logger.error('Socket connection error:', err);
-      setError('Failed to connect to chat server.');
-    });
+      socket.on('message', messageListener);
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-    };
-  }, [user, chatId]);
+      return () => {
+        socket.off('message', messageListener);
+      };
+    }
+  }, [socket, chatId]);
 
   const sendMessage = (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !socket) return;
 
     const uids = chatId.split('-');
     const receiverUid = uids.find(uid => uid !== user.uid);
@@ -72,7 +54,7 @@ function Chat() {
       return;
     }
 
-    socketRef.current.emit('sendMessage', {
+    socket.emit('sendMessage', {
       roomId: chatId,
       messageContent: input,
       receiverUid: receiverUid,

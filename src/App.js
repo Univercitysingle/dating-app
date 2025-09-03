@@ -6,6 +6,7 @@ import {
   Navigate,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
@@ -73,65 +74,67 @@ function AdminRoute({ children }) {
 function App() {
   return (
     <AuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route
-            path="/set-initial-password"
-            element={<SetInitialPasswordPage />}
-          />
-          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+      <SocketProvider>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route
+              path="/set-initial-password"
+              element={<SetInitialPasswordPage />}
+            />
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          {/* User-facing protected routes with MainLayout */}
-          <Route
-            element={
-              <PrivateRoute>
-                <MainLayout />
-              </PrivateRoute>
-            }
-          >
-            <Route path="/discover" element={<SwipeDeck />} />
-            <Route path="/likes" element={<LikesPage />} />
-            <Route path="/chat/:chatId" element={<Chat />} />
-            <Route path="/profile" element={<Profile />} />
-          </Route>
+            {/* User-facing protected routes with MainLayout */}
+            <Route
+              element={
+                <PrivateRoute>
+                  <MainLayout />
+                </PrivateRoute>
+              }
+            >
+              <Route path="/discover" element={<SwipeDeck />} />
+              <Route path="/likes" element={<LikesPage />} />
+              <Route path="/chat/:chatId" element={<Chat />} />
+              <Route path="/profile" element={<Profile />} />
+            </Route>
 
-          {/* Standalone protected routes */}
-          <Route
-            path="/premium"
-            element={
-              <PrivateRoute>
-                <PremiumContent />
-              </PrivateRoute>
-            }
-          />
+            {/* Standalone protected routes */}
+            <Route
+              path="/premium"
+              element={
+                <PrivateRoute>
+                  <PremiumContent />
+                </PrivateRoute>
+              }
+            />
 
-          {/* Admin Routes */}
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminLayout />
-              </AdminRoute>
-            }
-          >
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="users" element={<AdminUserListPage />} />
-            <Route path="users/new" element={<AdminUserEditPage />} />
-            <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
-            <Route path="users/:userId/profile" element={<AdminUserProfileViewPage />} />
-            <Route path="reports" element={<AdminReportListPage />} />
-            <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
-            <Route path="analytics" element={<AdminAnalyticsPage />} />
-          </Route>
+            {/* Admin Routes */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminLayout />
+                </AdminRoute>
+              }
+            >
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="users" element={<AdminUserListPage />} />
+              <Route path="users/new" element={<AdminUserEditPage />} />
+              <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
+              <Route path="users/:userId/profile" element={<AdminUserProfileViewPage />} />
+              <Route path="reports" element={<AdminReportListPage />} />
+              <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
+              <Route path="analytics" element={<AdminAnalyticsPage />} />
+            </Route>
 
-          {/* Default route */}
-          <Route path="/" element={<Navigate to="/discover" />} />
-          <Route path="*" element={<Navigate to="/discover" />} />
-        </Routes>
-      </Router>
+            {/* Default route */}
+            <Route path="/" element={<Navigate to="/discover" />} />
+            <Route path="*" element={<Navigate to="/discover" />} />
+          </Routes>
+        </Router>
+      </SocketProvider>
     </AuthProvider>
   );
 }
