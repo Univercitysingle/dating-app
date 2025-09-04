@@ -6,23 +6,7 @@ const sharp = require("sharp");
 const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
-
-const CDN_HOSTNAME = process.env.CDN_HOSTNAME || 'dateme.enadoctemp.workers.dev';
-
-const convertKeysToCdnUrls = (user) => {
-  if (!user) return user;
-
-  const isFullUrl = (url) => url && url.startsWith('http');
-
-  if (user.photos && user.photos.length > 0) {
-    user.photos.forEach(photo => {
-      if (photo.url && !isFullUrl(photo.url)) {
-        photo.url = `https://${CDN_HOSTNAME}/${photo.url}`;
-      }
-    });
-  }
-  return user;
-};
+const { convertKeysToCdnUrls } = require('../utils/cdnUtils');
 
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
@@ -96,13 +80,14 @@ const updateCurrentUserProfile = async (req, res) => {
   }
 
   try {
-    const user = await User.findOneAndUpdate({ uid: req.user.uid }, sanitizedUpdate, { new: true });
+    let user = await User.findOneAndUpdate({ uid: req.user.uid }, sanitizedUpdate, { new: true });
     if (!user) {
       log.warn(`UsersController: User not found during update for UID: ${req.user.uid}`);
       return res.status(404).json({ error: "User not found" });
     }
     log.info(`UsersController: Successfully updated profile for UID: ${req.user.uid}.`);
-    res.json(user);
+    user = user.toObject();
+    res.json(convertKeysToCdnUrls(user));
   } catch (err) {
     log.error({ err }, `UsersController: Error updating profile for UID ${req.user.uid}`);
     res.status(500).json({ error: "An unexpected error occurred while updating profile." });
@@ -267,7 +252,7 @@ const updatePhotoOrder = async (req, res) => {
   log.info(`UsersController: updatePhotoOrder entered for UID: ${req.user.uid}`);
 
   try {
-    const user = await User.findOneAndUpdate(
+    let user = await User.findOneAndUpdate(
       { uid: req.user.uid },
       { photos: photos },
       { new: true }
@@ -277,7 +262,8 @@ const updatePhotoOrder = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
     log.info(`UsersController: Successfully updated photo order for UID: ${req.user.uid}.`);
-    res.json(user);
+    user = user.toObject();
+    res.json(convertKeysToCdnUrls(user));
   } catch (err) {
     log.error({ err }, `UsersController: Error updating photo order for UID ${req.user.uid}`);
     res.status(500).json({ error: "An unexpected error occurred while updating photo order." });
@@ -466,7 +452,7 @@ const getLikes = async (req, res) => {
             };
         });
 
-        res.json(usersWithLikeType.map(user => sanitizeUser(user, req.user)));
+        res.json(usersWithLikeType.map(user => sanitizeUser(convertKeysToCdnUrls(user), req.user)));
     } catch (error) {
         console.error('Error fetching users who liked you:', error);
         res.status(500).json({ error: 'An unexpected error occurred.' });

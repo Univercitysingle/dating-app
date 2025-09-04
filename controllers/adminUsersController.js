@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Report = require('../models/Report'); // Import the Report model
 const bcrypt = require('bcryptjs');
 const { sanitizeUser } = require('../utils/userUtils');
+const { convertKeysToCdnUrls } = require('../utils/cdnUtils');
 
 // Get dashboard statistics
 const getDashboardStats = async (req, res) => {
@@ -55,7 +56,8 @@ const listUsers = async (req, res) => {
 
     const totalUsers = await User.countDocuments(query);
 
-    const sanitizedUsers = users.map(user => sanitizeUser(user, req.user));
+    const usersWithCdnUrls = users.map(user => convertKeysToCdnUrls(user));
+    const sanitizedUsers = usersWithCdnUrls.map(user => sanitizeUser(user, req.user));
 
     res.json({
       users: sanitizedUsers,
@@ -129,8 +131,9 @@ const createUser = async (req, res) => {
     const user = new User(newUserPayload);
     await user.save();
 
-    const userResponse = user.toObject();
+    let userResponse = user.toObject();
     delete userResponse.password; // Ensure password is not returned
+    userResponse = convertKeysToCdnUrls(userResponse);
 
     res.status(201).json(userResponse);
   } catch (error) {
@@ -146,10 +149,11 @@ const createUser = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId).select('-password');
+    let user = await User.findById(userId).select('-password').lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    user = convertKeysToCdnUrls(user);
     res.json(sanitizeUser(user, req.user));
   } catch (error) {
     console.error('Error getting user by ID:', error);
@@ -161,6 +165,16 @@ const getUserById = async (req, res) => {
 const updateUserById = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    // First, check if the user being updated is a superadmin
+    const userToUpdate = await User.findById(userId).lean();
+    if (!userToUpdate) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (userToUpdate.role === 'superadmin') {
+      return res.status(403).json({ message: 'Superadmin accounts cannot be modified.' });
+    }
+
     const updates = req.body;
     const requestingUserRole = req.user.role; // Populated by populateUser and checked by requireRole
 
@@ -209,12 +223,13 @@ const updateUserById = async (req, res) => {
     }
 
 
-    const updatedUser = await User.findByIdAndUpdate(userId, finalUpdates, { new: true }).select('-password');
+    let updatedUser = await User.findByIdAndUpdate(userId, finalUpdates, { new: true }).select('-password');
 
     if (!updatedUser) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(updatedUser);
+    updatedUser = updatedUser.toObject();
+    res.json(convertKeysToCdnUrls(updatedUser));
   } catch (error) {
     console.error('Error updating user:', error);
     if (error.code === 11000) {
@@ -228,9 +243,18 @@ const updateUserById = async (req, res) => {
 const deleteUserById = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    const userToDelete = await User.findById(userId).lean();
+    if (!userToDelete) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    if (userToDelete.role === 'superadmin') {
+      return res.status(403).json({ message: 'Superadmin accounts cannot be deleted.' });
+    }
+
     const deletedUser = await User.findByIdAndDelete(userId);
     if (!deletedUser) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'User not found during deletion.' });
     }
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
