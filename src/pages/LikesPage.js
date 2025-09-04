@@ -57,7 +57,7 @@ const LikesPage = () => {
                             <div key={user.uid} className="relative bg-white rounded-lg shadow-md overflow-hidden">
                                 {user.isBlurred ? (
                                     <div className="relative">
-                                        <img src={user.photoUrl || 'https://via.placeholder.com/150'} alt="A potential match" className="w-full h-48 object-cover filter blur-md" />
+                                        <img src={user.photos?.[0]?.url || 'https://via.placeholder.com/150'} alt="A potential match" className="w-full h-48 object-cover filter blur-md" />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
                                             <Link to="/premium" className="text-white font-bold text-lg">Upgrade to see</Link>
                                         </div>
