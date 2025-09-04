@@ -2,16 +2,14 @@ import React from 'react';
 import apiClient from '../api/apiClient';
 import { loadStripe } from '@stripe/stripe-js';
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
-
 function PremiumContent() {
     const handleSubscribe = async () => {
         try {
+            const stripe = await loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
             const { data: { sessionId } } = await apiClient.post('/api/payments/create-subscription', {
                 priceId: 'YOUR_STRIPE_PRICE_ID', // Replace with your actual Price ID
             });
 
-            const stripe = await stripePromise;
             const { error } = await stripe.redirectToCheckout({ sessionId });
 
             if (error) {
