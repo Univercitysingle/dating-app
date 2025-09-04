@@ -90,6 +90,13 @@ const getConversations = async (req, res) => {
 
     const validConversations = conversations.filter(c => c !== null);
 
+    // Sort conversations by the timestamp of the last message
+    validConversations.sort((a, b) => {
+        if (!a.lastMessage) return 1;
+        if (!b.lastMessage) return -1;
+        return b.lastMessage.timestamp - a.lastMessage.timestamp;
+    });
+
     res.json(validConversations);
   } catch (error) {
     console.error('Error fetching conversations:', error);

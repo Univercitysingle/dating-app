@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import apiClient from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import logger from '../utils/logger';
@@ -9,6 +10,7 @@ function Chat() {
   const [input, setInput] = useState('');
   const [error, setError] = useState(null);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
+  const [otherUser, setOtherUser] = useState(null);
   const { user } = useAuth();
   const { socket, allMessages, addMessage } = useSocket();
   const { chatId } = useParams();
@@ -24,7 +26,23 @@ function Chat() {
         }
       });
     }
-  }, [socket, chatId]);
+
+    const uids = chatId.split('-');
+    const otherUserUid = uids.find(uid => uid !== user.uid);
+
+    const fetchOtherUser = async () => {
+        try {
+            const data = await apiClient.get(`/api/users/${otherUserUid}`);
+            setOtherUser(data);
+        } catch (err) {
+            setError('Could not load user details.');
+        }
+    };
+
+    if (otherUserUid) {
+        fetchOtherUser();
+    }
+  }, [socket, chatId, user.uid]);
 
   const sendMessage = (e) => {
     e.preventDefault();
@@ -68,8 +86,17 @@ function Chat() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 shadow-md p-4">
-        <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white">Chat Room</h2>
+      <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center">
+        {otherUser ? (
+            <>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{otherUser.name}</h2>
+                <Link to={`/profile/${otherUser.uid}`} className="text-blue-500 hover:text-blue-700">
+                    View Profile
+                </Link>
+            </>
+        ) : (
+            <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white">Chat Room</h2>
+        )}
       </header>
       <main className="flex-grow p-4 overflow-y-auto">
         <div className="space-y-4">
