@@ -433,10 +433,12 @@ const getLikes = async (req, res) => {
             $or: [{ user1Uid: uid }, { user2Uid: uid }],
             status: 'pending',
         }).lean();
+        console.log('Matches:', JSON.stringify(matches, null, 2));
 
         const likedByUserIds = matches
             .filter(match => !match.likedBy.includes(uid))
             .map(match => (match.user1Uid === uid ? match.user2Uid : match.user1Uid));
+        console.log('Liked by user IDs:', JSON.stringify(likedByUserIds, null, 2));
 
         const users = await User.find({ uid: { $in: likedByUserIds } }).lean();
 
