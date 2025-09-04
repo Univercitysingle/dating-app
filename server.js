@@ -9,7 +9,7 @@ const http = require("http");
 const cors = require("cors");
 const os = require('os');
 
-const { initSocket } = require("./routes/chat");
+const { initSocket } = require("./services/socket");
 const authMiddleware = require("./middleware/authentication");
 const geolocationMiddleware = require("./middleware/geolocation");
 const { globalLogger: logger, buildLogger } = require("./utils/logger");

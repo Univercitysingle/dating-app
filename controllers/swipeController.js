@@ -1,7 +1,7 @@
 const Match = require('../models/Match');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const { getIO } = require('../routes/chat');
+const { getIO } = require('../services/socket');
 
 const recordSwipe = async (currentUserUid, targetUserId, action, matchId) => {
   await User.findOneAndUpdate(

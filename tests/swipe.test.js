@@ -3,12 +3,12 @@ const { like, pass, superLike, undoSwipe } = require('../controllers/swipeContro
 const Match = require('../models/Match');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const { getIO } = require('../routes/chat');
+const { getIO } = require('../services/socket');
 
 jest.mock('../models/Match');
 jest.mock('../models/User');
 jest.mock('../models/Notification');
-jest.mock('../routes/chat', () => ({
+jest.mock('../services/socket', () => ({
     getIO: jest.fn(),
 }));
 
