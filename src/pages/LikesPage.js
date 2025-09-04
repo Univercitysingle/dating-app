@@ -24,10 +24,14 @@ const LikesPage = () => {
         const fetchLikes = async () => {
             try {
                 const response = await apiClient.get('/api/users/likes');
+                console.log("Likes API raw response:", response);
+
                 if (response.forbidden) {
                     setError(response.error || 'This feature is for premium users only.');
                 } else {
-                    setUsers(response);
+                    // ✅ Ensure we set the actual data array
+                    const usersArray = response.data || response;
+                    setUsers(Array.isArray(usersArray) ? usersArray : []);
                 }
             } catch (err) {
                 setError(err.message || 'An error occurred');
@@ -40,21 +44,43 @@ const LikesPage = () => {
     }, []);
 
     if (loading) {
-        return <MainLayout><div className="text-center">Loading...</div></MainLayout>;
+        return (
+            <MainLayout>
+                <div className="text-center">Loading...</div>
+            </MainLayout>
+        );
     }
 
     if (error) {
-        return <MainLayout><div className="text-center text-red-500">{error}</div></MainLayout>;
+        return (
+            <MainLayout>
+                <div className="text-center text-red-500">{error}</div>
+            </MainLayout>
+        );
     }
 
     return (
         <MainLayout>
             <div className="container mx-auto p-4">
-                <h1 className="text-2xl font-bold mb-4">Who Likes You (Debug View)</h1>
+                <h1 className="text-2xl font-bold mb-4">Who Likes You</h1>
                 {users.length > 0 ? (
-                    <ul>
+                    <ul className="space-y-4">
                         {users.map(user => (
-                            <li key={user.uid}>{user.name}</li>
+                            <li
+                                key={user._id || user.uid}
+                                className="border rounded-lg p-4 shadow-sm flex justify-between items-center"
+                            >
+                                <div>
+                                    <p className="font-semibold">{user.name}</p>
+                                    <p className="text-gray-600 text-sm">{user.bio}</p>
+                                </div>
+                                <button
+                                    onClick={() => handleChat(user.uid)}
+                                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                                >
+                                    Chat
+                                </button>
+                            </li>
                         ))}
                     </ul>
                 ) : (
