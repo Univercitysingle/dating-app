@@ -449,6 +449,7 @@ const getLikes = async (req, res) => {
             return {
                 ...userWithCdnUrls,
                 likeType: match ? (match.superLike ? 'superlike' : 'like') : 'like',
+                isBlurred: req.user.plan !== 'premium',
             };
         });
 

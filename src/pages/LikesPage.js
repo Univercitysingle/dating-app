@@ -27,8 +27,6 @@ const LikesPage = () => {
                 if (response.forbidden) {
                     setError(response.error || 'This feature is for premium users only.');
                 } else {
-                    console.log('LikesPage response:', response);
-                    console.log('Is response an array?', Array.isArray(response));
                     setUsers(response);
                 }
             } catch (err) {
