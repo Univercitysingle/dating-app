@@ -50,44 +50,15 @@ const LikesPage = () => {
     return (
         <MainLayout>
             <div className="container mx-auto p-4">
-                <h1 className="text-2xl font-bold mb-4">Who Likes You</h1>
+                <h1 className="text-2xl font-bold mb-4">Who Likes You (Debug View)</h1>
                 {users.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <ul>
                         {users.map(user => (
-                            <div key={user.uid} className="relative bg-white rounded-lg shadow-md overflow-hidden">
-                                {user.isBlurred ? (
-                                    <div className="relative">
-                                        <img src={user.photos?.[0]?.url || 'https://via.placeholder.com/150'} alt="A potential match" className="w-full h-48 object-cover filter blur-md" />
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                                            <Link to="/premium" className="text-white font-bold text-lg">Upgrade to see</Link>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <Link to={`/profile/${user.uid}`}>
-                                            <img src={user.photos[0]?.url || 'https://via.placeholder.com/150'} alt={user.name} className="w-full h-48 object-cover" />
-                                            <div className="p-4">
-                                                <h2 className="text-lg font-semibold">{user.name}</h2>
-                                                <p className="text-gray-600">{user.age} years old</p>
-                                            </div>
-                                        </Link>
-                                        <div className="p-4">
-                                            <button onClick={() => handleChat(user.uid)} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded shadow-md">
-                                                Chat
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                                {user.likeType === 'superlike' && !user.isBlurred && (
-                                    <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full text-xs">
-                                        Superlike
-                                    </div>
-                                )}
-                            </div>
+                            <li key={user.uid}>{user.name}</li>
                         ))}
-                    </div>
+                    </ul>
                 ) : (
-                    <p className="text-center">No one has liked you yet. Keep swiping!</p>
+                    <p className="text-center">No users found.</p>
                 )}
             </div>
         </MainLayout>
