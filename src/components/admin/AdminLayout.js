@@ -68,6 +68,16 @@ const AdminLayout = () => {
                 Analytics
               </Link>
             </li>
+            {user.role === 'superadmin' && (
+              <li>
+                <Link
+                  to="/admin/subscriptions"
+                  className="block px-3 py-2 rounded-md hover:bg-gray-700"
+                >
+                  Subscription Management
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
         <div className="mt-auto">

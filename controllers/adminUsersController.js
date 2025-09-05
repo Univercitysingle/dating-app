@@ -263,6 +263,35 @@ const deleteUserById = async (req, res) => {
   }
 };
 
+// Update a user's subscription plan
+const updateUserSubscription = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { plan } = req.body;
+
+    // Validate plan
+    const validPlans = User.schema.path('plan').enumValues;
+    if (!validPlans.includes(plan)) {
+      return res.status(400).json({ message: `Invalid plan. Must be one of: ${validPlans.join(', ')}` });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { plan: plan },
+      { new: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(sanitizeUser(updatedUser.toObject(), req.user));
+  } catch (error) {
+    console.error('Error updating user subscription:', error);
+    res.status(500).json({ message: 'Error updating user subscription', error: error.message });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   listUsers,
@@ -270,4 +299,5 @@ module.exports = {
   getUserById,
   updateUserById,
   deleteUserById,
+  updateUserSubscription,
 };

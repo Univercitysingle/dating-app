@@ -56,4 +56,12 @@ router.delete(
   adminUsersController.deleteUserById
 );
 
+// PUT /api/admin/users/:userId/subscription - Update a user's subscription plan
+router.put(
+  '/:userId/subscription',
+  authMiddleware,
+  requireRole(['superadmin']),
+  adminUsersController.updateUserSubscription
+);
+
 module.exports = router;
