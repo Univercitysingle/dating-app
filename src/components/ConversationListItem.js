@@ -8,7 +8,7 @@ const ConversationListItem = ({ conversation }) => {
   return (
     <Link to={`/chat/${conversation.roomId}`} className="flex items-center p-4 border-b border-gray-200 hover:bg-gray-50">
       <img
-        src={otherUser.photos?.[0]?.url || 'https://via.placeholder.com/150'}
+        src={otherUser.photos?.[0]?.url || 'https://placehold.co/150'}
         alt={otherUser.name}
         className="w-12 h-12 rounded-full object-cover mr-4"
       />

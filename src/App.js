@@ -29,6 +29,7 @@ import AdminSubscriptionPage from './pages/admin/AdminSubscriptionPage';
 import SwipeDeck from './pages/SwipeDeck';
 import LikesPage from './pages/LikesPage';
 import ConversationsPage from './pages/ConversationsPage';
+import SubscriptionManagementPage from './pages/SubscriptionManagementPage';
 import MainLayout from './components/MainLayout';
 
 function PrivateRoute({ children }) {
@@ -114,6 +115,7 @@ function App() {
             <Route path="/conversations" element={<ConversationsPage />} />
               <Route path="/chat/:chatId" element={<Chat />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/manage-subscription" element={<SubscriptionManagementPage />} />
             </Route>
 
             {/* Standalone protected routes */}

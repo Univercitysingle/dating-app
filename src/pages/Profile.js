@@ -73,20 +73,29 @@ function Profile() {
         }
     };
 
+    const fetchOwnProfile = async () => {
+        try {
+            const data = await apiClient.get('/api/users/me');
+            setProfile(data);
+            setEditableFields({
+                education: data.education || '',
+                relationshipGoals: data.relationshipGoals || 'Figuring it out',
+                bio: data.bio || '',
+                personalityType: data.personalityType || '',
+                interests: data.interests || [],
+                profilePrompts: data.profilePrompts || [],
+                lifestyle: data.lifestyle || {},
+                badges: data.badges || {},
+            });
+        } catch (error) {
+            setFetchError(error.message || 'Failed to fetch own profile.');
+        }
+    };
+
     if (userId) {
         fetchProfile();
     } else if (currentUser) {
-        setProfile(currentUser);
-        setEditableFields({
-            education: currentUser.education || '',
-            relationshipGoals: currentUser.relationshipGoals || 'Figuring it out',
-            bio: currentUser.bio || '',
-            personalityType: currentUser.personalityType || '',
-            interests: currentUser.interests || [],
-            profilePrompts: currentUser.profilePrompts || [],
-            lifestyle: currentUser.lifestyle || {},
-            badges: currentUser.badges || {},
-          });
+        fetchOwnProfile();
     }
   }, [userId, currentUser]);
 
@@ -136,7 +145,7 @@ function Profile() {
   if (!profile) return <p className="p-4">Loading profile...</p>;
 
   const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
-  const isPremium = profile.tier === 'premium';
+  const isPremium = profile.plan === 'premium';
   const isVerified = profile.isVerified === true;
 
   const renderContent = () => {
@@ -265,14 +274,7 @@ function Profile() {
                   <SectionCard title="Settings">
                       {isPremium && (
                           <button
-                              onClick={async () => {
-                                  try {
-                                      const { data: { url } } = await apiClient.get('/api/payments/manage-subscription');
-                                      window.location.href = url;
-                                  } catch (error) {
-                                      console.error('Error creating customer portal session:', error);
-                                  }
-                              }}
+                              onClick={() => navigate('/manage-subscription')}
                               className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                           >
                               Manage Subscription
