@@ -53,7 +53,7 @@ const AdminSubscriptionPage = () => {
         try {
             await apiClient.put(`/api/admin/users/${userId}/subscription`, { plan: newPlan });
             // Refetch users to show the updated plan
-            fetchUsers();
+            fetchUsers(searchTerm, sortConfig);
             alert('User subscription updated successfully.');
         } catch (err) {
             alert(`Error updating subscription: ${err.message}`);
