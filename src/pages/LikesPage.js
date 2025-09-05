@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import { Link, useNavigate } from 'react-router-dom';
-import MainLayout from '../components/MainLayout';
 import { useAuth } from '../context/AuthContext';
 
 const LikesPage = () => {
@@ -44,51 +43,40 @@ const LikesPage = () => {
     }, []);
 
     if (loading) {
-        return (
-            <MainLayout>
-                <div className="text-center">Loading...</div>
-            </MainLayout>
-        );
+        return <div className="text-center p-4">Loading...</div>;
     }
 
     if (error) {
-        return (
-            <MainLayout>
-                <div className="text-center text-red-500">{error}</div>
-            </MainLayout>
-        );
+        return <div className="text-center text-red-500 p-4">{error}</div>;
     }
 
     return (
-        <MainLayout>
-            <div className="container mx-auto p-4">
-                <h1 style={{ color: 'red', fontSize: '48px', fontWeight: 'bold' }}>CAN YOU SEE THIS?</h1>
-                <h1 className="text-2xl font-bold mb-4">Who Likes You</h1>
-                {users.length > 0 ? (
-                    <ul className="space-y-4">
-                        {users.map(user => (
-                            <li
-                                key={user._id || user.uid}
-                                className="border rounded-lg p-4 shadow-sm flex justify-between items-center"
+        <div className="p-4">
+            <h1 className="text-2xl font-bold mb-4">Who Likes You</h1>
+            {users.length > 0 ? (
+                <ul className="space-y-4">
+                    {users.map(user => (
+                        <li
+                            key={user._id || user.uid}
+                            className="border rounded-lg p-4 shadow-sm flex justify-between items-center"
+                        >
+                            <div>
+                                <p className="font-semibold">{user.name}</p>
+                                <p className="text-gray-600 text-sm">{user.bio}</p>
+                            </div>
+                            <button
+                                onClick={() => handleChat(user.uid)}
+                                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
                             >
-                                <div>
-                                    <p className="font-semibold">{user.name}</p>
-                                    <p className="text-gray-600 text-sm">{user.bio}</p>
-                                </div>
-                                <button
-                                    onClick={() => handleChat(user.uid)}
-                                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-                                >
-                                    Chat
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-center">No users found.</p>
-                )}
-            </div>
-        </MainLayout>
+                                Chat
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-center">No users found.</p>
+            )}
+        </div>
     );
 };
 
