@@ -6,7 +6,7 @@ const sharp = require("sharp");
 const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
-const { convertKeysToCdnUrls } = require('../utils/cdnUtils');
+const { convertKeysToCdnUrls, convertToCdnUrl } = require('../utils/cdnUtils');
 
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
@@ -230,7 +230,7 @@ const uploadPhoto = async (req, res) => {
       { new: true }
     );
 
-    const cdnUrl = `https://${CDN_HOSTNAME}/${key}`;
+    const cdnUrl = convertToCdnUrl(key);
     res.json({ success: true, fileUrl: key, cdnUrl });
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
