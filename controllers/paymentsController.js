@@ -109,8 +109,42 @@ const manageSubscription = async (req, res) => {
     }
 };
 
+const getSubscriptionDetails = async (req, res) => {
+    const { uid } = req.user;
+
+    try {
+        const user = await User.findOne({ uid });
+        if (!user || !user.stripeCustomerId) {
+            return res.status(404).json({ error: 'Subscription not found.' });
+        }
+
+        const subscriptions = await stripe.subscriptions.list({
+            customer: user.stripeCustomerId,
+            status: 'all',
+            limit: 1,
+        });
+
+        if (subscriptions.data.length === 0) {
+            return res.status(404).json({ error: 'No active subscription found.' });
+        }
+
+        const sub = subscriptions.data[0];
+        const plan = sub.items.data[0]?.price.nickname || 'Unknown Plan';
+
+        res.json({
+            plan: plan,
+            status: sub.status,
+            renewalDate: new Date(sub.current_period_end * 1000),
+        });
+    } catch (error) {
+        console.error('Error fetching subscription details:', error);
+        res.status(500).json({ error: 'An unexpected error occurred.' });
+    }
+};
+
 module.exports = {
   handleStripeWebhook,
   createSubscription,
   manageSubscription,
+  getSubscriptionDetails,
 };
