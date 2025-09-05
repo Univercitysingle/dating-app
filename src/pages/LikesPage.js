@@ -62,6 +62,7 @@ const LikesPage = () => {
     return (
         <MainLayout>
             <div className="container mx-auto p-4">
+                <h1 style={{ color: 'red', fontSize: '48px', fontWeight: 'bold' }}>CAN YOU SEE THIS?</h1>
                 <h1 className="text-2xl font-bold mb-4">Who Likes You</h1>
                 {users.length > 0 ? (
                     <ul className="space-y-4">
