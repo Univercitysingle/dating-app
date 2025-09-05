@@ -34,7 +34,7 @@ const listUsers = async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
-    const { search, role } = req.query;
+    const { search, role, sortBy, sortOrder } = req.query;
 
     let query = {};
 
@@ -47,9 +47,16 @@ const listUsers = async (req, res) => {
       query.role = role;
     }
 
+    const sortOptions = {};
+    if (sortBy) {
+      sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sortOptions.createdAt = -1; // Default sort
+    }
+
     const users = await User.find(query)
       .select('-password')
-      .sort({ createdAt: -1 }) // Sort by most recently created
+      .sort(sortOptions)
       .skip(skip)
       .limit(limit)
       .lean();

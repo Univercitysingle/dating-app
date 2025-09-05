@@ -6,13 +6,20 @@ const AdminSubscriptionPage = () => {
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
 
-    const fetchUsers = useCallback(async () => {
+    const fetchUsers = useCallback(async (search, sort) => {
         setIsLoading(true);
         setError(null);
         try {
-            // Fetch all users - for simplicity, not implementing pagination for now
-            const data = await apiClient.get('/api/admin/users?limit=1000'); // A high limit to get all users
+            const queryParams = new URLSearchParams({
+                limit: 1000, // A high limit to get all users
+                ...(search && { search }),
+                sortBy: sort.key,
+                sortOrder: sort.direction,
+            });
+            const data = await apiClient.get(`/api/admin/users?${queryParams.toString()}`);
             setUsers(data.users || []);
         } catch (err) {
             setError(err.message);
@@ -23,8 +30,23 @@ const AdminSubscriptionPage = () => {
     }, []);
 
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        // Using a simple debounce effect for search
+        const handler = setTimeout(() => {
+            fetchUsers(searchTerm, sortConfig);
+        }, 300);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [searchTerm, sortConfig, fetchUsers]);
+
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     const handlePlanChange = async (userId, newPlan) => {
         if (!window.confirm(`Are you sure you want to change this user's plan to '${newPlan}'?`)) return;
@@ -42,6 +64,16 @@ const AdminSubscriptionPage = () => {
         <div className="container mx-auto p-4">
             <h1 className="text-2xl font-semibold text-gray-800 mb-6">Subscription Management</h1>
 
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md shadow-sm w-1/3"
+                />
+            </div>
+
             {isLoading && <p className="text-center p-4">Loading users...</p>}
             {error && <p className="text-center text-red-500 p-4">Error: {error}</p>}
 
@@ -50,9 +82,21 @@ const AdminSubscriptionPage = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Plan</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <button onClick={() => handleSort('name')} className="font-medium">
+                                        Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    </button>
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <button onClick={() => handleSort('email')} className="font-medium">
+                                        Email {sortConfig.key === 'email' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    </button>
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                    <button onClick={() => handleSort('plan')} className="font-medium">
+                                        Current Plan {sortConfig.key === 'plan' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    </button>
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Change Plan</th>
                             </tr>
                         </thead>
