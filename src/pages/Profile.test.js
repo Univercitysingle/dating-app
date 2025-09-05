@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Profile from './Profile';
 import { useAuth } from '../context/AuthContext';
@@ -29,42 +29,46 @@ const mockUser = {
   lifestyle: {},
   badges: {},
   spotifyRefreshToken: null,
+  mobileNumber: '+1234567890',
 };
 
 describe('Profile page', () => {
   beforeEach(() => {
     useAuth.mockReturnValue({ user: mockUser, logout: jest.fn() });
-    apiClient.get.mockResolvedValue([]);
+    apiClient.get.mockResolvedValue(mockUser);
   });
 
-  it('renders the 3-dot menu', () => {
+  it('renders the 3-dot menu', async () => {
     render(
       <BrowserRouter>
         <Profile />
       </BrowserRouter>
     );
+    await waitFor(() => expect(screen.queryByText(/Loading profile.../i)).not.toBeInTheDocument());
     const menuButton = screen.getByRole('button', { name: /menu/i });
     expect(menuButton).toBeInTheDocument();
   });
 
-  it('opens the menu on click', () => {
+  it('opens the menu on click', async () => {
     render(
       <BrowserRouter>
         <Profile />
       </BrowserRouter>
     );
+    await waitFor(() => expect(screen.queryByText(/Loading profile.../i)).not.toBeInTheDocument());
     const menuButton = screen.getByRole('button', { name: /menu/i });
     fireEvent.click(menuButton);
     expect(screen.getByText('Edit Profile')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
-  it('enters edit mode when "Edit Profile" is clicked', () => {
+  it('enters edit mode when "Edit Profile" is clicked', async () => {
     render(
       <BrowserRouter>
         <Profile />
       </BrowserRouter>
     );
+    await waitFor(() => expect(screen.queryByText(/Loading profile.../i)).not.toBeInTheDocument());
     const menuButton = screen.getByRole('button', { name: /menu/i });
     fireEvent.click(menuButton);
     const editButton = screen.getByText('Edit Profile');
@@ -73,12 +77,13 @@ describe('Profile page', () => {
     expect(screen.getByText('Save All Changes')).toBeInTheDocument();
   });
 
-  it('switches to the settings tab when "Settings" is clicked', () => {
+  it('switches to the settings tab when "Settings" is clicked', async () => {
     render(
       <BrowserRouter>
         <Profile />
       </BrowserRouter>
     );
+    await waitFor(() => expect(screen.queryByText(/Loading profile.../i)).not.toBeInTheDocument());
     const menuButton = screen.getByRole('button', { name: /menu/i });
     fireEvent.click(menuButton);
     const settingsButton = screen.getByText('Settings');
@@ -87,12 +92,13 @@ describe('Profile page', () => {
     expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument();
   });
 
-  it('does not render the Social Media section', () => {
+  it('does not render the Social Media section', async () => {
     render(
       <BrowserRouter>
         <Profile />
       </BrowserRouter>
     );
+    await waitFor(() => expect(screen.queryByText(/Loading profile.../i)).not.toBeInTheDocument());
     expect(screen.queryByText('Social Media')).not.toBeInTheDocument();
   });
 });

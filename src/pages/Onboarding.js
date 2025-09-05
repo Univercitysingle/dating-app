@@ -6,6 +6,7 @@ import PhotoUploader from '../components/PhotoUploader';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { subYears } from 'date-fns';
+import { validateMobileNumber } from '../utils/helpers';
 
 const Onboarding = () => {
   const [name, setName] = useState('');
@@ -160,12 +161,12 @@ const Onboarding = () => {
               required
               value={mobileNumber}
               onChange={(e) => {
-                const value = e.target.value.replace(/[^0-9]/g, '');
-                if (value.length <= 15) {
+                const value = validateMobileNumber(e.target.value);
+                if (value.length <= 16) {
                   setMobileNumber(value);
                 }
               }}
-              maxLength="15"
+              maxLength="16"
               className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
           </div>

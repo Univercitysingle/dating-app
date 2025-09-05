@@ -1,3 +1,6 @@
-// This file is intentionally left blank.
-// The rewriteCdnUrl function that was previously here has been
-// deprecated in favor of the centralized userProfileProcessor.
+export const validateMobileNumber = (value) => {
+    if (value.startsWith('+')) {
+        return '+' + value.substring(1).replace(/[^0-9]/g, '');
+    }
+    return value.replace(/[^0-9]/g, '');
+};

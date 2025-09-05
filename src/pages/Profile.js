@@ -13,6 +13,7 @@ import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
 import BadgesDisplay from '../components/BadgesDisplay';
 import { API_URL } from '../utils/constants';
+import { validateMobileNumber } from '../utils/helpers';
 
 // Reusable components
 const PremiumBadge = () => (
@@ -86,6 +87,7 @@ function Profile() {
                 profilePrompts: data.profilePrompts || [],
                 lifestyle: data.lifestyle || {},
                 badges: data.badges || {},
+                mobileNumber: data.mobileNumber || '',
             });
         } catch (error) {
             setFetchError(error.message || 'Failed to fetch own profile.');
@@ -101,10 +103,28 @@ function Profile() {
 
   const handleFieldChange = (e) => {
       const { id, value } = e.target;
+      if (id === 'bio') {
+          const words = value.split(/\s+/).filter(Boolean);
+          if (words.length > 50) {
+              return;
+          }
+      }
+      if (id === 'mobileNumber') {
+          const mobileValue = validateMobileNumber(value);
+          if (mobileValue.length > 16) {
+              return;
+          }
+          setEditableFields(prev => ({...prev, [id]: mobileValue}));
+          return;
+      }
       setEditableFields(prev => ({...prev, [id]: value}));
   }
 
   const handleSaveAll = async () => {
+      if (!editableFields.mobileNumber) {
+          setSaveStatus('Mobile number is required.');
+          return;
+      }
       setSaveStatus('Saving...');
       try {
           const updatedProfile = await apiClient.put('/api/users/me', editableFields);
@@ -157,6 +177,7 @@ function Profile() {
                           {isEditing ? (
                               <div>
                                  <textarea id="bio" value={editableFields.bio} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                 <p className="text-sm text-gray-500 mt-2">{editableFields.bio.split(/\s+/).filter(Boolean).length}/50 words</p>
                               </div>
                           ) : (
                               <p className="text-neutral-600 dark:text-neutral-300 whitespace-pre-wrap">{profile.bio || 'Tell us about yourself...'}</p>
@@ -193,6 +214,18 @@ function Profile() {
                             {isEditing ? (
                                 <div className="space-y-4">
                                     <div>
+                                        <label htmlFor="name" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Name</label>
+                                        <input type="text" id="name" value={profile.name} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="age" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Age</label>
+                                        <input type="text" id="age" value={profile.age} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="gender" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Gender</label>
+                                        <input type="text" id="gender" value={profile.gender} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <div>
                                         <label htmlFor="education" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Education</label>
                                         <input type="text" id="education" value={editableFields.education} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
                                     </div>
@@ -212,14 +245,21 @@ function Profile() {
                                             <option value="Figuring it out">Figuring it out</option>
                                         </select>
                                     </div>
+                                    <div>
+                                        <label htmlFor="mobileNumber" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Mobile Number</label>
+                                        <input type="tel" id="mobileNumber" value={editableFields.mobileNumber} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50" maxLength="16"/>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
+                                    <p><strong>Name:</strong> {profile.name}</p>
+                                    <p><strong>Age:</strong> {profile.age}</p>
                                     <p><strong>Email:</strong> {profile.email}</p>
                                     <p><strong>Gender:</strong> {profile.gender}</p>
                                     <p><strong>Preference:</strong> {profile.preference}</p>
                                     <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
                                     <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
+                                    <p><strong>Mobile Number:</strong> {profile.mobileNumber || 'N/A'}</p>
                                 </div>
                             )}
                         </SectionCard>
