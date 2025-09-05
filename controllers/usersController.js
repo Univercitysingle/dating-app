@@ -6,7 +6,7 @@ const sharp = require("sharp");
 const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
-const { convertKeysToCdnUrls, convertToCdnUrl } = require('../utils/cdnUtils');
+const { convertKeysToCdnUrls } = require('../utils/cdnUtils');
 
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
@@ -199,9 +199,9 @@ const uploadPhoto = async (req, res) => {
       return res.status(400).json({ message: "Uploading this photo would exceed your total storage limit of 25MB." });
     }
 
-    log.info(`UsersController: File received for photo: ${req.file.originalname}, size: ${req.file.size}`);
+    log.info(`UsersController: File received for photo: ${req.file.originalname}, size: ${req.file.size}, path: ${req.file.path}`);
 
-    const resizedImageBuffer = await sharp(req.file.buffer)
+    const resizedImageBuffer = await sharp(req.file.path)
       .resize({
         width: 600,
         withoutEnlargement: true,
@@ -214,6 +214,9 @@ const uploadPhoto = async (req, res) => {
 
     await uploadFile(key, resizedImageBuffer, req.file.mimetype);
     log.info({ key }, "UsersController: Photo uploaded to S3 successfully.");
+
+    fs.unlinkSync(req.file.path);
+    log.info(`UsersController: Temporary file ${req.file.path} deleted.`);
 
     const newPhoto = {
       url: key,
@@ -230,10 +233,13 @@ const uploadPhoto = async (req, res) => {
       { new: true }
     );
 
-    const cdnUrl = convertToCdnUrl(key);
+    const cdnUrl = `https://${CDN_HOSTNAME}/${key}`;
     res.json({ success: true, fileUrl: key, cdnUrl });
   } catch (error) {
     log.error({ err: error }, `UsersController: Error in photo upload for UID ${userUidForLog}`);
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     if (!res.headersSent) {
       res.status(500).json({ message: error.message || "An unexpected error occurred during photo upload." });
     }

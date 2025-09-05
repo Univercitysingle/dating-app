@@ -15,11 +15,4 @@ const convertKeysToCdnUrls = (user) => {
   return user;
 };
 
-const convertToCdnUrl = (key) => {
-  if (!key || key.startsWith('http')) {
-    return key;
-  }
-  return `https://${CDN_HOSTNAME}/${key}`;
-};
-
-module.exports = { convertKeysToCdnUrls, convertToCdnUrl };
+module.exports = { convertKeysToCdnUrls };

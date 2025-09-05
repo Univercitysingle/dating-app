@@ -3,13 +3,13 @@ const { IPinfoWrapper } = require("node-ipinfo");
 const ipinfoWrapper = new IPinfoWrapper(process.env.IPINFO);
 
 const getGeolocation = async (ip) => {
+    if (!ip) {
+        return null;
+    }
     try {
-        if (ip) {
-            return await ipinfoWrapper.lookupIp(ip);
-        }
-        return await ipinfoWrapper.lookupIp();
+        return await ipinfoWrapper.lookupIp(ip);
     } catch (error) {
-        console.error("Error fetching geolocation data from ipinfo.io:", error);
+        console.error(`Error fetching geolocation data for IP ${ip} from ipinfo.io:`, error);
         return null;
     }
 };

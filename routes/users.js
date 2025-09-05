@@ -31,9 +31,8 @@ const imageFileFilter = (req, file, cb) => {
 };
 
 // Configure multer for photo uploads
-const storage = multer.memoryStorage();
 const uploadImage = multer({
-  storage: storage,
+  dest: "uploads/",
   fileFilter: imageFileFilter,
   limits: { fileSize: MAX_IMAGE_SIZE },
 });
