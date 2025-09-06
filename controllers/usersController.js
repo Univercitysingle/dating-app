@@ -7,6 +7,7 @@ const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
 const { CDN_HOSTNAME, convertKeysToCdnUrls } = require('../utils/cdnUtils');
+const { getGeolocation } = require('../services/ipinfoService');
 
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
@@ -464,6 +465,20 @@ const getLikes = async (req, res) => {
     }
 };
 
+const getGeolocationForCurrentUser = async (req, res) => {
+    const log = req.log;
+    try {
+        const geo = await getGeolocation(req.ip);
+        if (!geo) {
+            return res.status(404).json({ error: 'Geolocation data not found.' });
+        }
+        res.json(geo);
+    } catch (error) {
+        log.error({ err: error }, 'Error fetching geolocation data');
+        res.status(500).json({ error: 'An unexpected error occurred.' });
+    }
+};
+
 module.exports = {
   getCurrentUserProfile,
   updateCurrentUserProfile,
@@ -475,4 +490,5 @@ module.exports = {
   discoverUsers,
   getUserProfile,
   getLikes,
+  getGeolocationForCurrentUser,
 };

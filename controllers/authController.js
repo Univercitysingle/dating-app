@@ -1,5 +1,6 @@
 const admin = require("../services/firebaseAdmin");
 const { findOrCreateUserFromToken } = require('../utils/userUtils');
+const { getGeolocation } = require('../services/ipinfoService');
 const Subscription = require('../models/Subscription');
 const bcrypt = require('bcryptjs');
 
@@ -55,6 +56,19 @@ const login = async (req, res) => {
       if (user) {
         user.lastLoginDevice = req.headers['user-agent'];
         user.lastLoginIp = req.ip;
+
+        const geo = await getGeolocation(req.ip);
+        if (geo) {
+            user.location = {
+                type: 'Point',
+                coordinates: [parseFloat(geo.loc.split(',')[1]), parseFloat(geo.loc.split(',')[0])],
+                city: geo.city,
+                region: geo.region,
+                country: geo.country,
+                locationLastUpdatedAt: new Date()
+            };
+        }
+
         await user.save();
         log.info({
           message: "User login successful",

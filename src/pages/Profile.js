@@ -45,6 +45,7 @@ function Profile() {
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
+  const [suggestedCountryCode, setSuggestedCountryCode] = useState('');
 
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
@@ -98,6 +99,18 @@ function Profile() {
         fetchProfile();
     } else if (currentUser) {
         fetchOwnProfile();
+        apiClient.get('/api/geolocation').then(geo => {
+            const countryCodeMapping = {
+                'US': '+1',
+                'GB': '+44',
+                'IN': '+91',
+                // Add more mappings as needed
+            };
+            const code = countryCodeMapping[geo.country];
+            if (code) {
+                setSuggestedCountryCode(code);
+            }
+        }).catch(err => console.error('Could not fetch geolocation for country code suggestion.', err));
     }
   }, [userId, currentUser]);
 
@@ -241,7 +254,14 @@ function Profile() {
                                     </div>
                                     <div>
                                         <label htmlFor="mobileNumber" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Mobile Number</label>
-                                        <input type="tel" id="mobileNumber" value={editableFields.mobileNumber} onChange={handleFieldChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50" maxLength="16"/>
+                                        <div className="mt-1 flex rounded-md shadow-sm">
+                                            {suggestedCountryCode && (
+                                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                                                    {suggestedCountryCode}
+                                                </span>
+                                            )}
+                                            <input type="tel" id="mobileNumber" value={editableFields.mobileNumber} onChange={handleFieldChange} className="block w-full rounded-none rounded-r-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50" maxLength="16"/>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (

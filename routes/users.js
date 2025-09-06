@@ -11,6 +11,7 @@ const {
   discoverUsers,
   getUserProfile,
   getLikes,
+  getGeolocationForCurrentUser,
 } = require("../controllers/usersController");
 const authMiddleware = require("../middleware/authentication");
 const multer = require("multer");
@@ -40,6 +41,9 @@ const uploadImage = multer({
 
 // Get current user profile
 router.get("/me", authMiddleware, getCurrentUserProfile);
+
+// Get geolocation for current user
+router.get("/geolocation", authMiddleware, getGeolocationForCurrentUser);
 
 // Get users for discovery swipe deck
 router.get("/discover", authMiddleware, discoverUsers);
