@@ -15,4 +15,7 @@ const convertKeysToCdnUrls = (user) => {
   return user;
 };
 
-module.exports = { convertKeysToCdnUrls };
+module.exports = {
+  CDN_HOSTNAME,
+  convertKeysToCdnUrls,
+};

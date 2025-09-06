@@ -6,7 +6,7 @@ const sharp = require("sharp");
 const { uploadFile, deleteFile } = require("../services/s3Service");
 const multer = require("multer");
 const { sanitizeUser } = require('../utils/userUtils');
-const { convertKeysToCdnUrls } = require('../utils/cdnUtils');
+const { CDN_HOSTNAME, convertKeysToCdnUrls } = require('../utils/cdnUtils');
 
 const getCurrentUserProfile = async (req, res) => {
   const log = req.log;
