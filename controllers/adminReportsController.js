@@ -82,6 +82,14 @@ const performModerationAction = async (req, res) => {
         reportedUser.isProfileVisible = false; // Also hide profile during suspension
         await reportedUser.save();
         report.status = 'resolved_user_suspended';
+        req.log.info({
+            message: 'User suspended',
+            userId: reportedUser.uid,
+            adminId: req.user.uid,
+            reason: report.reason,
+            durationDays: durationDays,
+            reportId: reportId
+        });
         break;
 
       case 'ban_user':
@@ -94,6 +102,13 @@ const performModerationAction = async (req, res) => {
         reportedUser.suspendedUntil = new Date('9999-12-31');
         await reportedUser.save();
         report.status = 'resolved_user_banned';
+        req.log.info({
+            message: 'User banned',
+            userId: reportedUser.uid,
+            adminId: req.user.uid,
+            reason: report.reason,
+            reportId: reportId
+        });
         break;
 
       default:

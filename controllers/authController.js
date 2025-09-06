@@ -14,9 +14,14 @@ const login = async (req, res) => {
         email === process.env.SUPER_ADMIN_EMAIL &&
         password === process.env.SUPER_ADMIN_PASSWORD
       ) {
-        log.info("Superadmin login attempt successful.");
         const superadminUID = "superadmin_uid"; // A consistent, unique ID for the superadmin
         const customToken = await admin.auth().createCustomToken(superadminUID, { role: 'superadmin' });
+        log.info({
+          message: "Superadmin login successful",
+          userId: superadminUID,
+          ip: req.ip,
+          device: req.headers['user-agent']
+        });
 
         const superadminUserObject = {
           uid: superadminUID,
@@ -31,7 +36,11 @@ const login = async (req, res) => {
           user: superadminUserObject,
         });
       } else {
-        log.warn("Failed hardcoded login attempt.");
+        log.warn({
+          message: "Superadmin login failed",
+          email: email,
+          ip: req.ip
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
     }
@@ -47,6 +56,12 @@ const login = async (req, res) => {
         user.lastLoginDevice = req.headers['user-agent'];
         user.lastLoginIp = req.ip;
         await user.save();
+        log.info({
+          message: "User login successful",
+          userId: user.uid,
+          ip: req.ip,
+          device: req.headers['user-agent']
+        });
       }
 
       if (!user) {
@@ -81,6 +96,11 @@ const login = async (req, res) => {
   } catch (error) {
     log.error({ err: error }, "Error during login");
     if (error.code && error.code.startsWith('auth/')) {
+      log.warn({
+        message: "User login failed",
+        error: error.message,
+        ip: req.ip
+      });
       res.status(401).json({ error: "Invalid or expired token" });
     } else {
       res.status(500).json({ error: "An unexpected error occurred during login." });
@@ -131,7 +151,19 @@ const setInitialPassword = async (req, res) => {
 };
 
 const logout = (req, res) => {
-  req.log.info("User logout endpoint hit.");
+  const user = req.user;
+  if (user) {
+    req.log.info({
+      message: "User logged out",
+      userId: user.uid,
+      ip: req.ip
+    });
+  } else {
+    req.log.info({
+      message: "Logout endpoint hit by unauthenticated user",
+      ip: req.ip
+    });
+  }
   // In a stateless token-based auth system, the server doesn't need to do much.
   // The client is responsible for destroying the token.
   // This endpoint is here to provide a clean logout mechanism for the client.

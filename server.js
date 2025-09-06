@@ -220,9 +220,12 @@ app.use((err, req, res, next) => {
   }
 
   const log = req.log || logger;
-  log.error(`Global Error Handler: Status ${statusCode}, Message: ${err.message || "N/A"}`, {
+  log.error({
+    message: "Global error handler caught an error",
+    statusCode,
+    errorMessage: err.message,
     stack: err.stack,
-    payload: errorPayload,
+    payload: errorPayload
   });
 
   if (!res.headersSent) {

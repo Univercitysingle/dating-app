@@ -1,4 +1,6 @@
 const { IPinfoWrapper } = require("node-ipinfo");
+const { buildLogger } = require('../utils/logger');
+const log = buildLogger('ipinfo-service');
 
 const ipinfoWrapper = new IPinfoWrapper(process.env.IPINFO);
 
@@ -11,12 +13,20 @@ const getGeolocation = async (ip) => {
     try {
         const isBogon = await ipinfoWrapper.isBogon(ip);
         if (isBogon) {
+            log.info({ message: 'Skipping bogon IP lookup', ip });
             return null; // Don't lookup bogon IPs
         }
-        return await ipinfoWrapper.lookupIp(ip);
+        log.info({ message: 'Looking up IP geolocation', ip });
+        const result = await ipinfoWrapper.lookupIp(ip);
+        log.info({ message: 'IP geolocation lookup successful', ip });
+        return result;
     } catch (error) {
         // Log the error but don't crash the app
-        console.error(`Error fetching geolocation data for IP ${ip}:`, error);
+        log.error({
+            message: `Error fetching geolocation data for IP ${ip}`,
+            error: error.message,
+            stack: error.stack
+        });
         return null;
     }
 };

@@ -1,7 +1,19 @@
 const winston = require('winston');
+require('winston-daily-rotate-file');
 
 const buildLogger = (correlationId) => {
   const logFormat = winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.splat(),
+    winston.format(info => {
+      info.correlationId = correlationId;
+      return info;
+    })(),
+    winston.format.json()
+  );
+
+  const consoleFormat = winston.format.combine(
     winston.format.colorize(),
     winston.format.timestamp(),
     winston.format.align(),
@@ -20,9 +32,24 @@ const buildLogger = (correlationId) => {
     level: process.env.LOG_LEVEL || 'info',
     format: logFormat,
     transports: [
-      new winston.transports.Console(),
-      new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-      new winston.transports.File({ filename: 'logs/combined.log' })
+      new winston.transports.Console({
+        format: consoleFormat
+      }),
+      new winston.transports.DailyRotateFile({
+        filename: 'logs/error.%DATE%.log',
+        level: 'error',
+        datePattern: 'YYYY-MM-DD',
+        zippedArchive: true,
+        maxSize: '20m',
+        maxFiles: '14d'
+      }),
+      new winston.transports.DailyRotateFile({
+        filename: 'logs/combined.%DATE%.log',
+        datePattern: 'YYYY-MM-DD',
+        zippedArchive: true,
+        maxSize: '20m',
+        maxFiles: '14d'
+      })
     ]
   });
 };

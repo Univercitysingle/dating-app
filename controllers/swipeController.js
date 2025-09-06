@@ -69,9 +69,16 @@ const like = async (req, res) => {
     await match.save();
     await recordSwipe(currentUserUid, userId, 'like', match._id);
 
+    req.log.info({
+        message: 'User liked another user',
+        swiperId: currentUserUid,
+        swipedId: userId,
+        matchStatus: match.status
+    });
+
     res.json(match);
   } catch (error) {
-    console.error("Error in 'like' controller:", error);
+    req.log.error({ err: error }, "Error in 'like' controller");
     res.status(500).json({ error: 'An unexpected error occurred.' });
   }
 };
@@ -107,9 +114,15 @@ const pass = async (req, res) => {
         type: { $in: ['like', 'superlike'] },
     });
 
+    req.log.info({
+        message: 'User passed on another user',
+        swiperId: currentUserUid,
+        swipedId: userId
+    });
+
       res.json(match);
     } catch (error) {
-      console.error("Error in 'pass' controller:", error);
+      req.log.error({ err: error }, "Error in 'pass' controller");
       res.status(500).json({ error: 'An unexpected error occurred.' });
     }
   };
@@ -181,9 +194,16 @@ const superLike = async (req, res) => {
     await match.save();
     await recordSwipe(currentUserUid, userId, 'superlike', match._id);
 
+    req.log.info({
+        message: 'User superliked another user',
+        swiperId: currentUserUid,
+        swipedId: userId,
+        matchStatus: match.status
+    });
+
     res.json(match);
   } catch (error) {
-    console.error("Error in 'superLike' controller:", error);
+    req.log.error({ err: error }, "Error in 'superLike' controller");
     res.status(500).json({ error: 'An unexpected error occurred.' });
   }
 };
@@ -237,10 +257,17 @@ const undoSwipe = async (req, res) => {
 
     const undoneUser = await User.findOne({ uid: targetUserId }).lean();
 
+    req.log.info({
+        message: 'User undid a swipe',
+        userId: currentUserUid,
+        undoneAction: action,
+        undoneTargetId: targetUserId
+    });
+
     res.json({ undoneUser });
 
   } catch (error) {
-    console.error("Undo swipe error:", error);
+    req.log.error({ err: error }, "Undo swipe error");
     res.status(500).json({ error: 'An unexpected error occurred during undo.' });
   }
 };

@@ -1,6 +1,8 @@
 const socketIo = require("socket.io");
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
+const { buildLogger } = require('../utils/logger');
+const log = buildLogger('socket-service');
 
 let io;
 const onlineUsers = new Map();
@@ -107,10 +109,16 @@ function initSocket(server, allowedOrigins, adminInstance) {
             senderUid: chatMessage.senderUid,
             messageContent: chatMessage.messageContent,
           });
+        log.info({
+          message: 'Message sent',
+          senderId: senderUid,
+          receiverId: receiverUid,
+          roomId: roomId
+        });
           console.log(`'message' and 'new_message_notification' emitted to user: ${receiverUid}`);
         }
       } catch (error) {
-        console.error("Failed to process or send chat message:", error);
+        log.error({ err: error }, "Failed to process or send chat message");
         socket.emit("messageError", { error: "Failed to send message due to a server error." });
       }
     });

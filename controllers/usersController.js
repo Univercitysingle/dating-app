@@ -85,7 +85,11 @@ const updateCurrentUserProfile = async (req, res) => {
       log.warn(`UsersController: User not found during update for UID: ${req.user.uid}`);
       return res.status(404).json({ error: "User not found" });
     }
-    log.info(`UsersController: Successfully updated profile for UID: ${req.user.uid}.`);
+    log.info({
+        message: 'User profile updated',
+        userId: req.user.uid,
+        updatedFields: Object.keys(sanitizedUpdate)
+    });
     user = user.toObject();
     res.json(convertKeysToCdnUrls(user));
   } catch (err) {
@@ -407,15 +411,21 @@ const discoverUsers = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
     const { userId } = req.params;
+    const log = req.log;
     try {
         let user = await User.findOne({ uid: userId }).lean();
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
+        log.info({
+            message: 'User profile viewed',
+            viewerId: req.user.uid,
+            viewedUserId: userId
+        });
         user = convertKeysToCdnUrls(user);
         res.json(sanitizeUser(user, req.user));
     } catch (error) {
-        console.error('Error fetching user profile:', error);
+        log.error({ err: error }, `Error fetching user profile for UID ${userId}`);
         res.status(500).json({ error: 'An unexpected error occurred.' });
     }
 };
