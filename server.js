@@ -33,10 +33,15 @@ app.use(correlationIdMiddleware);
 
 // CORS setup with preflight handling
 const isProduction = process.env.NODE_ENV === 'production';
-const clientUrl = process.env.CLIENT_URL;
+let clientUrl = process.env.CLIENT_URL;
+
+// Dynamically construct the client URL for Hugging Face Spaces
+if (isProduction && process.env.SPACE_HOST) {
+  clientUrl = `https://${process.env.SPACE_HOST}`;
+}
 
 if (isProduction && !clientUrl) {
-  logger.error('CLIENT_URL environment variable is not set in production. CORS will fail.');
+  logger.error('CLIENT_URL environment variable is not set and SPACE_HOST is not available. CORS will fail.');
   // Exiting because this is a critical configuration issue
   process.exit(1);
 }
