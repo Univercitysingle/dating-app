@@ -20,6 +20,9 @@ WORKDIR /app
 # Add system dependencies
 RUN apk add --no-cache ffmpeg
 
+# Set the environment to production
+ENV NODE_ENV=production
+
 # Install production dependencies from the root package.json
 COPY package*.json ./
 RUN npm install --omit=dev
