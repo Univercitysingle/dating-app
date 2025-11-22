@@ -3,7 +3,7 @@ name: Deploy to Hugging Face Space
 on:
   push:
     branches:
-      - feat-huggingface-dockerfile
+      - main
   workflow_dispatch:
 
 jobs:
@@ -13,13 +13,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Check package-lock.json exists
-        run: |
-          if [ ! -f backend/package-lock.json ]; then
-            echo "Error: backend/package-lock.json is missing!"
-            exit 1
-          fi
 
       - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
         run: |
@@ -65,9 +58,9 @@ jobs:
           # Clone the space repository
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
 
-          # Use rsync to efficiently sync only the backend directory to the space.
+          # Use rsync to efficiently sync the entire repository to the space.
           # The --delete flag ensures that old files are removed.
-          rsync -av --delete backend/ hf_space/ --exclude .git --exclude hf_space --exclude .github
+          rsync -av --delete ./ hf_space/ --exclude .git --exclude hf_space --exclude .github
 
           # Go into the space directory, commit and push the changes
           cd hf_space

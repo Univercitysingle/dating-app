@@ -3,7 +3,7 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Copy dependency files
+# Copy the root package.json and package-lock.json
 COPY package*.json ./
 RUN npm install
 
@@ -18,21 +18,23 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install ffmpeg and any other needed OS packages
+# Install ffmpeg
 RUN apk add --no-cache ffmpeg
 
-# Copy dependency files
-COPY package*.json ./
+# Copy the backend package.json and package-lock.json
+COPY backend/package*.json ./backend/
+WORKDIR /app/backend
 RUN npm install --omit=dev
 
-# Copy the rest of the app
-COPY . .
+# Copy the backend source code
+COPY backend/ .
+
+WORKDIR /app
 
 # Copy the built frontend from the builder stage
 COPY --from=build /app/build ./public
 
-# Hugging Face Spaces automatically expose port 7860,
-# but our server runs on 5000. We expose 5000 and HF will handle the mapping.
 EXPOSE 5000
 
+WORKDIR /app/backend
 CMD ["npm", "start"]
