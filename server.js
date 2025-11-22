@@ -129,7 +129,6 @@ if (initSocket) {
 }
 
 // -------------------- ROUTES --------------------
-app.get("/", (req, res) => res.send("API is running..."));
 app.get("/health", (req, res) => res.status(200).send("OK"));
 app.get("/status", (req, res) =>
   res.sendFile(path.join(__dirname, "public", "status.html"))
