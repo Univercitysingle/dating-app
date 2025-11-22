@@ -1,40 +1,43 @@
-# Stage 1: Build the React application
+# Stage 1: Build the frontend assets
 FROM node:18-alpine AS build
-
 WORKDIR /app
 
-# Copy the root package.json and package-lock.json
+# Install dependencies for the frontend build
 COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the source code
+# Copy all source code
 COPY . .
 
 # Build the frontend
 RUN npm run build
 
-# Stage 2: Serve the application
-FROM node:18-alpine
 
+# Stage 2: Create the final production image
+FROM node:18-alpine
 WORKDIR /app
 
-# Install ffmpeg
+# Add system dependencies
 RUN apk add --no-cache ffmpeg
 
-# Copy the backend package.json and package-lock.json
-COPY backend/package*.json ./backend/
-WORKDIR /app/backend
+# Install production dependencies from the root package.json
+COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy the backend source code
-COPY backend/ .
+# Install production dependencies from the backend package.json
+COPY backend/package*.json ./backend/
+# Check if package-lock.json exists before trying to copy it
+COPY backend/package-lock.json* ./backend/
+RUN cd backend && npm install --omit=dev
 
-WORKDIR /app
+# Copy all source code
+COPY . .
 
-# Copy the built frontend from the builder stage
+# Copy the built frontend assets from the build stage
 COPY --from=build /app/build ./public
 
+# Expose the application port
 EXPOSE 5000
 
-WORKDIR /app/backend
-CMD ["npm", "start"]
+# Start the server from the root directory
+CMD ["node", "server.js"]
