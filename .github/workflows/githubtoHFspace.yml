@@ -12,8 +12,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-      # Pull the code from your repo
         uses: actions/checkout@v3
+
+      # ----------------------------
+      # CREATE .env FILE FOR BUILD
+      # ----------------------------
+      - name: Create .env file
+        run: |
+          echo "REACT_APP_FIREBASE_API_KEY=${{ secrets.REACT_APP_FIREBASE_API_KEY }}" >> .env
+          echo "REACT_APP_FIREBASE_AUTH_DOMAIN=${{ secrets.REACT_APP_FIREBASE_AUTH_DOMAIN }}" >> .env
+          echo "REACT_APP_FIREBASE_PROJECT_ID=${{ secrets.REACT_APP_FIREBASE_PROJECT_ID }}" >> .env
+          echo "REACT_APP_FIREBASE_STORAGE_BUCKET=${{ secrets.REACT_APP_FIREBASE_STORAGE_BUCKET }}" >> .env
+          echo "REACT_APP_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.REACT_APP_FIREBASE_MESSAGING_SENDER_ID }}" >> .env
+          echo "REACT_APP_FIREBASE_APP_ID=${{ secrets.REACT_APP_FIREBASE_APP_ID }}" >> .env
 
       # ----------------------------
       # SYNC SECRETS TO HF SPACE
@@ -50,48 +61,6 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
             -d "{\"key\": \"PORT\", \"value\": \"7860\"}"
-
-      - name: Sync REACT_APP_FIREBASE_API_KEY
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"REACT_APP_FIREBASE_API_KEY\", \"value\": \"${{ secrets.REACT_APP_FIREBASE_API_KEY }}\"}"
-
-      - name: Sync REACT_APP_FIREBASE_AUTH_DOMAIN
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"REACT_APP_FIREBASE_AUTH_DOMAIN\", \"value\": \"${{ secrets.REACT_APP_FIREBASE_AUTH_DOMAIN }}\"}"
-
-      - name: Sync REACT_APP_FIREBASE_PROJECT_ID
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"REACT_APP_FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.REACT_APP_FIREBASE_PROJECT_ID }}\"}"
-
-      - name: Sync REACT_APP_FIREBASE_STORAGE_BUCKET
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"REACT_APP_FIREBASE_STORAGE_BUCKET\", \"value\": \"${{ secrets.REACT_APP_FIREBASE_STORAGE_BUCKET }}\"}"
-
-      - name: Sync REACT_APP_FIREBASE_MESSAGING_SENDER_ID
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"REACT_APP_FIREBASE_MESSAGING_SENDER_ID\", \"value\": \"${{ secrets.REACT_APP_FIREBASE_MESSAGING_SENDER_ID }}\"}"
-
-      - name: Sync REACT_APP_FIREBASE_APP_ID
-        run: |
-          curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
-            -H "Authorization: Bearer ${{ secrets.HF }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\": \"REACT_APP_FIREBASE_APP_ID\", \"value\": \"${{ secrets.REACT_APP_FIREBASE_APP_ID }}\"}"
 
       # ----------------------------
       # SYNC REPO FILES TO THE HF SPACE
