@@ -1,12 +1,3 @@
----
-title: Heart2Heart
-emoji: 💞
-colorFrom: pink
-colorTo: red
-sdk: docker
-pinned: false
----
-
 # Dating App
 
 Backend hosted on Hugging Face

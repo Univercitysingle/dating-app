@@ -1,12 +1,4 @@
 require("dotenv").config();
-
-console.log("--- Environment Variables ---");
-console.log(`PORT: ${process.env.PORT}`);
-console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-console.log(`CLIENT_URL: ${process.env.CLIENT_URL}`);
-console.log(`SPACE_HOST: ${process.env.SPACE_HOST}`);
-console.log("--------------------------");
-
 const express = require("express");
 const mongoose = require("mongoose");
 const path = require("path");
@@ -41,15 +33,10 @@ app.use(correlationIdMiddleware);
 
 // CORS setup with preflight handling
 const isProduction = process.env.NODE_ENV === 'production';
-let clientUrl = process.env.CLIENT_URL;
-
-// Dynamically construct the client URL for Hugging Face Spaces
-if (isProduction && process.env.SPACE_HOST) {
-  clientUrl = `https://${process.env.SPACE_HOST}`;
-}
+const clientUrl = process.env.CLIENT_URL;
 
 if (isProduction && !clientUrl) {
-  logger.error('CLIENT_URL environment variable is not set and SPACE_HOST is not available. CORS will fail.');
+  logger.error('CLIENT_URL environment variable is not set in production. CORS will fail.');
   // Exiting because this is a critical configuration issue
   process.exit(1);
 }
@@ -142,6 +129,7 @@ if (initSocket) {
 }
 
 // -------------------- ROUTES --------------------
+app.get("/", (req, res) => res.send("API is running..."));
 app.get("/health", (req, res) => res.status(200).send("OK"));
 app.get("/status", (req, res) =>
   res.sendFile(path.join(__dirname, "public", "status.html"))
@@ -195,8 +183,8 @@ app.use((err, req, res, next) => {
 });
 
 // -------------------- START SERVER --------------------
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => {
+const PORT = process.env.BACKEND_PORT || 5000;
+server.listen(PORT, () => {
   logger.info(
     `🚀 Server running on port ${PORT} | NODE_ENV=${process.env.NODE_ENV || "development"}`
   );
