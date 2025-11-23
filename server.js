@@ -1,4 +1,12 @@
 require("dotenv").config();
+
+console.log("--- Environment Variables ---");
+console.log(`PORT: ${process.env.PORT}`);
+console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`CLIENT_URL: ${process.env.CLIENT_URL}`);
+console.log(`SPACE_HOST: ${process.env.SPACE_HOST}`);
+console.log("--------------------------");
+
 const express = require("express");
 const mongoose = require("mongoose");
 const path = require("path");
