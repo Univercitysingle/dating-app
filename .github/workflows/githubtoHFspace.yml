@@ -3,7 +3,7 @@ name: Deploy to Hugging Face Space
 on:
   push:
     branches:
-      - feat-huggingface-dockerfile
+      - main
   workflow_dispatch:
 
 jobs:
@@ -12,20 +12,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-      # Pull the code from your repo
         uses: actions/checkout@v3
 
-      # ----------------------------
-      # SYNC SECRETS TO HF SPACE
-      # ----------------------------
-      - name: Sync FIREBASE_PROJECT_ID
+      - name: Sync FIREBASE_PROJECT_ID secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
             -d "{\"key\": \"FIREBASE_PROJECT_ID\", \"value\": \"${{ secrets.FIREBASE_PROJECT_ID }}\"}"
 
-      - name: Sync FIREBASE_CLIENT_EMAIL
+      - name: Sync FIREBASE_CLIENT_EMAIL secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
@@ -35,7 +31,7 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Sync FIREBASE_PRIVATE_KEY
+      - name: Sync FIREBASE_PRIVATE_KEY secret to Hugging Face Space
         run: |
           JSON_PAYLOAD=$(jq -n --arg key "FIREBASE_PRIVATE_KEY" --arg value "${{ secrets.FIREBASE_PRIVATE_KEY }}" \
             '{key: $key, value: $value}')
@@ -44,16 +40,13 @@ jobs:
             -H "Content-Type: application/json" \
             -d "$JSON_PAYLOAD"
 
-      - name: Sync PORT
+      - name: Sync PORT secret to Hugging Face Space
         run: |
           curl -s -X POST "https://huggingface.co/api/spaces/Sarangat/jit/secrets" \
             -H "Authorization: Bearer ${{ secrets.HF }}" \
             -H "Content-Type: application/json" \
             -d "{\"key\": \"PORT\", \"value\": \"7860\"}"
 
-      # ----------------------------
-      # SYNC REPO FILES TO THE HF SPACE
-      # ----------------------------
       - name: Install Git LFS
         run: |
           sudo apt-get update
@@ -62,21 +55,17 @@ jobs:
 
       - name: Sync files to Hugging Face Space
         run: |
-          # Clone the target Hugging Face Space
+          # Clone the space repository
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
 
-          # Sync your repo to the space repo
-          rsync -av --delete ./ hf_space/ \
-            --exclude .git \
-            --exclude hf_space \
-            --exclude .github \
-            --exclude .gitignore
+          # Use rsync to efficiently sync the entire repository to the space.
+          # The --delete flag ensures that old files are removed.
+          rsync -av --delete ./ hf_space/ --exclude .git --exclude hf_space --exclude .github
 
+          # Go into the space directory, commit and push the changes
           cd hf_space
           git add .
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          
-          # Avoid failing if nothing changed
           git commit -m "Deploy from GitHub Actions" || echo "No changes to commit"
           git push
