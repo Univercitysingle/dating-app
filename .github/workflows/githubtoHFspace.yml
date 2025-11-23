@@ -125,12 +125,11 @@ jobs:
           # Clone the target Hugging Face Space
           git clone https://Sarangat:${{ secrets.HF }}@huggingface.co/spaces/Sarangat/jit hf_space
 
-          # Sync your repo to the space repo
-          rsync -av --delete ./ hf_space/ \
+          # Sync your repo to the space repo, including dotfiles
+          rsync -av --delete --include=".*" ./ hf_space/ \
             --exclude .git \
             --exclude hf_space \
-            --exclude .github \
-            --exclude .gitignore
+            --exclude .github
 
           cd hf_space
           git add .
