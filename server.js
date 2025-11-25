@@ -56,7 +56,15 @@ logger.info(`CORS configured for origin: ${corsOptions.origin}`);
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-app.use(helmet());
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://apis.google.com", "'unsafe-inline'"],
+      // ... other directives as needed
+    },
+  })
+);
 app.use(express.json());
 
 // Static React build
