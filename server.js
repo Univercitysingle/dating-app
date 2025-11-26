@@ -62,6 +62,7 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         "script-src": ["'self'", "https://apis.google.com"],
+        "connect-src": ["'self'", "https://identitytoolkit.googleapis.com"],
       },
     },
   })
