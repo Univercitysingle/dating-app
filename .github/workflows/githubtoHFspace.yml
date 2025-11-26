@@ -3,7 +3,7 @@ name: Deploy to Hugging Face Space
 on:
   push:
     branches:
-      - feat-huggingface-dockerfile
+      - fix-firebase-sso-error-1700101981
   workflow_dispatch:
 
 jobs:
