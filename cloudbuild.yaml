@@ -1,0 +1,37 @@
+steps:
+  # 1. Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/dating-app:$COMMIT_SHA', '-t', 'gcr.io/$PROJECT_ID/dating-app:latest', '.']
+
+  # 2. Push the container image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/dating-app:$COMMIT_SHA']
+
+  # 3. Deploy container image to Google Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'dating-app'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/dating-app:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--cpu'
+      - '1'
+      - '--memory'
+      - '1Gi'
+
+images:
+  - 'gcr.io/$PROJECT_ID/dating-app:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/dating-app:latest'

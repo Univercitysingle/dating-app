@@ -1,0 +1,163 @@
+import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import SuperLikeNotification from './SuperLikeNotification';
+import ProfileDetailView from './profile/ProfileDetailView';
+
+const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [exitX, setExitX] = useState(0);
+
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-30, 30]);
+  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
+  const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
+
+  if (!user) {
+    return null;
+  }
+
+  const { name, age, photos } = user;
+  const imageSources =
+    photos && photos.length > 0
+      ? photos.map(p => p.url)
+      : ['https://placehold.co/400x600?text=Profile+Image'];
+
+  const handleDragEnd = (event, info) => {
+    if (info.offset.x > 100) {
+      setExitX(300);
+      onVote(user.uid, 'right');
+    } else if (info.offset.x < -100) {
+      setExitX(-300);
+      onVote(user.uid, 'left');
+    }
+  };
+
+  const changeImage = (direction) => {
+    setCurrentImageIndex((prevIndex) => {
+      if (direction === 'next') {
+        return (prevIndex + 1) % imageSources.length;
+      } else {
+        return (prevIndex - 1 + imageSources.length) % imageSources.length;
+      }
+    });
+  };
+
+  return (
+    <motion.div
+      drag="x"
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      onDragEnd={handleDragEnd}
+      onAnimationComplete={onSwipe}
+      exit={{ x: exitX, opacity: 0 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
+      style={{ x, rotate, ...style }}
+      className="absolute w-full h-full cursor-grab"
+      whileTap={{ cursor: 'grabbing' }}
+    >
+      <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-card bg-neutral-800 border border-neutral-700">
+        <motion.div
+            style={{ opacity: likeOpacity }}
+            className="absolute top-1/4 left-8 text-6xl font-extrabold text-green-500 border-4 border-green-500 p-4 rounded-xl -rotate-24 transform"
+        >
+            LIKE
+        </motion.div>
+        <motion.div
+            style={{ opacity: nopeOpacity }}
+            className="absolute top-1/4 right-8 text-6xl font-extrabold text-red-500 border-4 border-red-500 p-4 rounded-xl rotate-24 transform"
+        >
+            NOPE
+        </motion.div>
+
+        {superLike && <SuperLikeNotification />}
+
+        <motion.div className="w-full h-full overflow-y-auto">
+            <div className="relative w-full h-full">
+                <img
+                    src={imageSources[currentImageIndex]}
+                    alt={name || 'User profile'}
+                    className="w-full h-full object-cover"
+                />
+
+                {/* Navigation Areas */}
+                <div className="absolute inset-0 flex">
+                    <div
+                    className="w-1/2 h-full"
+                    onClick={() => changeImage('prev')}
+                    />
+                    <div
+                    className="w-1/2 h-full"
+                    onClick={() => changeImage('next')}
+                    />
+                </div>
+
+                {/* Image Indicators */}
+                <div className="absolute top-2 left-2 right-2 flex space-x-1 z-10">
+                    {imageSources.map((_, index) => (
+                    <div key={index} className="h-1 flex-1 rounded-full bg-neutral-50/50">
+                        <div
+                        className={`h-full rounded-full ${
+                            index === currentImageIndex ? 'bg-neutral-50' : ''
+                        }`}
+                        style={{
+                            width: '100%',
+                            transform: `scaleX(${index === currentImageIndex ? 1 : 0})`,
+                            transformOrigin: 'left',
+                            transition: 'transform 0.3s ease-in-out',
+                        }}
+                        />
+                    </div>
+                    ))}
+                </div>
+
+                {/* Info button */}
+                <div className="absolute top-4 right-4 z-10">
+                    <button onClick={() => setIsExpanded(!isExpanded)} className="text-neutral-50 opacity-80 hover:opacity-100" aria-label="Show profile details">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Basic Info Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-neutral-900/80 to-transparent h-1/2 flex flex-col justify-end">
+                    <h3 className="text-3xl font-extrabold text-neutral-50">
+                    {name || 'Unknown User'}
+                    </h3>
+                    {age && <p className="text-2xl text-neutral-100">{age}</p>}
+                </div>
+            </div>
+
+            {/* Expanded Details Section */}
+            <AnimatePresence>
+                {isExpanded && <ProfileDetailView user={user} />}
+            </AnimatePresence>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+};
+
+SwipeCard.propTypes = {
+    user: PropTypes.shape({
+        _id: PropTypes.string.isRequired,
+        name: PropTypes.string,
+        age: PropTypes.number,
+        photos: PropTypes.arrayOf(PropTypes.shape({
+            url: PropTypes.string.isRequired,
+        })),
+        bio: PropTypes.string,
+        interests: PropTypes.arrayOf(PropTypes.string),
+        profilePrompts: PropTypes.array,
+        lifestyle: PropTypes.object,
+        badges: PropTypes.object,
+        education: PropTypes.string,
+        relationshipGoals: PropTypes.string,
+    }),
+    onVote: PropTypes.func.isRequired,
+    onSwipe: PropTypes.func.isRequired,
+    style: PropTypes.object,
+};
+
+export default SwipeCard;

@@ -1,0 +1,86 @@
+const express = require('express');
+const router = express.Router();
+
+const adminUsersController = require('../controllers/adminUsersController');
+const authMiddleware = require('../middleware/authentication');
+const { requireRole } = require('../middleware/adminAuthMiddleware'); // Role-based authorization
+
+// Prefix for these routes will be /api/admin/users (defined in server.js)
+
+// GET /api/admin/users - List all users
+router.get(
+  '/',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.listUsers
+);
+
+// POST /api/admin/users - Create a new user
+router.post(
+  '/',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']), // Or just ['superadmin'] if only they can create users
+  adminUsersController.createUser
+);
+
+// GET /api/admin/stats - Get dashboard statistics
+// This must be defined *before* the '/:userId' route
+router.get(
+  '/stats',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.getDashboardStats
+);
+
+router.get(
+  '/purchases',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.getPurchases
+);
+router.post(
+  '/purchases/:id/approve',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.approvePurchase
+);
+router.post(
+  '/purchases/:id/reject',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.rejectPurchase
+);
+
+// GET /api/admin/users/:userId - Get a specific user by ID
+router.get(
+  '/:userId',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.getUserById
+);
+
+// PUT /api/admin/users/:userId - Update a specific user by ID
+router.put(
+  '/:userId',
+  authMiddleware,
+  requireRole(['admin', 'superadmin']),
+  adminUsersController.updateUserById
+);
+
+// DELETE /api/admin/users/:userId - Delete a specific user by ID
+router.delete(
+  '/:userId',
+  authMiddleware,
+  requireRole(['superadmin']), // Only superadmin can delete users
+  adminUsersController.deleteUserById
+);
+
+// PUT /api/admin/users/:userId/subscription - Update a user's subscription plan
+router.put(
+  '/:userId/subscription',
+  authMiddleware,
+  requireRole(['superadmin']),
+  adminUsersController.updateUserSubscription
+);
+
+module.exports = router;

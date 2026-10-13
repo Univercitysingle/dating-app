@@ -1,0 +1,248 @@
+
+> dating-app@1.0.0 test
+> npm run test:frontend && npm run test:backend
+
+
+> dating-app@1.0.0 test:frontend
+> jest --config=jest.config.js --roots src
+
+PASS src/components/LifestyleEditor.test.js
+PASS src/components/PhotoEditor.test.js
+PASS src/components/PhotoGallery.test.js
+PASS src/components/Filter.test.js
+PASS src/pages/Profile.test.js
+  ● Console
+
+    console.warn
+      ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+
+      40 |
+      41 |   it('renders the 3-dot menu', async () => {
+    > 42 |     render(
+         |           ^
+      43 |       <BrowserRouter>
+      44 |         <Profile />
+      45 |       </BrowserRouter>
+
+      at warn (node_modules/react-router/lib/deprecations.ts:9:13)
+      at warnOnce (node_modules/react-router/lib/deprecations.ts:14:3)
+      at Object.logDeprecation [as UNSAFE_logV6DeprecationWarnings] (node_modules/react-router/lib/deprecations.ts:26:5)
+      at logV6DeprecationWarnings (node_modules/react-router-dom/index.tsx:816:25)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+      at commitPassiveMountEffects_complete (node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+      at commitPassiveMountEffects_begin (node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+      at commitPassiveMountEffects (node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+      at flushPassiveEffectsImpl (node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+      at node_modules/react-dom/cjs/react-dom.development.js:26808:9
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at node_modules/@testing-library/react/dist/act-compat.js:47:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:190:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:292:10)
+      at src/pages/Profile.test.js:42:11
+      at Generator.call (src/pages/Profile.test.js:2:1)
+      at Generator._invoke [as next] (src/pages/Profile.test.js:2:1)
+      at asyncGeneratorStep (src/pages/Profile.test.js:2:1)
+      at asyncGeneratorStep (src/pages/Profile.test.js:2:1)
+      at _next (src/pages/Profile.test.js:2:1)
+      at Object.<anonymous> (src/pages/Profile.test.js:2:1)
+
+    console.warn
+      ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+      40 |
+      41 |   it('renders the 3-dot menu', async () => {
+    > 42 |     render(
+         |           ^
+      43 |       <BrowserRouter>
+      44 |         <Profile />
+      45 |       </BrowserRouter>
+
+      at warn (node_modules/react-router/lib/deprecations.ts:9:13)
+      at warnOnce (node_modules/react-router/lib/deprecations.ts:14:3)
+      at Object.logDeprecation [as UNSAFE_logV6DeprecationWarnings] (node_modules/react-router/lib/deprecations.ts:37:5)
+      at logV6DeprecationWarnings (node_modules/react-router-dom/index.tsx:816:25)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+      at commitPassiveMountEffects_complete (node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+      at commitPassiveMountEffects_begin (node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+      at commitPassiveMountEffects (node_modules/react-dom/cjs/react-dom.development.js:24905:3)
+      at flushPassiveEffectsImpl (node_modules/react-dom/cjs/react-dom.development.js:27078:3)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom.development.js:27023:14)
+      at node_modules/react-dom/cjs/react-dom.development.js:26808:9
+      at flushActQueue (node_modules/react/cjs/react.development.js:2667:24)
+      at act (node_modules/react/cjs/react.development.js:2582:11)
+      at node_modules/@testing-library/react/dist/act-compat.js:47:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:190:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:292:10)
+      at src/pages/Profile.test.js:42:11
+      at Generator.call (src/pages/Profile.test.js:2:1)
+      at Generator._invoke [as next] (src/pages/Profile.test.js:2:1)
+      at asyncGeneratorStep (src/pages/Profile.test.js:2:1)
+      at asyncGeneratorStep (src/pages/Profile.test.js:2:1)
+      at _next (src/pages/Profile.test.js:2:1)
+      at Object.<anonymous> (src/pages/Profile.test.js:2:1)
+
+PASS src/components/InterestsDisplay.test.js
+
+Test Suites: 6 passed, 6 total
+Tests:       24 passed, 24 total
+Snapshots:   0 total
+Time:        2.531 s
+Ran all test suites.
+
+> dating-app@1.0.0 test:backend
+> jest --config=jest.backend.config.js --verbose
+
+PASS tests/payhere.test.js
+  PayHere Service
+    generateHash
+      ✓ should generate a valid MD5 hash (8 ms)
+    verifySignature
+      ✓ should return true for a valid signature (1 ms)
+      ✓ should return false for an invalid signature (1 ms)
+    getAccessToken
+      ✓ should throw an error if PAYHERE_APP_ID is not set (27 ms)
+      ✓ should throw an error if PAYHERE_APP_SECRET is not set (4 ms)
+
+  console.error
+    Error creating PayHere payment session: Error: PAYHERE_MERCHANT_SECRET is not set or is empty in the environment variables.
+        at /app/tests/payhereController.test.js:76:15
+        at /app/node_modules/jest-mock/build/index.js:397:39
+        at /app/node_modules/jest-mock/build/index.js:404:13
+        at mockConstructor (/app/node_modules/jest-mock/build/index.js:148:19)
+        at generateHash (eval at _createMockFunction (/app/node_modules/jest-mock/build/index.js:566:31), <anonymous>:3:58)
+        at generateHash (/app/controllers/payhereController.js:30:18)
+        at Generator.call (/app/controllers/payhereController.js:2:1)
+        at Generator._invoke [as next] (/app/controllers/payhereController.js:2:1)
+        at asyncGeneratorStep (/app/controllers/payhereController.js:2:1)
+        at asyncGeneratorStep (/app/controllers/payhereController.js:2:1)
+        at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+      69 |     res.json(paymentDetails);
+      70 |   } catch (error) {
+    > 71 |     console.error('Error creating PayHere payment session:', error);
+         |             ^
+      72 |     if (error.message.includes('PAYHERE_MERCHANT_SECRET')) {
+      73 |       return res.status(500).json({ error: 'PayHere merchant secret is not configured. Please contact support.' });
+      74 |     }
+
+      at error (controllers/payhereController.js:71:13)
+      at Generator.call (controllers/payhereController.js:2:1)
+      at Generator._invoke [as next] (controllers/payhereController.js:2:1)
+      at asyncGeneratorStep (controllers/payhereController.js:2:1)
+      at asyncGeneratorStep (controllers/payhereController.js:2:1)
+
+  console.log
+    One-time purchase for user test-uid successful.
+
+      at log (controllers/payhereController.js:149:17)
+
+  console.log
+    Subscription for user test-uid updated: sub-123
+
+      at log (controllers/payhereController.js:127:17)
+
+  console.error
+    PayHere webhook signature verification failed.
+
+      81 |
+      82 |   if (!verifySignature(notification)) {
+    > 83 |     console.error('PayHere webhook signature verification failed.');
+         |             ^
+      84 |     return res.status(400).send('Webhook Error: Invalid signature');
+      85 |   }
+      86 |
+
+      at error (controllers/payhereController.js:83:13)
+      at Generator.call (controllers/payhereController.js:2:1)
+      at Generator._invoke [as next] (controllers/payhereController.js:2:1)
+      at asyncGeneratorStep (controllers/payhereController.js:2:1)
+      at asyncGeneratorStep (controllers/payhereController.js:2:1)
+      at _next (controllers/payhereController.js:2:1)
+      at controllers/payhereController.js:2:1
+      at apply (controllers/payhereController.js:79:27)
+      at handlePayhereWebhook (tests/payhereController.test.js:159:13)
+      at Generator.call (tests/payhereController.test.js:2:1)
+      at Generator._invoke [as next] (tests/payhereController.test.js:2:1)
+      at asyncGeneratorStep (tests/payhereController.test.js:2:1)
+      at asyncGeneratorStep (tests/payhereController.test.js:2:1)
+      at _next (tests/payhereController.test.js:2:1)
+      at Object.<anonymous> (tests/payhereController.test.js:2:1)
+
+PASS tests/payhereController.test.js
+  PayHere Controller
+    createPaymentSession
+      ✓ should create a checkout session and return payment details (8 ms)
+      ✓ should return 404 if user not found
+      ✓ should return 500 if merchant secret is not configured (67 ms)
+    handlePayhereWebhook
+      ✓ should handle a successful one-time payment notification (3 ms)
+      ✓ should handle a successful subscription payment notification (12 ms)
+      ✓ should return 400 for invalid signature (7 ms)
+
+PASS tests/usersController.test.js
+  Users Controller
+    updateCurrentUserProfile
+      ✓ should return the full photo URL after updating the profile (115 ms)
+    updatePhotoOrder
+      ✓ should return the full photo URL after updating photo order (21 ms)
+    deletePhoto
+      ✓ should return the full photo URL after deleting a photo (19 ms)
+    getUserProfile
+      ✓ should return the full photo URL when getting a user profile (10 ms)
+
+PASS tests/swipe.test.js
+  Swipe Controller
+    like
+      ✓ should create a new match and a like notification (5 ms)
+      ✓ should create a match notification on the second like (2 ms)
+    pass
+      ✓ should delete a like notification on pass (2 ms)
+    superLike
+      ✓ should return 400 if no super likes are remaining (1 ms)
+      ✓ should record a super like and decrement the count (2 ms)
+    undoSwipe
+      ✓ should return 404 if there is no swipe to undo (1 ms)
+      ✓ should successfully undo a like (2 ms)
+
+PASS tests/users.test.js
+  Admin Users Controller
+    updateUserById
+      ✓ should prevent updating a superadmin account (111 ms)
+    deleteUserById
+      ✓ should prevent deleting a superadmin account (48 ms)
+    listUsers
+      ✓ should return full photo URLs for users (61 ms)
+
+PASS tests/notifications.test.js
+  Notification Controller
+    getNotifications
+      ✓ should fetch pending notifications for the current user (3 ms)
+
+PASS tests/chat.test.js
+  Chat Controller
+    ✎ todo should have tests
+
+PASS tests/auth.test.js
+  Auth Controller
+    ✎ todo should have tests
+
+  console.log
+    Subscription for user test-uid updated: sub_123
+
+      at log (controllers/payhereController.js:127:17)
+
+PASS tests/payhereSubscription.test.js
+  Payhere Payment Routes
+    ✓ should return 401 for /payment without a token (29 ms)
+    ✓ should create a payment session successfully (9 ms)
+    ✓ should handle successful subscription webhook (51 ms)
+
+Test Suites: 1 skipped, 9 passed, 9 of 10 total
+Tests:       3 skipped, 2 todo, 29 passed, 34 total
+Snapshots:   0 total
+Time:        3.922 s, estimated 4 s
+Ran all test suites.

@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.backup
+.env.production
+*.log
+logs
+uploads
+tests
+cloudbuild.yaml
+apprunner.yaml
+README.md
+*.py
