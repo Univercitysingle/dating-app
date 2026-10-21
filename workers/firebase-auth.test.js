@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPublicKey, generateKeyPairSync, sign } from "node:crypto";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { authenticateFirebaseRequest, verifyFirebaseIdToken, FirebaseTokenError } from "./firebase-auth.js";
 
 const projectId = "test-project";
 const now = 1_800_000_000;
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const jwk = { ...createPublicKey(publicKey).export({ format: "jwk" }), kid: "test-key", alg: "RS256", use: "sig" };
+const jwk = { ...publicKey.export({ format: "jwk" }), kid: "test-key", alg: "RS256", use: "sig" };
 
 function b64url(value) {
   return Buffer.from(value).toString("base64url");
