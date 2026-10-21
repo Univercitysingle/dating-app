@@ -14,12 +14,8 @@ async function canViewChatHistory(userId, roomId) {
     if (user && user.role === 'superadmin') {
       return true; // Super admin can access any chat history
     }
-    const participants = roomId.split('-');
-    if (participants.includes(userId)) {
-      return true;
-    }
-
-    return false;
+    const { authorizeRoom } = require('../services/chatAuthorization');
+    return await authorizeRoom(userId, roomId);
   } catch (error) {
     console.error('Error in canViewChatHistory:', error);
     return false;
