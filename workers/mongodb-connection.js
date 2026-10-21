@@ -1587,6 +1587,20 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if ([
+      "/internal/admin/support-tickets", "/internal/admin/support-ticket",
+      "/internal/admin/support-ticket-message", "/internal/admin/support-ticket-status"
+    ].includes(url.pathname)) {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/admin/support-tickets") result = await this.getAdminSupportTickets(body.claims.sub, body.params || {});
+      else if (url.pathname === "/internal/admin/support-ticket") result = await this.getAdminSupportTicket(body.claims.sub, body.ticketId);
+      else if (url.pathname === "/internal/admin/support-ticket-message") result = await this.addAdminSupportMessage(body.claims.sub, body.ticketId, body.payload || {});
+      else result = await this.updateAdminSupportStatus(body.claims.sub, body.ticketId, body.payload || {});
+      return json(result.body, result.status);
+    }
+
     if (url.pathname.startsWith("/internal/admin/") && [
       "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
       "/internal/admin/transactions", "/internal/admin/analytics"
