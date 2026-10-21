@@ -153,6 +153,39 @@ test("POST /api/auth/logout rejects unsupported methods", async () => {
   assert.deepEqual(await response.json(), { error: "Method not allowed" });
 });
 
+test("undo swipe endpoint rejects anonymous requests", async () => {
+  const response = await worker.fetch(request("/api/swipe/undo", "POST"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  });
+  assert.equal(response.status, 401);
+});
+
+test("undo swipe restores a prior like and consumes an undo credit", async () => {
+  const current = { uid: "current", purchasedUndoSwipes: 1, lastSwipe: { action: "like", targetUserId: "target", matchId: "match-id" } };
+  const target = { _id: "target-id", uid: "target", email: "private@example.com", password: "secret", photos: [] };
+  let matchUpdate, userUpdates = [];
+  const users = {
+    findOne: async (query) => query.uid === "current" ? current : target,
+    updateOne: async (query, update) => { userUpdates.push({ query, update }); return { matchedCount: 1 }; }
+  };
+  const matches = {
+    findOne: async () => ({ _id: "match-id", user1Uid: "current", user2Uid: "target", likedBy: ["current"] }),
+    updateOne: async (_query, update) => { matchUpdate = update; return { matchedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  const result = await connection.undoSwipe("current");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.undoneUser.uid, "target");
+  assert.equal(result.body.undoneUser.email, undefined);
+  assert.equal(result.body.undoneUser.password, undefined);
+  assert.deepEqual(matchUpdate.$pull, { likedBy: "current" });
+  assert.equal(matchUpdate.$set.status, "pending");
+  assert.ok(userUpdates.some(entry => entry.update.$inc?.purchasedUndoSwipes === -1));
+  assert.ok(userUpdates.some(entry => entry.update.$unset?.lastSwipe === ""));
+});
+
 test("swipe endpoints reject anonymous requests and invalid methods", async () => {
   const anonymous = await worker.fetch(new Request("https://dating-app.test/api/swipe/like", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: "target" })
