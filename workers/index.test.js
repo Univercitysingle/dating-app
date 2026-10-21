@@ -837,3 +837,35 @@ test("rate limiter uses a storage transaction when supported", async () => {
   assert.equal(transactionCalls, 1);
   assert.equal((await response.json()).allowed, true);
 });
+
+
+test("support ticket creation validates subject and message before database access", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const emptySubject = await connection.createSupportTicket("user-1", { subject: "  ", message: "Help" });
+  assert.equal(emptySubject.status, 400);
+  const emptyMessage = await connection.createSupportTicket("user-1", { subject: "Help", message: " " });
+  assert.equal(emptyMessage.status, 400);
+});
+
+test("support ticket endpoints reject anonymous requests", async () => {
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  };
+  const list = await worker.fetch(request("/api/support-tickets"), env);
+  assert.equal(list.status, 401);
+  const create = await worker.fetch(new Request("https://dating-app.test/api/support-tickets", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ subject: "Help", message: "Need help" })
+  }), env);
+  assert.equal(create.status, 401);
+});
+
+test("support ticket internal route validates request structure", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/support-tickets", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ claims: { sub: "user-1" }, action: "POST", payload: { subject: " ", message: "help" } })
+  }));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).message, /subject and message/i);
+});
