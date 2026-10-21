@@ -649,6 +649,43 @@ export default {
       }
     }
 
+    const adminUsersBase = "/api/admin/users";
+    const adminUsersWriteMatch = url.pathname === adminUsersBase || url.pathname.startsWith(adminUsersBase + "/");
+    if (adminUsersWriteMatch) {
+      const parts = url.pathname.slice(adminUsersBase.length).split("/").filter(Boolean);
+      const isCreate = parts.length === 0 && request.method === "POST";
+      const isUpdateOrDelete = parts.length === 1 && /^[a-fA-F0-9]{24}$/.test(parts[0]) && ["PUT", "DELETE"].includes(request.method);
+      const isPlanUpdate = parts.length === 2 && /^[a-fA-F0-9]{24}$/.test(parts[0]) && parts[1] === "subscription" && request.method === "PUT";
+      if (isCreate || isUpdateOrDelete || isPlanUpdate) {
+        if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+        try {
+          const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+          if (!env.MONGODB_CONNECTION) return json({ message: "Administration service unavailable" }, 503);
+          const payload = request.method === "DELETE" ? null : await request.json().catch(() => null);
+          if (request.method !== "DELETE" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+            return json({ message: "A valid JSON object is required" }, 400);
+          }
+          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const connection = env.MONGODB_CONNECTION.get(id);
+          let internalPath;
+          if (isCreate) internalPath = "/internal/admin/user-create";
+          else if (isPlanUpdate) internalPath = "/internal/admin/user-plan";
+          else if (request.method === "DELETE") internalPath = "/internal/admin/user-delete";
+          else internalPath = "/internal/admin/user-update";
+          const response = await connection.fetch("https://internal.invalid" + internalPath, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, userId: parts[0], payload })
+          });
+          const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+          return json(result, response.status);
+        } catch (error) {
+          if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+          if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+          return json({ message: "Administration service unavailable" }, 503);
+        }
+      }
+    }
+
     const adminReadRoute = url.pathname === "/api/admin/users" ||
       url.pathname === "/api/admin/users/stats" ||
       (url.pathname.startsWith("/api/admin/users/") && /^[a-fA-F0-9]{24}$/.test(url.pathname.split("/").pop())) ||
