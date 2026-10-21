@@ -770,7 +770,7 @@ export class MongoDBConnection {
         if (Array.isArray(profile.photos)) {
           profile.photos = profile.photos.map(photo => {
             if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
-            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\/+/, "") };
+            return { ...photo, url: this.getMediaUrl(photo.url) };
           });
         }
         profile.superLikedByCurrentUser = superLikedBy.has(candidateUid);
@@ -841,7 +841,7 @@ export class MongoDBConnection {
         if (Array.isArray(profile.photos)) {
           profile.photos = profile.photos.map(photo => {
             if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
-            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\/+/, "") };
+            return { ...photo, url: this.getMediaUrl(photo.url) };
           });
         }
         const match = matchByUid.get(likedUid);
@@ -1172,7 +1172,7 @@ export class MongoDBConnection {
       if (Array.isArray(profile.photos)) {
         profile.photos = profile.photos.map(photo => {
           if (!photo || typeof photo.url !== "string" || !photo.url || /^https?:\/\//i.test(photo.url)) return photo;
-          return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\/+/, "") };
+          return { ...photo, url: this.getMediaUrl(photo.url) };
         });
       }
       return { status: 200, body: profile };
@@ -1272,7 +1272,7 @@ export class MongoDBConnection {
       if (Array.isArray(user.photos)) {
         for (const photo of user.photos) {
           if (photo && typeof photo.url === "string" && photo.url && !/^https?:\/\//i.test(photo.url)) {
-            photo.url = `https://${this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev"}/${photo.url.replace(/^\/+/, "")}`;
+            photo.url = this.getMediaUrl(photo.url);
           }
         }
       }
