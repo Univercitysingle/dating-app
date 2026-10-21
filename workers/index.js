@@ -503,7 +503,11 @@ export default {
         }
         return json({
           ...result,
-          cdnUrl: new URL("/media/" + encodeURIComponent(key), "https://" + (env.CDN_HOSTNAME || new URL(request.url).host)).toString()
+          cdnUrl: (function () {
+            const configured = String(env.CDN_HOSTNAME || new URL(request.url).host).trim();
+            const base = /^https:\/\//i.test(configured) ? configured.replace(/\/+$/, "") : "https://" + configured.replace(/\/+$/, "");
+            return base + "/" + encodeURIComponent(key);
+          })()
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
