@@ -1769,6 +1769,15 @@ export class MongoDBConnection {
 
 
 
+    if (url.pathname === "/internal/photo-upload" || url.pathname === "/internal/photo-delete") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
+      const result = url.pathname === "/internal/photo-upload"
+        ? await this.addUploadedPhoto(body.claims.sub, body.photo)
+        : await this.removeUploadedPhoto(body.claims.sub, body.key);
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/photo-order") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string" || !Array.isArray(body.photos)) {
