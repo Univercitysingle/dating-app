@@ -488,6 +488,30 @@ export default {
       }
     }
 
+    const statusRoute = url.pathname.match(/^\\/api\\/(purchase|subscription)\\/status\\/([^/]+)$/);
+    if (statusRoute) {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: statusRoute[1] === "purchase" ? "Purchase service unavailable" : "Subscription service unavailable" }, 503);
+      let idValue;
+      try { idValue = decodeURIComponent(statusRoute[2]); } catch { return json({ error: "Invalid ID" }, 400); }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/" + statusRoute[1] + "-status", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, id: idValue })
+        });
+        const body = await response.json().catch(() => ({ error: "Status service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Status service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/support-tickets") {
       if (request.method !== "GET" && request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
