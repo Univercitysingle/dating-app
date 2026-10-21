@@ -1535,3 +1535,36 @@ test("manual cron routes require a configured secret and execute only their requ
   assert.equal(response.status, 200);
   assert.deepEqual(body, { scope: "trials" });
 });
+
+test("chat conversations use a valid inclusion projection and return successfully", async () => {
+  let userProjection;
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne(filter, options) {
+          if (filter.uid === "alice") {
+            userProjection = options?.projection;
+            return { _id: "alice-id", uid: "alice", blocked: [] };
+          }
+          return null;
+        }
+      };
+      return {
+        find() {
+          return {
+            sort() { return this; },
+            limit() { return this; },
+            async toArray() { return []; }
+          };
+        }
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const result = await connection.getChatConversations("alice");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, []);
+  assert.deepEqual(userProjection, { _id: 1, uid: 1, blocked: 1 });
+});
+
