@@ -515,11 +515,11 @@ export default {
     if (statusRoute) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-      if (!env.MONGODB_CONNECTION) return json({ error: statusRoute[1] === "purchase" ? "Purchase service unavailable" : "Subscription service unavailable" }, 503);
       let idValue;
       try { idValue = decodeURIComponent(statusRoute[2]); } catch { return json({ error: "Invalid ID" }, 400); }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: statusRoute[1] === "purchase" ? "Purchase service unavailable" : "Subscription service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/" + statusRoute[1] + "-status", {
@@ -564,13 +564,13 @@ export default {
     const supportTicketMessage = url.pathname.match(/^\/api\/support-tickets\/([^/]+)\/messages$/);
     if (supportTicketMessage && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-      if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
       const payload = await request.json().catch(() => null);
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({ message: "A message is required." }, 400);
       let ticketId;
       try { ticketId = decodeURIComponent(supportTicketMessage[1]); } catch { return json({ message: "Invalid ticket ID" }, 400); }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/support-ticket-message", {
@@ -590,11 +590,11 @@ export default {
     if (supportTicketDetails) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-      if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
       let ticketId;
       try { ticketId = decodeURIComponent(supportTicketDetails[1]); } catch { return json({ message: "Invalid ticket ID" }, 400); }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/support-ticket", {
@@ -619,7 +619,6 @@ export default {
           (reportDetail && request.method !== "GET")) return json({ error: "Method not allowed" }, 405);
       if (!isList && !reportAction && !reportDetail) return json({ error: "Not found" }, 404);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-      if (!env.MONGODB_CONNECTION) return json({ message: "Report administration service unavailable." }, 503);
       let payload = null;
       if (reportAction) {
         payload = await request.json().catch(() => null);
@@ -627,6 +626,7 @@ export default {
       }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Report administration service unavailable." }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const params = Object.fromEntries(url.searchParams.entries());
