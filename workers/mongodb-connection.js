@@ -180,6 +180,171 @@ export class MongoDBConnection {
     }
   }
 
+  async discoverUsers(uid, filters = {}) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
+      return { status: 400, body: { error: "Invalid discovery request" } };
+    }
+    try {
+      const db = (await this.getClient()).db();
+      const currentUser = await db.collection("users").findOne({ uid });
+      if (!currentUser) return { status: 404, body: { error: "User not found" } };
+
+      const minAge = filters.minAge === undefined ? null : Number.parseInt(filters.minAge, 10);
+      const maxAge = filters.maxAge === undefined ? null : Number.parseInt(filters.maxAge, 10);
+      const maxDistance = filters.maxDistance === undefined ? null : Number.parseInt(filters.maxDistance, 10);
+      if ((filters.minAge !== undefined && (!Number.isInteger(minAge) || minAge < 18 || minAge > 100)) ||
+          (filters.maxAge !== undefined && (!Number.isInteger(maxAge) || maxAge < 18 || maxAge > 100)) ||
+          (minAge !== null && maxAge !== null && minAge > maxAge) ||
+          (filters.maxDistance !== undefined && (!Number.isInteger(maxDistance) || maxDistance < 1 || maxDistance > 20000))) {
+        return { status: 400, body: { error: "Invalid discovery filter" } };
+      }
+
+      const baseMatchQuery = {
+        uid: { $ne: uid },
+        isProfileVisible: true,
+        blocked: { $ne: uid }
+      };
+      if (currentUser.preference && currentUser.preference !== "everyone") baseMatchQuery.gender = currentUser.preference;
+      for (const key of ["sexualOrientation", "familyStatus", "relationshipGoals"]) {
+        if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery[key] = filters[key];
+      }
+      const lifestyleKeys = ["drinking", "smoking", "exercise", "diet", "lookingFor", "pets", "religion", "politicalLeaning"];
+      for (const key of lifestyleKeys) {
+        if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery["lifestyle." + key] = filters[key];
+      }
+      if (minAge !== null && maxAge !== null) {
+        const today = new Date();
+        const maxDate = new Date(today.getFullYear() - minAge, today.getMonth(), today.getDate());
+        const minDate = new Date(today.getFullYear() - maxAge - 1, today.getMonth(), today.getDate());
+        baseMatchQuery.birthday = { $gte: minDate, $lte: maxDate };
+      }
+
+      const pipeline = [];
+      const hasLocation = maxDistance !== null && currentUser.location &&
+        Array.isArray(currentUser.location.coordinates) && currentUser.location.coordinates.length === 2 &&
+        currentUser.location.coordinates.every(Number.isFinite);
+      if (hasLocation) {
+        pipeline.push({
+          $geoNear: {
+            near: { type: "Point", coordinates: currentUser.location.coordinates },
+            distanceField: "distanceMeters",
+            maxDistance: maxDistance * 1000,
+            spherical: true,
+            query: baseMatchQuery
+          }
+        });
+      } else {
+        pipeline.push({ $match: baseMatchQuery });
+      }
+      pipeline.push(
+        {
+          $lookup: {
+            from: "matches",
+            let: { candidateUid: "$uid" },
+            pipeline: [{
+              $match: {
+                $expr: {
+                  $or: [
+                    { $and: [{ $eq: ["$user1Uid", "$candidateUid"] }, { $eq: ["$user2Uid", uid] }] },
+                    { $and: [{ $eq: ["$user1Uid", uid] }, { $eq: ["$user2Uid", "$candidateUid"] }] }
+                  ]
+                }
+              }
+            }, { $limit: 1 }],
+            as: "interaction"
+          }
+        },
+        { $match: { interaction: { $eq: [] } } },
+        {
+          $facet: {
+            boostedUsers: [
+              { $match: { boostExpiresAt: { $gt: new Date() } } },
+              { $limit: 10 }
+            ],
+            regularUsers: [
+              { $match: { $or: [{ boostExpiresAt: { $lte: new Date() } }, { boostExpiresAt: { $exists: false } }] } },
+              { $sort: { lastActiveAt: -1 } },
+              { $limit: 20 }
+            ]
+          }
+        },
+        {
+          $project: {
+            combinedUsers: {
+              $let: {
+                vars: { boostedIds: "$boostedUsers.uid" },
+                in: {
+                  $concatArrays: [
+                    "$boostedUsers",
+                    {
+                      $slice: [
+                        {
+                          $filter: {
+                            input: "$regularUsers",
+                            as: "regularUser",
+                            cond: { $not: { $in: ["$regularUser.uid", "$boostedIds"] } }
+                          }
+                        },
+                        { $max: [0, { $subtract: [20, { $size: "$boostedUsers" }] }] }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        { $unwind: "$combinedUsers" },
+        { $replaceRoot: { newRoot: "$combinedUsers" } },
+        { $project: { uid: 1 } }
+      );
+
+      const uidDocs = await db.collection("users").aggregate(pipeline).toArray();
+      const orderedUids = uidDocs.map(doc => doc.uid).filter(value => typeof value === "string");
+      if (orderedUids.length === 0) return { status: 200, body: [] };
+
+      const [candidateUsers, superLikeMatches] = await Promise.all([
+        db.collection("users").find({ uid: { $in: orderedUids } }).toArray(),
+        db.collection("matches").find({ user2Uid: uid, superLike: true }).project({ user1Uid: 1 }).toArray()
+      ]);
+      const usersByUid = new Map(candidateUsers.map(user => [user.uid, user]));
+      const superLikedBy = new Set(superLikeMatches.map(match => match.user1Uid));
+      const result = [];
+      for (const candidateUid of orderedUids) {
+        const user = usersByUid.get(candidateUid);
+        if (!user) continue;
+        const profile = { ...user };
+        delete profile.email;
+        delete profile.mobileNumber;
+        delete profile.password;
+        delete profile.lastLoginIp;
+        if (profile._id !== undefined) profile.id = String(profile._id);
+        if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
+        if (profile.birthday) {
+          const birthday = new Date(profile.birthday);
+          if (!Number.isNaN(birthday.getTime())) {
+            const today = new Date();
+            let age = today.getFullYear() - birthday.getFullYear();
+            const month = today.getMonth() - birthday.getMonth();
+            if (month < 0 || (month === 0 && today.getDate() < birthday.getDate())) age--;
+            profile.age = age;
+          }
+        }
+        if (Array.isArray(profile.photos)) {
+          profile.photos = profile.photos.map(photo => {
+            if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
+            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\/+/, "") };
+          });
+        }
+        profile.superLikedByCurrentUser = superLikedBy.has(candidateUid);
+        result.push(profile);
+      }
+      return { status: 200, body: result };
+    } catch {
+      return { status: 503, body: { error: "Discovery service unavailable" } };
+    }
+  }
+
   async getSubscriptionHistory(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
@@ -431,6 +596,16 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/discover") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          !body.filters || typeof body.filters !== "object" || Array.isArray(body.filters)) {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.discoverUsers(body.claims.sub, body.filters);
       return json(result.body, result.status);
     }
 
