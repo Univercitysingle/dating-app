@@ -1,6 +1,13 @@
 name: Deploy dating-app Worker to staging
 
 on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - "workers/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-worker-staging.yml"
   workflow_dispatch:
 
 permissions:
