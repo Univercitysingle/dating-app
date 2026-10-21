@@ -307,6 +307,16 @@ export default {
         try {
           const token = await createSuperadminCustomToken(env, payload.email, payload.password);
           if (!token) return json({ error: "Invalid credentials" }, 401);
+          if (!env.MONGODB_CONNECTION) return json({ error: "Superadmin account service unavailable" }, 503);
+          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const connection = env.MONGODB_CONNECTION.get(id);
+          const provisionResponse = await connection.fetch("https://internal.invalid/internal/superadmin-provision", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: String(env.SUPER_ADMIN_EMAIL).trim() })
+          });
+          const provisionResult = await provisionResponse.json().catch(() => ({ error: "Superadmin account service unavailable" }));
+          if (!provisionResponse.ok) return json(provisionResult, provisionResponse.status);
           return json({
             token,
             user: {
