@@ -1719,13 +1719,18 @@ export class MongoDBConnection {
 
     if (url.pathname.startsWith("/internal/admin/") && [
       "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
-      "/internal/admin/transactions", "/internal/admin/analytics"
+      "/internal/admin/transactions", "/internal/admin/analytics", "/internal/admin/user-create",
+      "/internal/admin/user-update", "/internal/admin/user-delete", "/internal/admin/user-plan"
     ].includes(url.pathname)) {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
       let result;
       if (url.pathname === "/internal/admin/users") result = await this.getAdminUsers(body.claims.sub, body.params || {});
       else if (url.pathname === "/internal/admin/user") result = await this.getAdminUser(body.claims.sub, body.userId);
+      else if (url.pathname === "/internal/admin/user-create") result = await this.createAdminUser(body.claims.sub, body.payload || {});
+      else if (url.pathname === "/internal/admin/user-update") result = await this.updateAdminUser(body.claims.sub, body.userId, body.payload || {});
+      else if (url.pathname === "/internal/admin/user-delete") result = await this.deleteAdminUser(body.claims.sub, body.userId);
+      else if (url.pathname === "/internal/admin/user-plan") result = await this.updateAdminUserPlan(body.claims.sub, body.userId, body.payload || {});
       else if (url.pathname === "/internal/admin/stats") result = await this.getAdminDashboardStats(body.claims.sub);
       else if (url.pathname === "/internal/admin/transactions") result = await this.getAdminTransactions(body.claims.sub);
       else result = await this.getAdminAnalyticsSummary(body.claims.sub, body.params || {});
