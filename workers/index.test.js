@@ -1480,3 +1480,44 @@ test("scheduled expiration scopes run only the requested category", async () => 
     success: true, expiredSubscriptions: 0, expiredTrials: 0, downgradedUsers: 0
   });
 });
+
+
+test("status endpoint reports service readiness without exposing configuration", async () => {
+  const response = await worker.fetch(request("/api/status"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-primary"; },
+      get() { return { async fetch() { return new Response(JSON.stringify({ status: "ok" }), { status: 200 }); } }; }
+    }
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.database.status, "connected");
+  assert.equal(body.firebase.status, "configured");
+  assert.equal(JSON.stringify(body).includes("test-project"), false);
+});
+
+test("manual cron routes require a configured secret and execute only their requested scope", async () => {
+  const missing = await worker.fetch(new Request("https://dating-app.test/api/cron/trials", { method: "POST" }), {});
+  assert.equal(missing.status, 503);
+  const unauthorized = await worker.fetch(new Request("https://dating-app.test/api/cron/trials", {
+    method: "POST", headers: { "x-cron-secret": "wrong" }
+  }), { CRON_SECRET: "a".repeat(32) });
+  assert.equal(unauthorized.status, 401);
+  let body;
+  const response = await worker.fetch(new Request("https://dating-app.test/api/cron/trials", {
+    method: "POST", headers: { "x-cron-secret": "a".repeat(32) }
+  }), {
+    CRON_SECRET: "a".repeat(32),
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-primary"; },
+      get() { return { async fetch(url, init) {
+        assert.ok(url.endsWith("/internal/scheduled-expirations"));
+        body = JSON.parse(init.body);
+        return new Response(JSON.stringify({ success: true, expiredTrials: 1 }), { status: 200 });
+      } }; }
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(body, { scope: "trials" });
+});
