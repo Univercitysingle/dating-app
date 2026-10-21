@@ -181,6 +181,29 @@ export default {
       return json({ message: "Logged out successfully." });
     }
 
+    if (url.pathname === "/api/geolocation") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const ip = request.headers.get("CF-Connecting-IP") || "";
+        const isPrivateIp = /^(::1|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.|192\\.168\\.)/.test(ip);
+        if (isPrivateIp || !ip) {
+          return json({ ip, city: "Private Network", country: "N/A" });
+        }
+        const cf = request.cf || {};
+        const city = typeof cf.city === "string" ? cf.city : "";
+        const region = typeof cf.region === "string" ? cf.region : "";
+        const country = typeof cf.country === "string" ? cf.country : "";
+        if (!city && !region && !country) return json({ error: "Geolocation data not found." }, 404);
+        return json({ ip, city, region, country, loc: cf.latitude && cf.longitude ? cf.latitude + "," + cf.longitude : undefined, timezone: typeof cf.timezone === "string" ? cf.timezone : undefined });
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Geolocation service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/auth/verify") {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
