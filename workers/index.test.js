@@ -113,3 +113,20 @@ test("Firebase verification endpoint rejects unsupported methods", async () => {
   const response = await worker.fetch(request("/api/auth/verify", "POST"), { FIREBASE_PROJECT_ID: "test-project" });
   assert.equal(response.status, 405);
 });
+
+test("current-user profile endpoint rejects anonymous requests", async () => {
+  const response = await worker.fetch(request("/api/users/me"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Unauthorized" });
+});
+
+test("current-user profile endpoint rejects unsupported methods", async () => {
+  const response = await worker.fetch(request("/api/users/me", "POST"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  });
+  assert.equal(response.status, 405);
+});
