@@ -9,6 +9,9 @@ on:
       - "public/**"
       - "package.json"
       - "package-lock.json"
+      - "functions/**"
+      - "CLOUDFLARE_PAGES_SETUP.md"
+      - ".github/workflows/deploy-cloudflare-pages.yml"
       - ".github/workflows/serverless-frontend-build.yml"
   pull_request:
     branches:
