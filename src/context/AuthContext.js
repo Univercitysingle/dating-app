@@ -11,18 +11,7 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const lastUid = useRef(null);
 
-  // --- START DIAGNOSTIC LOGGING ---
-  useEffect(() => {
-    // This log will fire every time the user object or loading state changes.
-    console.log('%cAuthContext State Change:', 'color: blue; font-weight: bold;', {
-      isLoading,
-      isUserPresent: !!user,
-      userId: user ? user.uid : 'N/A',
-      isOnboardingComplete: user ? user.isOnboardingComplete : 'N/A',
-      fullUserObject: user ? JSON.parse(JSON.stringify(user)) : null, // Deep copy for inspection
-    });
-  }, [user, isLoading]);
-  // --- END DIAGNOSTIC LOGGING ---
+  // Avoid logging the full user profile or authentication credentials.
 
   useEffect(() => {
     logger.info("AuthContext: Setting up Firebase onIdTokenChanged listener.");
@@ -38,7 +27,7 @@ export function AuthProvider({ children }) {
           logger.info(`AuthContext: User ID changed from ${lastUid.current} to ${firebaseUser.uid}. Fetching profile.`);
           try {
             const currentUser = await apiClient.get('/users/me');
-            logger.info("AuthContext: Successfully fetched user profile.", { user: currentUser });
+            logger.info("AuthContext: Successfully fetched user profile.");
             setUser(currentUser);
             lastUid.current = firebaseUser.uid;
           } catch (error) {
@@ -66,11 +55,11 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (token, userData = null) => {
     localStorage.setItem("authToken", token);
-    logger.info("AuthContext: login called.", { token, userData });
+    logger.info("AuthContext: login called.", { hasToken: Boolean(token), hasUserData: Boolean(userData) });
     if (userData) {
       setUser(userData);
       lastUid.current = userData.uid;
-      logger.info("AuthContext: User state set directly with provided data.", { userData });
+      logger.info("AuthContext: User state set directly with provided data.");
     } else {
       try {
         const currentUser = await apiClient.get('/users/me');
