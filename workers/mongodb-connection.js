@@ -56,7 +56,8 @@ export class MongoDBConnection {
     return client.db(this.env.MONGODB_DATABASE || undefined);
   }
 
-  async runScheduledExpirations(now = new Date()) {
+  async runScheduledExpirations(now = new Date(), scope = "all") {
+    if (!["all", "trials", "subscriptions"].includes(scope)) throw new Error("Invalid expiration scope");
     const db = this.getDatabase(await this.getClient());
     const subscriptions = db.collection("subscriptions");
     const users = db.collection("users");
@@ -64,6 +65,7 @@ export class MongoDBConnection {
     let downgradedUsers = 0;
 
     // Bounded batches keep each Cron invocation within Worker execution limits.
+    if (scope !== "trials") {
     const expired = await subscriptions.find({
       status: "active",
       endDate: { $lt: now }
@@ -101,7 +103,10 @@ export class MongoDBConnection {
       }
     }
 
+    }
+
     // Expire trial-based premium access only when there is no active paid plan.
+    if (scope !== "subscriptions") {
     const expiredTrials = await users.find({
       plan: "premium",
       trialExpires: { $lt: now, $ne: null }
@@ -121,6 +126,8 @@ export class MongoDBConnection {
       );
       expiredTrialsCount += result.modifiedCount || 0;
       downgradedUsers += result.modifiedCount || 0;
+    }
+
     }
 
     return {
