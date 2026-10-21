@@ -882,3 +882,18 @@ test("support ticket detail and message routes reject anonymous requests", async
   }), env);
   assert.equal(message.status, 401);
 });
+
+
+test("purchase and subscription status routes require authentication", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project" };
+  const purchase = await worker.fetch(request("/api/purchase/status/0123456789abcdef01234567"), env);
+  assert.equal(purchase.status, 401);
+  const subscription = await worker.fetch(request("/api/subscription/status/0123456789abcdef01234567"), env);
+  assert.equal(subscription.status, 401);
+});
+
+test("purchase and subscription status reject malformed IDs before database access", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.equal((await connection.getPurchaseStatus("user-1", "not-an-id")).status, 400);
+  assert.equal((await connection.getSubscriptionStatus("user-1", "not-an-id")).status, 400);
+});
