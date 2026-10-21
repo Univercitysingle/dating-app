@@ -121,6 +121,60 @@ export class MongoDBConnection {
 
 
 
+  async addUploadedPhoto(uid, photo) {
+    if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid) ||
+        !photo || typeof photo.url !== "string" || !/^photos-[A-Za-z0-9_-]{1,128}-[a-f0-9-]+\\.(?:jpg|jpeg|png|gif)$/.test(photo.url) ||
+        !Number.isInteger(photo.size) || photo.size < 1 || photo.size > 5 * 1024 * 1024) {
+      return { status: 400, body: { message: "Invalid photo metadata" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const result = await users.findOneAndUpdate({
+        uid,
+        $expr: {
+          $and: [
+            { $lt: [{ $size: { $ifNull: ["$photos", []] } }, 6] },
+            { $lte: [{ $add: [{ $ifNull: ["$totalPhotoSize", 0] }, photo.size] }, 25 * 1024 * 1024] }
+          ]
+        }
+      }, {
+        $push: { photos: { url: photo.url, order: photo.order, size: photo.size } },
+        $inc: { totalPhotoSize: photo.size },
+        $set: { updatedAt: new Date() }
+      }, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } });
+      if (result) return { status: 201, body: { success: true, fileUrl: photo.url } };
+      const user = await users.findOne({ uid }, { projection: { photos: 1, totalPhotoSize: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      return { status: 400, body: { message: (user.photos || []).length >= 6 ? "You have reached the maximum of 6 photos." : "Uploading this photo would exceed your total storage limit." } };
+    } catch {
+      return { status: 503, body: { message: "Photo metadata service unavailable" } };
+    }
+  }
+
+  async removeUploadedPhoto(uid, key) {
+    if (typeof uid !== "string" || !uid || typeof key !== "string" || !key.startsWith("photos-" + uid + "-") ||
+        !/^photos-[A-Za-z0-9_-]{1,128}-[a-f0-9-]+\\.(?:jpg|jpeg|png|gif)$/.test(key)) {
+      return { status: 400, body: { message: "Invalid photo key" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const user = await users.findOne({ uid }, { projection: { photos: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const photo = (user.photos || []).find(item => item.url === key);
+      if (!photo) return { status: 404, body: { message: "Photo not found in profile" } };
+      if ((user.photos || []).length <= 1) return { status: 400, body: { message: "You must have at least one photo." } };
+      const size = Number.isFinite(photo.size) && photo.size > 0 ? photo.size : 0;
+      const result = await users.updateOne(
+        { uid, "photos.url": key, "photos.1": { $exists: true } },
+        { $pull: { photos: { url: key } }, $inc: { totalPhotoSize: -size }, $set: { updatedAt: new Date() } }
+      );
+      if (!result.modifiedCount) return { status: 409, body: { message: "Photo list changed; refresh and retry" } };
+      return { status: 200, body: { message: "Photo deleted successfully" } };
+    } catch {
+      return { status: 503, body: { message: "Photo metadata service unavailable" } };
+    }
+  }
+
   async updatePhotoOrder(uid, photos) {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     if (!Array.isArray(photos)) return { status: 400, body: { error: "Invalid payload. 'photos' must be an array." } };
