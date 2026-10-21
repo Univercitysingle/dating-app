@@ -115,6 +115,33 @@ export class MongoDBConnection {
 
 
 
+
+  async updatePhotoOrder(uid, photos) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    if (!Array.isArray(photos)) return { status: 400, body: { error: "Invalid payload. 'photos' must be an array." } };
+    if (photos.length > 6) return { status: 400, body: { error: "A maximum of 6 photos is allowed." } };
+    const normalized = [];
+    for (const photo of photos) {
+      if (!photo || typeof photo !== "object" || Array.isArray(photo) ||
+          typeof photo.url !== "string" || !photo.url || photo.url.length > 2048) {
+        return { status: 400, body: { error: "Invalid photo entry." } };
+      }
+      const item = { url: photo.url };
+      if (typeof photo.order === "number" && Number.isFinite(photo.order)) item.order = photo.order;
+      if (typeof photo.size === "number" && Number.isFinite(photo.size) && photo.size >= 0) item.size = photo.size;
+      if (typeof photo._id === "string" && /^[a-fA-F0-9]{24}$/.test(photo._id)) item._id = photo._id;
+      normalized.push(item);
+    }
+    try {
+      const users = (await this.getClient()).db().collection("users");
+      const result = await users.updateOne({ uid }, { $set: { photos: normalized } });
+      if (!result.matchedCount) return { status: 404, body: { error: "User not found" } };
+      return await this.getCurrentUserProfile(uid);
+    } catch {
+      return { status: 500, body: { error: "An unexpected error occurred while updating photo order." } };
+    }
+  }
+
   async updateBlockedUser(currentUid, targetUid, action) {
     if (typeof currentUid !== "string" || !currentUid || currentUid.length > 128 ||
         typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
@@ -310,6 +337,16 @@ export class MongoDBConnection {
     }
 
 
+
+
+    if (url.pathname === "/internal/photo-order") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || !Array.isArray(body.photos)) {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.updatePhotoOrder(body.claims.sub, body.photos);
+      return json(result.body, result.status);
+    }
 
     if (url.pathname === "/internal/block") {
       const body = await request.json().catch(() => null);
