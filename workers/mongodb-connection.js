@@ -41,7 +41,7 @@ export class MongoDBConnection {
   async ping() {
     try {
       const client = await this.getClient();
-      await client.db(this.env.MONGODB_DATABASE || undefined).command({ ping: 1 });
+      await client.db().command({ ping: 1 });
       return { ok: true };
     } catch {
       return { ok: false };
@@ -55,7 +55,7 @@ export class MongoDBConnection {
 
     try {
       const client = await this.getClient();
-      const db = client.db(this.env.MONGODB_DATABASE || undefined);
+      const db = client.db();
       const user = await db.collection("users").findOne(
         { uid },
         { projection: { password: 0, lastLoginIp: 0 } }
