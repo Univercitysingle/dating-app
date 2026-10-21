@@ -35,7 +35,7 @@ test("GET /ready reports ready only when the MongoDB probe succeeds", async () =
     MONGODB_URI: "mongodb://unused",
     MONGODB_CONNECTION: {
       idFromName: (name) => name,
-      get: () => ({ ping: async () => ({ ok: true }) })
+      get: () => ({ fetch: async () => new Response("ok", { status: 200 }) })
     }
   });
   assert.equal(response.status, 200);
@@ -51,7 +51,7 @@ test("GET /ready does not expose probe errors", async () => {
     MONGODB_URI: "mongodb://unused",
     MONGODB_CONNECTION: {
       idFromName: (name) => name,
-      get: () => ({ ping: async () => { throw new Error("private database detail"); } })
+      get: () => ({ fetch: async () => { throw new Error("private database detail"); } })
     }
   });
   assert.equal(response.status, 503);
