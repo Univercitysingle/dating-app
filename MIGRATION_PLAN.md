@@ -6,7 +6,7 @@
 - **Coordination:** Durable Objects for shared, strongly consistent coordination such as rate-limit counters and idempotency coordination. They are not the chat transport in this plan.
 - **Authentication:** Keep Firebase Authentication. Every protected Worker route must verify Firebase ID tokens server-side, including signature, issuer, audience/project ID, expiry, and relevant claims. Never trust a UID supplied in the request body.
 - **Chat:** Keep Firebase Realtime Database listeners as the client realtime delivery path. Enforce conversation membership through server-side authorization and RTDB Security Rules; do not add Socket.IO/WebSocket chat in this migration.
-- **Primary database:** Keep MongoDB initially. Cloudflare documents using the native MongoDB Node.js driver in Workers and recommends a Durable Object holding the MongoClient for latency-sensitive persistent connections. Use the official Cloudflare guide: https://developers.cloudflare.com/workers/tutorials/connect-to-mongodb/ . Cloudflare Hyperdrive supports SQL databases, not MongoDB.
+- **Primary database:** Keep MongoDB initially. The confirmed staging database is `test` on Cluster0; set `MONGODB_DATABASE=test` explicitly rather than relying on the database embedded in the connection URI. Cloudflare documents using the native MongoDB Node.js driver in Workers and recommends a Durable Object holding the MongoClient for latency-sensitive persistent connections. Use the official Cloudflare guide: https://developers.cloudflare.com/workers/tutorials/connect-to-mongodb/ . Cloudflare Hyperdrive supports SQL databases, not MongoDB.
 - **Secrets:** Configure `MONGODB_URI` with `wrangler secret put MONGODB_URI`; never commit connection strings or credentials. Set `FIREBASE_PROJECT_ID` as a non-secret Worker variable. Use a dedicated development/staging database for the first live probe.
 - **Legacy server:** Keep it running as rollback target. Do not change production DNS until parity and cutover checks pass.
 
@@ -27,12 +27,14 @@ The current root server.js is a long-lived Express/HTTP process. It loads all Mo
 
 1. Deploy Worker in staging on a separate hostname; production origin stays unchanged.
 2. Add request IDs, structured logs, bounded JSON bodies, CORS allowlist, security headers, route-level rate limiting, and consistent error responses.
-3. Implement Firebase ID-token verification with Google's published signing keys and strict project/issuer/audience/expiry checks. Reject invalid or missing tokens by default. The initial `GET /api/auth/verify` route is now implemented and returns only the verified UID and email-verification boolean.
+3. Implement Firebase ID-token verification with Google's published signing keys and strict project/issuer/audience/expiry checks. Reject invalid or missing tokens by default. The initial `GET /api/auth/verify` route is now implemented and returns only the verified UID and email-verification boolean. `GET /api/users/me` now uses the verified UID for a read-only profile lookup.
 4. Keep `/ready` dependency-aware: it verifies required configuration and performs a real MongoDB ping through the Durable Object. Firebase is currently configuration-checked only, not connectivity-checked; readiness must not be described as a full Firebase connectivity probe.
 
 ### Phase 2: migrate read-only endpoints
 
 The legacy contract for `GET /api/users/me` is authenticated and returns the current MongoDB user after `sanitizeUser`, including computed age and `isPremium` from an active Subscription document. The model is `User` (MongoDB collection `users`), and Subscription records are stored in `subscriptions`. The existing sanitizer currently returns the full owner object, so the Worker must explicitly exclude password hashes and login IP metadata rather than reproduce that exposure.
+
+The Worker now implements a first pass of `GET /api/users/me`: it verifies the Firebase ID token, queries only the matching UID from `test.users`, adds `age`, `id`, `isOnboardingComplete`, and `isPremium`, converts relative photo URLs to the configured CDN hostname, and excludes `password` and `lastLoginIp`. It does not yet reproduce the legacy find-or-create/link-by-email provisioning behavior or Redis cache behavior. Contract tests against representative fixture documents are still required.
 
 Move status/profile/read-only endpoints one group at a time. Preserve response schemas and pagination. Add contract tests comparing legacy and Worker responses on fixture data.
 
