@@ -44,8 +44,10 @@ export class MongoDBConnection {
     const isNewB2Photo = clean.startsWith("photos-") && [".jpg", ".jpeg", ".png", ".gif"].some(ext => clean.endsWith(ext));
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
     if (isNewB2Photo) {
-      const host = this.env.CDN_HOSTNAME || "dating-app-api-staging.enadoctemp.workers.dev";
-      return "https://" + host + "/media/" + encoded;
+      // Preserve the legacy CDN origin and root/object-key URL contract.
+      const configured = String(this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev").trim();
+      const base = /^https:\/\//i.test(configured) ? configured.replace(/\/+$/, "") : "https://" + configured.replace(/\/+$/, "");
+      return base + "/" + encoded;
     }
     return "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + encoded;
   }
