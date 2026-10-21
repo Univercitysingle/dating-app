@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { RateLimiter } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection } from "./index.js";
 
 function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
@@ -18,7 +18,44 @@ test("GET /ready fails closed when required configuration is missing", async () 
   const body = await response.json();
   assert.equal(body.status, "not_ready");
   assert.ok(body.missingConfiguration.includes("FIREBASE_PROJECT_ID"));
-  assert.ok(body.missingConfiguration.includes("MONGO_API_BASE_URL"));
+  assert.ok(body.missingConfiguration.includes("MONGODB_URI"));
+});
+
+test("GET /ready fails closed when MongoDB binding is missing", async () => {
+  const response = await worker.fetch(request("/ready"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_URI: "mongodb://unused"
+  });
+  assert.equal(response.status, 503);
+});
+
+test("GET /ready reports ready only when the MongoDB probe succeeds", async () => {
+  const response = await worker.fetch(request("/ready"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_URI: "mongodb://unused",
+    MONGODB_CONNECTION: {
+      idFromName: (name) => name,
+      get: () => ({ ping: async () => ({ ok: true }) })
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    status: "ready",
+    dependencies: { mongodb: "ok", firebase: "configuration_present" }
+  });
+});
+
+test("GET /ready does not expose probe errors", async () => {
+  const response = await worker.fetch(request("/ready"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_URI: "mongodb://unused",
+    MONGODB_CONNECTION: {
+      idFromName: (name) => name,
+      get: () => ({ ping: async () => { throw new Error("private database detail"); } })
+    }
+  });
+  assert.equal(response.status, 503);
+  assert.doesNotMatch(await response.text(), /private database detail/);
 });
 
 test("unmigrated API routes are not silently accepted", async () => {
@@ -47,4 +84,15 @@ test("rate limiter enforces a configured count within a window", async () => {
   }));
   assert.equal((await (await call()).json()).allowed, true);
   assert.equal((await (await call()).json()).allowed, false);
+});
+
+test("MongoDB Durable Object ping fails closed without a URI", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.deepEqual(await connection.ping(), { ok: false });
+});
+
+test("MongoDB Durable Object exposes no general-purpose HTTP operation", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const response = await connection.fetch(request("/internal/query", "POST"));
+  assert.equal(response.status, 404);
 });
