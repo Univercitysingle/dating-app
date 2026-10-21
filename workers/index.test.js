@@ -1045,6 +1045,7 @@ test("scheduled expiration processing is bounded, idempotent, and preserves acti
   const trialUser = { _id: "trial-user", plan: "premium", trialExpires: new Date("2026-01-01T00:00:00Z") };
   let subscriptionUpdates = 0;
   let userUpdates = 0;
+  const userUpdateFilters = [];
   const subscriptions = {
     find: () => ({ sort() { return this; }, limit() { return this; }, async toArray() { return [expiredSub]; } }),
     async updateOne() { subscriptionUpdates += 1; return { modifiedCount: 1 }; },
@@ -1052,7 +1053,7 @@ test("scheduled expiration processing is bounded, idempotent, and preserves acti
   };
   const users = {
     find: () => ({ sort() { return this; }, limit() { return this; }, async toArray() { return [trialUser]; } }),
-    async updateOne() { userUpdates += 1; return { modifiedCount: 1 }; }
+    async updateOne(filter) { userUpdates += 1; userUpdateFilters.push(filter); return { modifiedCount: 1 }; }
   };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({ db: () => ({ collection(name) { return name === "subscriptions" ? subscriptions : users; } }) });
@@ -1060,6 +1061,24 @@ test("scheduled expiration processing is bounded, idempotent, and preserves acti
   assert.deepEqual(result, { success: true, expiredSubscriptions: 1, expiredTrials: 1, downgradedUsers: 2 });
   assert.equal(subscriptionUpdates, 1);
   assert.equal(userUpdates, 2);
+  assert.ok(userUpdateFilters[0].$or.some(clause => clause.trialExpires && clause.trialExpires.$lte instanceof Date));
+});
+
+test("scheduled expiration does not downgrade users with another active subscription", async () => {
+  const expiredSub = { _id: "expired-sub", userId: "paid-user", endDate: new Date("2026-01-01T00:00:00Z") };
+  const subscriptions = {
+    find: () => ({ sort() { return this; }, limit() { return this; }, async toArray() { return [expiredSub]; } }),
+    async updateOne() { return { modifiedCount: 1 }; },
+    async findOne() { return { _id: "still-active" }; }
+  };
+  const users = {
+    find: () => ({ sort() { return this; }, limit() { return this; }, async toArray() { return [{ _id: "trial-user", plan: "premium" }]; } }),
+    async updateOne() { assert.fail("User with an active subscription must not be downgraded"); }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection(name) { return name === "subscriptions" ? subscriptions : users; } }) });
+  const result = await connection.runScheduledExpirations(new Date("2026-10-21T00:00:00Z"));
+  assert.deepEqual(result, { success: true, expiredSubscriptions: 1, expiredTrials: 0, downgradedUsers: 0 });
 });
 
 test("scheduled handler only runs in staging and delegates to the MongoDB Durable Object", async () => {
