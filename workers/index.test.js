@@ -268,6 +268,45 @@ test("profile updates reject underage birthdays and malformed mobile numbers", a
   assert.equal((await connection.updateCurrentUserProfile("user-1", { mobileNumber: "123" })).status, 400);
 });
 
+test("likes query returns pending likers with privacy filtering and premium blur metadata", async () => {
+  const current = { _id: "current-id", uid: "current", plan: "basic" };
+  const liker = {
+    _id: "liker-id", uid: "liker", name: "Liker", email: "private@example.com",
+    mobileNumber: "+971501234567", password: "never-return", lastLoginIp: "192.0.2.1",
+    photos: [{ url: "photos/one.jpg" }]
+  };
+  const users = {
+    findOne: async (query) => query.uid === "current" ? current : null,
+    find: async () => ({ toArray: async () => [liker] })
+  };
+  const matches = { find: async (query) => {
+    assert.deepEqual(query, { user2Uid: "current", status: "pending" });
+    return { toArray: async () => [{ user1Uid: "liker", user2Uid: "current", status: "pending", superLike: true }] };
+  }};
+  const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  const result = await connection.getLikes("current");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  assert.equal(result.body[0].likeType, "superlike");
+  assert.equal(result.body[0].isBlurred, true);
+  assert.equal(result.body[0].email, undefined);
+  assert.equal(result.body[0].mobileNumber, undefined);
+  assert.equal(result.body[0].password, undefined);
+  assert.equal(result.body[0].lastLoginIp, undefined);
+  assert.equal(result.body[0].photos[0].url, "https://cdn.example.com/photos/one.jpg");
+});
+
+test("likes query returns an empty list when no pending likes exist", async () => {
+  const users = { findOne: async () => ({ _id: "current-id", plan: "premium" }) };
+  const matches = { find: async () => ({ toArray: async () => [] }) };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  const result = await connection.getLikes("current");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, []);
+});
+
 test("public profile endpoint rejects anonymous requests", async () => {
   const response = await worker.fetch(request("/api/users/some-user"), {
     FIREBASE_PROJECT_ID: "test-project",
