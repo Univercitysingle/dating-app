@@ -200,6 +200,31 @@ test("like swipe creates a pending match and notification", async () => {
   assert.equal(recordedSwipe.targetUserId, "user-2");
 });
 
+test("super-like consumes a purchased credit and records super-like notification", async () => {
+  const userUpdates = [];
+  let insertedMatch, insertedNotification;
+  const users = {
+    findOne: async (query) => query.uid === "user-1"
+      ? { uid: "user-1", blocked: [], purchasedSuperLikes: 1, superLikes: { count: 0 } }
+      : { uid: "user-2", blocked: [] },
+    updateOne: async (query, update) => { userUpdates.push({ query, update }); return { matchedCount: 1 }; }
+  };
+  const matches = {
+    findOne: async () => null,
+    insertOne: async (doc) => { insertedMatch = doc; return { insertedId: "super-match-id" }; },
+    updateOne: async () => ({ matchedCount: 1 })
+  };
+  const notifications = { insertOne: async (doc) => { insertedNotification = doc; }, deleteOne: async () => ({ deletedCount: 0 }) };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "matches" ? matches : notifications }) });
+  const result = await connection.recordSwipe("user-1", "user-2", "superlike");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.superLike, true);
+  assert.equal(insertedMatch.superLike, true);
+  assert.equal(insertedNotification.type, "superlike");
+  assert.ok(userUpdates.some(entry => entry.update.$inc?.purchasedSuperLikes === -1));
+});
+
 test("match read endpoints reject anonymous requests", async () => {
   for (const path of ["/api/matches", "/api/matches/confirmed"]) {
     const response = await worker.fetch(request(path), {
