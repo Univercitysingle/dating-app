@@ -919,3 +919,9 @@ test("purchase and subscription status cannot be read by a different user", asyn
   assert.equal((await connection.getPurchaseStatus("user-1", String(purchaseId))).status, 403);
   assert.equal((await connection.getSubscriptionStatus("user-1", String(subscriptionId))).status, 403);
 });
+
+
+test("geolocation endpoint requires Firebase authentication", async () => {
+  const response = await worker.fetch(request("/api/geolocation"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(response.status, 401);
+});
