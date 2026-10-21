@@ -141,7 +141,7 @@ test("account provisioning refuses unverified email for a new account", async ()
     insertOne: async () => { inserted = true; return { insertedId: "new-id" }; }
   };
   const connection = new MongoDBConnection({}, {});
-  connection.clientPromise = Promise.resolve({ db: () => ({ collection: () => users }) });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
   const result = await connection.findOrCreateUserFromClaims({ sub: "firebase-user-1", email: "new@example.com", email_verified: false });
   assert.equal(result.status, 403);
   assert.equal(inserted, false);
@@ -153,7 +153,7 @@ test("account provisioning creates a verified user with legacy trial defaults", 
     insertOne: async (user) => { assert.equal(user.uid, "firebase-user-2"); return { insertedId: "new-id" }; }
   };
   const connection = new MongoDBConnection({}, {});
-  connection.clientPromise = Promise.resolve({ db: () => ({ collection: () => users }) });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
   const result = await connection.findOrCreateUserFromClaims({
     sub: "firebase-user-2", email: "  New@Example.com ", email_verified: true, name: "New User"
   });
@@ -174,7 +174,7 @@ test("account provisioning never links an email already bound to another UID", a
     findOneAndUpdate: async () => { throw new Error("Must not relink an account"); }
   };
   const connection = new MongoDBConnection({}, {});
-  connection.clientPromise = Promise.resolve({ db: () => ({ collection: () => users }) });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
   const result = await connection.findOrCreateUserFromClaims({
     sub: "firebase-user-3", email: "same@example.com", email_verified: true
   });
