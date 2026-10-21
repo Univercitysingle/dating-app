@@ -975,7 +975,7 @@ export class MongoDBConnection {
         }
         const now = new Date();
         const collection = purchase ? purchases : subscriptions;
-        const nextStatus = success ? completedState : (purchase ? "rejected" : "cancelled");
+        const nextStatus = success ? (purchase ? "completed" : "active") : (purchase ? "rejected" : "cancelled");
         const changed = await collection.updateOne(
           { _id: record._id, status: "pending" },
           { $set: { status: nextStatus, paymentReference: String(reference).slice(0, 128), updatedAt: now } },
