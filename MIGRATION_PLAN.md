@@ -69,7 +69,7 @@ Keep Firebase Realtime Database listeners for realtime updates. The Worker API v
 
 ### Still not complete / requires integration work
 
-- **Media uploads:** photo and bank-slip upload/deletion are not migrated to a configured Cloudflare R2 bucket. The app needs an actual staging bucket binding and public/CDN URL configuration; do not invent a bucket or public URL.
+- **Media uploads:** R2-backed profile-photo upload/deletion handlers and metadata ownership/size limits are implemented. They fail closed until a real R2 binding named MEDIA_BUCKET and HTTPS MEDIA_PUBLIC_BASE_URL are configured. Existing legacy WebP URLs retain the legacy CDN mapping. Bank-slip upload/deletion is not migrated; the current legacy subscription model has a plan/bank-slip schema mismatch that must be resolved before porting it.
 - **Payments:** WebXPay callback/signature verification and idempotent payment settlement are not migrated. This requires the real WebXPay public key/provider contract and integration tests; do not mark payments complete based only on mocked tests.
 - **Chat:** preserve Firebase Realtime Database as the realtime delivery path. The exact deployed RTDB rules and existing chat-path permissions must be reviewed and tested before changing chat writes or client access. Do not weaken rules or introduce a replacement transport.
 - **Admin payment moderation:** approve/reject purchase operations and associated entitlement updates still need an atomicity/idempotency design and tests.
