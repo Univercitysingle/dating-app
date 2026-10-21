@@ -17,6 +17,13 @@ export class FirebaseTokenError extends Error {
   }
 }
 
+export class FirebaseKeyServiceError extends Error {
+  constructor() {
+    super("Firebase signing key service unavailable");
+    this.name = "FirebaseKeyServiceError";
+  }
+}
+
 export async function verifyFirebaseIdToken(token, projectId, options = {}) {
   if (typeof token !== "string" || !token || typeof projectId !== "string" || !projectId) {
     throw new FirebaseTokenError();
@@ -43,15 +50,15 @@ export async function verifyFirebaseIdToken(token, projectId, options = {}) {
   try {
     response = await fetchImpl(JWKS_URL, { headers: { accept: "application/json" } });
   } catch {
-    throw new FirebaseTokenError();
+    throw new FirebaseKeyServiceError();
   }
-  if (!response.ok) throw new FirebaseTokenError();
+  if (!response.ok) throw new FirebaseKeyServiceError();
 
   let jwks;
   try {
     jwks = await response.json();
   } catch {
-    throw new FirebaseTokenError();
+    throw new FirebaseKeyServiceError();
   }
   const jwk = Array.isArray(jwks.keys) ? jwks.keys.find((key) => key.kid === header.kid && key.kty === "RSA" && key.alg === "RS256") : null;
   if (!jwk) throw new FirebaseTokenError();
