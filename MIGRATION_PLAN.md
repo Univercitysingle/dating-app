@@ -32,6 +32,8 @@ The current root server.js is a long-lived Express/HTTP process. It loads all Mo
 
 ### Phase 2: migrate read-only endpoints
 
+The legacy contract for `GET /api/users/me` is authenticated and returns the current MongoDB user after `sanitizeUser`, including computed age and `isPremium` from an active Subscription document. The model is `User` (MongoDB collection `users`), and Subscription records are stored in `subscriptions`. The existing sanitizer currently returns the full owner object, so the Worker must explicitly exclude password hashes and login IP metadata rather than reproduce that exposure.
+
 Move status/profile/read-only endpoints one group at a time. Preserve response schemas and pagination. Add contract tests comparing legacy and Worker responses on fixture data.
 
 ### Phase 3: write paths and business invariants
