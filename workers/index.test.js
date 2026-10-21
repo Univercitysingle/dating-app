@@ -8,6 +8,46 @@ function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
 }
 
+test("superadmin login issues a Firebase custom token with root-level role claim", async () => {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" }
+  });
+  const bcryptModule = await import("bcryptjs");
+  const bcrypt = bcryptModule.default || bcryptModule;
+  const passwordHash = await bcrypt.hash("correct-test-password", 4);
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    SUPER_ADMIN_EMAIL: "sadmin",
+    SUPER_ADMIN_PASSWORD_HASH: passwordHash,
+    FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      client_email: "firebase-adminsdk@test-project.iam.gserviceaccount.com",
+      private_key: privateKey
+    }),
+    MONGODB_CONNECTION: {
+      idFromName: name => name,
+      get: () => ({
+        fetch: async () => new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        })
+      })
+    }
+  };
+  const response = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "sadmin", password: "correct-test-password" })
+  }), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  const payload = JSON.parse(Buffer.from(body.token.split(".")[1], "base64url").toString("utf8"));
+  assert.equal(payload.uid, "superadmin_uid");
+  assert.equal(payload.role, "superadmin");
+  assert.equal(payload.claims, undefined);
+});
+
 test("GET / returns API metadata without pretending to serve the login UI", async () => {
   const response = await worker.fetch(request("/"), { MIGRATION_STAGE: "test" });
   assert.equal(response.status, 200);
