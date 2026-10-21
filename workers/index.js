@@ -641,6 +641,10 @@ export default {
           body: JSON.stringify({ claims, ticketId, payload, params: Object.fromEntries(url.searchParams.entries()) })
         });
         const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+        if (url.pathname === "/api/admin/analytics/export" && response.ok && Array.isArray(result.signupsPerDay)) {
+          const rows = ["date,new_signups", ...result.signupsPerDay.map(item => String(item._id || "") + "," + String(Number(item.count) || 0))];
+          return new Response(rows.join("\\n"), { status: 200, headers: { ...JSON_HEADERS, "content-type": "text/csv; charset=utf-8", "content-disposition": "attachment; filename=analytics_export.csv" } });
+        }
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
@@ -691,6 +695,7 @@ export default {
       (url.pathname.startsWith("/api/admin/users/") && /^[a-fA-F0-9]{24}$/.test(url.pathname.split("/").pop())) ||
       url.pathname === "/api/admin/transactions" ||
       url.pathname === "/api/admin/analytics/summary" ||
+      url.pathname === "/api/admin/analytics/export" ||
       url.pathname === "/api/admin/payment-logs" ||
       url.pathname === "/api/admin/user-activity/login-history" ||
       url.pathname === "/api/admin/audit-logs";
@@ -711,7 +716,7 @@ export default {
           internalPath = "/internal/admin/stats";
         } else if (url.pathname === "/api/admin/transactions") {
           internalPath = "/internal/admin/transactions";
-        } else if (url.pathname === "/api/admin/analytics/summary") {
+        } else if (url.pathname === "/api/admin/analytics/summary" || url.pathname === "/api/admin/analytics/export") {
           internalPath = "/internal/admin/analytics";
           body.params = Object.fromEntries(url.searchParams.entries());
         } else if (url.pathname === "/api/admin/payment-logs") {
