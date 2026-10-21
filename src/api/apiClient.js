@@ -40,9 +40,12 @@ const apiClient = {
       }
     }
 
+    const safeHeaders = Object.fromEntries(headers.entries());
+    if (safeHeaders.authorization) safeHeaders.authorization = "[REDACTED]";
     logger.debug(`API Request - ${config.method} ${url}`, {
-      headers: Object.fromEntries(headers.entries()),
-      body: data,
+      headers: safeHeaders,
+      hasBody: data !== null,
+      bodyType: data instanceof FormData ? "FormData" : typeof data,
     });
 
     try {
@@ -95,7 +98,7 @@ const apiClient = {
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const jsonData = await response.json();
-        logger.debug(`API Success (${config.method} ${url})`, jsonData);
+        logger.debug(`API Success (${config.method} ${url})`, { responseType: "json" });
         return jsonData;
       }
 
