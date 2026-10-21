@@ -794,8 +794,8 @@ export class MongoDBConnection {
               $match: {
                 $expr: {
                   $or: [
-                    { $and: [{ $eq: ["$user1Uid", "$candidateUid"] }, { $eq: ["$user2Uid", uid] }] },
-                    { $and: [{ $eq: ["$user1Uid", uid] }, { $eq: ["$user2Uid", "$candidateUid"] }] }
+                    { $and: [{ $eq: ["$user1Uid", "$$candidateUid"] }, { $eq: ["$user2Uid", uid] }] },
+                    { $and: [{ $eq: ["$user1Uid", uid] }, { $eq: ["$user2Uid", "$$candidateUid"] }] }
                   ]
                 }
               }
