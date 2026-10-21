@@ -1071,6 +1071,38 @@ export class MongoDBConnection {
     }
   }
 
+  async deleteOwnPendingBankSlip(uid, subscriptionId) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        typeof subscriptionId !== "string" || !/^[a-fA-F0-9]{24}$/.test(subscriptionId)) {
+      return { status: 400, body: { error: "Invalid subscription ID" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const { ObjectId } = await import("mongodb");
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const subscriptions = db.collection("subscriptions");
+      const subscription = await subscriptions.findOne({
+        _id: new ObjectId(subscriptionId),
+        userId: user._id,
+        status: "pending",
+        bankSlipUrl: { $type: "string" }
+      }, { projection: { bankSlipUrl: 1 } });
+      if (!subscription) return { status: 404, body: { error: "Pending bank-slip submission not found" } };
+      const changed = await subscriptions.updateOne(
+        { _id: new ObjectId(subscriptionId), userId: user._id, status: "pending" },
+        {
+          $set: { status: "cancelled", bankSlipDeletedAt: new Date(), updatedAt: new Date() },
+          $unset: { bankSlipUrl: "", bankSlipContentType: "", bankSlipSize: "" }
+        }
+      );
+      if (!changed.modifiedCount) return { status: 409, body: { error: "Bank-slip submission changed; refresh and retry" } };
+      return { status: 200, body: { success: true, key: subscription.bankSlipUrl, message: "Pending bank-slip submission deleted" } };
+    } catch {
+      return { status: 503, body: { error: "Bank-slip deletion unavailable" } };
+    }
+  }
+
   async authorizeAdminBankSlip(uid, key) {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
@@ -2195,6 +2227,15 @@ export class MongoDBConnection {
       const body = await request.json().catch(() => null);
       if (!body || typeof body.orderId !== "string" || typeof body.statusCode !== "string") return json({ error: "Invalid request" }, 400);
       const result = await this.settleWebXPay(body.orderId, body.statusCode, body.reference || "");
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/bank-slip-delete") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.subscriptionId !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.deleteOwnPendingBankSlip(body.claims.sub, body.subscriptionId);
       return json(result.body, result.status);
     }
 
