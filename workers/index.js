@@ -22,10 +22,18 @@ export class RateLimiter {
     const now = Date.now();
     const windowMs = Number.isInteger(body.windowMs) && body.windowMs >= 1000 && body.windowMs <= 86400000 ? body.windowMs : 60000;
     const limit = Number.isInteger(body.limit) && body.limit >= 1 && body.limit <= 10000 ? body.limit : 60;
-    const record = (await this.state.storage.get(body.key)) || { count: 0, resetAt: now + windowMs };
-    const current = record.resetAt <= now ? { count: 0, resetAt: now + windowMs } : record;
-    current.count += 1;
-    await this.state.storage.put(body.key, current);
+    const increment = async (storage) => {
+      const record = (await storage.get(body.key)) || { count: 0, resetAt: now + windowMs };
+      const current = record.resetAt <= now ? { count: 0, resetAt: now + windowMs } : record;
+      current.count += 1;
+      await storage.put(body.key, current);
+      return current;
+    };
+    // Durable Object storage transactions prevent concurrent requests from
+    // overwriting each other's counters at the limit boundary.
+    const current = typeof this.state.storage.transaction === "function"
+      ? await this.state.storage.transaction(increment)
+      : await increment(this.state.storage);
     return json({ allowed: current.count <= limit, remaining: Math.max(0, limit - current.count), resetAt: current.resetAt });
   }
 }
@@ -35,6 +43,34 @@ export { MongoDBConnection } from "./mongodb-connection.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Apply a per-client edge limit to API traffic. Cloudflare supplies
+    // CF-Connecting-IP; do not trust caller-controlled X-Forwarded-For.
+    if (url.pathname.startsWith("/api/") && request.method !== "OPTIONS" && env.RATE_LIMITER) {
+      const clientIp = request.headers.get("CF-Connecting-IP");
+      if (clientIp) {
+        try {
+          const limiterId = env.RATE_LIMITER.idFromName("api-ip:" + clientIp);
+          const limiter = env.RATE_LIMITER.get(limiterId);
+          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "api", limit: 120, windowMs: 60000 })
+          });
+          if (!rateResponse.ok) return json({ error: "Request rate limit service unavailable" }, 503);
+          const rate = await rateResponse.json();
+          if (!rate.allowed) {
+            const retryAfter = Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000));
+            return new Response(JSON.stringify({ error: "Too many requests. Please retry shortly." }), {
+              status: 429,
+              headers: { ...JSON_HEADERS, "retry-after": String(retryAfter) }
+            });
+          }
+        } catch {
+          return json({ error: "Request rate limit service unavailable" }, 503);
+        }
+      }
+    }
 
     // Keep the API origin useful when opened directly, without implying that
     // this backend URL is the React login page.
