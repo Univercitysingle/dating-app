@@ -488,7 +488,7 @@ export default {
       }
     }
 
-    const statusRoute = url.pathname.match(/^\\/api\\/(purchase|subscription)\\/status\\/([^/]+)$/);
+    const statusRoute = url.pathname.match(/^\/api\/(purchase|subscription)\/status\/([^/]+)$/);
     if (statusRoute) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
@@ -538,7 +538,7 @@ export default {
       }
     }
 
-    const supportTicketMessage = url.pathname.match(/^\\/api\\/support-tickets\\/([^/]+)\\/messages$/);
+    const supportTicketMessage = url.pathname.match(/^\/api\/support-tickets\/([^/]+)\/messages$/);
     if (supportTicketMessage && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
@@ -563,7 +563,7 @@ export default {
       }
     }
 
-    const supportTicketDetails = url.pathname.match(/^\\/api\\/support-tickets\\/([^/]+)$/);
+    const supportTicketDetails = url.pathname.match(/^\/api\/support-tickets\/([^/]+)$/);
     if (supportTicketDetails) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
