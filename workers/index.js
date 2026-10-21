@@ -52,7 +52,7 @@ async function createSuperadminCustomToken(env, email, password) {
     iat: now,
     exp: now + 3600,
     uid: "superadmin_uid",
-    claims: { role: "superadmin" }
+    role: "superadmin"
   });
   const unsigned = header + "." + claims;
   const signer = createSign("RSA-SHA256");
