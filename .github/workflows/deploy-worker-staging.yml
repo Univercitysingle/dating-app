@@ -159,6 +159,19 @@ jobs:
           STATUS="$(curl --silent --show-error --output /tmp/support-response.json --write-out '%{http_code}' "$WORKER_URL/api/support-tickets")"
           test "$STATUS" = "401" || { echo "Expected anonymous support ticket request to return 401; received $STATUS"; cat /tmp/support-response.json; exit 1; }
 
+      - name: Verify migrated chat routes reject anonymous requests
+        env:
+          WORKER_URL: \${{ steps.deploy.outputs.worker_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for SPEC in "GET /api/chat/history/test-room" "GET /api/chat/conversations" "POST /api/chat/send"; do
+            METHOD="\${SPEC%% *}"
+            PATH_TO_CHECK="\${SPEC#* }"
+            STATUS="$(curl --silent --show-error --output /tmp/chat-response.json --write-out '%{http_code}' --request "$METHOD" "$WORKER_URL$PATH_TO_CHECK")"
+            test "$STATUS" = "401" || { echo "Expected anonymous request to $PATH_TO_CHECK to return 401; received $STATUS"; cat /tmp/chat-response.json; exit 1; }
+          done
+
       - name: Verify new status and admin report routes reject anonymous requests
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
