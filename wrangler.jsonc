@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dating-app-api",
+  "main": "workers/index.js",
+  "compatibility_date": "2026-10-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "MIGRATION_STAGE": "scaffold"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RATE_LIMITER", "class_name": "RateLimiter" },
+      { "name": "MONGODB_CONNECTION", "class_name": "MongoDBConnection" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RateLimiter"] },
+    { "tag": "v2", "new_sqlite_classes": ["MongoDBConnection"] }
+  ],
+  "env": {
+    "staging": {
+      "name": "dating-app-api-staging",
+      "vars": {
+        "MIGRATION_STAGE": "staging"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "RATE_LIMITER", "class_name": "RateLimiter" },
+          { "name": "MONGODB_CONNECTION", "class_name": "MongoDBConnection" }
+        ]
+      },
+      "migrations": [
+        { "tag": "v1", "new_sqlite_classes": ["RateLimiter"] },
+        { "tag": "v2", "new_sqlite_classes": ["MongoDBConnection"] }
+      ]
+    }
+  }
+}

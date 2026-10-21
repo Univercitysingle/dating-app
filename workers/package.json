@@ -1,0 +1,11 @@
+{
+  "name": "dating-app-workers",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "mongodb": "^6.15.0"
+  },
+  "scripts": {
+    "test": "node --test index.test.js"
+  }
+}
