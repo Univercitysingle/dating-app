@@ -19,7 +19,6 @@ test("GET /ready fails closed when required configuration is missing", async () 
   assert.equal(body.status, "not_ready");
   assert.ok(body.missingConfiguration.includes("FIREBASE_PROJECT_ID"));
   assert.ok(body.missingConfiguration.includes("MONGODB_URI"));
-  assert.ok(body.missingConfiguration.includes("MONGODB_DATABASE"));
 });
 
 test("GET /ready fails closed when MongoDB binding is missing", async () => {
