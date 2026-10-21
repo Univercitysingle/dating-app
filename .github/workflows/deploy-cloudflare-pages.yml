@@ -71,6 +71,29 @@ jobs:
           done
           node -e 'const u=new URL(process.env.API_ORIGIN); if(u.protocol!=="https:" || u.username || u.password || u.search || u.hash) process.exit(1)'
 
+      - name: Validate Firebase Authentication API configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+            --header 'Content-Type: application/json' \
+            --data '{"email":"staging-config-probe@invalid.example","password":"intentionally-invalid-staging-probe","returnSecureToken":true}' \
+            "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${REACT_APP_FIREBASE_API_KEY}")"
+          error_code="$(jq -r '.error.message // empty' "$response_file")"
+          # Invalid probe credentials are expected. They prove the API key and
+          # Email/Password provider reached Firebase; configuration failures are not.
+          case "$error_code" in
+            INVALID_LOGIN_CREDENTIALS|EMAIL_NOT_FOUND|INVALID_PASSWORD)
+              echo "Firebase Authentication API key and Email/Password provider are reachable."
+              ;;
+            *)
+              echo "::error::Firebase Authentication configuration probe failed (HTTP ${status:-unknown}, Firebase error: ${error_code:-no error code})."
+              exit 1
+              ;;
+          esac
+
       - name: Discover Cloudflare Pages project using the existing account credentials
         shell: bash
         run: |
