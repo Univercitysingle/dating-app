@@ -258,6 +258,16 @@ test("super-like consumes a purchased credit and records super-like notification
   assert.ok(userUpdates.some(entry => entry.update.$inc?.purchasedSuperLikes === -1));
 });
 
+test("legacy match-like route rejects anonymous requests and unsupported methods", async () => {
+  const anonymous = await worker.fetch(request("/api/matches/like/target"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  });
+  assert.equal(anonymous.status, 401);
+  const wrongMethod = await worker.fetch(request("/api/matches/like/target", "GET"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(wrongMethod.status, 405);
+});
+
 test("match read endpoints reject anonymous requests", async () => {
   for (const path of ["/api/matches", "/api/matches/confirmed"]) {
     const response = await worker.fetch(request(path), {
