@@ -1474,6 +1474,21 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if (url.pathname.startsWith("/internal/admin/") && [
+      "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
+      "/internal/admin/transactions", "/internal/admin/analytics"
+    ].includes(url.pathname)) {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/admin/users") result = await this.getAdminUsers(body.claims.sub, body.params || {});
+      else if (url.pathname === "/internal/admin/user") result = await this.getAdminUser(body.claims.sub, body.userId);
+      else if (url.pathname === "/internal/admin/stats") result = await this.getAdminDashboardStats(body.claims.sub);
+      else if (url.pathname === "/internal/admin/transactions") result = await this.getAdminTransactions(body.claims.sub);
+      else result = await this.getAdminAnalyticsSummary(body.claims.sub, body.params || {});
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/admin/reports" || url.pathname === "/internal/admin/report" || url.pathname === "/internal/admin/report-action") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
