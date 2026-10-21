@@ -180,6 +180,150 @@ export class MongoDBConnection {
     }
   }
 
+  async getPotentialMatches(uid, filters = {}) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
+      return { status: 400, body: { error: "Invalid match request" } };
+    }
+    try {
+      const db = (await this.getClient()).db();
+      const currentUser = await db.collection("users").findOne({ uid });
+      if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
+      const query = {
+        uid: { $ne: uid, $nin: Array.isArray(currentUser.blocked) ? currentUser.blocked : [] },
+        blocked: { $ne: uid },
+        isProfileVisible: true
+      };
+      if (currentUser.preference) query.gender = currentUser.preference;
+      if (typeof filters.education === "string" && filters.education.length <= 100) query.education = filters.education;
+      if (typeof filters.relationshipGoals === "string" && filters.relationshipGoals.length <= 100) query.relationshipGoals = filters.relationshipGoals;
+      if (typeof filters.interests === "string") {
+        const interests = filters.interests.split(",").map(value => value.trim()).filter(Boolean).slice(0, 50);
+        if (interests.length) query.interests = { $in: interests };
+      }
+      if (typeof filters.personalityType === "string" && filters.personalityType.length <= 20) {
+        query["personalityQuizResults.type"] = filters.personalityType;
+      }
+
+      const projection = {
+        uid: 1, email: 1, name: 1, birthday: 1, gender: 1, bio: 1, photos: 1,
+        videoProfile: 1, isVerified: 1, education: 1, relationshipGoals: 1,
+        location: 1, lastActiveAt: 1, interests: 1, personalityQuizResults: 1,
+        personalityType: 1, badges: 1, lifestyle: 1, mobileNumber: 1, password: 1,
+        lastLoginIp: 1, role: 1, isOnboardingComplete: 1, _id: 1
+      };
+      const candidates = await db.collection("users").find(query, { projection }).toArray();
+      const score = candidate => {
+        let value = 0;
+        const currentInterests = new Set((Array.isArray(currentUser.interests) ? currentUser.interests : [])
+          .map(item => typeof item === "string" ? item.toLowerCase().trim() : "").filter(Boolean));
+        for (const item of (Array.isArray(candidate.interests) ? candidate.interests : [])) {
+          const normalized = typeof item === "string" ? item.toLowerCase().trim() : "";
+          if (normalized && currentInterests.has(normalized)) value += 10;
+        }
+        if (typeof currentUser.relationshipGoals === "string" && typeof candidate.relationshipGoals === "string" &&
+            currentUser.relationshipGoals.trim().toLowerCase() === candidate.relationshipGoals.trim().toLowerCase()) value += 30;
+        const currentType = currentUser.personalityQuizResults?.type;
+        const candidateType = candidate.personalityQuizResults?.type;
+        if (typeof currentType === "string" && typeof candidateType === "string" &&
+            currentType.trim().toLowerCase() === candidateType.trim().toLowerCase()) value += 20;
+        return value;
+      };
+      const ranked = candidates.map(user => ({ user, matchScore: score(user) }))
+        .sort((a, b) => b.matchScore - a.matchScore);
+      const parsedPage = Number.parseInt(filters.page, 10);
+      const parsedLimit = Number.parseInt(filters.limit, 10);
+      const page = Number.isInteger(parsedPage) && parsedPage > 0 ? Math.min(parsedPage, 100000) : 1;
+      const limit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 10;
+      const totalMatches = ranked.length;
+      const paginated = ranked.slice((page - 1) * limit, page * limit);
+      const sanitized = paginated.map(item => {
+        const profile = { ...item.user };
+        delete profile.password;
+        delete profile.lastLoginIp;
+        if (currentUser.role !== "superadmin") {
+          delete profile.email;
+          delete profile.mobileNumber;
+        }
+        if (profile._id !== undefined) profile.id = String(profile._id);
+        if (profile.birthday) {
+          const birthday = new Date(profile.birthday);
+          if (!Number.isNaN(birthday.getTime())) {
+            const today = new Date();
+            let age = today.getFullYear() - birthday.getFullYear();
+            const month = today.getMonth() - birthday.getMonth();
+            if (month < 0 || (month === 0 && today.getDate() < birthday.getDate())) age--;
+            profile.age = age;
+          }
+        }
+        if (Array.isArray(profile.photos)) {
+          profile.photos = profile.photos.map(photo => {
+            if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
+            let path = photo.url;
+            while (path.startsWith("/")) path = path.slice(1);
+            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + path };
+          });
+        }
+        return { ...item, user: profile };
+      });
+      return {
+        status: 200,
+        body: {
+          matches: sanitized,
+          currentPage: page,
+          totalPages: Math.ceil(totalMatches / limit),
+          totalMatches
+        }
+      };
+    } catch {
+      return { status: 503, body: { error: "Match service unavailable" } };
+    }
+  }
+
+  async getConfirmedMatches(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const db = (await this.getClient()).db();
+      const [currentUser, matches] = await Promise.all([
+        db.collection("users").findOne({ uid }, { projection: { role: 1 } }),
+        db.collection("matches").find({
+          $or: [{ user1Uid: uid }, { user2Uid: uid }],
+          status: "matched"
+        }).toArray()
+      ]);
+      if (!currentUser) return { status: 404, body: { error: "User not found" } };
+      const matchedUids = [...new Set(matches.map(match => match.user1Uid === uid ? match.user2Uid : match.user1Uid).filter(Boolean))];
+      if (matchedUids.length === 0) return { status: 200, body: [] };
+      const users = await db.collection("users").find({ uid: { $in: matchedUids } }).toArray();
+      const byUid = new Map(users.map(user => [user.uid, user]));
+      return {
+        status: 200,
+        body: matchedUids.flatMap(matchedUid => {
+          const user = byUid.get(matchedUid);
+          if (!user) return [];
+          const profile = { ...user };
+          delete profile.password;
+          delete profile.lastLoginIp;
+          if (currentUser.role !== "superadmin") {
+            delete profile.email;
+            delete profile.mobileNumber;
+          }
+          if (profile._id !== undefined) profile.id = String(profile._id);
+          if (Array.isArray(profile.photos)) {
+            profile.photos = profile.photos.map(photo => {
+              if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
+              let path = photo.url;
+              while (path.startsWith("/")) path = path.slice(1);
+              return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + path };
+            });
+          }
+          return [profile];
+        })
+      };
+    } catch {
+      return { status: 503, body: { error: "Match service unavailable" } };
+    }
+  }
+
   async discoverUsers(uid, filters = {}) {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid discovery request" } };
@@ -596,6 +740,25 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/potential-matches") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          !body.filters || typeof body.filters !== "object" || Array.isArray(body.filters)) {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getPotentialMatches(body.claims.sub, body.filters);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/confirmed-matches") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getConfirmedMatches(body.claims.sub);
       return json(result.body, result.status);
     }
 
