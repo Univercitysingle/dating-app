@@ -785,6 +785,104 @@ export class MongoDBConnection {
     }
   }
 
+  async getAdminReports(uid, params = {}) {
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const admin = await db.collection("users").findOne({ uid }, { projection: { _id: 1, role: 1 } });
+      if (!admin || !["admin", "superadmin"].includes(admin.role)) {
+        return { status: 403, body: { message: "Forbidden: You do not have the required permissions." } };
+      }
+      const allowedStatuses = ["pending_review", "under_investigation", "resolved_no_action", "resolved_warning_issued_to_reported_user", "resolved_reporter_notified", "resolved_content_removed", "resolved_user_suspended", "resolved_user_banned"];
+      const query = {};
+      if (typeof params.status === "string" && params.status) {
+        if (!allowedStatuses.includes(params.status)) return { status: 400, body: { message: "Invalid report status." } };
+        query.status = params.status;
+      }
+      const page = Number.isInteger(params.page) && params.page > 0 ? Math.min(params.page, 100000) : 1;
+      const limit = Number.isInteger(params.limit) && params.limit > 0 ? Math.min(params.limit, 100) : 10;
+      if (typeof params.search === "string" && params.search.trim()) {
+        const term = params.search.trim().slice(0, 128);
+        const matchingUsers = await db.collection("users").find({
+          $or: [{ uid: term }, { email: term }]
+        }, { projection: { uid: 1 } }).toArray();
+        const matchingUids = matchingUsers.map(user => user.uid).filter(Boolean);
+        if (!matchingUids.length) return { status: 200, body: { reports: [], totalPages: 0, currentPage: page } };
+        query.reportedUserUid = { $in: matchingUids };
+      }
+      const reports = await db.collection("reports").find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray();
+      const total = await db.collection("reports").countDocuments(query);
+      const uids = [...new Set(reports.flatMap(report => [report.reporterUid, report.reportedUserUid]).filter(Boolean))];
+      const users = uids.length ? await db.collection("users").find({ uid: { $in: uids } }, { projection: { uid: 1, name: 1, email: 1, isProfileVisible: 1, role: 1 } }).toArray() : [];
+      const byUid = new Map(users.map(user => [user.uid, user]));
+      return { status: 200, body: { reports: reports.map(report => ({ ...report, reporter: byUid.get(report.reporterUid) || null, reportedUser: byUid.get(report.reportedUserUid) || null })), totalPages: Math.ceil(total / limit), currentPage: page } };
+    } catch {
+      return { status: 503, body: { message: "Report administration service is temporarily unavailable." } };
+    }
+  }
+
+  async getAdminReport(uid, reportId) {
+    if (typeof reportId !== "string" || !/^[a-fA-F0-9]{24}$/.test(reportId)) return { status: 400, body: { message: "Invalid report ID" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const admin = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!admin || !["admin", "superadmin"].includes(admin.role)) return { status: 403, body: { message: "Forbidden: You do not have the required permissions." } };
+      const report = await db.collection("reports").findOne({ _id: new ObjectId(reportId) });
+      if (!report) return { status: 404, body: { message: "Report not found" } };
+      const [reporter, reportedUser] = await Promise.all([
+        db.collection("users").findOne({ uid: report.reporterUid }, { projection: { uid: 1, name: 1, email: 1 } }),
+        db.collection("users").findOne({ uid: report.reportedUserUid }, { projection: { uid: 1, name: 1, email: 1, isProfileVisible: 1, role: 1, suspendedUntil: 1 } })
+      ]);
+      return { status: 200, body: { ...report, reporter, reportedUser } };
+    } catch {
+      return { status: 503, body: { message: "Report administration service is temporarily unavailable." } };
+    }
+  }
+
+  async moderateReport(uid, reportId, payload = {}) {
+    if (typeof reportId !== "string" || !/^[a-fA-F0-9]{24}$/.test(reportId)) return { status: 400, body: { message: "Invalid report ID" } };
+    const actions = ["dismiss", "suspend_user", "ban_user"];
+    if (!payload || !actions.includes(payload.action)) return { status: 400, body: { message: "Invalid action specified." } };
+    if (payload.adminNotes !== undefined && (typeof payload.adminNotes !== "string" || payload.adminNotes.length > 4000)) {
+      return { status: 400, body: { message: "Admin notes must be text of at most 4000 characters." } };
+    }
+    let durationDays;
+    if (payload.action === "suspend_user") {
+      durationDays = Number(payload.durationDays);
+      if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 3650) {
+        return { status: 400, body: { message: "Valid duration in days (1-3650) is required for suspension." } };
+      }
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const admin = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!admin || !["admin", "superadmin"].includes(admin.role)) return { status: 403, body: { message: "Forbidden: You do not have the required permissions." } };
+      const report = await db.collection("reports").findOne({ _id: new ObjectId(reportId) });
+      if (!report) return { status: 404, body: { message: "Report not found." } };
+      const target = await db.collection("users").findOne({ uid: report.reportedUserUid });
+      if (!target) return { status: 404, body: { message: "Reported user not found." } };
+      const now = new Date();
+      let status;
+      if (payload.action === "dismiss") {
+        status = "resolved_no_action";
+      } else if (payload.action === "suspend_user") {
+        const until = new Date(now.getTime() + durationDays * 86400000);
+        await db.collection("users").updateOne({ _id: target._id }, { $set: { suspendedUntil: until, isProfileVisible: false, updatedAt: now } });
+        status = "resolved_user_suspended";
+      } else {
+        await db.collection("users").updateOne({ _id: target._id }, { $set: { role: "user", isProfileVisible: false, suspendedUntil: new Date("9999-12-31T00:00:00.000Z"), updatedAt: now } });
+        status = "resolved_user_banned";
+      }
+      const update = { status, updatedAt: now };
+      if (typeof payload.adminNotes === "string") update.adminNotes = payload.adminNotes.trim();
+      await db.collection("reports").updateOne({ _id: report._id }, { $set: update });
+      return { status: 200, body: { message: "Action '" + payload.action + "' performed successfully.", report: { ...report, ...update } } };
+    } catch {
+      return { status: 503, body: { message: "Report moderation service is temporarily unavailable." } };
+    }
+  }
+
   async getPurchaseStatus(uid, purchaseId) {
     if (typeof purchaseId !== "string" || !/^[a-fA-F0-9]{24}$/.test(purchaseId)) {
       return { status: 400, body: { error: "Invalid purchase ID" } };
@@ -1226,6 +1324,20 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.getLikes(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/admin/reports" || url.pathname === "/internal/admin/report" || url.pathname === "/internal/admin/report-action") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/admin/reports") {
+        result = await this.getAdminReports(body.claims.sub, body.params || {});
+      } else if (url.pathname === "/internal/admin/report") {
+        result = await this.getAdminReport(body.claims.sub, body.reportId);
+      } else {
+        result = await this.moderateReport(body.claims.sub, body.reportId, body.payload || {});
+      }
       return json(result.body, result.status);
     }
 
