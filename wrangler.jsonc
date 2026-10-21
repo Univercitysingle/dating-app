@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dating-app-api",
+  "main": "workers/index.js",
+  "compatibility_date": "2026-10-21",
+  "workers_dev": true,
+  "vars": { "MIGRATION_STAGE": "scaffold" },
+  "durable_objects": {
+    "bindings": [{ "name": "RATE_LIMITER", "class_name": "RateLimiter" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RateLimiter"] }]
+}
