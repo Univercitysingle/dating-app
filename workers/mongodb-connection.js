@@ -964,8 +964,8 @@ export class MongoDBConnection {
           return;
         }
         const success = statusCode === "0" || statusCode === "00";
-        const completedState = purchase ? "completed" : "active";
-        if (record.status === completedState) {
+        const terminalStates = purchase ? ["completed", "rejected"] : ["active", "cancelled", "inactive"];
+        if (terminalStates.includes(record.status)) {
           outcome = { status: 200, body: { success: true, message: "Payment already processed." } };
           return;
         }
