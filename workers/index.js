@@ -643,7 +643,7 @@ export default {
         const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
         if (url.pathname === "/api/admin/analytics/export" && response.ok && Array.isArray(result.signupsPerDay)) {
           const rows = ["date,new_signups", ...result.signupsPerDay.map(item => String(item._id || "") + "," + String(Number(item.count) || 0))];
-          return new Response(rows.join("\\n"), { status: 200, headers: { ...JSON_HEADERS, "content-type": "text/csv; charset=utf-8", "content-disposition": "attachment; filename=analytics_export.csv" } });
+          return new Response(rows.join("\n"), { status: 200, headers: { ...JSON_HEADERS, "content-type": "text/csv; charset=utf-8", "content-disposition": "attachment; filename=analytics_export.csv" } });
         }
         return json(result, response.status);
       } catch (error) {
