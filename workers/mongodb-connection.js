@@ -2352,7 +2352,10 @@ export class MongoDBConnection {
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
 
     if (url.pathname === "/internal/scheduled-expirations") {
-      const result = await this.runScheduledExpirations();
+      const body = await request.json().catch(() => ({}));
+      const scope = body && body.scope ? body.scope : "all";
+      if (!["all", "trials", "subscriptions"].includes(scope)) return json({ error: "Invalid expiration scope" }, 400);
+      const result = await this.runScheduledExpirations(new Date(), scope);
       return json(result);
     }
 
