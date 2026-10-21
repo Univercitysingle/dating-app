@@ -512,7 +512,7 @@ export default {
         }
         return json({
           ...result,
-          cdnUrl: publicBase.origin + publicBase.pathname.replace(/\\/$/, "") + "/" + encodeURIComponent(key)
+          cdnUrl: publicBase.origin + (publicBase.pathname.endsWith("/") ? publicBase.pathname.slice(0, -1) : publicBase.pathname) + "/" + encodeURIComponent(key)
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
@@ -530,7 +530,7 @@ export default {
         if (!payload || typeof payload.photoUrl !== "string" || !payload.photoUrl) return json({ error: "photoUrl is required." }, 400);
         let key = payload.photoUrl;
         try {
-          if (/^https?:\\/\\//i.test(key)) key = new URL(key).pathname.split("/").filter(Boolean).pop() || "";
+          if (key.startsWith("https://") || key.startsWith("http://")) key = new URL(key).pathname.split("/").filter(Boolean).pop() || "";
           else key = key.split("/").filter(Boolean).pop() || "";
           key = decodeURIComponent(key);
         } catch {
