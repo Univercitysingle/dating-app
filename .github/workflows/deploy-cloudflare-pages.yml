@@ -149,3 +149,22 @@ jobs:
 
       - name: Deploy frontend to Cloudflare Pages
         run: npx --yes wrangler@4 pages deploy build --project-name "$CLOUDFLARE_PAGES_PROJECT_NAME" --branch migrate-to-serverless
+
+      - name: Verify deployed frontend assets and API routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          frontend_url="https://dating-app-staging.pages.dev"
+          manifest="$(curl --fail --silent --show-error "$frontend_url/manifest.json")"
+          jq -e 'any(.icons[]; .src == "/logo.jpg" and .type == "image/jpeg")' <<< "$manifest" >/dev/null
+          curl --fail --silent --show-error "$API_ORIGIN/health"
+          curl --fail --silent --show-error "$API_ORIGIN/ready"
+          curl --fail --silent --show-error "$API_ORIGIN/api/status"
+          for base in "$API_ORIGIN" "$frontend_url"; do
+            status="$(curl --silent --show-error --output /tmp/discover-check.json --write-out '%{http_code}' "$base/api/users/discover")"
+            if [[ "$status" != "401" ]]; then
+              echo "::error::Expected unauthenticated discovery to return 401 from $base; received HTTP $status."
+              cat /tmp/discover-check.json
+              exit 1
+            fi
+          done
