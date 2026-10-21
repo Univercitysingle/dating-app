@@ -6,6 +6,6 @@
     "mongodb": "^6.15.0"
   },
   "scripts": {
-    "test": "node --test index.test.js"
+    "test": "node --test *.test.js"
   }
 }
