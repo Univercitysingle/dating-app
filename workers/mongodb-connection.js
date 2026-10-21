@@ -180,6 +180,62 @@ export class MongoDBConnection {
     }
   }
 
+  async getLikes(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = (await this.getClient()).db();
+      const currentUser = await db.collection("users").findOne({ uid }, { projection: { _id: 1, plan: 1 } });
+      if (!currentUser) return { status: 404, body: { error: "User not found" } };
+      const matches = await db.collection("matches").find({ user2Uid: uid, status: "pending" }).toArray();
+      if (matches.length === 0) return { status: 200, body: [] };
+      const likedUids = [...new Set(matches.map(match => match.user1Uid).filter(value => typeof value === "string" && value.length > 0))];
+      if (likedUids.length === 0) return { status: 200, body: [] };
+      const users = await db.collection("users").find({ uid: { $in: likedUids } }).toArray();
+      const usersByUid = new Map(users.map(user => [user.uid, user]));
+      const matchByUid = new Map(matches.map(match => [match.user1Uid, match]));
+      const isBlurred = currentUser.plan !== "premium";
+      const result = [];
+      for (const likedUid of likedUids) {
+        const user = usersByUid.get(likedUid);
+        if (!user) continue;
+        const profile = { ...user };
+        delete profile.email;
+        delete profile.mobileNumber;
+        delete profile.password;
+        delete profile.lastLoginIp;
+        if (profile._id !== undefined) profile.id = String(profile._id);
+        if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
+        if (profile.birthday) {
+          const birthday = new Date(profile.birthday);
+          if (!Number.isNaN(birthday.getTime())) {
+            const today = new Date();
+            let age = today.getFullYear() - birthday.getFullYear();
+            const month = today.getMonth() - birthday.getMonth();
+            if (month < 0 || (month === 0 && today.getDate() < birthday.getDate())) age--;
+            profile.age = age;
+          }
+        }
+        if (Array.isArray(profile.photos)) {
+          profile.photos = profile.photos.map(photo => {
+            if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
+            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\\/+/, "") };
+          });
+        }
+        const match = matchByUid.get(likedUid);
+        result.push({
+          ...profile,
+          likeType: match && match.superLike ? "superlike" : "like",
+          isBlurred
+        });
+      }
+      return { status: 200, body: result };
+    } catch {
+      return { status: 503, body: { error: "Profile service unavailable" } };
+    }
+  }
+
   async getUserProfile(targetUid, viewerUid) {
     if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
         typeof viewerUid !== "string" || !viewerUid || viewerUid.length > 128) {
@@ -195,11 +251,12 @@ export class MongoDBConnection {
       const isOwner = targetUid === viewerUid;
       const isSuperAdmin = viewer?.role === "superadmin";
       const profile = { ...user };
+      // Never expose credentials or operational IP metadata in profile responses.
+      delete profile.password;
+      delete profile.lastLoginIp;
       if (!isOwner && !isSuperAdmin) {
         delete profile.email;
         delete profile.mobileNumber;
-        delete profile.password;
-        delete profile.lastLoginIp;
       }
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
@@ -355,6 +412,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/likes") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getLikes(body.claims.sub);
       return json(result.body, result.status);
     }
 
