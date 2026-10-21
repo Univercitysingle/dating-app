@@ -250,7 +250,7 @@ function Login() {
   return (
     <div
       className="flex flex-col items-center justify-center min-h-screen p-4 bg-cover bg-center"
-      style={{ backgroundImage: "url('/bg.jpg')" }}
+      style={{ backgroundImage: "url('/bg.webp')" }}
     >
       <div className="w-full max-w-md p-8 space-y-6 bg-black bg-opacity-25 rounded-lg shadow-xl backdrop-blur-sm">
         <img src="/logo.jpg" alt="Hart2Hart Logo" className="w-24 h-24 mx-auto rounded-full" />
