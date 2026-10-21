@@ -775,3 +775,65 @@ test("photo ordering returns 404 when the user does not exist", async () => {
   connection.getClient = async () => ({ db: () => ({ collection: () => ({ updateOne: async () => ({ matchedCount: 0 }) }) }) });
   assert.equal((await connection.updatePhotoOrder("missing", [{ url: "photo.jpg" }])).status, 404);
 });
+
+
+test("API requests are rate limited per Cloudflare client IP", async () => {
+  let calls = 0;
+  const env = {
+    RATE_LIMITER: {
+      idFromName: (name) => name,
+      get: () => ({
+        fetch: async (_url, init) => {
+          calls++;
+          assert.equal(init.method, "POST");
+          const payload = JSON.parse(init.body);
+          assert.equal(payload.limit, 120);
+          return new Response(JSON.stringify({ allowed: false, remaining: 0, resetAt: Date.now() + 30000 }), {
+            status: 200, headers: { "content-type": "application/json" }
+          });
+        }
+      })
+    }
+  };
+  const response = await worker.fetch(new Request("https://dating-app.test/api/auth/verify", {
+    headers: { "CF-Connecting-IP": "203.0.113.10", "X-Forwarded-For": "198.51.100.20" }
+  }), env);
+  assert.equal(calls, 1);
+  assert.equal(response.status, 429);
+  assert.ok(Number(response.headers.get("retry-after")) >= 1);
+  assert.match((await response.json()).error, /Too many requests/);
+});
+
+test("API rate limiting fails closed if the configured Durable Object fails", async () => {
+  const response = await worker.fetch(new Request("https://dating-app.test/api/auth/verify", {
+    headers: { "CF-Connecting-IP": "203.0.113.11" }
+  }), {
+    RATE_LIMITER: {
+      idFromName: (name) => name,
+      get: () => ({ fetch: async () => { throw new Error("internal failure"); } })
+    }
+  });
+  assert.equal(response.status, 503);
+  assert.doesNotMatch(await response.text(), /internal failure/);
+});
+
+test("rate limiter uses a storage transaction when supported", async () => {
+  const values = new Map();
+  let transactionCalls = 0;
+  const storage = {
+    get: async (key) => values.get(key),
+    put: async (key, value) => values.set(key, value),
+    transaction: async (callback) => {
+      transactionCalls++;
+      return callback(storage);
+    }
+  };
+  const limiter = new RateLimiter({ storage });
+  const response = await limiter.fetch(new Request("https://do.test", {
+    method: "POST", body: JSON.stringify({ key: "transaction-key", limit: 1, windowMs: 10000 }),
+    headers: { "content-type": "application/json" }
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(transactionCalls, 1);
+  assert.equal((await response.json()).allowed, true);
+});
