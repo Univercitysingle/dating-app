@@ -1239,3 +1239,33 @@ test("WebXPay subscription settlement activates the plan and sets an expiry once
   assert.equal(user.plan, "premium");
   assert.equal(userUpdates, 1);
 });
+
+
+test("declined WebXPay callbacks are acknowledged idempotently without granting benefits", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "2123456789abcdef01234567";
+  const purchase = { _id: new ObjectId(orderId), userId: new ObjectId("abcdef0123456789abcdef03"), status: "pending", itemId: "super-like-5" };
+  let userUpdates = 0;
+  const purchases = {
+    async findOne(filter) { return String(filter._id) === orderId ? purchase : null; },
+    async updateOne(filter, update) {
+      if (String(filter._id) !== orderId || purchase.status !== filter.status) return { modifiedCount: 0 };
+      Object.assign(purchase, update.$set || {});
+      return { modifiedCount: 1 };
+    }
+  };
+  const subscriptions = { async findOne() { return null; } };
+  const users = { async updateOne() { userUpdates += 1; return { matchedCount: 1, modifiedCount: 1 }; } };
+  const db = { collection(name) { return name === "purchases" ? purchases : name === "subscriptions" ? subscriptions : users; } };
+  const client = { db: () => db, startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} }) };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => client;
+  const first = await connection.settleWebXPay(orderId, "15", "Tdeclined");
+  const second = await connection.settleWebXPay(orderId, "15", "Tdeclined");
+  assert.equal(first.status, 200);
+  assert.equal(first.body.processed, false);
+  assert.equal(second.status, 200);
+  assert.match(second.body.message, /already processed/i);
+  assert.equal(purchase.status, "rejected");
+  assert.equal(userUpdates, 0);
+});
