@@ -1337,3 +1337,66 @@ test("bank-slip deletion is limited to the owner's pending submission", async ()
   assert.equal(subscription.status, "cancelled");
   assert.equal(subscription.bankSlipUrl, undefined);
 });
+
+
+test("chat message creation requires both participants and refuses blocked conversations", async () => {
+  const { ObjectId } = await import("mongodb");
+  const usersByUid = {
+    sender: { _id: new ObjectId("abcdef0123456789abcdef01"), uid: "sender", blocked: [] },
+    receiver: { _id: new ObjectId("abcdef0123456789abcdef02"), uid: "receiver", blocked: [] }
+  };
+  const stored = [];
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne(filter) { return usersByUid[filter.uid] || null; } };
+      return { async insertOne(doc) { stored.push({ ...doc, _id: new ObjectId("abcdef0123456789abcdef03") }); return { insertedId: stored[0]._id }; } };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const ok = await connection.createChatMessage("sender", {
+    roomId: "sender-receiver", receiverUid: "receiver", messageContent: "Hello"
+  });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.body.senderUid, "sender");
+  assert.equal(stored.length, 1);
+  const wrongRoom = await connection.createChatMessage("sender", {
+    roomId: "sender-other", receiverUid: "receiver", messageContent: "Hello"
+  });
+  assert.equal(wrongRoom.status, 400);
+  usersByUid.receiver.blocked = ["sender"];
+  const blocked = await connection.createChatMessage("sender", {
+    roomId: "sender-receiver", receiverUid: "receiver", messageContent: "Hello"
+  });
+  assert.equal(blocked.status, 403);
+  assert.equal(stored.length, 1);
+});
+
+test("chat history refuses cross-user access and limits result pagination", async () => {
+  let capturedQuery;
+  let capturedLimit;
+  let capturedSkip;
+  const messages = [{ roomId: "alice-bob", senderUid: "alice", receiverUid: "bob", messageContent: "Hi" }];
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne(filter) { return filter.uid === "alice" ? { uid: "alice", role: "user" } : null; } };
+      return {
+        find(query) {
+          capturedQuery = query;
+          return { sort() { return this; }, skip(value) { capturedSkip = value; return this; }, limit(value) { capturedLimit = value; return this; }, async toArray() { return messages; } };
+        },
+        async findOne() { return { _id: "message-id" }; }
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const denied = await connection.getChatHistory("mallory", "alice-bob", 1000, 2);
+  assert.equal(denied.status, 404);
+  const result = await connection.getChatHistory("alice", "alice-bob", 1000, 2);
+  assert.equal(result.status, 200);
+  assert.equal(capturedLimit, 100);
+  assert.equal(capturedSkip, 2);
+  assert.equal(capturedQuery.roomId, "alice-bob");
+  assert.deepEqual(capturedQuery.$or, [{ senderUid: "alice" }, { receiverUid: "alice" }]);
+});
