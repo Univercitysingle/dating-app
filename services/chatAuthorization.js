@@ -44,15 +44,7 @@ async function authorizeRoom(userUid, roomId, peerUid) {
       { user1Uid: peerUid, user2Uid: userUid },
     ],
   }).select('_id').lean();
-  if (matched) return true;
-
-  return Boolean(await ChatMessage.findOne({
-    roomId,
-    $or: [
-      { senderUid: userUid, receiverUid: peerUid },
-      { senderUid: peerUid, receiverUid: userUid },
-    ],
-  }).select('_id').lean());
+  return Boolean(matched);
 }
 
 module.exports = { authorizeRoom };
