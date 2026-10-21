@@ -488,6 +488,81 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/support-tickets") {
+      if (request.method !== "GET" && request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
+      const payload = request.method === "POST" ? await request.json().catch(() => null) : null;
+      if (request.method === "POST" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+        return json({ message: "A support ticket object is required." }, 400);
+      }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/support-tickets", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, action: request.method, payload })
+        });
+        const body = await response.json().catch(() => ({ message: "Support ticket service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Support ticket service unavailable" }, 503);
+      }
+    }
+
+    const supportTicketMessage = url.pathname.match(/^\\/api\\/support-tickets\\/([^/]+)\\/messages$/);
+    if (supportTicketMessage && request.method === "POST") {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
+      const payload = await request.json().catch(() => null);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({ message: "A message is required." }, 400);
+      let ticketId;
+      try { ticketId = decodeURIComponent(supportTicketMessage[1]); } catch { return json({ message: "Invalid ticket ID" }, 400); }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/support-ticket-message", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, ticketId, payload })
+        });
+        const body = await response.json().catch(() => ({ message: "Support ticket service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Support ticket service unavailable" }, 503);
+      }
+    }
+
+    const supportTicketDetails = url.pathname.match(/^\\/api\\/support-tickets\\/([^/]+)$/);
+    if (supportTicketDetails) {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
+      let ticketId;
+      try { ticketId = decodeURIComponent(supportTicketDetails[1]); } catch { return json({ message: "Invalid ticket ID" }, 400); }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/support-ticket", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, ticketId })
+        });
+        const body = await response.json().catch(() => ({ message: "Support ticket service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Support ticket service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/reports") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
