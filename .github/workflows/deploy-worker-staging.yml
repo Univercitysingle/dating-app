@@ -97,3 +97,14 @@ jobs:
           set -euo pipefail
           STATUS="$(curl --silent --show-error --output /tmp/support-response.json --write-out '%{http_code}' "$WORKER_URL/api/support-tickets")"
           test "$STATUS" = "401" || { echo "Expected anonymous support ticket request to return 401; received $STATUS"; cat /tmp/support-response.json; exit 1; }
+
+      - name: Verify new status and admin report routes reject anonymous requests
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for PATH_TO_CHECK in "/api/purchase/status/0123456789abcdef01234567" "/api/subscription/status/0123456789abcdef01234567" "/api/admin/reports"; do
+            STATUS="$(curl --silent --show-error --output /tmp/route-response.json --write-out '%{http_code}' "$WORKER_URL$PATH_TO_CHECK")"
+            test "$STATUS" = "401" || { echo "Expected anonymous request to $PATH_TO_CHECK to return 401; received $STATUS"; cat /tmp/route-response.json; exit 1; }
+          done
