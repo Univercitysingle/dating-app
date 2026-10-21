@@ -1,6 +1,7 @@
 name: One-time Cloudflare discovery log query
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - migrate-to-serverless
@@ -12,19 +13,19 @@ permissions:
 
 jobs:
   query-cloudflare-logs:
-    if: github.event.head_commit.message == 'Add one-time Cloudflare discovery log query'
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Add one-time Cloudflare discovery log query'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Query recent Worker discovery logs through Cloudflare API
         env:
-          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_OBSERVABILITY_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${CF_API_TOKEN:-}" || -z "${CF_ACCOUNT_ID:-}" ]]; then
-            echo "::error::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret is missing."
+            echo "::error::CLOUDFLARE_OBSERVABILITY_API_TOKEN (or CLOUDFLARE_API_TOKEN) and CLOUDFLARE_ACCOUNT_ID secrets are required."
             exit 1
           fi
           TO_MS=$(date -u +%s%3N)
@@ -84,5 +85,5 @@ jobs:
           COUNT=$(jq '.result.events.events // [] | length' response.json)
           echo "Matching events returned: $COUNT"
           if [[ "$COUNT" -eq 0 ]]; then
-            echo "No matching events in the last 48 hours. Check Workers Logs enablement, token permissions, and whether the failure was reproduced during this time range."
+            echo "No matching events in the last 48 hours. Check Workers Logs enablement and whether the failure was reproduced during this time range."
           fi
