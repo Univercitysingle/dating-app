@@ -12,6 +12,8 @@ const morgan = require("morgan");
 const http = require("http");
 const cors = require("cors");
 const os = require("os");
+const { getRuntimeConfig } = require("./serverless/runtimeConfig");
+const runtimeConfig = getRuntimeConfig(process.env);
 
 const { initSocket } = require("./services/socket");
 const { startTrialExpirationJob } = require("./services/trialManager");
@@ -319,14 +321,14 @@ if (mongoUri) {
     .connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      maxPoolSize: 10,
+      maxPoolSize: runtimeConfig.mongoMaxPoolSize,
       serverSelectionTimeoutMS: 5000,
     })
     .then(() => {
       logger.info("✅ MongoDB connected successfully.");
 
       // In-process cron jobs (can be disabled in serverless via ENABLE_IN_PROCESS_CRON=false)
-      if (process.env.ENABLE_IN_PROCESS_CRON !== "false") {
+      if (runtimeConfig.enableInProcessCron) {
         startTrialExpirationJob();
         startSubscriptionExpirationJob();
       }
