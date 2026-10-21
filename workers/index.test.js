@@ -933,12 +933,22 @@ test("migrated admin read endpoints reject anonymous requests before database ch
     "/api/admin/users",
     "/api/admin/users/stats",
     "/api/admin/transactions",
-    "/api/admin/analytics/summary"
+    "/api/admin/analytics/summary",
+    "/api/admin/support-tickets",
+    "/api/admin/support-tickets/0123456789abcdef01234567"
   ];
   for (const path of paths) {
     const response = await worker.fetch(request(path), env);
     assert.equal(response.status, 401, path);
   }
+  const message = await worker.fetch(new Request("https://dating-app.test/api/admin/support-tickets/0123456789abcdef01234567/messages", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: "Help" })
+  }), env);
+  assert.equal(message.status, 401);
+  const status = await worker.fetch(new Request("https://dating-app.test/api/admin/support-tickets/0123456789abcdef01234567/status", {
+    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "Closed" })
+  }), env);
+  assert.equal(status.status, 401);
 });
 
 test("admin read methods deny users without an admin role", async () => {
