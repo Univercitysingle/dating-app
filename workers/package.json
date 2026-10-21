@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "mongodb": "^6.15.0"
+    "mongodb": "^6.15.0",
+    "bcryptjs": "^2.4.3"
   },
   "scripts": {
     "test": "node --test *.test.js"
