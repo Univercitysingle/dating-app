@@ -745,6 +745,24 @@ test("unblocking removes the target and preserves legacy message shape", async (
   assert.deepEqual(result.body, { message: "User user-2 successfully unblocked." });
 });
 
+test("R2 photo upload and deletion routes require Firebase authentication", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project" };
+  const upload = await worker.fetch(new Request("https://dating-app.test/api/users/photos", {
+    method: "POST", body: new FormData()
+  }), env);
+  assert.equal(upload.status, 401);
+  const deletion = await worker.fetch(new Request("https://dating-app.test/api/users/photos", {
+    method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ photoUrl: "photos-user-a-sample.jpg" })
+  }), env);
+  assert.equal(deletion.status, 401);
+});
+
+test("photo metadata operations reject cross-user object keys before database access", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.equal((await connection.addUploadedPhoto("user-a", { url: "photos-user-b-sample.jpg", size: 100, order: 0 })).status, 400);
+  assert.equal((await connection.removeUploadedPhoto("user-a", "photos-user-b-sample.jpg")).status, 400);
+});
+
 test("photo ordering rejects malformed payloads and too many photos", async () => {
   const connection = new MongoDBConnection({}, {});
   assert.equal((await connection.updatePhotoOrder("user-1", null)).status, 400);
