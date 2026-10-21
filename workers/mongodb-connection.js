@@ -84,8 +84,17 @@ export class MongoDBConnection {
         endDate: { $gt: now }
       }, { projection: { _id: 1 } });
       if (!active) {
+        // Preserve a still-valid trial even when a separate paid subscription expires.
         const downgraded = await users.updateOne(
-          { _id: sub.userId, plan: "premium" },
+          {
+            _id: sub.userId,
+            plan: "premium",
+            $or: [
+              { trialExpires: { $exists: false } },
+              { trialExpires: null },
+              { trialExpires: { $lte: now } }
+            ]
+          },
           { $set: { plan: "basic", updatedAt: now } }
         );
         downgradedUsers += downgraded.modifiedCount || 0;
