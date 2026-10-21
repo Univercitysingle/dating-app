@@ -925,3 +925,31 @@ test("geolocation endpoint requires Firebase authentication", async () => {
   const response = await worker.fetch(request("/api/geolocation"), { FIREBASE_PROJECT_ID: "test-project" });
   assert.equal(response.status, 401);
 });
+
+
+test("admin report endpoints reject anonymous requests", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project" };
+  const list = await worker.fetch(request("/api/admin/reports"), env);
+  assert.equal(list.status, 401);
+  const detail = await worker.fetch(request("/api/admin/reports/0123456789abcdef01234567"), env);
+  assert.equal(detail.status, 401);
+});
+
+test("admin report operations enforce database-backed admin roles", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({
+      collection: () => ({ findOne: async () => ({ role: "user" }) })
+    })
+  });
+  assert.equal((await connection.getAdminReports("ordinary-user")).status, 403);
+  assert.equal((await connection.getAdminReport("ordinary-user", "0123456789abcdef01234567")).status, 403);
+  assert.equal((await connection.moderateReport("ordinary-user", "0123456789abcdef01234567", { action: "dismiss" })).status, 403);
+});
+
+test("report moderation validates action and suspension duration", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.equal((await connection.moderateReport("admin", "0123456789abcdef01234567", { action: "delete_database" })).status, 400);
+  assert.equal((await connection.moderateReport("admin", "0123456789abcdef01234567", { action: "suspend_user", durationDays: 0 })).status, 400);
+  assert.equal((await connection.moderateReport("admin", "0123456789abcdef01234567", { action: "suspend_user", durationDays: 99999 })).status, 400);
+});
