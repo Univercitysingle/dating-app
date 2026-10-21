@@ -960,5 +960,20 @@ export default {
     }
 
     return json({ error: "Route not migrated yet" }, 501);
+  },
+
+  async scheduled(controller, env, ctx) {
+    // Only the isolated staging environment gets scheduled jobs until production cutover is approved.
+    if (env.MIGRATION_STAGE !== "staging") return;
+    if (!env.MONGODB_CONNECTION) throw new Error("MongoDB scheduled-job binding is unavailable");
+    const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+    const connection = env.MONGODB_CONNECTION.get(id);
+    const task = connection.fetch("https://internal.invalid/internal/scheduled-expirations", {
+      method: "POST"
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Scheduled expiration job failed with status " + response.status);
+      return response.json();
+    });
+    ctx.waitUntil(task);
   }
 };
