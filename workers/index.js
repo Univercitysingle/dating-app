@@ -1492,7 +1492,7 @@ export default {
       try {
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
-        const response = await connection.fetch("https://internal.invalid/internal/scheduled-expirations", { method: "POST" });
+        const response = await connection.fetch("https://internal.invalid/internal/scheduled-expirations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: cronRoute[1] }) });
         const result = await response.json().catch(() => ({ error: "Expiration service unavailable" }));
         if (!response.ok) return json(result, response.status);
         return json({ message: cronRoute[1] === "trials" ? "Trial expiration check completed." : "Subscription expiration check completed.", ...result });
