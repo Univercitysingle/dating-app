@@ -1420,7 +1420,11 @@ export default {
         if (!response.ok) return json(result, response.status);
         const authorization = request.headers.get("authorization") || "";
         const idToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-        if (!idToken || !env.FIREBASE_DATABASE_URL) {
+        // Match the frontend's Firebase configuration fallback when the explicit
+        // Realtime Database URL secret is not supplied to the Worker.
+        const databaseUrl = env.FIREBASE_DATABASE_URL ||
+          (env.FIREBASE_PROJECT_ID ? `https://${env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com` : "");
+        if (!idToken || !databaseUrl) {
           await connection.fetch("https://internal.invalid/internal/chat/rollback", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ claims, messageId: result._id })
@@ -1429,7 +1433,7 @@ export default {
         }
         let databaseBase;
         try {
-          const configured = new URL(env.FIREBASE_DATABASE_URL);
+          const configured = new URL(databaseUrl);
           if (configured.protocol !== "https:" || !configured.hostname.endsWith("firebasedatabase.app") && !configured.hostname.endsWith("firebaseio.com")) throw new Error("Invalid database URL");
           databaseBase = configured.toString().replace(/\/+$/, "");
         } catch {
