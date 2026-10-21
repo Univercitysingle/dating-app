@@ -107,11 +107,26 @@ jobs:
             project="dating-app"
           elif [[ "${#matching_projects[@]}" -eq 1 ]]; then
             project="${matching_projects[0]}"
-          elif [[ "${#matching_projects[@]}" -eq 0 && "${#all_projects[@]}" -eq 1 ]]; then
-            project="${all_projects[0]}"
+          elif [[ "${#matching_projects[@]}" -eq 0 ]]; then
+            project="dating-app-staging"
+            create_file="$(mktemp)"
+            trap 'rm -f "$response_file" "$create_file"' EXIT
+            create_status="$(curl --silent --show-error --output "$create_file" --write-out '%{http_code}' \
+              --request POST \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data "$(jq -cn --arg name "$project" --arg branch "migrate-to-serverless" '{name:$name,production_branch:$branch}')" \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects")"
+            create_response="$(cat "$create_file")"
+            if [[ ! "$create_status" =~ ^2[0-9][0-9]$ ]] || [[ "$(jq -r '.success' <<< "$create_response")" != "true" ]]; then
+              echo "::error::Could not create the dedicated Cloudflare Pages project (HTTP $create_status)."
+              jq -r '(.errors // [])[]? | "Cloudflare error code: " + ((.code // "unknown") | tostring) + "; message: " + (.message // "No message")' <<< "$create_response"
+              exit 1
+            fi
+            echo "Created dedicated Cloudflare Pages project: $project"
           else
-            echo "::error::Could not safely choose the Pages project. Projects found in this Cloudflare account:"
-            printf '%s\n' "${all_projects[@]}"
+            echo "::error::Multiple dating-app Pages projects found; refusing to choose automatically:"
+            printf '%s\n' "${matching_projects[@]}"
             exit 1
           fi
           if [[ -z "$project" ]]; then
