@@ -113,6 +113,52 @@ export class MongoDBConnection {
   }
 
 
+
+  async getUserProfile(targetUid, viewerUid) {
+    if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
+        typeof viewerUid !== "string" || !viewerUid || viewerUid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = (await this.getClient()).db();
+      const user = await db.collection("users").findOne({ uid: targetUid });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const viewer = targetUid === viewerUid ? user : await db.collection("users").findOne(
+        { uid: viewerUid }, { projection: { role: 1 } }
+      );
+      const isOwner = targetUid === viewerUid;
+      const isSuperAdmin = viewer?.role === "superadmin";
+      const profile = { ...user };
+      if (!isOwner && !isSuperAdmin) {
+        delete profile.email;
+        delete profile.mobileNumber;
+        delete profile.password;
+        delete profile.lastLoginIp;
+      }
+      if (profile._id !== undefined) profile.id = String(profile._id);
+      if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
+      if (profile.birthday) {
+        const birthday = new Date(profile.birthday);
+        if (!Number.isNaN(birthday.getTime())) {
+          const today = new Date();
+          let age = today.getFullYear() - birthday.getFullYear();
+          const month = today.getMonth() - birthday.getMonth();
+          if (month < 0 || (month === 0 && today.getDate() < birthday.getDate())) age--;
+          profile.age = age;
+        }
+      }
+      if (Array.isArray(profile.photos)) {
+        profile.photos = profile.photos.map(photo => {
+          if (!photo || typeof photo.url !== "string" || !photo.url || /^https?:\/\//i.test(photo.url)) return photo;
+          return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\/+/, "") };
+        });
+      }
+      return { status: 200, body: profile };
+    } catch {
+      return { status: 503, body: { error: "Profile service unavailable" } };
+    }
+  }
+
   async updateCurrentUserProfile(uid, update) {
     if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     if (!update || typeof update !== "object" || Array.isArray(update)) return { status: 400, body: { error: "A JSON profile object is required" } };
@@ -222,6 +268,16 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/ping") {
       const result = await this.ping();
       return json({ status: result.ok ? "ok" : "unavailable" }, result.ok ? 200 : 503);
+    }
+
+
+    if (url.pathname === "/internal/public-profile") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.targetUid !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getUserProfile(body.targetUid, body.claims.sub);
+      return json(result.body, result.status);
     }
 
     if (url.pathname === "/internal/profile") {
