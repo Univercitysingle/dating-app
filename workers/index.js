@@ -1,3 +1,5 @@
+import { authenticateFirebaseRequest, FirebaseTokenError } from "./firebase-auth.js";
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
@@ -57,6 +59,22 @@ export default {
         return json({ status: "ready", dependencies: { mongodb: "ok", firebase: "configuration_present" } });
       } catch {
         return json({ status: "not_ready", dependencies: { mongodb: "unavailable" } }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/auth/verify") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        return json({
+          authenticated: true,
+          uid: claims.sub,
+          emailVerified: claims.email_verified === true
+        });
+      } catch (error) {
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Authentication service unavailable" }, 503);
       }
     }
 
