@@ -2274,7 +2274,7 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const [user, messages] = await Promise.all([
-        db.collection("users").findOne({ uid }, { projection: { _id: 1, password: 0, lastLoginIp: 0 } }),
+        db.collection("users").findOne({ uid }, { projection: { _id: 1, uid: 1, blocked: 1 } }),
         db.collection("chatmessages").find({ $or: [{ senderUid: uid }, { receiverUid: uid }] })
           .sort({ timestamp: -1 }).limit(500).toArray()
       ]);
