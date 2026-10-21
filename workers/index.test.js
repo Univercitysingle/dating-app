@@ -1038,3 +1038,50 @@ test("report moderation validates action and suspension duration", async () => {
   assert.equal((await connection.moderateReport("admin", "0123456789abcdef01234567", { action: "suspend_user", durationDays: 0 })).status, 400);
   assert.equal((await connection.moderateReport("admin", "0123456789abcdef01234567", { action: "suspend_user", durationDays: 99999 })).status, 400);
 });
+
+
+test("scheduled expiration processing is bounded, idempotent, and preserves active subscriptions", async () => {
+  const expiredSub = { _id: "expired-sub", userId: "paid-user", endDate: new Date("2026-01-01T00:00:00Z") };
+  const trialUser = { _id: "trial-user", plan: "premium", trialExpires: new Date("2026-01-01T00:00:00Z") };
+  let subscriptionUpdates = 0;
+  let userUpdates = 0;
+  const subscriptions = {
+    find: () => ({ sort() { return this; }, limit() { return this; }, async toArray() { return [expiredSub]; } }),
+    async updateOne() { subscriptionUpdates += 1; return { modifiedCount: 1 }; },
+    async findOne() { return null; }
+  };
+  const users = {
+    find: () => ({ sort() { return this; }, limit() { return this; }, async toArray() { return [trialUser]; } }),
+    async updateOne() { userUpdates += 1; return { modifiedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection(name) { return name === "subscriptions" ? subscriptions : users; } }) });
+  const result = await connection.runScheduledExpirations(new Date("2026-10-21T00:00:00Z"));
+  assert.deepEqual(result, { success: true, expiredSubscriptions: 1, expiredTrials: 1, downgradedUsers: 2 });
+  assert.equal(subscriptionUpdates, 1);
+  assert.equal(userUpdates, 2);
+});
+
+test("scheduled handler only runs in staging and delegates to the MongoDB Durable Object", async () => {
+  let delegated = 0;
+  let waited = null;
+  const env = {
+    MIGRATION_STAGE: "staging",
+    MONGODB_CONNECTION: {
+      idFromName(name) { assert.equal(name, "mongo-primary"); return "id"; },
+      get(id) {
+        assert.equal(id, "id");
+        return { async fetch(url, init) {
+          assert.match(url, /internal\\/scheduled-expirations$/);
+          assert.equal(init.method, "POST");
+          delegated += 1;
+          return new Response(JSON.stringify({ success: true }), { status: 200 });
+        } };
+      }
+    }
+  };
+  await worker.scheduled({ cron: "0 * * * *" }, env, { waitUntil(promise) { waited = promise; } });
+  await waited;
+  assert.equal(delegated, 1);
+  await worker.scheduled({ cron: "0 * * * *" }, { MIGRATION_STAGE: "production" }, { waitUntil() { assert.fail("production job must not run before cutover"); } });
+});
