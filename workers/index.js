@@ -87,13 +87,15 @@ export default {
       return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400" } });
     }
 
-    // Private B2 profile images are served through a constrained object proxy.
-    const mediaMatch = url.pathname.match(/^\/media\/([^/]+)$/);
+    // Serve private B2 profile images through the existing CDN hostname.
+    // Accept both the legacy /<object-key> URL and the explicit /media/<key> form.
+    const mediaMatch = url.pathname.match(/^\\/media\\/([^/]+)$/) ||
+      url.pathname.match(/^\\/(photos-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\\.(jpg|png|gif))$/i);
     if (mediaMatch) {
       if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
       let key;
       try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
-      if (!/^photos-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\.(jpg|png|gif)$/i.test(key)) return json({ error: "Media not found" }, 404);
+      if (!/^photos-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\\.(jpg|png|gif)$/i.test(key)) return json({ error: "Media not found" }, 404);
       if (!isB2Configured(env)) return json({ error: "Media storage unavailable" }, 503);
       try {
         const object = await getPrivateObject(env, key);
