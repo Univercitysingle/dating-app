@@ -48,6 +48,76 @@ export class MongoDBConnection {
     }
   }
 
+  async findOrCreateUserFromClaims(claims) {
+    if (!claims || typeof claims.sub !== "string" || claims.sub.length < 1 || claims.sub.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+
+    try {
+      const client = await this.getClient();
+      const users = client.db().collection("users");
+      const existingByUid = await users.findOne({ uid: claims.sub });
+      if (existingByUid) return { status: 200, user: existingByUid };
+
+      const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+      if (!email || claims.email_verified !== true) {
+        return { status: 403, body: { error: "User provisioning requires a verified email address" } };
+      }
+
+      const existingByEmail = await users.findOne({ email: { $regex: "^" + email.replace(/[.*+?^${}()|[\]\\]/g, "\\  async getCurrentUserProfile(uid) {
+") + "$", $options: "i" } });
+      if (existingByEmail) {
+        // Never transfer an account already bound to a different Firebase identity.
+        if (existingByEmail.uid && existingByEmail.uid !== claims.sub) {
+          return { status: 409, body: { error: "This email is already linked to another account" } };
+        }
+        const linked = await users.findOneAndUpdate(
+          { _id: existingByEmail._id, $or: [{ uid: { $exists: false } }, { uid: null }, { uid: "" }] },
+          { $set: { uid: claims.sub, email } },
+          { returnDocument: "after" }
+        );
+        if (linked?.value) return { status: 200, user: linked.value };
+        // MongoDB driver v6 returns the document directly when includeResultMetadata is false.
+        if (linked && linked.uid === claims.sub) return { status: 200, user: linked };
+        return { status: 409, body: { error: "Account identity changed; please retry sign-in" } };
+      }
+
+      const user = {
+        uid: claims.sub,
+        email,
+        name: typeof claims.name === "string" ? claims.name : "",
+        trialExpires: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        isOnboardingComplete: false,
+        interests: [],
+        profilePrompts: [],
+        blocked: [],
+        photos: [],
+        totalPhotoSize: 0,
+        isVerified: false,
+        plan: "basic",
+        role: "user",
+        isProfileVisible: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      try {
+        const result = await users.insertOne(user);
+        user._id = result.insertedId;
+        return { status: 200, user };
+      } catch (error) {
+        // A concurrent sign-in can win the unique UID/email insert race.
+        if (error?.code === 11000) {
+          const racedUser = await users.findOne({ uid: claims.sub });
+          if (racedUser) return { status: 200, user: racedUser };
+          return { status: 409, body: { error: "Account already exists; please retry sign-in" } };
+        }
+        throw error;
+      }
+    } catch {
+      return { status: 503, body: { error: "Profile service unavailable" } };
+    }
+  }
+
   async getCurrentUserProfile(uid) {
     if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
