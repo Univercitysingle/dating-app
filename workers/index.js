@@ -610,6 +610,44 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/admin/reports" || /^\/api\/admin\/reports\/[^/]+(?:\/action)?$/.test(url.pathname)) {
+      const reportAction = url.pathname.match(/^\/api\/admin\/reports\/([^/]+)\/action$/);
+      const reportDetail = url.pathname.match(/^\/api\/admin\/reports\/([^/]+)$/);
+      const isList = url.pathname === "/api/admin/reports";
+      if ((isList && request.method !== "GET") ||
+          (reportAction && request.method !== "POST") ||
+          (reportDetail && request.method !== "GET")) return json({ error: "Method not allowed" }, 405);
+      if (!isList && !reportAction && !reportDetail) return json({ error: "Not found" }, 404);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ message: "Report administration service unavailable." }, 503);
+      let payload = null;
+      if (reportAction) {
+        payload = await request.json().catch(() => null);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({ message: "A moderation action is required." }, 400);
+      }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const params = Object.fromEntries(url.searchParams.entries());
+        const body = isList
+          ? { claims, params: { status: params.status, search: params.search, page: Number(params.page), limit: Number(params.limit) } }
+          : reportAction
+            ? { claims, reportId: decodeURIComponent(reportAction[1]), payload }
+            : { claims, reportId: decodeURIComponent(reportDetail[1]) };
+        const internalPath = isList ? "/internal/admin/reports" : reportAction ? "/internal/admin/report-action" : "/internal/admin/report";
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+        });
+        const result = await response.json().catch(() => ({ message: "Report administration service unavailable." }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Report administration service unavailable." }, 503);
+      }
+    }
+
     if (url.pathname === "/api/reports") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
