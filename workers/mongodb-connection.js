@@ -1271,6 +1271,122 @@ export class MongoDBConnection {
     }
   }
 
+  async createAdminUser(uid, payload = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (!payload || typeof payload.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email.trim())) {
+      return { status: 400, body: { message: "A valid email address is required" } };
+    }
+    const role = typeof payload.role === "string" ? payload.role : "user";
+    if (!["user", "contributor", "admin", "superadmin"].includes(role)) return { status: 400, body: { message: "Invalid role" } };
+    if (access.role !== "superadmin" && ["admin", "superadmin"].includes(role)) return { status: 403, body: { message: "Only a superadmin can create administrator accounts" } };
+    const email = payload.email.trim().toLowerCase();
+    const name = typeof payload.name === "string" ? payload.name.trim().slice(0, 160) : "";
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      if (await users.findOne({ $expr: { $eq: [{ $toLower: "$email" }, email] } }, { projection: { _id: 1 } })) {
+        return { status: 409, body: { message: "User with this email already exists" } };
+      }
+      const now = new Date();
+      const user = {
+        email, name, role, isProfileVisible: payload.isProfileVisible !== false,
+        mustSetPassword: true, isOnboardingComplete: false, interests: [], profilePrompts: [],
+        blocked: [], photos: [], totalPhotoSize: 0, isVerified: false, plan: "basic",
+        createdAt: now, updatedAt: now
+      };
+      const result = await users.insertOne(user);
+      delete user.password;
+      return { status: 201, body: { ...user, _id: result.insertedId } };
+    } catch {
+      return { status: 503, body: { message: "Unable to create user" } };
+    }
+  }
+
+  async updateAdminUser(uid, userId, payload = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) return { status: 400, body: { message: "Invalid user ID" } };
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { status: 400, body: { message: "A user update object is required" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const targetId = new ObjectId(userId);
+      const target = await users.findOne({ _id: targetId }, { projection: { role: 1 } });
+      if (!target) return { status: 404, body: { message: "User not found" } };
+      if (target.role === "superadmin") return { status: 403, body: { message: "Superadmin accounts cannot be modified" } };
+      const allowed = [
+        "name", "email", "gender", "bio", "interests", "profilePrompts", "education",
+        "relationshipGoals", "isProfileVisible", "plan", "faceVerified", "isVerified",
+        "mustSetPassword", "role", "location", "lastActiveAt", "photos"
+      ];
+      const update = {};
+      for (const key of allowed) if (Object.prototype.hasOwnProperty.call(payload, key)) update[key] = payload[key];
+      if (Object.keys(update).length === 0) return { status: 400, body: { message: "No supported fields to update" } };
+      if (update.role !== undefined) {
+        if (!["user", "contributor", "admin", "superadmin"].includes(update.role)) return { status: 400, body: { message: "Invalid role" } };
+        if (access.role !== "superadmin" && update.role === "superadmin") return { status: 403, body: { message: "Admins cannot assign the superadmin role" } };
+      }
+      if (update.plan !== undefined && !["basic", "premium", "weekly", "monthly", "yearly"].includes(update.plan)) return { status: 400, body: { message: "Invalid plan" } };
+      if (update.email !== undefined) {
+        if (typeof update.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(update.email.trim())) return { status: 400, body: { message: "Invalid email address" } };
+        update.email = update.email.trim().toLowerCase();
+        const duplicate = await users.findOne({ email: update.email, _id: { $ne: targetId } }, { projection: { _id: 1 } });
+        if (duplicate) return { status: 409, body: { message: "Email is already in use" } };
+      }
+      if (update.name !== undefined && (typeof update.name !== "string" || update.name.length > 160)) return { status: 400, body: { message: "Invalid name" } };
+      if (update.bio !== undefined && (typeof update.bio !== "string" || update.bio.length > 5000)) return { status: 400, body: { message: "Invalid bio" } };
+      if (update.isProfileVisible !== undefined && typeof update.isProfileVisible !== "boolean") return { status: 400, body: { message: "Invalid profile visibility" } };
+      if (update.interests !== undefined && (!Array.isArray(update.interests) || update.interests.length > 100 || update.interests.some(x => typeof x !== "string" || x.length > 100))) return { status: 400, body: { message: "Invalid interests" } };
+      update.updatedAt = new Date();
+      const result = await users.findOneAndUpdate(
+        { _id: targetId }, { $set: update }, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } }
+      );
+      if (!result) return { status: 404, body: { message: "User not found" } };
+      return { status: 200, body: result };
+    } catch {
+      return { status: 503, body: { message: "Unable to update user" } };
+    }
+  }
+
+  async deleteAdminUser(uid, userId) {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) return { status: 400, body: { message: "Invalid user ID" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const targetId = new ObjectId(userId);
+      const target = await users.findOne({ _id: targetId }, { projection: { role: 1 } });
+      if (!target) return { status: 404, body: { message: "User not found" } };
+      if (target.role === "superadmin") return { status: 403, body: { message: "Superadmin accounts cannot be deleted" } };
+      const result = await users.deleteOne({ _id: targetId });
+      return result.deletedCount ? { status: 200, body: { message: "User deleted successfully" } } : { status: 404, body: { message: "User not found" } };
+    } catch {
+      return { status: 503, body: { message: "Unable to delete user" } };
+    }
+  }
+
+  async updateAdminUserPlan(uid, userId, payload = {}) {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) return { status: 400, body: { message: "Invalid user ID" } };
+    const plan = payload && payload.plan;
+    if (!["basic", "premium", "weekly", "monthly", "yearly"].includes(plan)) return { status: 400, body: { message: "Invalid plan" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const result = await this.getDatabase(await this.getClient()).collection("users").findOneAndUpdate(
+        { _id: new ObjectId(userId), role: { $ne: "superadmin" } },
+        { $set: { plan, updatedAt: new Date() } },
+        { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } }
+      );
+      if (!result) return { status: 404, body: { message: "User not found or cannot be modified" } };
+      return { status: 200, body: result };
+    } catch {
+      return { status: 503, body: { message: "Unable to update user plan" } };
+    }
+  }
+
   async getAdminDashboardStats(uid) {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
