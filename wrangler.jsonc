@@ -3,6 +3,7 @@
   "name": "dating-app-api",
   "main": "workers/index.js",
   "compatibility_date": "2026-10-21",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "vars": {
     "MIGRATION_STAGE": "scaffold"
