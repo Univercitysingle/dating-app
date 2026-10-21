@@ -277,9 +277,9 @@ test("likes query returns pending likers with privacy filtering and premium blur
   };
   const users = {
     findOne: async (query) => query.uid === "current" ? current : null,
-    find: async () => ({ toArray: async () => [liker] })
+    find: () => ({ toArray: async () => [liker] })
   };
-  const matches = { find: async (query) => {
+  const matches = { find: (query) => {
     assert.deepEqual(query, { user2Uid: "current", status: "pending" });
     return { toArray: async () => [{ user1Uid: "liker", user2Uid: "current", status: "pending", superLike: true }] };
   }};
@@ -299,7 +299,7 @@ test("likes query returns pending likers with privacy filtering and premium blur
 
 test("likes query returns an empty list when no pending likes exist", async () => {
   const users = { findOne: async () => ({ _id: "current-id", plan: "premium" }) };
-  const matches = { find: async () => ({ toArray: async () => [] }) };
+  const matches = { find: () => ({ toArray: async () => [] }) };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
   const result = await connection.getLikes("current");
