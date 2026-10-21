@@ -32,7 +32,8 @@ async function createSuperadminCustomToken(env, email, password) {
       typeof password !== "string" || password.length < 1 || password.length > 1024) {
     return null;
   }
-  const bcrypt = await import("bcryptjs");
+  const bcryptModule = await import("bcryptjs");
+  const bcrypt = bcryptModule.default || bcryptModule;
   const hashMatches = await bcrypt.compare(password, env.SUPER_ADMIN_PASSWORD_HASH);
   if (!hashMatches) return null;
   let serviceAccount;
