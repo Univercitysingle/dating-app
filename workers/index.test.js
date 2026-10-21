@@ -6,6 +6,23 @@ function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
 }
 
+test("GET / returns API metadata without pretending to serve the login UI", async () => {
+  const response = await worker.fetch(request("/"), { MIGRATION_STAGE: "test" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    service: "dating-app-api",
+    stage: "test",
+    status: "ok",
+    frontend: "not_served_by_this_worker"
+  });
+});
+
+test("GET /favicon.ico returns an empty response instead of an unmigrated-route error", async () => {
+  const response = await worker.fetch(request("/favicon.ico"), {});
+  assert.equal(response.status, 204);
+  assert.equal(await response.text(), "");
+});
+
 test("GET /health returns a non-sensitive liveness response", async () => {
   const response = await worker.fetch(request("/health"), { MIGRATION_STAGE: "test" });
   assert.equal(response.status, 200);
