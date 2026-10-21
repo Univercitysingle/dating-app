@@ -869,3 +869,16 @@ test("support ticket internal route validates request structure", async () => {
   assert.equal(response.status, 400);
   assert.match((await response.json()).message, /subject and message/i);
 });
+
+
+test("support ticket detail and message routes reject anonymous requests", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project" };
+  const detail = await worker.fetch(request("/api/support-tickets/0123456789abcdef01234567"), env);
+  assert.equal(detail.status, 401);
+  const message = await worker.fetch(new Request("https://dating-app.test/api/support-tickets/0123456789abcdef01234567/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: "Please help" })
+  }), env);
+  assert.equal(message.status, 401);
+});
