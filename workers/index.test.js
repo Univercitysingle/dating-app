@@ -106,6 +106,31 @@ test("rate limiter enforces a configured count within a window", async () => {
   assert.equal((await (await call()).json()).allowed, false);
 });
 
+test("MongoDB Durable Object honors the configured database name", () => {
+  let selectedDatabase;
+  const connection = new MongoDBConnection({}, { MONGODB_DATABASE: "test" });
+  const database = connection.getDatabase({
+    db: (name) => {
+      selectedDatabase = name;
+      return { name };
+    }
+  });
+  assert.equal(selectedDatabase, "test");
+  assert.deepEqual(database, { name: "test" });
+});
+
+test("MongoDB Durable Object preserves the URI default when no database override is set", () => {
+  let selectedDatabase = "not-called";
+  const connection = new MongoDBConnection({}, {});
+  connection.getDatabase({
+    db: (name) => {
+      selectedDatabase = name;
+      return { name };
+    }
+  });
+  assert.equal(selectedDatabase, undefined);
+});
+
 test("MongoDB Durable Object ping fails closed without a URI", async () => {
   const connection = new MongoDBConnection({}, {});
   assert.deepEqual(await connection.ping(), { ok: false });
