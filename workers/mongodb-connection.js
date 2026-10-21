@@ -180,6 +180,25 @@ export class MongoDBConnection {
     }
   }
 
+  async getSubscriptionHistory(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = (await this.getClient()).db();
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const subscriptions = await db.collection("subscriptions")
+        .find({ userId: user._id })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .toArray();
+      return { status: 200, body: subscriptions };
+    } catch {
+      return { status: 503, body: { error: "Subscription history unavailable" } };
+    }
+  }
+
   async getLikes(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
@@ -412,6 +431,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/subscriptions") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getSubscriptionHistory(body.claims.sub);
       return json(result.body, result.status);
     }
 
