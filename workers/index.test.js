@@ -106,6 +106,28 @@ test("rate limiter enforces a configured count within a window", async () => {
   assert.equal((await (await call()).json()).allowed, false);
 });
 
+test("Report creation rejects invalid input before touching MongoDB", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const selfReport = await connection.createReport("user-a", {
+    reportedUserUid: "user-a",
+    reason: "This is a test",
+    category: "spam"
+  });
+  assert.equal(selfReport.status, 400);
+  const invalidCategory = await connection.createReport("user-a", {
+    reportedUserUid: "user-b",
+    reason: "This is a test",
+    category: "made-up"
+  });
+  assert.equal(invalidCategory.status, 400);
+  const emptyReason = await connection.createReport("user-a", {
+    reportedUserUid: "user-b",
+    reason: "   ",
+    category: "spam"
+  });
+  assert.equal(emptyReason.status, 400);
+});
+
 test("MongoDB Durable Object honors the configured database name", () => {
   let selectedDatabase;
   const connection = new MongoDBConnection({}, { MONGODB_DATABASE: "test" });
