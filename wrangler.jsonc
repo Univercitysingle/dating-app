@@ -33,7 +33,10 @@
       "migrations": [
         { "tag": "v1", "new_sqlite_classes": ["RateLimiter"] },
         { "tag": "v2", "new_sqlite_classes": ["MongoDBConnection"] }
-      ]
+      ],
+      "triggers": {
+        "crons": ["0 * * * *"]
+      }
     }
   }
 }
