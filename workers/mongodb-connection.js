@@ -1026,6 +1026,160 @@ export class MongoDBConnection {
     }
   }
 
+  async createBankSlipSubscription(uid, key, contentType, size, planId) {
+    const plans = {
+      basic_1m: { plan: "basic", durationDays: 30, superLikes: 5, undos: 10 },
+      premium_1m: { plan: "premium", durationDays: 30, superLikes: 25, undos: 50 },
+      premium_3m: { plan: "premium", durationDays: 90, superLikes: 75, undos: 150 }
+    };
+    if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid) ||
+        typeof key !== "string" || !key.startsWith("bank-slips-" + uid + "-") ||
+        !["image/jpeg", "image/png", "image/gif"].includes(contentType) ||
+        !Number.isInteger(size) || size < 1 || size > 5 * 1024 * 1024 ||
+        !Object.hasOwn(plans, planId)) {
+      return { status: 400, body: { error: "Invalid bank-slip upload metadata" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1, plan: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const subscriptions = db.collection("subscriptions");
+      const active = await subscriptions.findOne({
+        userId: user._id, status: "active", endDate: { $gt: new Date() }
+      }, { projection: { _id: 1 } });
+      if (active) return { status: 409, body: { error: "You already have an active subscription." } };
+      const pending = await subscriptions.findOne({
+        userId: user._id, status: "pending", bankSlipUrl: { $exists: true }
+      }, { projection: { _id: 1 } });
+      if (pending) return { status: 409, body: { error: "A bank-slip submission is already awaiting review." } };
+      const now = new Date();
+      const doc = {
+        userId: user._id,
+        ...plans[planId],
+        planId,
+        bankSlipUrl: key,
+        bankSlipContentType: contentType,
+        bankSlipSize: size,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now
+      };
+      const inserted = await subscriptions.insertOne(doc);
+      return { status: 201, body: { success: true, subscriptionId: String(inserted.insertedId), message: "Bank slip uploaded successfully. Your subscription is pending review." } };
+    } catch {
+      return { status: 503, body: { error: "Subscription service unavailable" } };
+    }
+  }
+
+  async authorizeAdminBankSlip(uid, key) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof key !== "string" || !/^bank-slips-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\.(jpg|png|gif)$/i.test(key)) {
+      return { status: 400, body: { error: "Invalid bank-slip key" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const slip = await db.collection("subscriptions").findOne(
+        { bankSlipUrl: key },
+        { projection: { _id: 1, bankSlipContentType: 1, status: 1 } }
+      );
+      if (!slip) return { status: 404, body: { error: "Bank slip not found" } };
+      return { status: 200, body: { contentType: slip.bankSlipContentType || "application/octet-stream" } };
+    } catch {
+      return { status: 503, body: { error: "Bank-slip authorization unavailable" } };
+    }
+  }
+
+  async getPendingBankSlipSubscriptions(uid) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const records = await db.collection("subscriptions").aggregate([
+        { $match: { status: "pending", bankSlipUrl: { $type: "string" } } },
+        { $sort: { createdAt: 1 } },
+        { $limit: 200 },
+        { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+        { $project: { "user.password": 0, "user.lastLoginIp": 0, "user.email": 1, "user.name": 1, "user.uid": 1 } }
+      ]).toArray();
+      return { status: 200, body: records.map(record => ({ ...record, user: record.user || null })) };
+    } catch {
+      return { status: 503, body: { error: "Unable to load pending bank slips" } };
+    }
+  }
+
+  async moderateBankSlipSubscription(uid, subscriptionId, action, reason = "") {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof subscriptionId !== "string" || !/^[a-fA-F0-9]{24}$/.test(subscriptionId) ||
+        !["approve", "reject"].includes(action) ||
+        (action === "reject" && (typeof reason !== "string" || !reason.trim() || reason.length > 1000))) {
+      return { status: 400, body: { error: "Invalid bank-slip moderation request" } };
+    }
+    let outcome = { status: 503, body: { error: "Bank-slip moderation unavailable" } };
+    let session;
+    try {
+      const client = await this.getClient();
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(client);
+      session = client.startSession();
+      await session.withTransaction(async () => {
+        const subscriptions = db.collection("subscriptions");
+        const subscription = await subscriptions.findOne({
+          _id: new ObjectId(subscriptionId),
+          status: "pending",
+          bankSlipUrl: { $type: "string" }
+        }, { session });
+        if (!subscription) {
+          outcome = { status: 404, body: { error: "Pending bank-slip subscription not found" } };
+          return;
+        }
+        const now = new Date();
+        if (action === "reject") {
+          const changed = await subscriptions.updateOne(
+            { _id: subscription._id, status: "pending" },
+            { $set: { status: "cancelled", rejectionReason: reason.trim(), updatedAt: now } },
+            { session }
+          );
+          if (!changed.modifiedCount) {
+            outcome = { status: 409, body: { error: "Bank-slip subscription was already processed" } };
+            throw new Error("BANK_SLIP_STATE_CHANGED");
+          }
+          outcome = { status: 200, body: { success: true, message: "Bank slip rejected" } };
+          return;
+        }
+        const days = Number(subscription.durationDays);
+        if (![30, 90].includes(days) || !["basic", "premium"].includes(subscription.plan)) {
+          outcome = { status: 409, body: { error: "Bank-slip plan metadata is invalid" } };
+          throw new Error("BANK_SLIP_PLAN_INVALID");
+        }
+        const changed = await subscriptions.updateOne(
+          { _id: subscription._id, status: "pending" },
+          { $set: { status: "active", startDate: now, endDate: new Date(now.getTime() + days * 86400000), updatedAt: now } },
+          { session }
+        );
+        if (!changed.modifiedCount) {
+          outcome = { status: 409, body: { error: "Bank-slip subscription was already processed" } };
+          throw new Error("BANK_SLIP_STATE_CHANGED");
+        }
+        const userUpdate = await db.collection("users").updateOne(
+          { _id: subscription.userId },
+          { $set: { plan: subscription.plan, ...(subscription.plan === "premium" ? { trialExpires: null } : {}), updatedAt: now } },
+          { session }
+        );
+        if (!userUpdate.matchedCount) throw new Error("BANK_SLIP_USER_MISSING");
+        outcome = { status: 200, body: { success: true, message: "Bank-slip subscription approved" } };
+      });
+      return outcome;
+    } catch {
+      if (outcome.status === 404 || outcome.status === 409) return outcome;
+      return { status: 503, body: { error: "Bank-slip moderation unavailable" } };
+    } finally {
+      if (session) await session.endSession().catch(() => {});
+    }
+  }
+
   async getSubscriptionHistory(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
