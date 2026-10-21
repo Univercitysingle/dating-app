@@ -180,6 +180,95 @@ export class MongoDBConnection {
     }
   }
 
+  async recordSwipe(uid, targetUid, action) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
+        !["like", "pass"].includes(action)) {
+      return { status: 400, body: { error: "Invalid swipe request" } };
+    }
+    if (uid === targetUid) return { status: 400, body: { error: "Cannot swipe on yourself." } };
+    try {
+      const db = (await this.getClient()).db();
+      const users = db.collection("users");
+      const [currentUser, targetUser] = await Promise.all([
+        users.findOne({ uid }, { projection: { blocked: 1 } }),
+        users.findOne({ uid: targetUid }, { projection: { blocked: 1 } })
+      ]);
+      if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
+      if (!targetUser) return { status: 404, body: { error: "Target user not found." } };
+      if (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(targetUid)) {
+        return { status: 403, body: { error: "You have blocked this user. Unblock them to swipe." } };
+      }
+      if (Array.isArray(targetUser.blocked) && targetUser.blocked.includes(uid)) {
+        return { status: 403, body: { error: "This user has blocked you." } };
+      }
+
+      let match = await db.collection("matches").findOne({
+        $or: [
+          { user1Uid: uid, user2Uid: targetUid },
+          { user1Uid: targetUid, user2Uid: uid }
+        ]
+      });
+      const now = new Date();
+      if (!match) {
+        const inserted = await db.collection("matches").insertOne({
+          user1Uid: uid,
+          user2Uid: targetUid,
+          status: action === "like" ? "pending" : "unmatched",
+          likedBy: action === "like" ? [uid] : [],
+          superLike: false,
+          createdAt: now,
+          updatedAt: now
+        });
+        match = { _id: inserted.insertedId, user1Uid: uid, user2Uid: targetUid, status: action === "like" ? "pending" : "unmatched", likedBy: action === "like" ? [uid] : [], superLike: false };
+      } else if (action === "like") {
+        await db.collection("matches").updateOne({ _id: match._id }, { $addToSet: { likedBy: uid }, $set: { updatedAt: now } });
+        match = await db.collection("matches").findOne({ _id: match._id });
+      } else {
+        await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: "unmatched", updatedAt: now } });
+        match.status = "unmatched";
+      }
+
+      if (action === "like") {
+        const likedBy = Array.isArray(match.likedBy) ? match.likedBy : [];
+        const finalStatus = likedBy.includes(match.user1Uid) && likedBy.includes(match.user2Uid) ? "matched" : "pending";
+        await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: finalStatus, updatedAt: now } });
+        match.status = finalStatus;
+        const notificationType = finalStatus === "matched" ? "match" : "like";
+        await db.collection("notifications").insertOne({
+          recipientUid: targetUid,
+          senderUid: uid,
+          type: notificationType,
+          status: "pending",
+          createdAt: now,
+          updatedAt: now
+        });
+        if (finalStatus === "matched") {
+          await db.collection("notifications").deleteOne({
+            recipientUid: uid, senderUid: targetUid, type: { $in: ["like", "superlike"] }
+          });
+        }
+      } else {
+        await db.collection("notifications").deleteOne({
+          recipientUid: uid, senderUid: targetUid, type: { $in: ["like", "superlike"] }
+        });
+      }
+
+      await users.updateOne({ uid }, {
+        $set: { lastSwipe: { action, targetUserId: targetUid, matchId: match._id, timestamp: now }, updatedAt: now }
+      });
+      return {
+        status: 200,
+        body: {
+          ...match,
+          _id: match._id === undefined ? undefined : String(match._id)
+        }
+      };
+    } catch {
+      return { status: 503, body: { error: "Swipe service unavailable" } };
+    }
+  }
+
   async getPotentialMatches(uid, filters = {}) {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid match request" } };
@@ -740,6 +829,16 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/swipe") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          typeof body.targetUid !== "string" || !["like", "pass"].includes(body.action)) {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.recordSwipe(body.claims.sub, body.targetUid, body.action);
       return json(result.body, result.status);
     }
 
