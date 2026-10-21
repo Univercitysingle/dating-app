@@ -38,10 +38,15 @@ export class MongoDBConnection {
     return this.clientPromise;
   }
 
+  getDatabase(client) {
+    // Honor the explicit environment database when set; otherwise preserve the URI default.
+    return client.db(this.env.MONGODB_DATABASE || undefined);
+  }
+
   async ping() {
     try {
       const client = await this.getClient();
-      await client.db().command({ ping: 1 });
+      await this.getDatabase(client).command({ ping: 1 });
       return { ok: true };
     } catch {
       return { ok: false };
@@ -54,7 +59,7 @@ export class MongoDBConnection {
     }
 
     try {
-      const users = (await this.getClient()).db().collection("users");
+      const users = this.getDatabase(await this.getClient()).collection("users");
       const existingByUid = await users.findOne({ uid: claims.sub });
       if (existingByUid) return { status: 200, user: existingByUid };
 
@@ -133,7 +138,7 @@ export class MongoDBConnection {
       normalized.push(item);
     }
     try {
-      const users = (await this.getClient()).db().collection("users");
+      const users = this.getDatabase(await this.getClient()).collection("users");
       const result = await users.updateOne({ uid }, { $set: { photos: normalized } });
       if (!result.matchedCount) return { status: 404, body: { error: "User not found" } };
       return await this.getCurrentUserProfile(uid);
@@ -152,7 +157,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: action === "block" ? "Cannot block yourself." : "Cannot unblock yourself." } };
     }
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       if (action === "block") {
         const target = await users.findOne({ uid: targetUid }, { projection: { _id: 1 } });
@@ -188,7 +193,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Password must be at least 6 characters long." } };
     }
     try {
-      const users = (await this.getClient()).db().collection("users");
+      const users = this.getDatabase(await this.getClient()).collection("users");
       const user = await users.findOne({ uid }, { projection: { mustSetPassword: 1 } });
       if (!user) return { status: 404, body: { error: "User not found." } };
       if (user.mustSetPassword !== true) {
@@ -210,7 +215,7 @@ export class MongoDBConnection {
   async undoSwipe(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found." } };
@@ -283,7 +288,7 @@ export class MongoDBConnection {
     }
     if (uid === targetUid) return { status: 400, body: { error: "Cannot swipe on yourself." } };
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const [currentUser, targetUser] = await Promise.all([
         users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1 } }),
@@ -386,7 +391,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Invalid user identity" } };
     }
     try {
-      const notifications = await (await this.getClient()).db().collection("notifications")
+      const notifications = await this.getDatabase(await this.getClient()).collection("notifications")
         .find({ recipientUid: uid, status: "pending" })
         .sort({ createdAt: -1 })
         .toArray();
@@ -401,7 +406,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Invalid match request" } };
     }
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
       const query = {
@@ -498,7 +503,7 @@ export class MongoDBConnection {
   async getConfirmedMatches(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const [currentUser, matches] = await Promise.all([
         db.collection("users").findOne({ uid }, { projection: { role: 1 } }),
         db.collection("matches").find({
@@ -545,7 +550,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Invalid discovery request" } };
     }
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
 
@@ -710,7 +715,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Invalid user identity" } };
     }
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
       if (!user) return { status: 404, body: { error: "User not found" } };
       const subscriptions = await db.collection("subscriptions")
@@ -729,7 +734,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Invalid user identity" } };
     }
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const currentUser = await db.collection("users").findOne({ uid }, { projection: { _id: 1, plan: 1 } });
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
       const matches = await db.collection("matches").find({ user2Uid: uid, status: "pending" }).toArray();
@@ -786,7 +791,7 @@ export class MongoDBConnection {
       return { status: 400, body: { error: "Invalid user identity" } };
     }
     try {
-      const db = (await this.getClient()).db();
+      const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid: targetUid });
       if (!user) return { status: 404, body: { error: "User not found" } };
       const viewer = targetUid === viewerUid ? user : await db.collection("users").findOne(
@@ -830,7 +835,7 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     if (!update || typeof update !== "object" || Array.isArray(update)) return { status: 400, body: { error: "A JSON profile object is required" } };
     try {
-      const users = (await this.getClient()).db().collection("users");
+      const users = this.getDatabase(await this.getClient()).collection("users");
       const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1 } });
       if (!current) return { status: 404, body: { error: "User not found" } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
@@ -885,7 +890,7 @@ export class MongoDBConnection {
 
     try {
       const client = await this.getClient();
-      const db = client.db();
+      const db = this.getDatabase(client);
       const user = await db.collection("users").findOne(
         { uid },
         { projection: { password: 0, lastLoginIp: 0 } }
