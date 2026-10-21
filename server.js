@@ -327,7 +327,7 @@ if (mongoUri) {
     .then(() => {
       logger.info("✅ MongoDB connected successfully.");
 
-      // In-process cron jobs (can be disabled in serverless via ENABLE_IN_PROCESS_CRON=false)
+      // In-process cron is disabled when SERVERLESS_RUNTIME=true or ENABLE_IN_PROCESS_CRON=false.
       if (runtimeConfig.enableInProcessCron) {
         startTrialExpirationJob();
         startSubscriptionExpirationJob();
