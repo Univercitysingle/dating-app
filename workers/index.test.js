@@ -117,6 +117,30 @@ test("MongoDB Durable Object exposes no general-purpose HTTP operation", async (
   assert.equal(response.status, 404);
 });
 
+test("initial password setup rejects anonymous requests and unsupported methods", async () => {
+  const anonymous = await worker.fetch(new Request("https://dating-app.test/api/auth/set-initial-password", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ newPassword: "long-enough" })
+  }), { FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {} });
+  assert.equal(anonymous.status, 401);
+  const wrongMethod = await worker.fetch(request("/api/auth/set-initial-password", "GET"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(wrongMethod.status, 405);
+});
+
+test("initial password setup hashes the password and clears the setup flag", async () => {
+  let update;
+  const users = {
+    findOne: async () => ({ mustSetPassword: true }),
+    updateOne: async (_query, value) => { update = value; return { matchedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const result = await connection.setInitialPassword("user-1", "secure-password");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.message, "Password set successfully.");
+  assert.match(update.$set.password, /^\$2[aby]\$/);
+  assert.equal(update.$set.mustSetPassword, false);
+});
+
 test("Firebase token login rejects missing credentials and unsupported methods", async () => {
   const missing = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({})
