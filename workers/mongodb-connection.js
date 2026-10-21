@@ -180,6 +180,33 @@ export class MongoDBConnection {
     }
   }
 
+  async setInitialPassword(uid, newPassword) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "User not authenticated properly." } };
+    }
+    if (typeof newPassword !== "string" || newPassword.length < 6 || newPassword.length > 1024) {
+      return { status: 400, body: { error: "Password must be at least 6 characters long." } };
+    }
+    try {
+      const users = (await this.getClient()).db().collection("users");
+      const user = await users.findOne({ uid }, { projection: { mustSetPassword: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found." } };
+      if (user.mustSetPassword !== true) {
+        return { status: 400, body: { error: "Password already set or action not allowed." } };
+      }
+      const { default: bcrypt } = await import("bcryptjs");
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      const result = await users.updateOne(
+        { uid, mustSetPassword: true },
+        { $set: { password: passwordHash, mustSetPassword: false, updatedAt: new Date() } }
+      );
+      if (!result.matchedCount) return { status: 409, body: { error: "Password setup state changed; please retry." } };
+      return { status: 200, body: { message: "Password set successfully." } };
+    } catch {
+      return { status: 503, body: { error: "Password setup service unavailable" } };
+    }
+  }
+
   async undoSwipe(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
@@ -914,6 +941,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/set-initial-password") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.newPassword !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.setInitialPassword(body.claims.sub, body.newPassword);
       return json(result.body, result.status);
     }
 
