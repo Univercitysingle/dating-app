@@ -41,15 +41,14 @@ export class MongoDBConnection {
   getMediaUrl(path) {
     let clean = String(path || "");
     while (clean.startsWith("/")) clean = clean.slice(1);
-    const isNewB2Photo = clean.startsWith("photos-") && [".jpg", ".jpeg", ".png", ".gif"].some(ext => clean.endsWith(ext));
+    const isNewB2Photo = clean.startsWith("photos-") && [".jpg", ".jpeg", ".png", ".gif"].some(ext => clean.toLowerCase().endsWith(ext));
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-    if (isNewB2Photo) {
-      // Preserve the legacy CDN origin and root/object-key URL contract.
-      const configured = String(this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev").trim();
-      const base = /^https:\/\//i.test(configured) ? configured.replace(/\/+$/, "") : "https://" + configured.replace(/\/+$/, "");
-      return base + "/" + encoded;
-    }
-    return "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + encoded;
+    // CDN_HOSTNAME may be configured as either a hostname or a full HTTPS URL.
+    const configured = String(this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev").trim();
+    const base = /^https:\/\//i.test(configured) ? configured.replace(/\/+$/, "") : "https://" + configured.replace(/\/+$/, "");
+    // New B2 objects use the same CDN origin and legacy root/object-key URL shape.
+    // Existing object keys continue to resolve through the same origin.
+    return base + "/" + encoded;
   }
 
   getDatabase(client) {
