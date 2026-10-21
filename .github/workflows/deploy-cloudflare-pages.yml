@@ -66,5 +66,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build frontend with real Firebase configuration
         run: npm run build
+      - name: Configure Pages API proxy origin
+        shell: bash
+        run: printf '%s' "$API_ORIGIN" | npx --yes wrangler@4 pages secret put API_ORIGIN --project-name "$CLOUDFLARE_PAGES_PROJECT_NAME"
       - name: Deploy frontend to Cloudflare Pages
         run: npx --yes wrangler@4 pages deploy build --project-name "$CLOUDFLARE_PAGES_PROJECT_NAME" --branch migrate-to-serverless
