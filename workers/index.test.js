@@ -1072,7 +1072,7 @@ test("scheduled handler only runs in staging and delegates to the MongoDB Durabl
       get(id) {
         assert.equal(id, "id");
         return { async fetch(url, init) {
-          assert.match(url, /internal\\/scheduled-expirations$/);
+          assert.ok(url.endsWith("/internal/scheduled-expirations"));
           assert.equal(init.method, "POST");
           delegated += 1;
           return new Response(JSON.stringify({ success: true }), { status: 200 });
