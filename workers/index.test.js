@@ -134,6 +134,53 @@ test("current-user profile endpoint rejects unsupported methods", async () => {
   assert.equal(response.status, 405);
 });
 
+test("account provisioning refuses unverified email for a new account", async () => {
+  let inserted = false;
+  const users = {
+    findOne: async () => null,
+    insertOne: async () => { inserted = true; return { insertedId: "new-id" }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.clientPromise = Promise.resolve({ db: () => ({ collection: () => users }) });
+  const result = await connection.findOrCreateUserFromClaims({ sub: "firebase-user-1", email: "new@example.com", email_verified: false });
+  assert.equal(result.status, 403);
+  assert.equal(inserted, false);
+});
+
+test("account provisioning creates a verified user with legacy trial defaults", async () => {
+  const users = {
+    findOne: async () => null,
+    insertOne: async (user) => { assert.equal(user.uid, "firebase-user-2"); return { insertedId: "new-id" }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.clientPromise = Promise.resolve({ db: () => ({ collection: () => users }) });
+  const result = await connection.findOrCreateUserFromClaims({
+    sub: "firebase-user-2", email: "  New@Example.com ", email_verified: true, name: "New User"
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.user.email, "new@example.com");
+  assert.equal(result.user.name, "New User");
+  assert.equal(result.user.plan, "basic");
+  assert.equal(result.user.role, "user");
+  assert.equal(result.user.isOnboardingComplete, false);
+  assert.ok(result.user.trialExpires instanceof Date);
+});
+
+test("account provisioning never links an email already bound to another UID", async () => {
+  const users = {
+    findOne: async (query) => query.uid
+      ? null
+      : { _id: "existing-id", uid: "different-firebase-user", email: "same@example.com" },
+    findOneAndUpdate: async () => { throw new Error("Must not relink an account"); }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.clientPromise = Promise.resolve({ db: () => ({ collection: () => users }) });
+  const result = await connection.findOrCreateUserFromClaims({
+    sub: "firebase-user-3", email: "same@example.com", email_verified: true
+  });
+  assert.equal(result.status, 409);
+});
+
 test("MongoDB Durable Object rejects malformed internal profile requests", async () => {
   const connection = new MongoDBConnection({}, {});
   const response = await connection.fetch(new Request("https://do.test/internal/profile", {
