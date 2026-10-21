@@ -22,7 +22,8 @@
     "staging": {
       "name": "dating-app-api-staging",
       "vars": {
-        "MIGRATION_STAGE": "staging"
+        "MIGRATION_STAGE": "staging",
+        "CDN_HOSTNAME": "dating-app-api-staging.enadoctemp.workers.dev"
       },
       "durable_objects": {
         "bindings": [
