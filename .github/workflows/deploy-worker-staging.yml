@@ -187,6 +187,100 @@ jobs:
             test "$STATUS" = "401" || { echo "Expected anonymous request to $PATH_TO_CHECK to return 401; received $STATUS"; cat /tmp/chat-response.json; exit 1; }
           done
 
+      - name: Verify legacy HTTP route inventory does not fall through to 404/501
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exercise each legacy Express HTTP route family without credentials.
+          # Protected routes should reject the anonymous request, not fall through
+          # to the Worker's generic "Route not migrated yet" handler.
+          while read -r METHOD PATH_TO_CHECK; do
+            [[ -z "${METHOD:-}" ]] && continue
+            ARGS=()
+            case "$METHOD" in
+              POST|PUT|PATCH) ARGS=(-H "content-type: application/json" --data '{}') ;;
+            esac
+            STATUS="$(curl --silent --show-error --output /tmp/route-inventory-response.json --write-out '%{http_code}' --request "$METHOD" "${ARGS[@]}" "$WORKER_URL$PATH_TO_CHECK")"
+            if [[ "$STATUS" == "404" || "$STATUS" == "501" ]]; then
+              echo "::error::Legacy route is missing in Worker: $METHOD $PATH_TO_CHECK returned HTTP $STATUS"
+              cat /tmp/route-inventory-response.json
+              exit 1
+            fi
+            echo "PASS $METHOD $PATH_TO_CHECK -> $STATUS"
+          done <<'ROUTES'
+          GET /api/auth/test
+          POST /api/auth/login
+          POST /api/auth/logout
+          GET /api/auth/verify
+          POST /api/auth/set-initial-password
+          GET /api/status
+          POST /api/webxpay/response
+          POST /api/cron/trials
+          POST /api/cron/subscriptions
+          GET /api/geolocation
+          GET /api/users/me
+          GET /api/users/me/subscriptions
+          GET /api/users/discover
+          GET /api/users/likes
+          GET /api/users/0123456789abcdef01234567
+          PUT /api/users/me
+          POST /api/users/photos
+          PUT /api/users/photos/order
+          DELETE /api/users/photos
+          POST /api/users/block/test-user
+          POST /api/users/unblock/test-user
+          POST /api/users/subscription/upload-slip
+          DELETE /api/users/subscription/upload-slip
+          POST /api/swipe/like
+          POST /api/swipe/pass
+          POST /api/swipe/superlike
+          POST /api/swipe/undo
+          GET /api/matches
+          POST /api/matches/like/test-user
+          GET /api/matches/confirmed
+          GET /api/notifications
+          POST /api/reports
+          GET /api/support-tickets
+          POST /api/support-tickets
+          GET /api/support-tickets/test-ticket
+          POST /api/support-tickets/test-ticket/messages
+          GET /api/admin/users
+          POST /api/admin/users
+          GET /api/admin/users/stats
+          GET /api/admin/users/purchases
+          POST /api/admin/users/purchases/0123456789abcdef01234567/approve
+          POST /api/admin/users/purchases/0123456789abcdef01234567/reject
+          GET /api/admin/users/0123456789abcdef01234567
+          PUT /api/admin/users/0123456789abcdef01234567
+          DELETE /api/admin/users/0123456789abcdef01234567
+          PUT /api/admin/users/0123456789abcdef01234567/subscription
+          GET /api/admin/reports
+          GET /api/admin/reports/0123456789abcdef01234567
+          POST /api/admin/reports/0123456789abcdef01234567/action
+          GET /api/admin/analytics/summary
+          GET /api/admin/analytics/export
+          GET /api/admin/support-tickets
+          GET /api/admin/support-tickets/test-ticket
+          POST /api/admin/support-tickets/test-ticket/messages
+          PUT /api/admin/support-tickets/test-ticket/status
+          GET /api/admin/transactions
+          GET /api/admin/payment-logs
+          GET /api/admin/user-activity/login-history
+          GET /api/admin/audit-logs
+          POST /api/purchase/store-item
+          GET /api/purchase/status/0123456789abcdef01234567
+          POST /api/subscription
+          GET /api/subscription/status/0123456789abcdef01234567
+          GET /api/admin/subscriptions/pending
+          POST /api/admin/subscriptions/0123456789abcdef01234567/approve
+          POST /api/admin/subscriptions/0123456789abcdef01234567/reject
+          GET /api/admin/bank-slips/test-key
+          GET /api/chat/history/test-room
+          GET /api/chat/conversations
+          POST /api/chat/send
+          ROUTES
       - name: Verify new status and admin report routes reject anonymous requests
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
