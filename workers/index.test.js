@@ -932,6 +932,7 @@ test("migrated admin read endpoints reject anonymous requests before database ch
   const paths = [
     "/api/admin/users",
     "/api/admin/users/stats",
+    "/api/admin/users/purchases",
     "/api/admin/transactions",
     "/api/admin/analytics/summary",
     "/api/admin/analytics/export",
@@ -945,6 +946,14 @@ test("migrated admin read endpoints reject anonymous requests before database ch
     const response = await worker.fetch(request(path), env);
     assert.equal(response.status, 401, path);
   }
+  const approve = await worker.fetch(new Request("https://dating-app.test/api/admin/users/purchases/0123456789abcdef01234567/approve", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({})
+  }), env);
+  assert.equal(approve.status, 401);
+  const reject = await worker.fetch(new Request("https://dating-app.test/api/admin/users/purchases/0123456789abcdef01234567/reject", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason: "Test" })
+  }), env);
+  assert.equal(reject.status, 401);
   const message = await worker.fetch(new Request("https://dating-app.test/api/admin/support-tickets/0123456789abcdef01234567/messages", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: "Help" })
   }), env);
@@ -981,6 +990,8 @@ test("admin read methods deny users without an admin role", async () => {
   assert.equal((await connection.getAdminLogs("ordinary-user", "payment")).status, 403);
   assert.equal((await connection.getAdminLogs("ordinary-user", "login")).status, 403);
   assert.equal((await connection.getAdminLogs("ordinary-user", "audit")).status, 403);
+  assert.equal((await connection.getAdminPurchases("ordinary-user")).status, 403);
+  assert.equal((await connection.moderateAdminPurchase("ordinary-user", "0123456789abcdef01234567", "approve")).status, 403);
 });
 
 test("admin report endpoints reject anonymous requests", async () => {
