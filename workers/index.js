@@ -610,6 +610,47 @@ export default {
       }
     }
 
+    const adminReadRoute = url.pathname === "/api/admin/users" ||
+      url.pathname === "/api/admin/users/stats" ||
+      /^\\/api\\/admin\\/users\\/[a-fA-F0-9]{24}$/.test(url.pathname) ||
+      url.pathname === "/api/admin/transactions" ||
+      url.pathname === "/api/admin/analytics/summary";
+    if (adminReadRoute) {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Administration service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        let internalPath;
+        const body = { claims };
+        if (url.pathname === "/api/admin/users") {
+          internalPath = "/internal/admin/users";
+          body.params = Object.fromEntries(url.searchParams.entries());
+        } else if (url.pathname === "/api/admin/users/stats") {
+          internalPath = "/internal/admin/stats";
+        } else if (url.pathname === "/api/admin/transactions") {
+          internalPath = "/internal/admin/transactions";
+        } else if (url.pathname === "/api/admin/analytics/summary") {
+          internalPath = "/internal/admin/analytics";
+          body.params = Object.fromEntries(url.searchParams.entries());
+        } else {
+          internalPath = "/internal/admin/user";
+          body.userId = url.pathname.split("/").pop();
+        }
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+        });
+        const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Administration service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/admin/reports" || /^\/api\/admin\/reports\/[^/]+(?:\/action)?$/.test(url.pathname)) {
       const reportAction = url.pathname.match(/^\/api\/admin\/reports\/([^/]+)\/action$/);
       const reportDetail = url.pathname.match(/^\/api\/admin\/reports\/([^/]+)$/);
