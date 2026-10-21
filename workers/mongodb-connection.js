@@ -1234,8 +1234,9 @@ export class MongoDBConnection {
     const query = {};
     if (typeof params.role === "string" && ["user", "contributor", "admin", "superadmin"].includes(params.role)) query.role = params.role;
     if (typeof params.search === "string" && params.search.trim()) {
-      const escaped = params.search.trim().slice(0, 100).replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
-");
+      const escaped = params.search.trim().slice(0, 100).split("").map((ch) =>
+        "\\.^$*+?()[]{}|".includes(ch) ? "\\" + ch : ch
+      ).join("");
       query.$or = [{ name: { $regex: escaped, $options: "i" } }, { email: { $regex: escaped, $options: "i" } }];
     }
     const allowedSort = ["createdAt", "name", "email", "lastActiveAt", "role"];
