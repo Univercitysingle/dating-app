@@ -172,7 +172,7 @@ app.use(
     strictTransportSecurity: false,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -238,6 +238,16 @@ app.get("/health", (req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     database: dbStatus,
+  });
+});
+
+// Readiness check for deployments that need MongoDB before serving traffic.
+app.get("/ready", (req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "READY" : "NOT_READY",
+    database: ready ? "connected" : "disconnected",
+    timestamp: new Date().toISOString(),
   });
 });
 
