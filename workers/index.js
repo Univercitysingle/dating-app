@@ -213,6 +213,38 @@ export default {
       }
     }
 
+    const legacyMatchLike = url.pathname.match(/^\/api\/matches\/like\/([^/]+)$/);
+    if (legacyMatchLike) {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: "Match service unavailable" }, 503);
+      let targetUid;
+      try { targetUid = decodeURIComponent(legacyMatchLike[1]); } catch { return json({ error: "Invalid user ID" }, 400); }
+      if (!targetUid || targetUid.length > 128) return json({ error: "Invalid user ID" }, 400);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/swipe", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, targetUid, action: "like", canonical: true })
+        });
+        const match = await response.json().catch(() => ({ error: "Match service unavailable" }));
+        if (!response.ok) return json(match, response.status);
+        return json({
+          status: match.status,
+          likedBy: match.likedBy,
+          matchId: match._id,
+          user1Uid: match.user1Uid,
+          user2Uid: match.user2Uid
+        }, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Match service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/matches" || url.pathname === "/api/matches/confirmed") {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
