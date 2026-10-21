@@ -32,7 +32,7 @@ describe("getRuntimeConfig", () => {
     ).toBe(8);
   });
 
-  test.each(["0", "-1", "101", "invalid", ""])(
+  test.each(["0", "-1", "101", "invalid", "8abc", ""])(
     "uses a safe default for invalid pool size %p",
     (value) => {
       expect(
