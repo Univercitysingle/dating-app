@@ -123,7 +123,7 @@ export class MongoDBConnection {
 
   async addUploadedPhoto(uid, photo) {
     if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid) ||
-        !photo || typeof photo.url !== "string" || !/^photos-[A-Za-z0-9_-]{1,128}-[a-f0-9-]+\\.(?:jpg|jpeg|png|gif)$/.test(photo.url) ||
+        !photo || typeof photo.url !== "string" || !photo.url.startsWith("photos-" + uid + "-") || photo.url.length > 256 || ![".jpg", ".jpeg", ".png", ".gif"].some(ext => photo.url.endsWith(ext)) ||
         !Number.isInteger(photo.size) || photo.size < 1 || photo.size > 5 * 1024 * 1024) {
       return { status: 400, body: { message: "Invalid photo metadata" } };
     }
@@ -153,7 +153,7 @@ export class MongoDBConnection {
 
   async removeUploadedPhoto(uid, key) {
     if (typeof uid !== "string" || !uid || typeof key !== "string" || !key.startsWith("photos-" + uid + "-") ||
-        !/^photos-[A-Za-z0-9_-]{1,128}-[a-f0-9-]+\\.(?:jpg|jpeg|png|gif)$/.test(key)) {
+        key.length > 256 || ![".jpg", ".jpeg", ".png", ".gif"].some(ext => key.endsWith(ext))) {
       return { status: 400, body: { message: "Invalid photo key" } };
     }
     try {
