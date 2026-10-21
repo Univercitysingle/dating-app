@@ -80,7 +80,7 @@ jobs:
           http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
             --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             --header "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects?per_page=50")"
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects")"
           curl_exit=$?
           set -e
           response="$(cat "$response_file")"
