@@ -1269,3 +1269,42 @@ test("declined WebXPay callbacks are acknowledged idempotently without granting 
   assert.equal(purchase.status, "rejected");
   assert.equal(userUpdates, 0);
 });
+
+
+test("bank-slip submission uses server-owned plan metadata and private object keys", async () => {
+  const user = { _id: "user-object-id", uid: "user-1", plan: "basic" };
+  let inserted = null;
+  const subscriptions = {
+    async findOne() { return null; },
+    async insertOne(doc) { inserted = doc; return { insertedId: "subscription-id" }; }
+  };
+  const users = { async findOne() { return user; } };
+  const db = { collection(name) { return name === "users" ? users : subscriptions; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const result = await connection.createBankSlipSubscription(
+    "user-1", "bank-slips-user-1-12345678-1234-4234-8234-123456789abc.jpg", "image/jpeg", 2048, "premium_1m"
+  );
+  assert.equal(result.status, 201);
+  assert.equal(inserted.plan, "premium");
+  assert.equal(inserted.durationDays, 30);
+  assert.equal(inserted.superLikes, 25);
+  assert.equal(inserted.undos, 50);
+  assert.equal(inserted.status, "pending");
+  assert.equal(inserted.bankSlipContentType, "image/jpeg");
+  const invalid = await connection.createBankSlipSubscription(
+    "user-1", "bank-slips-user-1-12345678-1234-4234-8234-123456789abc.jpg", "image/jpeg", 2048, "premium_99y"
+  );
+  assert.equal(invalid.status, 400);
+});
+
+test("bank-slip admin retrieval and moderation deny non-admin users", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({ collection: () => ({ findOne: async () => ({ role: "user" }) }) })
+  });
+  const key = "bank-slips-user-1-12345678-1234-4234-8234-123456789abc.jpg";
+  assert.equal((await connection.authorizeAdminBankSlip("ordinary-user", key)).status, 403);
+  assert.equal((await connection.getPendingBankSlipSubscriptions("ordinary-user")).status, 403);
+  assert.equal((await connection.moderateBankSlipSubscription("ordinary-user", "0123456789abcdef01234567", "approve")).status, 403);
+});
