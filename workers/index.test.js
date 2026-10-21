@@ -117,6 +117,30 @@ test("MongoDB Durable Object exposes no general-purpose HTTP operation", async (
   assert.equal(response.status, 404);
 });
 
+test("Firebase token login rejects missing credentials and unsupported methods", async () => {
+  const missing = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({})
+  }), { FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {} });
+  assert.equal(missing.status, 400);
+  const wrongMethod = await worker.fetch(request("/api/auth/login", "GET"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(wrongMethod.status, 405);
+});
+
+test("Firebase token login rejects invalid tokens without provisioning users", async () => {
+  const response = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: "not-a-valid-token" })
+  }), { FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {} });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Invalid or expired token" });
+});
+
+test("password-based administrator login fails closed until migrated", async () => {
+  const response = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "admin@example.com", password: "secret" })
+  }), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(response.status, 501);
+});
+
 test("POST /api/auth/logout preserves the legacy stateless logout response", async () => {
   const response = await worker.fetch(request("/api/auth/logout", "POST"), {});
   assert.equal(response.status, 200);
