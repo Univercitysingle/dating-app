@@ -27,14 +27,14 @@ export function isB2Configured(env) {
   return Boolean(env.B2_ENDPOINT && env.B2_BUCKET_NAME && env.B2_APPLICATION_KEY_ID && env.B2_APPLICATION_KEY);
 }
 
-export async function putPrivateObject(env, key, body, contentType, ownerUid) {
+export async function putPrivateObject(env, key, body, contentType, ownerUid, purpose = "profile-photo") {
   const { client, bucket } = createClient(env);
   await client.send(new PutObjectCommand({
     Bucket: bucket,
     Key: key,
     Body: body,
     ContentType: contentType,
-    Metadata: { owneruid: ownerUid, purpose: "profile-photo" }
+    Metadata: { owneruid: ownerUid, purpose }
   }));
 }
 
