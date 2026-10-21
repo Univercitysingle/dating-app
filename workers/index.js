@@ -610,6 +610,42 @@ export default {
       }
     }
 
+    const adminSupportMatch = url.pathname.match(/^\\/api\\/admin\\/support-tickets(?:\\/([^/]+)(?:\\/(messages|status))?)?$/);
+    if (adminSupportMatch) {
+      const ticketId = adminSupportMatch[1];
+      const action = adminSupportMatch[2];
+      const allowed = (!ticketId && request.method === "GET") ||
+        (ticketId && !action && request.method === "GET") ||
+        (ticketId && action === "messages" && request.method === "POST") ||
+        (ticketId && action === "status" && request.method === "PUT");
+      if (!allowed) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Administration service unavailable" }, 503);
+        const payload = action ? await request.json().catch(() => null) : null;
+        if (action && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+          return json({ message: "A valid request body is required" }, 400);
+        }
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const internalPath = !ticketId ? "/internal/admin/support-tickets"
+          : action === "messages" ? "/internal/admin/support-ticket-message"
+          : action === "status" ? "/internal/admin/support-ticket-status"
+          : "/internal/admin/support-ticket";
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, ticketId, payload, params: Object.fromEntries(url.searchParams.entries()) })
+        });
+        const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Administration service unavailable" }, 503);
+      }
+    }
+
     const adminReadRoute = url.pathname === "/api/admin/users" ||
       url.pathname === "/api/admin/users/stats" ||
       (url.pathname.startsWith("/api/admin/users/") && /^[a-fA-F0-9]{24}$/.test(url.pathname.split("/").pop())) ||
