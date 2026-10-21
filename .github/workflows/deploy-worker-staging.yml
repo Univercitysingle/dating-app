@@ -39,6 +39,7 @@ jobs:
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
       SUPER_ADMIN_PASSWORD_HASH: ${{ secrets.SUPER_ADMIN_PASSWORD_HASH }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -129,6 +130,14 @@ jobs:
           fi
           if [[ -n "$SUPER_ADMIN_PASSWORD_HASH" ]]; then
             printf '%s' "$SUPER_ADMIN_PASSWORD_HASH" | npx --yes wrangler@4 secret put SUPER_ADMIN_PASSWORD_HASH --config wrangler.jsonc --env staging
+          fi
+
+      - name: Configure optional manual cron secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$CRON_SECRET" ]]; then
+            printf '%s' "$CRON_SECRET" | npx --yes wrangler@4 secret put CRON_SECRET --config wrangler.jsonc --env staging
           fi
 
       - name: Verify staging liveness
