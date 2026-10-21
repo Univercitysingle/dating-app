@@ -60,26 +60,12 @@ const SwipeDeck = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // --- START DIAGNOSTIC LOGGING ---
-  useEffect(() => {
-    console.log('%cSwipeDeck State Change:', 'color: purple; font-weight: bold;', {
-      isLoading,
-      error,
-      usersCount: users.length,
-      users: users ? JSON.parse(JSON.stringify(users)) : null,
-    });
-  }, [isLoading, error, users]);
-  // --- END DIAGNOSTIC LOGGING ---
-
   const fetchUsersToSwipe = useCallback(async (filters = {}) => {
-    const logger = console;
-    logger.log("SwipeDeck DIAGNOSTIC: Fetching users with filters:", filters);
     setIsLoading(true);
     setError(null);
     setNewMatchInfo(null);
     try {
       const data = await apiClient.get('/users/discover', { params: filters });
-      logger.log("SwipeDeck DIAGNOSTIC: Successfully fetched users. API response:", data);
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching users for swipe deck:", err);
