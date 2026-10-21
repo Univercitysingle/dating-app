@@ -1,4 +1,4 @@
-import { authenticateFirebaseRequest, FirebaseTokenError } from "./firebase-auth.js";
+import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -73,6 +73,7 @@ export default {
           emailVerified: claims.email_verified === true
         });
       } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
         return json({ error: "Authentication service unavailable" }, 503);
       }
