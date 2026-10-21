@@ -283,7 +283,7 @@ test("super-like consumes a purchased credit and records super-like notification
 });
 
 test("legacy match-like route rejects anonymous requests and unsupported methods", async () => {
-  const anonymous = await worker.fetch(request("/api/matches/like/target"), {
+  const anonymous = await worker.fetch(request("/api/matches/like/target", "POST"), {
     FIREBASE_PROJECT_ID: "test-project",
     MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
   });
