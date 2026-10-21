@@ -2,18 +2,6 @@ name: Deploy dating-app frontend to Cloudflare Pages
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - migrate-to-serverless
-    paths:
-      - "src/**"
-      - "public/**"
-      - "functions/**"
-      - "package.json"
-      - "package-lock.json"
-      - "tailwind.config.js"
-      - "postcss.config.js"
-      - ".github/workflows/deploy-cloudflare-pages.yml"
 
 permissions:
   contents: read
