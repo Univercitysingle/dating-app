@@ -1,4 +1,5 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
+import { isB2Configured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -84,6 +85,24 @@ export default {
     }
     if (url.pathname === "/favicon.ico" && request.method === "GET") {
       return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400" } });
+    }
+
+    // Private B2 profile images are served through a constrained object proxy.
+    const mediaMatch = url.pathname.match(/^\/media\/([^/]+)$/);
+    if (mediaMatch) {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
+      let key;
+      try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
+      if (!/^photos-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\.(jpg|png|gif)$/i.test(key)) return json({ error: "Media not found" }, 404);
+      if (!isB2Configured(env)) return json({ error: "Media storage unavailable" }, 503);
+      try {
+        const object = await getPrivateObject(env, key);
+        const headers = new Headers({ "content-type": object.ContentType || "application/octet-stream", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" });
+        if (object.ContentLength !== undefined) headers.set("content-length", String(object.ContentLength));
+        if (request.method === "HEAD") return new Response(null, { status: 200, headers });
+        const body = object.Body && typeof object.Body.transformToWebStream === "function" ? object.Body.transformToWebStream() : object.Body;
+        return new Response(body, { status: 200, headers });
+      } catch { return json({ error: "Media not found" }, 404); }
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
@@ -438,17 +457,8 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        if (!env.MEDIA_BUCKET || typeof env.MEDIA_BUCKET.put !== "function" || !env.MEDIA_PUBLIC_BASE_URL) {
+        if (!isB2Configured(env)) {
           return json({ message: "Photo storage is not configured" }, 503);
-        }
-        let publicBase;
-        try {
-          publicBase = new URL(env.MEDIA_PUBLIC_BASE_URL);
-          if (publicBase.protocol !== "https:" || publicBase.username || publicBase.password || publicBase.search || publicBase.hash) {
-            return json({ message: "Photo storage URL is not configured safely" }, 503);
-          }
-        } catch {
-          return json({ message: "Photo storage URL is not configured safely" }, 503);
         }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("photo");
@@ -470,16 +480,13 @@ export default {
         if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         try {
-          await env.MEDIA_BUCKET.put(key, fileBytes, {
-            httpMetadata: { contentType: file.type },
-            customMetadata: { ownerUid: claims.sub, purpose: "profile-photo" }
-          });
+          await putPrivateObject(env, key, fileBytes, file.type, claims.sub);
         } catch {
           return json({ message: "Photo upload failed" }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
-          await env.MEDIA_BUCKET.delete(key).catch(() => {});
+          await deletePrivateObject(env, key).catch(() => {});
           return json({ message: "Photo metadata service unavailable" }, 503);
         }
         const connection = env.MONGODB_CONNECTION.get(id);
@@ -489,12 +496,12 @@ export default {
         });
         const result = await metadataResponse.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!metadataResponse.ok) {
-          await env.MEDIA_BUCKET.delete(key).catch(() => {});
+          await deletePrivateObject(env, key).catch(() => {});
           return json(result, metadataResponse.status);
         }
         return json({
           ...result,
-          cdnUrl: publicBase.origin + (publicBase.pathname.endsWith("/") ? publicBase.pathname.slice(0, -1) : publicBase.pathname) + "/" + encodeURIComponent(key)
+          cdnUrl: new URL("/media/" + encodeURIComponent(key), request.url).toString()
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
@@ -507,7 +514,7 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        if (!env.MEDIA_BUCKET || typeof env.MEDIA_BUCKET.delete !== "function") return json({ message: "Photo storage is not configured" }, 503);
+        if (!isB2Configured(env)) return json({ message: "Photo storage is not configured" }, 503);
         const payload = await request.json().catch(() => null);
         if (!payload || typeof payload.photoUrl !== "string" || !payload.photoUrl) return json({ error: "photoUrl is required." }, 400);
         let key = payload.photoUrl;
@@ -527,7 +534,7 @@ export default {
         });
         const result = await response.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!response.ok) return json(result, response.status);
-        await env.MEDIA_BUCKET.delete(key).catch(() => {});
+        await deletePrivateObject(env, key).catch(() => {});
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
