@@ -54,8 +54,7 @@ export class MongoDBConnection {
     }
 
     try {
-      const client = await this.getClient();
-      const users = client.db().collection("users");
+      const users = (await this.getClient()).db().collection("users");
       const existingByUid = await users.findOne({ uid: claims.sub });
       if (existingByUid) return { status: 200, user: existingByUid };
 
@@ -64,7 +63,56 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "User provisioning requires a verified email address" } };
       }
 
-      const existingByEmail = await users.findOne({ email: { $regex: "^" + email.replace(/[.*+?^${}()|[\]\\]/g, "\\  async getCurrentUserProfile(uid) {
+      const existingByEmail = await users.findOne({ $expr: { $eq: [{ $toLower: "$email" }, email] } });
+      if (existingByEmail) {
+        if (existingByEmail.uid && existingByEmail.uid !== claims.sub) {
+          return { status: 409, body: { error: "This email is already linked to another account" } };
+        }
+        const linked = await users.findOneAndUpdate(
+          { _id: existingByEmail._id, $or: [{ uid: { $exists: false } }, { uid: null }, { uid: "" }] },
+          { $set: { uid: claims.sub, email } },
+          { returnDocument: "after" }
+        );
+        if (linked && linked.uid === claims.sub) return { status: 200, user: linked };
+        return { status: 409, body: { error: "Account identity changed; please retry sign-in" } };
+      }
+
+      const user = {
+        uid: claims.sub,
+        email,
+        name: typeof claims.name === "string" ? claims.name : "",
+        trialExpires: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        isOnboardingComplete: false,
+        interests: [],
+        profilePrompts: [],
+        blocked: [],
+        photos: [],
+        totalPhotoSize: 0,
+        isVerified: false,
+        plan: "basic",
+        role: "user",
+        isProfileVisible: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      try {
+        const result = await users.insertOne(user);
+        user._id = result.insertedId;
+        return { status: 200, user };
+      } catch (error) {
+        if (error?.code === 11000) {
+          const racedUser = await users.findOne({ uid: claims.sub });
+          if (racedUser) return { status: 200, user: racedUser };
+          return { status: 409, body: { error: "Account already exists; please retry sign-in" } };
+        }
+        throw error;
+      }
+    } catch {
+      return { status: 503, body: { error: "Profile service unavailable" } };
+    }
+  }
+
+  async getCurrentUserProfile(uid) {
 ") + "$", $options: "i" } });
       if (existingByEmail) {
         // Never transfer an account already bound to a different Firebase identity.
