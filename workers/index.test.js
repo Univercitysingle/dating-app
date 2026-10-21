@@ -1444,3 +1444,39 @@ test("password-based superadmin login signs a Firebase custom token only for the
   assert.equal(claims.uid, "superadmin_uid");
   assert.equal(claims.claims.role, "superadmin");
 });
+
+
+test("scheduled expiration scopes run only the requested category", async () => {
+  const emptyCursor = { sort() { return this; }, limit() { return this; }, async toArray() { return []; } };
+  const trialsOnly = new MongoDBConnection({}, {});
+  trialsOnly.getClient = async () => ({
+    db: () => ({
+      collection(name) {
+        if (name === "subscriptions") return {
+          find() { assert.fail("trial-only run must not query expired subscriptions"); },
+          async findOne() { return null; }
+        };
+        return { find() { return emptyCursor; }, async updateOne() { return { modifiedCount: 0 }; } };
+      }
+    })
+  });
+  assert.deepEqual(await trialsOnly.runScheduledExpirations(new Date(), "trials"), {
+    success: true, expiredSubscriptions: 0, expiredTrials: 0, downgradedUsers: 0
+  });
+
+  const subscriptionsOnly = new MongoDBConnection({}, {});
+  subscriptionsOnly.getClient = async () => ({
+    db: () => ({
+      collection(name) {
+        if (name === "users") return {
+          find() { assert.fail("subscription-only run must not query expired trials"); },
+          async updateOne() { return { modifiedCount: 0 }; }
+        };
+        return { find() { return emptyCursor; }, async updateOne() { return { modifiedCount: 0 }; }, async findOne() { return null; } };
+      }
+    })
+  });
+  assert.deepEqual(await subscriptionsOnly.runScheduledExpirations(new Date(), "subscriptions"), {
+    success: true, expiredSubscriptions: 0, expiredTrials: 0, downgradedUsers: 0
+  });
+});
