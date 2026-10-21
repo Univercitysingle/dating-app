@@ -598,6 +598,31 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/users/subscription/upload-slip" && request.method === "DELETE") {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!isB2Configured(env)) return json({ error: "Bank-slip storage is not configured" }, 503);
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload.subscriptionId !== "string") return json({ error: "subscriptionId is required" }, 400);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Subscription service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/bank-slip-delete", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, subscriptionId: payload.subscriptionId })
+        });
+        const result = await response.json().catch(() => ({ error: "Bank-slip deletion unavailable" }));
+        if (!response.ok) return json(result, response.status);
+        if (typeof result.key === "string") await deletePrivateObject(env, result.key).catch(() => {});
+        return json({ success: true, message: "Pending bank-slip submission deleted" }, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Bank-slip deletion unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/photos" && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
