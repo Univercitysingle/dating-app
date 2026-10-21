@@ -27,7 +27,7 @@ The current root server.js is a long-lived Express/HTTP process. It loads all Mo
 
 1. Deploy Worker in staging on a separate hostname; production origin stays unchanged.
 2. Add request IDs, structured logs, bounded JSON bodies, CORS allowlist, security headers, route-level rate limiting, and consistent error responses.
-3. Implement Firebase ID-token verification with Google's published signing keys and strict project/issuer/audience checks. Reject invalid or missing tokens by default.
+3. Implement Firebase ID-token verification with Google's published signing keys and strict project/issuer/audience/expiry checks. Reject invalid or missing tokens by default. The initial `GET /api/auth/verify` route is now implemented and returns only the verified UID and email-verification boolean.
 4. Keep `/ready` dependency-aware: it verifies required configuration and performs a real MongoDB ping through the Durable Object. Firebase is currently configuration-checked only, not connectivity-checked; readiness must not be described as a full Firebase connectivity probe.
 
 ### Phase 2: migrate read-only endpoints
