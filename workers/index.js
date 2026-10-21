@@ -501,7 +501,7 @@ export default {
         }
         return json({
           ...result,
-          cdnUrl: new URL("/media/" + encodeURIComponent(key), request.url).toString()
+          cdnUrl: new URL("/media/" + encodeURIComponent(key), "https://" + (env.CDN_HOSTNAME || new URL(request.url).host)).toString()
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
