@@ -311,7 +311,7 @@ test("photo ordering persists only supported fields and returns the current prof
   const stored = { _id: "user-id", uid: "user-1", email: "user@example.com", photos: [] };
   let update;
   const users = {
-    updateOne: async (_query, value) => { update = value; stored.photos = value.$set.photos; return { matchedCount: 1 }; },
+    updateOne: async (_query, value) => { update = value; stored.photos = value.$set.photos.map((photo) => ({ ...photo })); return { matchedCount: 1 }; },
     findOne: async () => stored
   };
   const subscriptions = { findOne: async () => null };
