@@ -69,7 +69,7 @@ function initSocket(server, allowedOrigins, adminInstance) {
       }
     });
 
-    socket.on("sendMessage", async ({ roomId, messageContent, receiverUid }) => {
+    socket.on("sendMessage", async ({ roomId, messageContent, receiverUid } = {}) => {
       console.log(`Message received in room ${roomId} from ${socket.user.uid}: ${messageContent}`);
       if (typeof roomId !== 'string' || !roomId || typeof messageContent !== 'string' || !messageContent.trim() || messageContent.length > MAX_MESSAGE_LENGTH || typeof receiverUid !== 'string' || !receiverUid) {
         socket.emit("messageError", { error: "Invalid message data. Messages must contain 1 to 2000 characters." });
