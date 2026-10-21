@@ -850,7 +850,7 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/swipe") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string" ||
-          typeof body.targetUid !== "string" || !["like", "pass"].includes(body.action)) {
+          typeof body.targetUid !== "string" || !["like", "pass", "superlike"].includes(body.action)) {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.recordSwipe(body.claims.sub, body.targetUid, body.action);
