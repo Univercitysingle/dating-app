@@ -2198,6 +2198,33 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if (url.pathname === "/internal/bank-slip-upload") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          typeof body.key !== "string" || typeof body.contentType !== "string" ||
+          typeof body.size !== "number" || typeof body.planId !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.createBankSlipSubscription(body.claims.sub, body.key, body.contentType, body.size, body.planId);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/admin/bank-slip-authorize" ||
+        url.pathname === "/internal/admin/bank-slip-pending" ||
+        url.pathname === "/internal/admin/bank-slip-moderate") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/admin/bank-slip-authorize") {
+        result = await this.authorizeAdminBankSlip(body.claims.sub, body.key);
+      } else if (url.pathname === "/internal/admin/bank-slip-pending") {
+        result = await this.getPendingBankSlipSubscriptions(body.claims.sub);
+      } else {
+        result = await this.moderateBankSlipSubscription(body.claims.sub, body.subscriptionId, body.action, body.reason || "");
+      }
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/ping") {
       const result = await this.ping();
       return json({ status: result.ok ? "ok" : "unavailable" }, result.ok ? 200 : 503);
