@@ -292,6 +292,33 @@ test("legacy match-like route rejects anonymous requests and unsupported methods
   assert.equal(wrongMethod.status, 405);
 });
 
+test("notifications endpoint rejects anonymous requests and unsupported methods", async () => {
+  const anonymous = await worker.fetch(request("/api/notifications"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  });
+  assert.equal(anonymous.status, 401);
+  const wrongMethod = await worker.fetch(request("/api/notifications", "POST"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(wrongMethod.status, 405);
+});
+
+test("notifications return pending items ordered newest first", async () => {
+  let query, sortSpec;
+  const notifications = {
+    find: (value) => {
+      query = value;
+      return { sort: (value) => { sortSpec = value; return { toArray: async () => [{ type: "like" }] }; } };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => notifications }) });
+  const result = await connection.getNotifications("user-1");
+  assert.equal(result.status, 200);
+  assert.deepEqual(query, { recipientUid: "user-1", status: "pending" });
+  assert.deepEqual(sortSpec, { createdAt: -1 });
+  assert.deepEqual(result.body, [{ type: "like" }]);
+});
+
 test("match read endpoints reject anonymous requests", async () => {
   for (const path of ["/api/matches", "/api/matches/confirmed"]) {
     const response = await worker.fetch(request(path), {
