@@ -91,7 +91,7 @@ export default {
         const response = await connection.fetch("https://internal.invalid/internal/profile", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ uid: claims.sub })
+          body: JSON.stringify({ claims })
         });
         const body = await response.json().catch(() => ({ error: "Profile service unavailable" }));
         return json(body, response.status);
