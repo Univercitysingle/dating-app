@@ -690,7 +690,10 @@ export default {
       url.pathname === "/api/admin/users/stats" ||
       (url.pathname.startsWith("/api/admin/users/") && /^[a-fA-F0-9]{24}$/.test(url.pathname.split("/").pop())) ||
       url.pathname === "/api/admin/transactions" ||
-      url.pathname === "/api/admin/analytics/summary";
+      url.pathname === "/api/admin/analytics/summary" ||
+      url.pathname === "/api/admin/payment-logs" ||
+      url.pathname === "/api/admin/user-activity/login-history" ||
+      url.pathname === "/api/admin/audit-logs";
     if (adminReadRoute) {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
@@ -711,6 +714,15 @@ export default {
         } else if (url.pathname === "/api/admin/analytics/summary") {
           internalPath = "/internal/admin/analytics";
           body.params = Object.fromEntries(url.searchParams.entries());
+        } else if (url.pathname === "/api/admin/payment-logs") {
+          internalPath = "/internal/admin/payment-logs";
+          body.search = url.searchParams.get("search") || "";
+        } else if (url.pathname === "/api/admin/user-activity/login-history") {
+          internalPath = "/internal/admin/login-history";
+          body.search = url.searchParams.get("search") || "";
+        } else if (url.pathname === "/api/admin/audit-logs") {
+          internalPath = "/internal/admin/audit-logs";
+          body.search = url.searchParams.get("search") || "";
         } else {
           internalPath = "/internal/admin/user";
           body.userId = url.pathname.split("/").pop();
