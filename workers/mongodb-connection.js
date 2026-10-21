@@ -180,6 +180,74 @@ export class MongoDBConnection {
     }
   }
 
+  async undoSwipe(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const db = (await this.getClient()).db();
+      const users = db.collection("users");
+      const user = await users.findOne({ uid });
+      if (!user) return { status: 404, body: { error: "User not found." } };
+      if ((!user.undoSwipes || user.undoSwipes.count <= 0) && !(user.purchasedUndoSwipes > 0)) {
+        return { status: 400, body: { error: "No undo swipes remaining." } };
+      }
+      const lastSwipe = user.lastSwipe;
+      if (!lastSwipe || !lastSwipe.action) return { status: 404, body: { error: "No swipe to undo." } };
+      if (!lastSwipe.matchId) return { status: 404, body: { error: "Cannot find the match record for the swipe to undo." } };
+      const matches = db.collection("matches");
+      const match = await matches.findOne({ _id: lastSwipe.matchId });
+      if (!match) return { status: 404, body: { error: "Cannot find the match record for the swipe to undo." } };
+
+      let undoCreditSource = null;
+      if (user.purchasedUndoSwipes > 0) {
+        const consumed = await users.updateOne({ uid, purchasedUndoSwipes: { $gt: 0 } }, { $inc: { purchasedUndoSwipes: -1 } });
+        if (consumed.matchedCount) undoCreditSource = "purchasedUndoSwipes";
+      }
+      if (!undoCreditSource) {
+        const consumed = await users.updateOne({ uid, "undoSwipes.count": { $gt: 0 } }, { $inc: { "undoSwipes.count": -1 } });
+        if (consumed.matchedCount) undoCreditSource = "undoSwipes.count";
+      }
+      if (!undoCreditSource) return { status: 400, body: { error: "No undo swipes remaining." } };
+
+      const update = { $set: { status: "pending", updatedAt: new Date() } };
+      if (lastSwipe.action === "like" || lastSwipe.action === "superlike") {
+        update.$pull = { likedBy: uid };
+      }
+      if (lastSwipe.action === "superlike") update.$set.superLike = false;
+      await matches.updateOne({ _id: match._id }, update);
+
+      if (lastSwipe.action === "superlike") {
+        if (lastSwipe.superLikeSource === "purchasedSuperLikes") {
+          await users.updateOne({ uid }, { $inc: { purchasedSuperLikes: 1 } });
+        } else {
+          await users.updateOne({ uid }, { $inc: { "superLikes.count": 1 } });
+        }
+      }
+      await users.updateOne({ uid }, { $unset: { lastSwipe: "" }, $set: { updatedAt: new Date() } });
+
+      const target = await users.findOne({ uid: lastSwipe.targetUserId });
+      if (!target) return { status: 200, body: { undoneUser: null } };
+      const profile = { ...target };
+      delete profile.password;
+      delete profile.lastLoginIp;
+      if (profile.uid !== uid) {
+        delete profile.email;
+        delete profile.mobileNumber;
+      }
+      if (profile._id !== undefined) profile.id = String(profile._id);
+      if (Array.isArray(profile.photos)) {
+        profile.photos = profile.photos.map(photo => {
+          if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
+          let path = photo.url;
+          while (path.startsWith("/")) path = path.slice(1);
+          return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + path };
+        });
+      }
+      return { status: 200, body: { undoneUser: profile } };
+    } catch {
+      return { status: 503, body: { error: "Swipe service unavailable" } };
+    }
+  }
+
   async recordSwipe(uid, targetUid, action) {
     if (typeof uid !== "string" || !uid || uid.length > 128 ||
         typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
@@ -270,7 +338,7 @@ export class MongoDBConnection {
       }
 
       await users.updateOne({ uid }, {
-        $set: { lastSwipe: { action, targetUserId: targetUid, matchId: match._id, timestamp: now }, updatedAt: now }
+        $set: { lastSwipe: { action, targetUserId: targetUid, matchId: match._id, timestamp: now, ...(action === "superlike" ? { superLikeSource: superLikeSpent } : {}) }, updatedAt: now }
       });
       return {
         status: 200,
@@ -844,6 +912,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/undo-swipe") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.undoSwipe(body.claims.sub);
       return json(result.body, result.status);
     }
 
