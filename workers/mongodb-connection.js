@@ -1587,6 +1587,44 @@ export class MongoDBConnection {
     }
   }
 
+  async getAdminLogs(uid, kind, search = "") {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (!["payment", "login", "audit"].includes(kind)) return { status: 400, body: { message: "Invalid log type" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const filter = {};
+      if (typeof search === "string" && search.trim()) {
+        const needle = search.trim().slice(0, 100);
+        const escaped = needle.split("").map(ch => "\\.^$*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
+        const userQuery = { $or: [{ name: { $regex: escaped, $options: "i" } }, { email: { $regex: escaped, $options: "i" } }] };
+        if (kind === "audit") userQuery.role = { $in: ["admin", "superadmin"] };
+        const users = await db.collection("users").find(userQuery, { projection: { _id: 1 } }).limit(500).toArray();
+        if (!users.length) return { status: 200, body: [] };
+        const userIds = users.map(user => user._id);
+        if (kind === "audit") filter.adminId = { $in: userIds };
+        else filter.userId = { $in: userIds };
+      }
+      const collectionName = kind === "payment" ? "subscriptions" : kind === "login" ? "loginhistories" : "auditlogs";
+      const refField = kind === "audit" ? "adminId" : "userId";
+      const entries = await db.collection(collectionName).aggregate([
+        { $match: filter },
+        { $sort: { timestamp: -1, createdAt: -1 } },
+        { $limit: 500 },
+        { $lookup: { from: "users", localField: refField, foreignField: "_id", as: "user" } },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+        { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
+      ]).toArray();
+      return { status: 200, body: entries.map(entry => {
+        if (kind === "payment") return { ...entry, userId: entry.user || null };
+        if (kind === "audit") return { ...entry, adminId: entry.user || null };
+        return { ...entry, userId: entry.user || null };
+      }) };
+    } catch {
+      return { status: 503, body: { message: "Unable to load administrative logs" } };
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
