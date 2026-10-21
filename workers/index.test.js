@@ -951,6 +951,18 @@ test("migrated admin read endpoints reject anonymous requests before database ch
   assert.equal(status.status, 401);
 });
 
+test("admin user write routes reject anonymous requests", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project" };
+  const userId = "0123456789abcdef01234567";
+  const calls = [
+    new Request("https://dating-app.test/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "test@example.com" }) }),
+    new Request("https://dating-app.test/api/admin/users/" + userId, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Changed" }) }),
+    new Request("https://dating-app.test/api/admin/users/" + userId, { method: "DELETE" }),
+    new Request("https://dating-app.test/api/admin/users/" + userId + "/subscription", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: "premium" }) })
+  ];
+  for (const call of calls) assert.equal((await worker.fetch(call, env)).status, 401, call.url);
+});
+
 test("admin read methods deny users without an admin role", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({
