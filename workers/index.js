@@ -28,17 +28,38 @@ export class RateLimiter {
   }
 }
 
+export { MongoDBConnection } from "./mongodb-connection.js";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ status: "ok", service: "dating-app-api", stage: env.MIGRATION_STAGE || "unknown" });
     }
+
     if (request.method === "GET" && url.pathname === "/ready") {
-      const missing = ["FIREBASE_PROJECT_ID", "MONGO_API_BASE_URL"].filter((key) => !env[key]);
-      if (missing.length) return json({ status: "not_ready", missingConfiguration: missing }, 503);
-      return json({ status: "configuration_present", note: "Dependency connectivity checks are not implemented in this scaffold." }, 503);
+      const missing = ["FIREBASE_PROJECT_ID", "MONGODB_URI"].filter((key) => !env[key]);
+      if (missing.length) {
+        return json({ status: "not_ready", missingConfiguration: missing }, 503);
+      }
+
+      if (!env.MONGODB_CONNECTION) {
+        return json({ status: "not_ready", reason: "MongoDB connectivity probe is unavailable" }, 503);
+      }
+
+      try {
+        const id = env.MONGODB_CONNECTION.idFromName("readiness-probe");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const result = await connection.ping();
+        if (!result || result.ok !== true) {
+          return json({ status: "not_ready", dependencies: { mongodb: "unavailable" } }, 503);
+        }
+        return json({ status: "ready", dependencies: { mongodb: "ok", firebase: "configuration_present" } });
+      } catch {
+        return json({ status: "not_ready", dependencies: { mongodb: "unavailable" } }, 503);
+      }
     }
+
     return json({ error: "Route not migrated yet" }, 501);
   }
 };
