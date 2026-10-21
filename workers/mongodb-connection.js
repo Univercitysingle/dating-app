@@ -41,20 +41,13 @@ export class MongoDBConnection {
   getMediaUrl(path) {
     let clean = String(path || "");
     while (clean.startsWith("/")) clean = clean.slice(1);
-    const isNewR2Photo = clean.startsWith("photos-") && [".jpg", ".jpeg", ".png", ".gif"].some(ext => clean.endsWith(ext));
-    if (this.env.MEDIA_PUBLIC_BASE_URL && isNewR2Photo) {
-      try {
-        const base = new URL(this.env.MEDIA_PUBLIC_BASE_URL);
-        if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
-          const prefix = base.pathname.endsWith("/") ? base.pathname.slice(0, -1) : base.pathname;
-          const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-          return base.origin + prefix + "/" + encoded;
-        }
-      } catch {
-        // Fall back to the existing CDN hostname for legacy media only.
-      }
+    const isNewB2Photo = clean.startsWith("photos-") && [".jpg", ".jpeg", ".png", ".gif"].some(ext => clean.endsWith(ext));
+    const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
+    if (isNewB2Photo) {
+      const host = this.env.CDN_HOSTNAME || "dating-app-api-staging.enadoctemp.workers.dev";
+      return "https://" + host + "/media/" + encoded;
     }
-    return "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + clean;
+    return "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + encoded;
   }
 
   getDatabase(client) {
