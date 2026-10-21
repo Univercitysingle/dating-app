@@ -63,6 +63,7 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing GitHub secret CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$MONGODB_URI" || { echo "Missing GitHub secret MONGODB_URI"; exit 1; }
           test -n "$FIREBASE_PROJECT_ID" || { echo "Missing FIREBASE_PROJECT_ID configuration"; exit 1; }
+          test -n "$FIREBASE_DATABASE_URL" || { echo "Missing GitHub secret FIREBASE_DATABASE_URL (copy the URL from Firebase Console → Realtime Database)"; exit 1; }
           test -n "$CDN_HOSTNAME" || { echo "Missing GitHub secret CDN_HOSTNAME (legacy CDN hostname)"; exit 1; }
           test -n "$B2_ENDPOINT" || { echo "Missing GitHub secret AWS_S3_ENDPOINT"; exit 1; }
           test -n "$B2_BUCKET_NAME" || { echo "Missing GitHub secret AWS_S3_BUCKET_NAME"; exit 1; }
@@ -116,13 +117,11 @@ jobs:
             printf '%s' "$WEBXPAY_SECRET_KEY" | npx --yes wrangler@4 secret put WEBXPAY_SECRET_KEY --config wrangler.jsonc --env staging
           fi
 
-      - name: Configure optional Firebase Realtime Database secret
+      - name: Configure required Firebase Realtime Database secret
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "$FIREBASE_DATABASE_URL" ]]; then
-            printf '%s' "$FIREBASE_DATABASE_URL" | npx --yes wrangler@4 secret put FIREBASE_DATABASE_URL --config wrangler.jsonc --env staging
-          fi
+          printf '%s' "$FIREBASE_DATABASE_URL" | npx --yes wrangler@4 secret put FIREBASE_DATABASE_URL --config wrangler.jsonc --env staging
 
       - name: Configure optional superadmin authentication secrets
         shell: bash
