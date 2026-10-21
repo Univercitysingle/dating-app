@@ -2205,6 +2205,117 @@ export class MongoDBConnection {
     }
   }
 
+  parseChatRoom(roomId) {
+    if (typeof roomId !== "string" || roomId.length > 260) return null;
+    const parts = roomId.split("-");
+    if (parts.length !== 2 || !parts.every(part => /^[A-Za-z0-9_]{1,128}$/.test(part)) || parts[0] === parts[1]) return null;
+    return parts;
+  }
+
+  async getChatHistory(uid, roomId, limit = 50, skip = 0) {
+    const participants = this.parseChatRoom(roomId);
+    if (!participants || !participants.includes(uid)) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
+    limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
+    skip = Number.isInteger(skip) ? Math.max(0, Math.min(skip, 100000)) : 0;
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const messages = await db.collection("chatmessages").find({ roomId })
+        .sort({ timestamp: 1 }).skip(skip).limit(limit).toArray();
+      return { status: 200, body: { messages } };
+    } catch {
+      return { status: 503, body: { error: "Chat history unavailable" } };
+    }
+  }
+
+  async getChatConversations(uid) {
+    if (typeof uid !== "string" || !/^[A-Za-z0-9_]{1,128}$/.test(uid)) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const [user, messages] = await Promise.all([
+        db.collection("users").findOne({ uid }, { projection: { _id: 1, password: 0, lastLoginIp: 0 } }),
+        db.collection("chatmessages").find({ $or: [{ senderUid: uid }, { receiverUid: uid }] })
+          .sort({ timestamp: -1 }).limit(500).toArray()
+      ]);
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const byRoom = new Map();
+      for (const message of messages) {
+        const parts = this.parseChatRoom(message.roomId);
+        if (!parts || !parts.includes(uid)) continue;
+        const otherUid = parts.find(part => part !== uid);
+        if (!otherUid || byRoom.has(message.roomId)) continue;
+        const otherUser = await db.collection("users").findOne(
+          { uid: otherUid },
+          { projection: { password: 0, lastLoginIp: 0, email: 0, mobileNumber: 0, location: 0, lastLoginDevice: 0 } }
+        );
+        if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
+            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) continue;
+        byRoom.set(message.roomId, {
+          roomId: message.roomId,
+          otherUser: otherUser,
+          lastMessage: message
+        });
+      }
+      return { status: 200, body: [...byRoom.values()] };
+    } catch {
+      return { status: 503, body: { error: "Chat conversations unavailable" } };
+    }
+  }
+
+  async createChatMessage(uid, payload) {
+    const { roomId, receiverUid, messageContent } = payload || {};
+    const participants = this.parseChatRoom(roomId);
+    if (!participants || !participants.includes(uid) || typeof receiverUid !== "string" ||
+        !participants.includes(receiverUid) || receiverUid === uid ||
+        typeof messageContent !== "string" || !messageContent.trim() || messageContent.length > 5000) {
+      return { status: 400, body: { error: "Invalid roomId, receiverUid, or messageContent" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const [sender, receiver] = await Promise.all([
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } }),
+        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } })
+      ]);
+      if (!sender || !receiver) return { status: 404, body: { error: "Chat participant not found" } };
+      const now = new Date();
+      if ((sender.suspendedUntil && new Date(sender.suspendedUntil) > now) ||
+          (receiver.suspendedUntil && new Date(receiver.suspendedUntil) > now)) {
+        return { status: 403, body: { error: "Messaging is unavailable for this account" } };
+      }
+      if ((Array.isArray(sender.blocked) && sender.blocked.includes(receiverUid)) ||
+          (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid))) {
+        return { status: 403, body: { error: "Messaging is unavailable for this conversation" } };
+      }
+      const message = {
+        roomId, senderUid: uid, receiverUid,
+        messageContent: messageContent.trim(),
+        timestamp: now,
+        status: "sent"
+      };
+      const inserted = await db.collection("chatmessages").insertOne(message);
+      message._id = inserted.insertedId;
+      return { status: 201, body: message };
+    } catch {
+      return { status: 503, body: { error: "Unable to send chat message" } };
+    }
+  }
+
+  async deleteChatMessage(uid, messageId) {
+    if (typeof messageId !== "string" || !/^[a-fA-F0-9]{24}$/.test(messageId)) return { status: 400, body: { error: "Invalid message ID" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const { ObjectId } = await import("mongodb");
+      const result = await db.collection("chatmessages").deleteOne({
+        _id: new ObjectId(messageId), senderUid: uid, status: "sent"
+      });
+      return result.deletedCount ? { status: 200, body: { success: true } } : { status: 404, body: { error: "Message not found" } };
+    } catch {
+      return { status: 503, body: { error: "Unable to roll back chat message" } };
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
@@ -2262,6 +2373,25 @@ export class MongoDBConnection {
         result = await this.getPendingBankSlipSubscriptions(body.claims.sub);
       } else {
         result = await this.moderateBankSlipSubscription(body.claims.sub, body.subscriptionId, body.action, body.reason || "");
+      }
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/chat/history" ||
+        url.pathname === "/internal/chat/conversations" ||
+        url.pathname === "/internal/chat/send" ||
+        url.pathname === "/internal/chat/rollback") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/chat/history") {
+        result = await this.getChatHistory(body.claims.sub, body.roomId, body.limit, body.skip);
+      } else if (url.pathname === "/internal/chat/conversations") {
+        result = await this.getChatConversations(body.claims.sub);
+      } else if (url.pathname === "/internal/chat/send") {
+        result = await this.createChatMessage(body.claims.sub, body.payload);
+      } else {
+        result = await this.deleteChatMessage(body.claims.sub, body.messageId);
       }
       return json(result.body, result.status);
     }
