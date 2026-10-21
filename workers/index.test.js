@@ -1288,6 +1288,16 @@ test("declined WebXPay callbacks are acknowledged idempotently without granting 
 });
 
 
+test("DELETE bank-slip route reaches owner authentication instead of the POST method guard", async () => {
+  const response = await worker.fetch(new Request("https://dating-app.test/api/users/subscription/upload-slip", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ subscriptionId: "3123456789abcdef01234567" })
+  }), { FIREBASE_PROJECT_ID: "test-project" });
+  // No bearer token must be rejected by auth, not by the POST-only handler.
+  assert.equal(response.status, 401);
+});
+
 test("bank-slip submission uses server-owned plan metadata and private object keys", async () => {
   const user = { _id: "user-object-id", uid: "user-1", plan: "basic" };
   let inserted = null;
