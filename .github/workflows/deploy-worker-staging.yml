@@ -41,8 +41,10 @@ jobs:
       SUPER_ADMIN_PASSWORD_HASH: ${{ secrets.SUPER_ADMIN_PASSWORD_HASH }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
-      - name: Check out repository
+      - name: Check out migration branch only
         uses: actions/checkout@v4
+        with:
+          ref: migrate-to-serverless
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -53,6 +55,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" != "migrate-to-serverless" ]]; then
+            echo "::error::This deployment workflow must be dispatched from migrate-to-serverless."
+            exit 1
+          fi
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing GitHub secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing GitHub secret CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$MONGODB_URI" || { echo "Missing GitHub secret MONGODB_URI"; exit 1; }
