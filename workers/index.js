@@ -40,7 +40,7 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/ready") {
-      const missing = ["FIREBASE_PROJECT_ID", "MONGODB_URI"].filter((key) => !env[key]);
+      const missing = ["FIREBASE_PROJECT_ID", "MONGODB_URI", "MONGODB_DATABASE"].filter((key) => !env[key]);
       if (missing.length) {
         return json({ status: "not_ready", missingConfiguration: missing }, 503);
       }
