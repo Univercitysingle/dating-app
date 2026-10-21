@@ -927,6 +927,33 @@ test("geolocation endpoint requires Firebase authentication", async () => {
 });
 
 
+test("migrated admin read endpoints reject anonymous requests before database checks", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project" };
+  const paths = [
+    "/api/admin/users",
+    "/api/admin/users/stats",
+    "/api/admin/transactions",
+    "/api/admin/analytics/summary"
+  ];
+  for (const path of paths) {
+    const response = await worker.fetch(request(path), env);
+    assert.equal(response.status, 401, path);
+  }
+});
+
+test("admin read methods deny users without an admin role", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({
+      collection: () => ({ findOne: async () => ({ role: "user" }) })
+    })
+  });
+  assert.equal((await connection.getAdminUsers("ordinary-user")).status, 403);
+  assert.equal((await connection.getAdminDashboardStats("ordinary-user")).status, 403);
+  assert.equal((await connection.getAdminTransactions("ordinary-user")).status, 403);
+  assert.equal((await connection.getAdminAnalyticsSummary("ordinary-user")).status, 403);
+});
+
 test("admin report endpoints reject anonymous requests", async () => {
   const env = { FIREBASE_PROJECT_ID: "test-project" };
   const list = await worker.fetch(request("/api/admin/reports"), env);
