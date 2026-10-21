@@ -338,6 +338,52 @@ test("profile updates reject underage birthdays and malformed mobile numbers", a
   assert.equal((await connection.updateCurrentUserProfile("user-1", { mobileNumber: "123" })).status, 400);
 });
 
+test("subscription history returns the ten newest records for the current user", async () => {
+  let subscriptionQuery, sortSpec, limitValue;
+  const user = { _id: "mongo-user-id" };
+  const subscriptions = {
+    find: (query) => {
+      subscriptionQuery = query;
+      return {
+        sort: (value) => { sortSpec = value; return {
+          limit: (value) => { limitValue = value; return { toArray: async () => [{ plan: "premium" }] }; }
+        }; }
+      };
+    }
+  };
+  const users = { findOne: async () => user };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : subscriptions }) });
+  const result = await connection.getSubscriptionHistory("current");
+  assert.equal(result.status, 200);
+  assert.deepEqual(subscriptionQuery, { userId: "mongo-user-id" });
+  assert.deepEqual(sortSpec, { createdAt: -1 });
+  assert.equal(limitValue, 10);
+  assert.deepEqual(result.body, [{ plan: "premium" }]);
+});
+
+test("potential matches preserve legacy score and pagination response shape", async () => {
+  const current = { uid: "current", interests: ["music"], relationshipGoals: "Long-term", personalityQuizResults: { type: "INFJ" }, role: "user" };
+  const candidates = [
+    { _id: "candidate-id", uid: "candidate", name: "Candidate", email: "private@example.com", interests: ["MUSIC"], relationshipGoals: "long-term", personalityQuizResults: { type: "infj" }, photos: [] },
+    { _id: "other-id", uid: "other", name: "Other", interests: [], photos: [] }
+  ];
+  const users = {
+    findOne: async () => current,
+    find: () => ({ toArray: async () => candidates })
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const result = await connection.getPotentialMatches("current", { page: "1", limit: "1" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.totalMatches, 2);
+  assert.equal(result.body.totalPages, 2);
+  assert.equal(result.body.matches.length, 1);
+  assert.equal(result.body.matches[0].user.uid, "candidate");
+  assert.equal(result.body.matches[0].matchScore, 60);
+  assert.equal(result.body.matches[0].user.email, undefined);
+});
+
 test("discovery validates filters before querying MongoDB", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({ db: () => ({ collection: () => ({ findOne: async () => ({ uid: "current" }) }) }) });
