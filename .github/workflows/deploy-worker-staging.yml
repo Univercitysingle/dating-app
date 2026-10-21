@@ -27,6 +27,7 @@ jobs:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       FIREBASE_PROJECT_ID: it-services-1841e
       MONGODB_DATABASE: test
+      CDN_HOSTNAME: ${{ secrets.CDN_HOSTNAME }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -44,6 +45,7 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing GitHub secret CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$MONGODB_URI" || { echo "Missing GitHub secret MONGODB_URI"; exit 1; }
           test -n "$FIREBASE_PROJECT_ID" || { echo "Missing FIREBASE_PROJECT_ID configuration"; exit 1; }
+          test -n "$CDN_HOSTNAME" || { echo "Missing GitHub secret CDN_HOSTNAME (legacy CDN hostname)"; exit 1; }
 
       - name: Install Worker dependencies
         working-directory: workers
@@ -58,7 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@4 deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "MONGODB_DATABASE:$MONGODB_DATABASE" 2>&1 | tee /tmp/wrangler-deploy.log
+          npx --yes wrangler@4 deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "MONGODB_DATABASE:$MONGODB_DATABASE" --var "CDN_HOSTNAME:$CDN_HOSTNAME" 2>&1 | tee /tmp/wrangler-deploy.log
           WORKER_URL="$(grep -Eo 'https://dating-app-api-staging\.[a-z0-9-]+\.workers\.dev' /tmp/wrangler-deploy.log | tail -n 1 || true)"
           if [[ -z "$WORKER_URL" ]]; then
             echo "Could not determine the workers.dev URL from Wrangler output. Check the deployment log and verify the account's Workers subdomain."
