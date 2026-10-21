@@ -610,10 +610,13 @@ export default {
       }
     }
 
-    const adminSupportMatch = url.pathname.match(/^\\/api\\/admin\\/support-tickets(?:\\/([^/]+)(?:\\/(messages|status))?)?$/);
+    const adminSupportBase = "/api/admin/support-tickets";
+    const adminSupportMatch = url.pathname === adminSupportBase || url.pathname.startsWith(adminSupportBase + "/");
     if (adminSupportMatch) {
-      const ticketId = adminSupportMatch[1];
-      const action = adminSupportMatch[2];
+      const adminSupportParts = url.pathname.slice(adminSupportBase.length).split("/").filter(Boolean);
+      if (adminSupportParts.length > 2) return json({ error: "Not found" }, 404);
+      const ticketId = adminSupportParts[0];
+      const action = adminSupportParts[1];
       const allowed = (!ticketId && request.method === "GET") ||
         (ticketId && !action && request.method === "GET") ||
         (ticketId && action === "messages" && request.method === "POST") ||
