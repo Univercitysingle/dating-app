@@ -11,6 +11,12 @@ on:
       - 'functions/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/**'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'babel.config.*'
+      - 'config/**'
+      - 'CLOUDFLARE_PAGES_SETUP.md'
   workflow_dispatch:
 
 permissions:
