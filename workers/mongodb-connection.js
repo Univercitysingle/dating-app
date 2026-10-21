@@ -113,7 +113,7 @@ export class MongoDBConnection {
   }
 
   async getCurrentUserProfile(uid) {
-") + "$", $options: "i" } });
+
       if (existingByEmail) {
         // Never transfer an account already bound to a different Firebase identity.
         if (existingByEmail.uid && existingByEmail.uid !== claims.sub) {
