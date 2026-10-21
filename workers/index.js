@@ -166,7 +166,7 @@ export default {
     }
 
 
-    const swipeAction = url.pathname.match(/^\/api\/swipe\/(like|pass)$/);
+    const swipeAction = url.pathname.match(/^\/api\/swipe\/(like|pass|superlike)$/);
     if (swipeAction) {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
