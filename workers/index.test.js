@@ -222,3 +222,43 @@ test("profile updates reject underage birthdays and malformed mobile numbers", a
   assert.equal((await connection.updateCurrentUserProfile("user-1", { birthday: "2015-01-01" })).status, 400);
   assert.equal((await connection.updateCurrentUserProfile("user-1", { mobileNumber: "123" })).status, 400);
 });
+
+test("public profile endpoint rejects anonymous requests", async () => {
+  const response = await worker.fetch(request("/api/users/some-user"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+  });
+  assert.equal(response.status, 401);
+});
+
+test("public profile sanitization hides email and mobile from other users", async () => {
+  const target = { _id: "target-id", uid: "target", email: "private@example.com", mobileNumber: "+971501234567", name: "Target", photos: [{ url: "photo.jpg" }] };
+  const viewer = { uid: "viewer", role: "user" };
+  const users = { findOne: async (query) => query.uid === "target" ? target : viewer };
+  const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const result = await connection.getUserProfile("target", "viewer");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.id, "target-id");
+  assert.equal(result.body.email, undefined);
+  assert.equal(result.body.mobileNumber, undefined);
+  assert.equal(result.body.photos[0].url, "https://cdn.example.com/photo.jpg");
+});
+
+test("profile owner and superadmin retain the legacy full-profile view", async () => {
+  const target = { _id: "target-id", uid: "target", email: "private@example.com", mobileNumber: "+971501234567", role: "user" };
+  const admin = { uid: "admin", role: "superadmin" };
+  const users = { findOne: async (query) => query.uid === "target" ? target : admin };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const owner = await connection.getUserProfile("target", "target");
+  const superadmin = await connection.getUserProfile("target", "admin");
+  assert.equal(owner.body.email, "private@example.com");
+  assert.equal(superadmin.body.mobileNumber, "+971501234567");
+});
+
+test("public profile returns 404 for unknown users", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => ({ findOne: async () => null }) }) });
+  assert.equal((await connection.getUserProfile("missing", "viewer")).status, 404);
+});
