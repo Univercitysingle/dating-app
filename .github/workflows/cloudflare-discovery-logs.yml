@@ -1,0 +1,88 @@
+name: One-time Cloudflare discovery log query
+
+on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - .github/workflows/cloudflare-discovery-logs.yml
+
+permissions:
+  contents: read
+
+jobs:
+  query-cloudflare-logs:
+    if: github.event.head_commit.message == 'Add one-time Cloudflare discovery log query'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query recent Worker discovery logs through Cloudflare API
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CF_API_TOKEN:-}" || -z "${CF_ACCOUNT_ID:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret is missing."
+            exit 1
+          fi
+          TO_MS=$(date -u +%s%3N)
+          FROM_MS=$((TO_MS - 172800000))
+          BODY=$(jq -n --argjson from "$FROM_MS" --argjson to "$TO_MS" '{
+            queryId: "adhoc-dating-app-discovery-debug",
+            timeframe: {from: $from, to: $to},
+            view: "events",
+            limit: 100,
+            parameters: {
+              datasets: ["cloudflare-workers"],
+              needle: {
+                value: "MongoDB discovery|Discovery route failed|Discovery service unavailable|users/discover",
+                isRegex: true,
+                matchCase: false
+              }
+            }
+          }')
+          HTTP_CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
+            -X POST "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/observability/telemetry/query" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$BODY")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "::error::Cloudflare Observability API returned HTTP $HTTP_CODE. Response:"
+            jq -c '{success, errors, messages}' response.json || head -c 2000 response.json
+            exit 1
+          fi
+          if [[ "$(jq -r '.success // false' response.json)" != "true" ]]; then
+            echo "::error::Cloudflare Observability API reported failure:"
+            jq -c '{success, errors, messages}' response.json
+            exit 1
+          fi
+          echo "Cloudflare Observability query completed. Showing only safe diagnostic fields:"
+          jq -c '
+            .result.events.events[]? |
+            {
+              timestamp,
+              service: (."$metadata".service // ."$metadata".origin // null),
+              url: (."$metadata".url // ."$metadata".trigger // null),
+              statusCode: (."$metadata".statusCode // null),
+              error: (."$metadata".error // null),
+              source: (
+                if (.source | type) == "object" then
+                  {
+                    message: (.source.message // .source[0] // null),
+                    error: (.source.error // null),
+                    code: (.source.code // null),
+                    codeName: (.source.codeName // null),
+                    route: (.source.route // null)
+                  }
+                else
+                  (.source | tostring | .[0:1200])
+                end
+              )
+            }' response.json
+          COUNT=$(jq '.result.events.events // [] | length' response.json)
+          echo "Matching events returned: $COUNT"
+          if [[ "$COUNT" -eq 0 ]]; then
+            echo "No matching events in the last 48 hours. Check Workers Logs enablement, token permissions, and whether the failure was reproduced during this time range."
+          fi
