@@ -46,15 +46,28 @@ jobs:
         run: npm test
 
       - name: Deploy isolated staging Worker
-        run: npx --yes wrangler@4 deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID"
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" 2>&1 | tee /tmp/wrangler-deploy.log
+          WORKER_URL="$(grep -Eo 'https://dating-app-api-staging\.[a-z0-9-]+\.workers\.dev' /tmp/wrangler-deploy.log | tail -n 1 || true)"
+          if [[ -z "$WORKER_URL" ]]; then
+            echo "Could not determine the workers.dev URL from Wrangler output. Check the deployment log and verify the account's Workers subdomain."
+            exit 1
+          fi
+          echo "worker_url=$WORKER_URL" >> "$GITHUB_OUTPUT"
 
       - name: Configure staging MongoDB secret
         shell: bash
         run: printf '%s' "$MONGODB_URI" | npx --yes wrangler@4 secret put MONGODB_URI --config wrangler.jsonc --env staging
 
-      - name: Check staging liveness
-        shell: bash
-        run: |
-          set -euo pipefail
-          URL="https://dating-app-api-staging.<your-workers-subdomain>.workers.dev/health"
-          echo "Worker deployed. Replace the placeholder workers.dev hostname with the hostname shown by Wrangler, then verify /health and /ready."
+      - name: Verify staging liveness
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        run: curl --fail --silent --show-error "$WORKER_URL/health"
+
+      - name: Verify staging readiness and MongoDB connectivity
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        run: curl --fail --silent --show-error "$WORKER_URL/ready"
