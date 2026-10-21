@@ -612,7 +612,7 @@ export default {
 
     const adminReadRoute = url.pathname === "/api/admin/users" ||
       url.pathname === "/api/admin/users/stats" ||
-      /^\\/api\\/admin\\/users\\/[a-fA-F0-9]{24}$/.test(url.pathname) ||
+      (url.pathname.startsWith("/api/admin/users/") && /^[a-fA-F0-9]{24}$/.test(url.pathname.split("/").pop())) ||
       url.pathname === "/api/admin/transactions" ||
       url.pathname === "/api/admin/analytics/summary";
     if (adminReadRoute) {
