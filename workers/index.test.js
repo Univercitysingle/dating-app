@@ -100,6 +100,18 @@ test("MongoDB Durable Object exposes no general-purpose HTTP operation", async (
   assert.equal(response.status, 404);
 });
 
+test("POST /api/auth/logout preserves the legacy stateless logout response", async () => {
+  const response = await worker.fetch(request("/api/auth/logout", "POST"), {});
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { message: "Logged out successfully." });
+});
+
+test("POST /api/auth/logout rejects unsupported methods", async () => {
+  const response = await worker.fetch(request("/api/auth/logout", "GET"), {});
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { error: "Method not allowed" });
+});
+
 test("Firebase verification endpoint rejects missing bearer credentials", async () => {
   const response = await worker.fetch(request("/api/auth/verify"), { FIREBASE_PROJECT_ID: "test-project" });
   assert.equal(response.status, 401);
