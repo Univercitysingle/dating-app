@@ -187,7 +187,7 @@ export default {
       try {
         await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         const ip = request.headers.get("CF-Connecting-IP") || "";
-        const isPrivateIp = /^(::1|127\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.|192\\.168\\.)/.test(ip);
+        const isPrivateIp = /^(::1|127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(ip);
         if (isPrivateIp || !ip) {
           return json({ ip, city: "Private Network", country: "N/A" });
         }
