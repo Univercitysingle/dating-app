@@ -262,3 +262,40 @@ test("public profile returns 404 for unknown users", async () => {
   connection.getClient = async () => ({ db: () => ({ collection: () => ({ findOne: async () => null }) }) });
   assert.equal((await connection.getUserProfile("missing", "viewer")).status, 404);
 });
+
+test("blocking rejects self-targets and unknown target users", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.equal((await connection.updateBlockedUser("user-1", "user-1", "block")).status, 400);
+  connection.getClient = async () => ({ db: () => ({ collection: () => ({ findOne: async () => null }) }) });
+  const missing = await connection.updateBlockedUser("user-1", "missing", "block");
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.error, "User to block not found.");
+});
+
+test("blocking updates block list and unmatches the pair using sorted UIDs", async () => {
+  let userUpdate, matchUpdate;
+  const users = {
+    findOne: async () => ({ _id: "target-id" }),
+    updateOne: async (_query, update) => { userUpdate = update; return { matchedCount: 1 }; }
+  };
+  const matches = { updateOne: async (query, update) => { matchUpdate = { query, update }; return { matchedCount: 1 }; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  const result = await connection.updateBlockedUser("z-user", "a-user", "block");
+  assert.equal(result.status, 200);
+  assert.deepEqual(userUpdate.$addToSet, { blocked: "a-user" });
+  assert.deepEqual(matchUpdate.query, { user1Uid: "a-user", user2Uid: "z-user" });
+  assert.equal(matchUpdate.update.$set.status, "unmatched");
+  assert.deepEqual(matchUpdate.update.$unset, { likedBy: "" });
+});
+
+test("unblocking removes the target and preserves legacy message shape", async () => {
+  let update;
+  const users = { updateOne: async (_query, value) => { update = value; return { matchedCount: 1 }; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const result = await connection.updateBlockedUser("user-1", "user-2", "unblock");
+  assert.equal(result.status, 200);
+  assert.deepEqual(update.$pull, { blocked: "user-2" });
+  assert.deepEqual(result.body, { message: "User user-2 successfully unblocked." });
+});
