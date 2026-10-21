@@ -56,6 +56,72 @@ export class MongoDBConnection {
     return client.db(this.env.MONGODB_DATABASE || undefined);
   }
 
+  async runScheduledExpirations(now = new Date()) {
+    const db = this.getDatabase(await this.getClient());
+    const subscriptions = db.collection("subscriptions");
+    const users = db.collection("users");
+    let expiredSubscriptions = 0;
+    let downgradedUsers = 0;
+
+    // Bounded batches keep each Cron invocation within Worker execution limits.
+    const expired = await subscriptions.find({
+      status: "active",
+      endDate: { $lt: now }
+    }).sort({ endDate: 1 }).limit(500).toArray();
+
+    for (const sub of expired) {
+      const result = await subscriptions.updateOne(
+        { _id: sub._id, status: "active", endDate: { $lt: now } },
+        { $set: { status: "inactive", updatedAt: now } }
+      );
+      if (!result.modifiedCount) continue;
+      expiredSubscriptions += 1;
+
+      // Do not downgrade a user if another paid subscription is still active.
+      const active = await subscriptions.findOne({
+        userId: sub.userId,
+        status: "active",
+        endDate: { $gt: now }
+      }, { projection: { _id: 1 } });
+      if (!active) {
+        const downgraded = await users.updateOne(
+          { _id: sub.userId, plan: "premium" },
+          { $set: { plan: "basic", updatedAt: now } }
+        );
+        downgradedUsers += downgraded.modifiedCount || 0;
+      }
+    }
+
+    // Expire trial-based premium access only when there is no active paid plan.
+    const expiredTrials = await users.find({
+      plan: "premium",
+      trialExpires: { $lt: now, $ne: null }
+    }).sort({ trialExpires: 1 }).limit(500).toArray();
+
+    let expiredTrialsCount = 0;
+    for (const user of expiredTrials) {
+      const active = await subscriptions.findOne({
+        userId: user._id,
+        status: "active",
+        endDate: { $gt: now }
+      }, { projection: { _id: 1 } });
+      if (active) continue;
+      const result = await users.updateOne(
+        { _id: user._id, plan: "premium", trialExpires: { $lt: now, $ne: null } },
+        { $set: { plan: "basic", trialExpires: null, updatedAt: now } }
+      );
+      expiredTrialsCount += result.modifiedCount || 0;
+      downgradedUsers += result.modifiedCount || 0;
+    }
+
+    return {
+      success: true,
+      expiredSubscriptions,
+      expiredTrials: expiredTrialsCount,
+      downgradedUsers
+    };
+  }
+
   async ping() {
     try {
       const client = await this.getClient();
@@ -1780,6 +1846,11 @@ export class MongoDBConnection {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
+
+    if (url.pathname === "/internal/scheduled-expirations") {
+      const result = await this.runScheduledExpirations();
+      return json(result);
+    }
 
     if (url.pathname === "/internal/ping") {
       const result = await this.ping();
