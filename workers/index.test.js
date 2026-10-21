@@ -1403,3 +1403,39 @@ test("chat history refuses cross-user access and limits result pagination", asyn
   assert.equal(capturedQuery.roomId, "alice-bob");
   assert.deepEqual(capturedQuery.$or, [{ senderUid: "alice" }, { receiverUid: "alice" }]);
 });
+
+
+test("password-based superadmin login signs a Firebase custom token only for the configured hash", async () => {
+  const bcrypt = await import("bcryptjs");
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" }
+  });
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    SUPER_ADMIN_EMAIL: "admin@example.com",
+    SUPER_ADMIN_PASSWORD_HASH: await bcrypt.hash("correct horse battery", 4),
+    FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      client_email: "firebase-adminsdk@test-project.iam.gserviceaccount.com",
+      private_key: privateKey
+    })
+  };
+  const login = async password => worker.fetch(new Request("https://dating-app.test/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "admin@example.com", password })
+  }), env);
+  const denied = await login("wrong password");
+  assert.equal(denied.status, 401);
+  const response = await login("correct horse battery");
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.uid, "superadmin_uid");
+  assert.equal(body.user.role, "superadmin");
+  const parts = body.token.split(".");
+  assert.equal(parts.length, 3);
+  const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  assert.equal(claims.uid, "superadmin_uid");
+  assert.equal(claims.claims.role, "superadmin");
+});
