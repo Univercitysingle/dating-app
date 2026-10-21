@@ -462,6 +462,98 @@ export default {
 
 
 
+    if (url.pathname === "/api/users/photos" && request.method === "POST") {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MEDIA_BUCKET || typeof env.MEDIA_BUCKET.put !== "function" || !env.MEDIA_PUBLIC_BASE_URL) {
+          return json({ message: "Photo storage is not configured" }, 503);
+        }
+        let publicBase;
+        try {
+          publicBase = new URL(env.MEDIA_PUBLIC_BASE_URL);
+          if (publicBase.protocol !== "https:" || publicBase.username || publicBase.password || publicBase.search || publicBase.hash) {
+            return json({ message: "Photo storage URL is not configured safely" }, 503);
+          }
+        } catch {
+          return json({ message: "Photo storage URL is not configured safely" }, 503);
+        }
+        const form = await request.formData().catch(() => null);
+        const file = form && form.get("photo");
+        const allowedTypes = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif" };
+        if (!file || typeof file.arrayBuffer !== "function" || !allowedTypes[file.type]) {
+          return json({ message: "A JPEG, PNG, or GIF photo is required" }, 400);
+        }
+        if (file.size < 1 || file.size > 5 * 1024 * 1024) return json({ message: "Photo must be 5 MB or smaller" }, 400);
+        if (typeof claims.sub !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(claims.sub)) return json({ message: "Invalid user identity" }, 400);
+        const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
+        try {
+          await env.MEDIA_BUCKET.put(key, await file.arrayBuffer(), {
+            httpMetadata: { contentType: file.type },
+            customMetadata: { ownerUid: claims.sub, purpose: "profile-photo" }
+          });
+        } catch {
+          return json({ message: "Photo upload failed" }, 503);
+        }
+        const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        if (!id) {
+          await env.MEDIA_BUCKET.delete(key).catch(() => {});
+          return json({ message: "Photo metadata service unavailable" }, 503);
+        }
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const metadataResponse = await connection.fetch("https://internal.invalid/internal/photo-upload", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, photo: { url: key, order: 0, size: file.size } })
+        });
+        const result = await metadataResponse.json().catch(() => ({ message: "Photo metadata service unavailable" }));
+        if (!metadataResponse.ok) {
+          await env.MEDIA_BUCKET.delete(key).catch(() => {});
+          return json(result, metadataResponse.status);
+        }
+        return json({
+          ...result,
+          cdnUrl: publicBase.origin + publicBase.pathname.replace(/\\/$/, "") + "/" + encodeURIComponent(key)
+        }, metadataResponse.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Photo upload failed" }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/users/photos" && request.method === "DELETE") {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MEDIA_BUCKET || typeof env.MEDIA_BUCKET.delete !== "function") return json({ message: "Photo storage is not configured" }, 503);
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload.photoUrl !== "string" || !payload.photoUrl) return json({ error: "photoUrl is required." }, 400);
+        let key = payload.photoUrl;
+        try {
+          if (/^https?:\\/\\//i.test(key)) key = new URL(key).pathname.split("/").filter(Boolean).pop() || "";
+          else key = key.split("/").filter(Boolean).pop() || "";
+          key = decodeURIComponent(key);
+        } catch {
+          return json({ error: "Invalid photo URL" }, 400);
+        }
+        if (!key.startsWith("photos-" + claims.sub + "-")) return json({ error: "Photo does not belong to the current user" }, 403);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/photo-delete", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, key })
+        });
+        const result = await response.json().catch(() => ({ message: "Photo metadata service unavailable" }));
+        if (!response.ok) return json(result, response.status);
+        await env.MEDIA_BUCKET.delete(key).catch(() => {});
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Photo deletion failed" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/photos/order") {
       if (request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
