@@ -1506,7 +1506,8 @@ test("password-based superadmin login signs a Firebase custom token only for the
   assert.equal(parts.length, 3);
   const claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
   assert.equal(claims.uid, "superadmin_uid");
-  assert.equal(claims.claims.role, "superadmin");
+  assert.equal(claims.role, "superadmin");
+  assert.equal(claims.claims, undefined);
 });
 
 
