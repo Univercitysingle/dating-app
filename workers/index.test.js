@@ -153,6 +153,22 @@ test("POST /api/auth/logout rejects unsupported methods", async () => {
   assert.deepEqual(await response.json(), { error: "Method not allowed" });
 });
 
+test("match read endpoints reject anonymous requests", async () => {
+  for (const path of ["/api/matches", "/api/matches/confirmed"]) {
+    const response = await worker.fetch(request(path), {
+      FIREBASE_PROJECT_ID: "test-project",
+      MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
+    });
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { error: "Unauthorized" });
+  }
+});
+
+test("match read endpoints reject unsupported methods", async () => {
+  const response = await worker.fetch(request("/api/matches", "POST"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(response.status, 405);
+});
+
 test("discovery endpoint rejects anonymous requests", async () => {
   const response = await worker.fetch(request("/api/users/discover"), {
     FIREBASE_PROJECT_ID: "test-project",
