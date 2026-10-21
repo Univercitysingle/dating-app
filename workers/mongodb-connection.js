@@ -1837,7 +1837,8 @@ export class MongoDBConnection {
       "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
       "/internal/admin/transactions", "/internal/admin/analytics", "/internal/admin/user-create",
       "/internal/admin/user-update", "/internal/admin/user-delete", "/internal/admin/user-plan",
-      "/internal/admin/payment-logs", "/internal/admin/login-history", "/internal/admin/audit-logs"
+      "/internal/admin/payment-logs", "/internal/admin/login-history", "/internal/admin/audit-logs",
+      "/internal/admin/purchases", "/internal/admin/purchase-action"
     ].includes(url.pathname)) {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
@@ -1853,6 +1854,8 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/payment-logs") result = await this.getAdminLogs(body.claims.sub, "payment", body.search || "");
       else if (url.pathname === "/internal/admin/login-history") result = await this.getAdminLogs(body.claims.sub, "login", body.search || "");
       else if (url.pathname === "/internal/admin/audit-logs") result = await this.getAdminLogs(body.claims.sub, "audit", body.search || "");
+      else if (url.pathname === "/internal/admin/purchases") result = await this.getAdminPurchases(body.claims.sub, body.status || "all");
+      else if (url.pathname === "/internal/admin/purchase-action") result = await this.moderateAdminPurchase(body.claims.sub, body.purchaseId, body.action, body.reason || "");
       else result = await this.getAdminAnalyticsSummary(body.claims.sub, body.params || {});
       return json(result.body, result.status);
     }
