@@ -299,3 +299,34 @@ test("unblocking removes the target and preserves legacy message shape", async (
   assert.deepEqual(update.$pull, { blocked: "user-2" });
   assert.deepEqual(result.body, { message: "User user-2 successfully unblocked." });
 });
+
+test("photo ordering rejects malformed payloads and too many photos", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.equal((await connection.updatePhotoOrder("user-1", null)).status, 400);
+  assert.equal((await connection.updatePhotoOrder("user-1", Array.from({ length: 7 }, (_, i) => ({ url: "photo-" + i })))).status, 400);
+  assert.equal((await connection.updatePhotoOrder("user-1", [{ url: "" }])).status, 400);
+});
+
+test("photo ordering persists only supported fields and returns the current profile", async () => {
+  const stored = { _id: "user-id", uid: "user-1", email: "user@example.com", photos: [] };
+  let update;
+  const users = {
+    updateOne: async (_query, value) => { update = value; stored.photos = value.$set.photos; return { matchedCount: 1 }; },
+    findOne: async () => stored
+  };
+  const subscriptions = { findOne: async () => null };
+  const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : subscriptions }) });
+  const result = await connection.updatePhotoOrder("user-1", [
+    { _id: "0123456789abcdef01234567", url: "photo.jpg", order: 0, size: 20, admin: true }
+  ]);
+  assert.equal(result.status, 200);
+  assert.deepEqual(update.$set.photos, [{ _id: "0123456789abcdef01234567", url: "photo.jpg", order: 0, size: 20 }]);
+  assert.equal(result.body.photos[0].url, "https://cdn.example.com/photo.jpg");
+});
+
+test("photo ordering returns 404 when the user does not exist", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => ({ updateOne: async () => ({ matchedCount: 0 }) }) }) });
+  assert.equal((await connection.updatePhotoOrder("missing", [{ url: "photo.jpg" }])).status, 404);
+});
