@@ -112,6 +112,59 @@ export class MongoDBConnection {
     }
   }
 
+
+  async updateCurrentUserProfile(uid, update) {
+    if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    if (!update || typeof update !== "object" || Array.isArray(update)) return { status: 400, body: { error: "A JSON profile object is required" } };
+    try {
+      const users = (await this.getClient()).db().collection("users");
+      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1 } });
+      if (!current) return { status: 404, body: { error: "User not found" } };
+      const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
+      const allowedFields = onboardingComplete
+        ? ["sexualOrientation", "bio", "photos", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "badges", "lastActiveAt"]
+        : ["name", "birthday", "gender", "sexualOrientation", "bio", "photos", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "badges", "mobileNumber", "lastActiveAt", "isOnboardingComplete"];
+      const nestedAllowed = {
+        lifestyle: ["drinking", "smoking", "exercise", "diet", "lookingFor"],
+        badges: ["verified", "premium", "early_adopter"],
+        socialMediaLinks: ["instagram", "spotify", "tiktok"],
+        education: ["school", "degree"]
+      };
+      const sanitizedUpdate = {};
+      for (const key of allowedFields) {
+        if (update[key] === undefined) continue;
+        if (nestedAllowed[key]) {
+          if (!update[key] || typeof update[key] !== "object" || Array.isArray(update[key])) return { status: 400, body: { error: "Invalid nested profile field format" } };
+          sanitizedUpdate[key] = {};
+          for (const prop of nestedAllowed[key]) if (update[key][prop] !== undefined) sanitizedUpdate[key][prop] = update[key][prop];
+        } else sanitizedUpdate[key] = update[key];
+      }
+      if (sanitizedUpdate.mobileNumber) {
+        const mobile = sanitizedUpdate.mobileNumber;
+        if (typeof mobile !== "string" || !/^\+\d{1,3}\d{6,14}$/.test(mobile)) return { status: 400, body: { error: "Invalid mobile number format. Please use the format +[countrycode][number]." } };
+        const digits = mobile.replace(/^\+\d{1,3}/, "");
+        if (/^(\d)\1{8,}$/.test(digits)) return { status: 400, body: { error: "Invalid mobile number pattern." } };
+      }
+      if (sanitizedUpdate.birthday) {
+        const birthDate = new Date(sanitizedUpdate.birthday);
+        if (Number.isNaN(birthDate.getTime())) return { status: 400, body: { error: "Invalid birthday format." } };
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const month = today.getMonth() - birthDate.getMonth();
+        if (month < 0 || (month === 0 && today.getDate() < birthDate.getDate())) age--;
+        if (age < 18) return { status: 400, body: { error: "You must be at least 18 years old to register." } };
+        sanitizedUpdate.birthday = birthDate;
+      }
+      if (sanitizedUpdate.lifestyle && sanitizedUpdate.lifestyle.lookingFor === "Casual (FWB)" && !sanitizedUpdate.sexualOrientation) {
+        return { status: 400, body: { error: 'Sexual orientation is required when looking for "Casual (FWB)".' } };
+      }
+      await users.updateOne({ uid }, { $set: { ...sanitizedUpdate, updatedAt: new Date() } });
+      return await this.getCurrentUserProfile(uid);
+    } catch {
+      return { status: 503, body: { error: "Profile service unavailable" } };
+    }
+  }
+
   async getCurrentUserProfile(uid) {
     if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
@@ -176,6 +229,10 @@ export class MongoDBConnection {
       if (!body || !body.claims || typeof body.claims !== "object") return json({ error: "Invalid request" }, 400);
       const provisioned = await this.findOrCreateUserFromClaims(body.claims);
       if (!provisioned.user) return json(provisioned.body, provisioned.status);
+      if (body.update !== undefined) {
+        const updated = await this.updateCurrentUserProfile(body.claims.sub, body.update);
+        return json(updated.body, updated.status);
+      }
       const result = await this.getCurrentUserProfile(body.claims.sub);
       return json(result.body, result.status);
     }
