@@ -79,7 +79,7 @@ test("GET /ready does not expose probe errors", async () => {
 });
 
 test("unmigrated API routes are not silently accepted", async () => {
-  const response = await worker.fetch(request("/api/matches"), {});
+  const response = await worker.fetch(request("/api/admin/not-migrated"), {});
   assert.equal(response.status, 501);
 });
 
