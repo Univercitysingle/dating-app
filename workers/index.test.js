@@ -221,6 +221,7 @@ test("GET /api/auth/test preserves the legacy non-sensitive diagnostic route", a
   const response = await worker.fetch(request("/api/auth/test"), {});
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(await response.text(), "Auth test route is working");
 });
 
