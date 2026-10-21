@@ -54,14 +54,33 @@ Keep Firebase Realtime Database listeners for realtime updates. The Worker API v
 4. Keep legacy server and rollback config available through an observation window.
 5. Remove old routes/dependencies/server only after verified parity and rollback expiry.
 
-## Branch contents and limitations
+## Current branch status (2026-10-21)
 
-- `workers/index.js`: Worker liveness endpoint, fail-closed readiness endpoint, and explicit 501 responses for routes not yet migrated.
-- `workers/mongodb-connection.js`: Durable Object with a lazy MongoDB Node driver connection and restricted ping operation. It is not a general database query proxy.
-- `workers/package.json`: includes MongoDB Node.js driver v6.15 or later.
-- `workers/index.test.js`: Node built-in tests for readiness failure/success paths, route scaffold, rate limiter, and MongoDB Durable Object guards.
-- `wrangler.jsonc`: Worker and Durable Object bindings with a new migration tag for MongoDB connection class.
-- The MongoDB Durable Object is not yet proven against a live database. Unit tests mock the Durable Object binding; they do not establish network/TLS/credentials connectivity.
-- `/ready` checks MongoDB using the configured Durable Object and only checks that `FIREBASE_PROJECT_ID` exists. Firebase ID-token verification and Firebase service connectivity are not implemented yet.
-- The rate limiter accepts caller-provided keys and is only a scaffold. Derive keys from authenticated identity and enforce abuse protections before production use.
-- No application routes are migrated in this phase. Do not deploy to production or change DNS until staging connectivity, authentication, contract, and security gates pass.
+### Implemented on migrate-to-serverless
+
+- Cloudflare Worker foundation, liveness/readiness endpoints, Firebase ID-token verification, rate limiting via Durable Objects, and MongoDB Durable Object access.
+- Current-user provisioning/profile reads and updates, public-profile privacy filtering, discovery/matches/swipes, likes, notifications, block/unblock, and photo ordering.
+- User reports and database-backed admin report listing/detail/moderation.
+- User support ticket create/list/detail/message operations and admin support ticket list/detail/reply/status operations.
+- Purchase/subscription status reads with ObjectId validation and owner checks.
+- Admin read APIs for user listing/detail, dashboard statistics, transaction listing, analytics summary/CSV export, payment logs, login history, and audit logs.
+- Admin user creation/update/deletion/plan-update routes with database-backed role checks and superadmin restrictions.
+- Staging deployment workflow and anonymous-access smoke tests. Worker tests and staging smoke tests have passed on recent commits; check the latest run before considering the current branch validated.
+
+### Still not complete / requires integration work
+
+- **Media uploads:** photo and bank-slip upload/deletion are not migrated to a configured Cloudflare R2 bucket. The app needs an actual staging bucket binding and public/CDN URL configuration; do not invent a bucket or public URL.
+- **Payments:** WebXPay callback/signature verification and idempotent payment settlement are not migrated. This requires the real WebXPay public key/provider contract and integration tests; do not mark payments complete based only on mocked tests.
+- **Chat:** preserve Firebase Realtime Database as the realtime delivery path. The exact deployed RTDB rules and existing chat-path permissions must be reviewed and tested before changing chat writes or client access. Do not weaken rules or introduce a replacement transport.
+- **Admin payment moderation:** approve/reject purchase operations and associated entitlement updates still need an atomicity/idempotency design and tests.
+- **Remaining admin endpoints:** inventory additional legacy administrative surfaces against the frontend; any route still returning 501 must be migrated or explicitly retired.
+- **Frontend/Pages:** configure real Firebase web settings and the same-origin Pages /api/* proxy; test sign-in, profile flows, chat, uploads, payment and admin workflows with real staging accounts.
+- **Production cutover:** not authorized or performed. Keep the legacy server available as rollback until full staging parity, security checks, and data-integrity tests pass.
+
+### Deployment and safety notes
+
+- Staging uses the explicitly configured MongoDB database test; do not repoint it at production data.
+- /ready verifies required configuration and a MongoDB ping. It only checks that FIREBASE_PROJECT_ID is configured; it is not a Firebase service-connectivity test.
+- Worker unit tests with mocked database bindings do not prove provider integration, storage, or payment correctness.
+- The staging workflow deploys only the isolated staging Worker. No production DNS or routing changes should be made by this migration workflow.
+- All changes remain on migrate-to-serverless. Do not merge to main or create additional branches as part of this work.
