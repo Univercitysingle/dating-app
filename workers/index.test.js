@@ -1419,7 +1419,11 @@ test("password-based superadmin login signs a Firebase custom token only for the
     FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
       client_email: "firebase-adminsdk@test-project.iam.gserviceaccount.com",
       private_key: privateKey
-    })
+    }),
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-primary"; },
+      get() { return { async fetch() { return new Response(JSON.stringify({ success: true }), { status: 200 }); } }; }
+    }
   };
   const login = async password => worker.fetch(new Request("https://dating-app.test/api/auth/login", {
     method: "POST",
