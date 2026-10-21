@@ -1456,6 +1456,51 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/status") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      let databaseStatus = "unavailable";
+      if (env.MONGODB_CONNECTION) {
+        try {
+          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const connection = env.MONGODB_CONNECTION.get(id);
+          const response = await connection.fetch("https://internal.invalid/internal/ping", { method: "POST" });
+          databaseStatus = response.ok ? "connected" : "disconnected";
+        } catch { databaseStatus = "disconnected"; }
+      }
+      const body = {
+        application: { name: "dating-app", version: "serverless" },
+        worker: { status: "ok", stage: env.MIGRATION_STAGE || "unknown" },
+        database: { status: databaseStatus },
+        firebase: { status: env.FIREBASE_PROJECT_ID ? "configured" : "unavailable" }
+      };
+      return json(body, databaseStatus === "connected" && env.FIREBASE_PROJECT_ID ? 200 : 503);
+    }
+
+    const cronRoute = url.pathname.match(/^\/api\/cron\/(trials|subscriptions)$/);
+    if (cronRoute) {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (typeof env.CRON_SECRET !== "string" || env.CRON_SECRET.length < 32) {
+        return json({ error: "Manual expiration trigger is not configured" }, 503);
+      }
+      const supplied = request.headers.get("x-cron-secret") || "";
+      const expectedBytes = Buffer.from(env.CRON_SECRET, "utf8");
+      const suppliedBytes = Buffer.from(supplied, "utf8");
+      if (expectedBytes.length !== suppliedBytes.length || !timingSafeEqual(expectedBytes, suppliedBytes)) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+      if (!env.MONGODB_CONNECTION) return json({ error: "Expiration service unavailable" }, 503);
+      try {
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/scheduled-expirations", { method: "POST" });
+        const result = await response.json().catch(() => ({ error: "Expiration service unavailable" }));
+        if (!response.ok) return json(result, response.status);
+        return json({ message: cronRoute[1] === "trials" ? "Trial expiration check completed." : "Subscription expiration check completed.", ...result });
+      } catch {
+        return json({ error: "Expiration service unavailable" }, 503);
+      }
+    }
+
     return json({ error: "Route not migrated yet" }, 501);
   },
 
