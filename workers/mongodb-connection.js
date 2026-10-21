@@ -785,6 +785,104 @@ export class MongoDBConnection {
     }
   }
 
+  async createSupportTicket(uid, payload) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        !payload || typeof payload.subject !== "string" || !payload.subject.trim() ||
+        payload.subject.trim().length > 200 || typeof payload.message !== "string" ||
+        !payload.message.trim() || payload.message.trim().length > 5000) {
+      return { status: 400, body: { message: "A subject and message are required." } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const now = new Date();
+      const ticket = {
+        userId: user._id,
+        ticketNumber: crypto.randomUUID(),
+        subject: payload.subject.trim(),
+        status: "Open",
+        createdAt: now,
+        updatedAt: now
+      };
+      const ticketResult = await db.collection("supporttickets").insertOne(ticket);
+      ticket._id = ticketResult.insertedId;
+      const message = {
+        ticketId: ticket._id,
+        senderId: user._id,
+        message: payload.message.trim(),
+        createdAt: now,
+        updatedAt: now
+      };
+      const messageResult = await db.collection("ticketmessages").insertOne(message);
+      message._id = messageResult.insertedId;
+      return { status: 201, body: ticket };
+    } catch {
+      return { status: 503, body: { message: "Support ticket service is temporarily unavailable." } };
+    }
+  }
+
+  async getSupportTickets(uid) {
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const tickets = await db.collection("supporttickets").find({ userId: user._id }).sort({ createdAt: -1 }).toArray();
+      return { status: 200, body: tickets };
+    } catch {
+      return { status: 503, body: { message: "Support ticket service is temporarily unavailable." } };
+    }
+  }
+
+  async getSupportTicket(uid, ticketId) {
+    if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId)) {
+      return { status: 400, body: { message: "Invalid ticket ID" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId), userId: user._id });
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      const messages = await db.collection("ticketmessages").find({ ticketId: ticket._id }).sort({ createdAt: 1 }).toArray();
+      const senderIds = [...new Set(messages.map(item => String(item.senderId)))];
+      const { ObjectId: MongoObjectId } = await import("mongodb");
+      const senders = senderIds.length
+        ? await db.collection("users").find({ _id: { $in: senderIds.map(id => new MongoObjectId(id)) } }, { projection: { name: 1 } }).toArray()
+        : [];
+      const names = new Map(senders.map(sender => [String(sender._id), sender.name || ""]));
+      return { status: 200, body: { ticket, messages: messages.map(item => ({ ...item, senderId: { _id: item.senderId, name: names.get(String(item.senderId)) || "" } })) } };
+    } catch {
+      return { status: 503, body: { message: "Support ticket service is temporarily unavailable." } };
+    }
+  }
+
+  async addSupportTicketMessage(uid, ticketId, payload) {
+    if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId) ||
+        !payload || typeof payload.message !== "string" || !payload.message.trim() ||
+        payload.message.trim().length > 5000) {
+      return { status: 400, body: { message: "A valid ticket ID and message are required." } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId), userId: user._id });
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      if (ticket.status === "Closed") return { status: 403, body: { message: "This ticket is closed and cannot be updated." } };
+      const now = new Date();
+      const message = { ticketId: ticket._id, senderId: user._id, message: payload.message.trim(), createdAt: now, updatedAt: now };
+      const result = await db.collection("ticketmessages").insertOne(message);
+      message._id = result.insertedId;
+      await db.collection("supporttickets").updateOne({ _id: ticket._id, userId: user._id }, { $set: { status: "In Progress", updatedAt: now } });
+      return { status: 201, body: message };
+    } catch {
+      return { status: 503, body: { message: "Support ticket service is temporarily unavailable." } };
+    }
+  }
+
   async createReport(reporterUid, payload) {
     const categories = [
       "spam",
@@ -1090,6 +1188,35 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.getLikes(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/support-tickets") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || !["GET", "POST"].includes(body.action)) {
+        return json({ message: "Invalid request" }, 400);
+      }
+      const result = body.action === "GET"
+        ? await this.getSupportTickets(body.claims.sub)
+        : await this.createSupportTicket(body.claims.sub, body.payload);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/support-ticket") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.ticketId !== "string") {
+        return json({ message: "Invalid request" }, 400);
+      }
+      const result = await this.getSupportTicket(body.claims.sub, body.ticketId);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/support-ticket-message") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.ticketId !== "string") {
+        return json({ message: "Invalid request" }, 400);
+      }
+      const result = await this.addSupportTicketMessage(body.claims.sub, body.ticketId, body.payload);
       return json(result.body, result.status);
     }
 
