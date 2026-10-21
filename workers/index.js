@@ -361,6 +361,16 @@ export default {
       }
     }
 
+    // Preserve the legacy, non-sensitive auth diagnostic route for deployments
+    // and smoke tests. It deliberately returns no environment or identity data.
+    if (url.pathname === "/api/auth/test") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      return new Response("Auth test route is working", {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" }
+      });
+    }
+
     // The legacy Express logout endpoint is stateless: the client clears its
     // Firebase session/token. Keep the response contract for existing clients.
     if (url.pathname === "/api/auth/logout") {
