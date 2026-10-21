@@ -248,7 +248,7 @@ export class MongoDBConnection {
     }
   }
 
-  async recordSwipe(uid, targetUid, action) {
+  async recordSwipe(uid, targetUid, action, canonical = false) {
     if (typeof uid !== "string" || !uid || uid.length > 128 ||
         typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
         !["like", "pass", "superlike"].includes(action)) {
@@ -292,16 +292,18 @@ export class MongoDBConnection {
       });
       const now = new Date();
       if (!match) {
+        const user1Uid = canonical && uid > targetUid ? targetUid : uid;
+        const user2Uid = canonical && uid > targetUid ? uid : targetUid;
         const inserted = await db.collection("matches").insertOne({
-          user1Uid: uid,
-          user2Uid: targetUid,
+          user1Uid,
+          user2Uid,
           status: action === "pass" ? "unmatched" : "pending",
           likedBy: action === "pass" ? [] : [uid],
           superLike: action === "superlike",
           createdAt: now,
           updatedAt: now
         });
-        match = { _id: inserted.insertedId, user1Uid: uid, user2Uid: targetUid, status: action === "pass" ? "unmatched" : "pending", likedBy: action === "pass" ? [] : [uid], superLike: action === "superlike" };
+        match = { _id: inserted.insertedId, user1Uid, user2Uid, status: action === "pass" ? "unmatched" : "pending", likedBy: action === "pass" ? [] : [uid], superLike: action === "superlike" };
       } else if (action === "like" || action === "superlike") {
         const update = { $addToSet: { likedBy: uid }, $set: { updatedAt: now } };
         if (action === "superlike") update.$set.superLike = true;
@@ -927,10 +929,11 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/swipe") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string" ||
-          typeof body.targetUid !== "string" || !["like", "pass", "superlike"].includes(body.action)) {
+          typeof body.targetUid !== "string" || !["like", "pass", "superlike"].includes(body.action) ||
+          (body.canonical !== undefined && typeof body.canonical !== "boolean")) {
         return json({ error: "Invalid request" }, 400);
       }
-      const result = await this.recordSwipe(body.claims.sub, body.targetUid, body.action);
+      const result = await this.recordSwipe(body.claims.sub, body.targetUid, body.action, body.canonical === true);
       return json(result.body, result.status);
     }
 
