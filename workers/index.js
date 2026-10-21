@@ -1,10 +1,106 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
+import { Buffer } from "node:buffer";
+import { constants, createPublicKey, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
 import { isB2Configured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
 };
+
+
+
+function normalizeWebXPayPublicKey(value) {
+  if (typeof value !== "string" || !value.trim()) throw new Error("WebXPay public key is not configured");
+  let key = value.trim();
+  if (key.startsWith('"') && key.endsWith('"')) key = key.slice(1, -1);
+  return key.replace(/\\n/g, "\n");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[ch]);
+}
+
+function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") {
+  if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
+    throw new Error("WebXPay payment configuration is incomplete");
+  }
+  const publicKey = createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
+  const frontend = new URL(env.FRONTEND_URL);
+  if (frontend.protocol !== "https:" && frontend.hostname !== "localhost") {
+    throw new Error("FRONTEND_URL must use HTTPS");
+  }
+  const returnUrl = new URL(returnPath, frontend);
+  returnUrl.searchParams.set("purchaseId", order.orderId);
+  const encryptedPayment = publicEncrypt({
+    key: publicKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, Buffer.from(order.orderId + "|" + String(order.price), "utf8")).toString("base64");
+  const user = order.user || {};
+  const nameParts = String(user.name || "User").trim().split(/\s+/);
+  const fields = [
+    ["first_name", nameParts[0] || "User"],
+    ["last_name", nameParts.slice(1).join(" ") || nameParts[0] || "User"],
+    ["email", user.email || ""],
+    ["contact_number", user.contactNumber || "0711234567"],
+    ["address_line_one", "N/A"],
+    ["process_currency", "LKR"],
+    ["secret_key", env.WEBXPAY_SECRET_KEY],
+    ["return_url", returnUrl.toString()],
+    ["custom_fields", ""],
+    ["payment", encryptedPayment]
+  ];
+  if (itemDescription) fields.push(["items", itemDescription]);
+  const nonce = crypto.randomUUID();
+  const inputs = fields.map(([name, value]) =>
+    '<input type="hidden" name="' + escapeHtml(name) + '" value="' + escapeHtml(value) + '">'
+  ).join("\n");
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>Redirecting to secure payment</title></head><body>' +
+    '<p>Redirecting to WebXPay securely…</p>' +
+    '<form action="https://stagingxpay.info/index.php?route=checkout/billing" id="webxpay-form" method="post">' +
+    inputs + '</form><script nonce="' + nonce + '">document.getElementById("webxpay-form").submit();</script></body></html>';
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "content-security-policy": "default-src 'none'; form-action https://stagingxpay.info; script-src 'nonce-" + nonce + "'; base-uri 'none'; frame-ancestors 'none'",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
+async function readWebXPayCallback(request) {
+  const raw = await request.text();
+  if (!raw || raw.length > 65536) return null;
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+  const params = new URLSearchParams(raw);
+  return {
+    payment: params.get("payment"),
+    signature: params.get("signature"),
+    custom_fields: params.get("custom_fields")
+  };
+}
+
+function verifyWebXPayCallback(payment, signature, configuredPublicKey) {
+  if (typeof payment !== "string" || typeof signature !== "string" ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(payment) ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(signature)) return null;
+  const paymentBytes = Buffer.from(payment, "base64");
+  const signatureBytes = Buffer.from(signature, "base64");
+  if (!paymentBytes.length || !signatureBytes.length) return null;
+  const verifiedBytes = publicDecrypt({
+    key: createPublicKey(normalizeWebXPayPublicKey(configuredPublicKey)),
+    padding: constants.RSA_PKCS1_PADDING
+  }, signatureBytes);
+  if (verifiedBytes.length !== paymentBytes.length || !timingSafeEqual(verifiedBytes, paymentBytes)) return null;
+  return paymentBytes.toString("utf8");
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -956,6 +1052,96 @@ export default {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
         return json({ error: "Report service unavailable" }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/purchase/store-item") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
+          return json({ error: "Payment gateway is not configured." }, 503);
+        }
+        createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload.itemId !== "string") return json({ error: "Invalid item ID." }, 400);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Purchase service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/create-purchase", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, itemId: payload.itemId })
+        });
+        const order = await response.json().catch(() => ({ error: "Purchase service unavailable" }));
+        if (!response.ok) return json(order, response.status);
+        try { return buildWebXPayCheckoutForm(order, env, "/store"); }
+        catch { return json({ error: "Payment gateway is not configured." }, 503); }
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Purchase service unavailable" }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/subscription") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
+          return json({ error: "Payment gateway is not configured." }, 503);
+        }
+        createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload.plan !== "string") return json({ error: "Invalid subscription plan." }, 400);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Subscription service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/create-subscription", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, plan: payload.plan })
+        });
+        const order = await response.json().catch(() => ({ error: "Subscription service unavailable" }));
+        if (!response.ok) return json(order, response.status);
+        const planLabel = order.plan ? order.plan.charAt(0).toUpperCase() + order.plan.slice(1) + " Subscription" : "Premium Subscription";
+        try { return buildWebXPayCheckoutForm(order, env, "/premium", planLabel); }
+        catch { return json({ error: "Payment gateway is not configured." }, 503); }
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Subscription service unavailable" }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/webxpay/response") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.WEBXPAY_PUBLIC_KEY) return json({ error: "Payment gateway is not configured." }, 503);
+      try {
+        const callback = await readWebXPayCallback(request);
+        if (!callback || typeof callback.payment !== "string" || typeof callback.signature !== "string") {
+          return json({ error: "Payment or signature missing." }, 400);
+        }
+        const decoded = verifyWebXPayCallback(callback.payment, callback.signature, env.WEBXPAY_PUBLIC_KEY);
+        if (!decoded) return json({ error: "Signature verification failed." }, 400);
+        const fields = decoded.split("|").map(value => value.trim());
+        if (fields.length < 5 || !/^[a-fA-F0-9]{24}$/.test(fields[0])) {
+          return json({ error: "Invalid payment response." }, 400);
+        }
+        // WEBXPAY's published examples differ on whether gateway ID or status is field 4.
+        const statusCode = [fields[3], fields[4]].find(value => ["0", "00", "15"].includes(value));
+        if (!statusCode) return json({ error: "Unsupported payment status." }, 400);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Payment settlement unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/webxpay-settle", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ orderId: fields[0], statusCode, reference: fields[1] || "" })
+        });
+        const body = await response.json().catch(() => ({ error: "Payment settlement unavailable" }));
+        return json(body, response.status);
+      } catch {
+        return json({ error: "Invalid payment signature or callback." }, 400);
       }
     }
 
