@@ -1,6 +1,6 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 import { Buffer } from "node:buffer";
-import { constants, createPublicKey, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
+import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
 import { isB2Configured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
 const JSON_HEADERS = {
@@ -15,6 +15,49 @@ function normalizeWebXPayPublicKey(value) {
   let key = value.trim();
   if (key.startsWith('"') && key.endsWith('"')) key = key.slice(1, -1);
   return key.replace(/\\n/g, "\n");
+}
+
+
+
+function base64UrlJson(value) {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
+async function createSuperadminCustomToken(env, email, password) {
+  if (!env.SUPER_ADMIN_EMAIL || !env.SUPER_ADMIN_PASSWORD_HASH || !env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    throw new Error("Superadmin login is not configured");
+  }
+  const configuredEmail = String(env.SUPER_ADMIN_EMAIL).trim().toLowerCase();
+  if (typeof email !== "string" || email.trim().toLowerCase() !== configuredEmail ||
+      typeof password !== "string" || password.length < 1 || password.length > 1024) {
+    return null;
+  }
+  const bcrypt = await import("bcryptjs");
+  const hashMatches = await bcrypt.compare(password, env.SUPER_ADMIN_PASSWORD_HASH);
+  if (!hashMatches) return null;
+  let serviceAccount;
+  try { serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON); }
+  catch { throw new Error("Firebase service account configuration is invalid"); }
+  if (typeof serviceAccount.client_email !== "string" || typeof serviceAccount.private_key !== "string" ||
+      !serviceAccount.private_key.includes("PRIVATE KEY")) {
+    throw new Error("Firebase service account configuration is invalid");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlJson({ alg: "RS256", typ: "JWT" });
+  const claims = base64UrlJson({
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+    iat: now,
+    exp: now + 3600,
+    uid: "superadmin_uid",
+    claims: { role: "superadmin" }
+  });
+  const unsigned = header + "." + claims;
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  return unsigned + "." + signer.sign(serviceAccount.private_key, "base64url");
 }
 
 function escapeHtml(value) {
@@ -261,7 +304,23 @@ export default {
         return json({ error: "Request must contain either a Firebase token or email/password." }, 400);
       }
       if (payload.email || payload.password) {
-        return json({ error: "Password-based administrator login is not yet supported by the serverless API." }, 501);
+        try {
+          const token = await createSuperadminCustomToken(env, payload.email, payload.password);
+          if (!token) return json({ error: "Invalid credentials" }, 401);
+          return json({
+            token,
+            user: {
+              uid: "superadmin_uid",
+              email: String(env.SUPER_ADMIN_EMAIL).trim(),
+              name: "Super Admin",
+              role: "superadmin",
+              isPremium: true,
+              isOnboardingComplete: true
+            }
+          });
+        } catch {
+          return json({ error: "Password-based administrator login is not configured" }, 503);
+        }
       }
       if (typeof payload.token !== "string" || !payload.token || payload.token.length > 10000) {
         return json({ error: "Request must contain either a Firebase token or email/password." }, 400);
