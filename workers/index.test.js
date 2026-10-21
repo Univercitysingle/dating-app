@@ -195,7 +195,7 @@ test("profile updates whitelist fields and preserve legacy response shape", asyn
   const stored = { _id: "mongo-id", uid: "user-1", email: "user@example.com", isOnboardingComplete: false, name: "Old", role: "user" };
   let updateDoc;
   const users = {
-    findOne: async () => ({ isOnboardingComplete: false }),
+    findOne: async (_query, options) => options?.projection?.isOnboardingComplete ? { isOnboardingComplete: false } : stored,
     updateOne: async (_query, update) => { updateDoc = update; Object.assign(stored, update.$set); return { modifiedCount: 1 }; }
   };
   const subscriptions = { findOne: async () => null };
