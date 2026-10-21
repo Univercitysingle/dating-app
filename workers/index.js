@@ -35,6 +35,21 @@ export { MongoDBConnection } from "./mongodb-connection.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Keep the API origin useful when opened directly, without implying that
+    // this backend URL is the React login page.
+    if (url.pathname === "/" && request.method === "GET") {
+      return json({
+        service: "dating-app-api",
+        stage: env.MIGRATION_STAGE || "unknown",
+        status: "ok",
+        frontend: "not_served_by_this_worker"
+      });
+    }
+    if (url.pathname === "/favicon.ico" && request.method === "GET") {
+      return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400" } });
+    }
+
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ status: "ok", service: "dating-app-api", stage: env.MIGRATION_STAGE || "unknown" });
     }
