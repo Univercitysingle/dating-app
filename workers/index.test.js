@@ -217,6 +217,19 @@ test("password-based administrator login fails closed when secure signing secret
   assert.match((await response.json()).error, /not configured/i);
 });
 
+test("GET /api/auth/test preserves the legacy non-sensitive diagnostic route", async () => {
+  const response = await worker.fetch(request("/api/auth/test"), {});
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(await response.text(), "Auth test route is working");
+});
+
+test("POST /api/auth/test rejects unsupported methods", async () => {
+  const response = await worker.fetch(request("/api/auth/test", "POST"), {});
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { error: "Method not allowed" });
+});
+
 test("POST /api/auth/logout preserves the legacy stateless logout response", async () => {
   const response = await worker.fetch(request("/api/auth/logout", "POST"), {});
   assert.equal(response.status, 200);
