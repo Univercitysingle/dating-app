@@ -2206,23 +2206,28 @@ export class MongoDBConnection {
   }
 
   parseChatRoom(roomId) {
-    if (typeof roomId !== "string" || roomId.length > 260) return null;
-    const parts = roomId.split("-");
-    if (parts.length !== 2 || !parts.every(part => /^[A-Za-z0-9_]{1,128}$/.test(part)) || parts[0] === parts[1]) return null;
-    return parts;
+    if (typeof roomId !== "string" || roomId.length > 260 || roomId.length < 3) return null;
+    return roomId;
   }
 
   async getChatHistory(uid, roomId, limit = 50, skip = 0) {
-    const participants = this.parseChatRoom(roomId);
-    if (!participants || !participants.includes(uid)) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
+    if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
     skip = Number.isInteger(skip) ? Math.max(0, Math.min(skip, 100000)) : 0;
     try {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
       if (!user) return { status: 404, body: { error: "User not found" } };
-      const messages = await db.collection("chatmessages").find({ roomId })
+      const access = user.role === "superadmin" ? {} : {
+        $or: [{ senderUid: uid }, { receiverUid: uid }]
+      };
+      const query = { roomId, ...access };
+      const messages = await db.collection("chatmessages").find(query)
         .sort({ timestamp: 1 }).skip(skip).limit(limit).toArray();
+      if (user.role !== "superadmin" && messages.length === 0) {
+        const hasConversation = await db.collection("chatmessages").findOne({ roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] }, { projection: { _id: 1 } });
+        if (!hasConversation) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
+      }
       return { status: 200, body: { messages } };
     } catch {
       return { status: 503, body: { error: "Chat history unavailable" } };
@@ -2230,7 +2235,7 @@ export class MongoDBConnection {
   }
 
   async getChatConversations(uid) {
-    if (typeof uid !== "string" || !/^[A-Za-z0-9_]{1,128}$/.test(uid)) return { status: 400, body: { error: "Invalid user identity" } };
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
       const db = this.getDatabase(await this.getClient());
       const [user, messages] = await Promise.all([
@@ -2241,21 +2246,16 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found" } };
       const byRoom = new Map();
       for (const message of messages) {
-        const parts = this.parseChatRoom(message.roomId);
-        if (!parts || !parts.includes(uid)) continue;
-        const otherUid = parts.find(part => part !== uid);
-        if (!otherUid || byRoom.has(message.roomId)) continue;
+        if (typeof message.roomId !== "string" || byRoom.has(message.roomId)) continue;
+        const otherUid = message.senderUid === uid ? message.receiverUid : message.senderUid;
+        if (typeof otherUid !== "string" || !otherUid || otherUid === uid) continue;
         const otherUser = await db.collection("users").findOne(
           { uid: otherUid },
           { projection: { password: 0, lastLoginIp: 0, email: 0, mobileNumber: 0, location: 0, lastLoginDevice: 0 } }
         );
         if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
             (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) continue;
-        byRoom.set(message.roomId, {
-          roomId: message.roomId,
-          otherUser: otherUser,
-          lastMessage: message
-        });
+        byRoom.set(message.roomId, { roomId: message.roomId, otherUser, lastMessage: message });
       }
       return { status: 200, body: [...byRoom.values()] };
     } catch {
@@ -2265,9 +2265,9 @@ export class MongoDBConnection {
 
   async createChatMessage(uid, payload) {
     const { roomId, receiverUid, messageContent } = payload || {};
-    const participants = this.parseChatRoom(roomId);
-    if (!participants || !participants.includes(uid) || typeof receiverUid !== "string" ||
-        !participants.includes(receiverUid) || receiverUid === uid ||
+    if (typeof uid !== "string" || !uid || typeof receiverUid !== "string" || !receiverUid ||
+        receiverUid === uid || typeof roomId !== "string" ||
+        ![uid + "-" + receiverUid, receiverUid + "-" + uid].includes(roomId) ||
         typeof messageContent !== "string" || !messageContent.trim() || messageContent.length > 5000) {
       return { status: 400, body: { error: "Invalid roomId, receiverUid, or messageContent" } };
     }
@@ -2288,12 +2288,7 @@ export class MongoDBConnection {
           (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid))) {
         return { status: 403, body: { error: "Messaging is unavailable for this conversation" } };
       }
-      const message = {
-        roomId, senderUid: uid, receiverUid,
-        messageContent: messageContent.trim(),
-        timestamp: now,
-        status: "sent"
-      };
+      const message = { roomId, senderUid: uid, receiverUid, messageContent: messageContent.trim(), timestamp: now, status: "sent" };
       const inserted = await db.collection("chatmessages").insertOne(message);
       message._id = inserted.insertedId;
       return { status: 201, body: message };
@@ -2315,6 +2310,7 @@ export class MongoDBConnection {
       return { status: 503, body: { error: "Unable to roll back chat message" } };
     }
   }
+
 
   async fetch(request) {
     const url = new URL(request.url);
