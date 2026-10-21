@@ -934,6 +934,7 @@ test("migrated admin read endpoints reject anonymous requests before database ch
     "/api/admin/users/stats",
     "/api/admin/transactions",
     "/api/admin/analytics/summary",
+    "/api/admin/analytics/export",
     "/api/admin/payment-logs",
     "/api/admin/user-activity/login-history",
     "/api/admin/audit-logs",
