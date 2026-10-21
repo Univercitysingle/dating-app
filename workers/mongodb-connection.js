@@ -141,6 +141,34 @@ export class MongoDBConnection {
     }
   }
 
+  async ensureSuperadminUser(email) {
+    if (typeof email !== "string" || !email.trim() || email.length > 320) {
+      return { status: 400, body: { error: "Invalid superadmin email" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const existing = await users.findOne({ uid: "superadmin_uid" });
+      if (existing && existing.role !== "superadmin") {
+        return { status: 409, body: { error: "Reserved superadmin identity conflicts with an existing account" } };
+      }
+      const other = await users.findOne({ email: email.trim().toLowerCase(), uid: { $ne: "superadmin_uid" } });
+      if (other) return { status: 409, body: { error: "Superadmin email is linked to another account" } };
+      const now = new Date();
+      await users.updateOne(
+        { uid: "superadmin_uid" },
+        { $set: {
+          uid: "superadmin_uid", email: email.trim().toLowerCase(),
+          name: "Super Admin", role: "superadmin", plan: "premium",
+          isOnboardingComplete: true, isProfileVisible: false, updatedAt: now
+        }, $setOnInsert: { createdAt: now, photos: [], blocked: [], interests: [], profilePrompts: [] } },
+        { upsert: true }
+      );
+      return { status: 200, body: { success: true } };
+    } catch {
+      return { status: 503, body: { error: "Superadmin account provisioning unavailable" } };
+    }
+  }
+
   async findOrCreateUserFromClaims(claims) {
     if (!claims || typeof claims.sub !== "string" || claims.sub.length < 1 || claims.sub.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
@@ -2370,6 +2398,13 @@ export class MongoDBConnection {
       } else {
         result = await this.moderateBankSlipSubscription(body.claims.sub, body.subscriptionId, body.action, body.reason || "");
       }
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/superadmin-provision") {
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body.email !== "string") return json({ error: "Invalid request" }, 400);
+      const result = await this.ensureSuperadminUser(body.email);
       return json(result.body, result.status);
     }
 
