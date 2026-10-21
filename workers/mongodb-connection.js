@@ -785,6 +785,50 @@ export class MongoDBConnection {
     }
   }
 
+  async createReport(reporterUid, payload) {
+    const categories = [
+      "spam",
+      "inappropriate_profile_content",
+      "harassment_or_bullying",
+      "hateful_conduct",
+      "impersonation",
+      "underage_user",
+      "scam_or_fraud",
+      "other"
+    ];
+    const reportedUserUid = payload?.reportedUserUid;
+    const reason = typeof payload?.reason === "string" ? payload.reason.trim() : "";
+    const category = payload?.category;
+    if (typeof reportedUserUid !== "string" || !reportedUserUid || reportedUserUid.length > 128 ||
+        reportedUserUid === reporterUid || !reason || reason.length > 2000 || !categories.includes(category)) {
+      return { status: 400, body: { error: "A different reported user, valid category, and reason of at most 2000 characters are required." } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const [reporter, reported] = await Promise.all([
+        users.findOne({ uid: reporterUid }, { projection: { _id: 1 } }),
+        users.findOne({ uid: reportedUserUid }, { projection: { _id: 1 } })
+      ]);
+      if (!reporter) return { status: 404, body: { error: "Reporter user not found." } };
+      if (!reported) return { status: 404, body: { error: "Reported user not found." } };
+      const report = {
+        reporterUid,
+        reportedUserUid,
+        reason,
+        category,
+        status: "pending_review",
+        adminNotes: "",
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      const result = await db.collection("reports").insertOne(report);
+      return { status: 201, body: { message: "Report submitted successfully.", reportId: result.insertedId.toString() } };
+    } catch {
+      return { status: 503, body: { error: "Report service is temporarily unavailable." } };
+    }
+  }
+
   async getUserProfile(targetUid, viewerUid) {
     if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
         typeof viewerUid !== "string" || !viewerUid || viewerUid.length > 128) {
@@ -1046,6 +1090,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.getLikes(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/create-report") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || !body.payload || typeof body.payload !== "object") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.createReport(body.claims.sub, body.payload);
       return json(result.body, result.status);
     }
 
