@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   getAuth,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   createUserWithEmailAndPassword,
   sendEmailVerification,
   signInWithPopup,
@@ -105,8 +106,12 @@ function Login() {
         if (!response.ok) {
           throw new Error(data.error || 'Superadmin login failed');
         }
-        // Use the new login function signature from AuthContext
-        await login(data.token, data.user);
+        // The Worker returns a Firebase custom token, not an ID token.
+        // Exchange it through Firebase Auth so subsequent API calls carry a
+        // verifiable Firebase ID token and the superadmin custom claims.
+        const credential = await signInWithCustomToken(auth, data.token);
+        const idToken = await credential.user.getIdToken();
+        await login(idToken, data.user);
         navigate('/admin');
       } catch (err) {
         logger.error('Superadmin login error:', err);
