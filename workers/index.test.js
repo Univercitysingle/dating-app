@@ -934,6 +934,9 @@ test("migrated admin read endpoints reject anonymous requests before database ch
     "/api/admin/users/stats",
     "/api/admin/transactions",
     "/api/admin/analytics/summary",
+    "/api/admin/payment-logs",
+    "/api/admin/user-activity/login-history",
+    "/api/admin/audit-logs",
     "/api/admin/support-tickets",
     "/api/admin/support-tickets/0123456789abcdef01234567"
   ];
@@ -974,6 +977,9 @@ test("admin read methods deny users without an admin role", async () => {
   assert.equal((await connection.getAdminDashboardStats("ordinary-user")).status, 403);
   assert.equal((await connection.getAdminTransactions("ordinary-user")).status, 403);
   assert.equal((await connection.getAdminAnalyticsSummary("ordinary-user")).status, 403);
+  assert.equal((await connection.getAdminLogs("ordinary-user", "payment")).status, 403);
+  assert.equal((await connection.getAdminLogs("ordinary-user", "login")).status, 403);
+  assert.equal((await connection.getAdminLogs("ordinary-user", "audit")).status, 403);
 });
 
 test("admin report endpoints reject anonymous requests", async () => {
