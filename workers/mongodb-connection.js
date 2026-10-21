@@ -785,6 +785,44 @@ export class MongoDBConnection {
     }
   }
 
+  async getPurchaseStatus(uid, purchaseId) {
+    if (typeof purchaseId !== "string" || !/^[a-fA-F0-9]{24}$/.test(purchaseId)) {
+      return { status: 400, body: { error: "Invalid purchase ID" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const purchase = await db.collection("purchases").findOne({ _id: new ObjectId(purchaseId) });
+      if (!purchase) return { status: 404, body: { error: "Purchase not found" } };
+      if (String(purchase.userId) !== String(user._id)) return { status: 403, body: { error: "Access denied." } };
+      return { status: 200, body: { status: purchase.status } };
+    } catch {
+      return { status: 503, body: { error: "Purchase service is temporarily unavailable." } };
+    }
+  }
+
+  async getSubscriptionStatus(uid, subscriptionId) {
+    if (typeof subscriptionId !== "string" || !/^[a-fA-F0-9]{24}$/.test(subscriptionId)) {
+      return { status: 400, body: { error: "Invalid subscription ID" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const subscription = await db.collection("subscriptions").findOne({ _id: new ObjectId(subscriptionId) });
+      if (!subscription) return { status: 404, body: { error: "Subscription not found" } };
+      if (String(subscription.userId) !== String(user._id)) {
+        return { status: 403, body: { error: "Not authorized to view this subscription" } };
+      }
+      return { status: 200, body: { status: subscription.status, plan: subscription.plan, endDate: subscription.endDate } };
+    } catch {
+      return { status: 503, body: { error: "Subscription service is temporarily unavailable." } };
+    }
+  }
+
   async createSupportTicket(uid, payload) {
     if (typeof uid !== "string" || !uid || uid.length > 128 ||
         !payload || typeof payload.subject !== "string" || !payload.subject.trim() ||
@@ -1188,6 +1226,17 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.getLikes(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/purchase-status" || url.pathname === "/internal/subscription-status") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.id !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = url.pathname === "/internal/purchase-status"
+        ? await this.getPurchaseStatus(body.claims.sub, body.id)
+        : await this.getSubscriptionStatus(body.claims.sub, body.id);
       return json(result.body, result.status);
     }
 
