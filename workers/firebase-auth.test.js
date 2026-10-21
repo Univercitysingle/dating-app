@@ -56,8 +56,7 @@ for (const [label, overrides] of [
   ["expired token", { exp: now - 1 }],
   ["future-issued token", { iat: now + 60 }],
   ["future authentication time", { auth_time: now + 60 }],
-  ["missing subject", { sub: "" }],
-  ["mismatched user ID", { user_id: "someone-else" }]
+  ["missing subject", { sub: "" }]
 ]) {
   test(`rejects token with ${label}`, async () => {
     await assert.rejects(verifyFirebaseIdToken(makeToken(overrides), projectId, { now: now * 1000, fetchImpl: mockFetch() }), FirebaseTokenError);
@@ -80,4 +79,19 @@ test("request authentication returns verified claims", async () => {
   const request = new Request("https://worker.test/api/me", { headers: { authorization: `Bearer ${makeToken()}` } });
   const claims = await authenticateFirebaseRequest(request, projectId, { now: now * 1000, fetchImpl: mockFetch() });
   assert.equal(claims.sub, "firebase-user-123");
+});
+
+test("accepts a valid token when the optional user_id claim is absent", async () => {
+  const token = makeToken();
+  const [header, payload, signature] = token.split(".");
+  const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  delete claims.user_id;
+  const changedPayload = b64url(JSON.stringify(claims));
+  const input = `${header}.${changedPayload}`;
+  const signed = sign("RSA-SHA256", Buffer.from(input), privateKey);
+  const claimsResult = await verifyFirebaseIdToken(`${input}.${b64url(signed)}`, projectId, {
+    now: now * 1000,
+    fetchImpl: mockFetch()
+  });
+  assert.equal(claimsResult.sub, "firebase-user-123");
 });
