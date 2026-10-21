@@ -298,6 +298,38 @@ test("profile updates reject underage birthdays and malformed mobile numbers", a
   assert.equal((await connection.updateCurrentUserProfile("user-1", { mobileNumber: "123" })).status, 400);
 });
 
+test("discovery validates filters before querying MongoDB", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => ({ findOne: async () => ({ uid: "current" }) }) }) });
+  const invalid = await connection.discoverUsers("current", { minAge: "not-a-number" });
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(invalid.body, { error: "Invalid discovery filter" });
+});
+
+test("discovery returns ordered public profiles with super-like metadata", async () => {
+  const current = { uid: "current", preference: "everyone", location: { coordinates: [0, 0] } };
+  const candidate = { _id: "candidate-id", uid: "candidate", name: "Candidate", email: "private@example.com", password: "secret", lastLoginIp: "192.0.2.1", photos: [{ url: "photos/a.jpg" }] };
+  let pipeline;
+  const users = {
+    findOne: async () => current,
+    aggregate: (value) => { pipeline = value; return { toArray: async () => [{ uid: "candidate" }] }; },
+    find: () => ({ toArray: async () => [candidate] })
+  };
+  const matches = { find: () => ({ project: () => ({ toArray: async () => [{ user1Uid: "candidate" }] }) }) };
+  const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  const result = await connection.discoverUsers("current", { relationshipGoals: "Long-term relationship" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  assert.equal(result.body[0].uid, "candidate");
+  assert.equal(result.body[0].email, undefined);
+  assert.equal(result.body[0].password, undefined);
+  assert.equal(result.body[0].lastLoginIp, undefined);
+  assert.equal(result.body[0].superLikedByCurrentUser, true);
+  assert.equal(result.body[0].photos[0].url, "https://cdn.example.com/photos/a.jpg");
+  assert.ok(pipeline.some(stage => stage.$lookup && stage.$lookup.from === "matches"));
+});
+
 test("likes query returns pending likers with privacy filtering and premium blur metadata", async () => {
   const current = { _id: "current-id", uid: "current", plan: "basic" };
   const liker = {
