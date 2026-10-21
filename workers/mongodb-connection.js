@@ -227,8 +227,10 @@ export class MongoDBConnection {
 
     if (url.pathname === "/internal/profile") {
       const body = await request.json().catch(() => null);
-      if (!body || typeof body.uid !== "string") return json({ error: "Invalid request" }, 400);
-      const result = await this.getCurrentUserProfile(body.uid);
+      if (!body || !body.claims || typeof body.claims !== "object") return json({ error: "Invalid request" }, 400);
+      const provisioned = await this.findOrCreateUserFromClaims(body.claims);
+      if (!provisioned.user) return json(provisioned.body, provisioned.status);
+      const result = await this.getCurrentUserProfile(body.claims.sub);
       return json(result.body, result.status);
     }
 
