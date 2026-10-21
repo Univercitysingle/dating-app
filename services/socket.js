@@ -1,5 +1,48 @@
 const socketIo = require("socket.io");
 const ChatMessage = require('../models/ChatMessage');
+const MAX_MESSAGE_LENGTH = 2000;
+async function authorizeRoom(userUid, roomId, peerUid) {
+  if (typeof roomId !== 'string' || !roomId || roomId.length > 256) return false;
+  if (peerUid && (peerUid === userUid || typeof peerUid !== 'string')) return false;
+
+  const existing = await ChatMessage.findOne({
+    roomId,
+    $or: [
+      { senderUid: userUid },
+      { receiverUid: userUid },
+    ],
+  }).select('_id').lean();
+  if (existing) {
+    if (!peerUid) return true;
+    const pairMessage = await ChatMessage.findOne({
+      roomId,
+      $or: [
+        { senderUid: userUid, receiverUid: peerUid },
+        { senderUid: peerUid, receiverUid: userUid },
+      ],
+    }).select('_id').lean();
+    if (pairMessage) return true;
+  }
+
+  if (!peerUid) return false;
+  const expectedRooms = [
+    [userUid, peerUid].sort().join('-'),
+    [userUid, peerUid].join('-'),
+    [peerUid, userUid].join('-'),
+  ];
+  if (!expectedRooms.includes(roomId)) return false;
+
+  const match = await require('../models/Match').findOne({
+    status: 'matched',
+    $or: [
+      { user1Uid: userUid, user2Uid: peerUid },
+      { user1Uid: peerUid, user2Uid: userUid },
+    ],
+  }).select('_id').lean();
+  return !!match;
+}
+
+
 const User = require('../models/User');
 const { buildLogger } = require('../utils/logger');
 const log = buildLogger('socket-service');
@@ -50,30 +93,40 @@ function initSocket(server, allowedOrigins, adminInstance) {
     socket.join(socket.user.uid);
 
     socket.on("joinRoom", async (roomId, callback) => {
-      socket.join(roomId);
-      console.log(`${socket.user.uid} joined room ${roomId}`);
-
       try {
+        const allowed = await authorizeRoom(socket.user.uid, roomId);
+        if (!allowed) {
+          if (typeof callback === 'function') callback({ status: 'error', error: 'Not authorized to join this conversation.' });
+          return;
+        }
+        socket.join(roomId);
         const messages = await ChatMessage.find({ roomId }).sort({ timestamp: 1 }).limit(50).exec();
         socket.emit("chatHistory", { roomId, messages });
+        if (typeof callback === 'function') callback({ status: "ok" });
       } catch (error) {
-        console.error(`Error fetching chat history for room ${roomId}:`, error);
-      }
-
-      if (callback) {
-        callback({ status: "ok" });
+        log.error({ err: error }, 'Failed to authorize or load chat room');
+        if (typeof callback === 'function') callback({ status: 'error', error: 'Unable to join conversation.' });
       }
     });
 
     socket.on("sendMessage", async ({ roomId, messageContent, receiverUid }) => {
       console.log(`Message received in room ${roomId} from ${socket.user.uid}: ${messageContent}`);
-      if (!roomId || !messageContent || !receiverUid) {
-        console.error("sendMessage: missing roomId, messageContent, or receiverUid");
-        socket.emit("messageError", { error: "Missing required message data." });
+      if (typeof roomId !== 'string' || !roomId || typeof messageContent !== 'string' || !messageContent.trim() || messageContent.length > MAX_MESSAGE_LENGTH || typeof receiverUid !== 'string' || !receiverUid) {
+        socket.emit("messageError", { error: "Invalid message data. Messages must contain 1 to 2000 characters." });
         return;
       }
 
       const sender = socket.user;
+      try {
+        if (!(await authorizeRoom(sender.uid, roomId, receiverUid))) {
+          socket.emit("messageError", { error: "Not authorized to message this user in this conversation." });
+          return;
+        }
+      } catch (error) {
+        log.error({ err: error }, 'Chat authorization failed');
+        socket.emit("messageError", { error: "Unable to authorize this conversation." });
+        return;
+      }
       const senderUid = sender.uid;
 
       // Rate limit: basic plan users can send max 2 messages per 24 hours
@@ -149,45 +202,59 @@ function initSocket(server, allowedOrigins, adminInstance) {
       }
     });
 
-    socket.on('typing', ({ roomId, receiverUid }) => {
-      const receiverSocketId = onlineUsers.get(receiverUid);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('userTyping', { roomId, typerUid: socket.user.uid });
+    socket.on('typing', async ({ roomId, receiverUid } = {}) => {
+      try {
+        if (!(await authorizeRoom(socket.user.uid, roomId, receiverUid))) return;
+        const receiverSocketId = onlineUsers.get(receiverUid);
+        if (receiverSocketId) io.to(receiverSocketId).emit('userTyping', { roomId, typerUid: socket.user.uid });
+      } catch (error) {
+        log.warn({ err: error }, 'Typing event authorization failed');
       }
     });
 
-    socket.on('stopTyping', ({ roomId, receiverUid }) => {
-      const receiverSocketId = onlineUsers.get(receiverUid);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('userStoppedTyping', { roomId, typerUid: socket.user.uid });
+    socket.on('stopTyping', async ({ roomId, receiverUid } = {}) => {
+      try {
+        if (!(await authorizeRoom(socket.user.uid, roomId, receiverUid))) return;
+        const receiverSocketId = onlineUsers.get(receiverUid);
+        if (receiverSocketId) io.to(receiverSocketId).emit('userStoppedTyping', { roomId, typerUid: socket.user.uid });
+      } catch (error) {
+        log.warn({ err: error }, 'Stop-typing event authorization failed');
       }
     });
 
-    socket.on('messageDelivered', async ({ messageId, senderUid }) => {
-        try {
-            await ChatMessage.findByIdAndUpdate(messageId, { status: 'delivered' });
+    socket.on('messageDelivered', async ({ messageId } = {}) => {
+      try {
+        const message = await ChatMessage.findOneAndUpdate(
+          { _id: messageId, receiverUid: socket.user.uid },
+          { $set: { status: 'delivered' } },
+          { new: true }
+        );
+        if (!message) return;
+        const senderSocketId = onlineUsers.get(message.senderUid);
+        if (senderSocketId) io.to(senderSocketId).emit('messageStatusUpdate', { messageId: String(message._id), status: 'delivered' });
+      } catch (error) {
+        log.error({ err: error }, 'Failed to update message delivery status');
+      }
+    });
+
+    socket.on('messagesRead', async ({ roomId } = {}) => {
+      try {
+        const allowed = await authorizeRoom(socket.user.uid, roomId);
+        if (!allowed) return;
+        const result = await ChatMessage.updateMany(
+          { roomId, receiverUid: socket.user.uid, status: { $ne: 'read' } },
+          { $set: { status: 'read' } }
+        );
+        if (result.modifiedCount > 0) {
+          const senders = await ChatMessage.distinct('senderUid', { roomId, receiverUid: socket.user.uid });
+          for (const senderUid of senders) {
             const senderSocketId = onlineUsers.get(senderUid);
-            if (senderSocketId) {
-                io.to(senderSocketId).emit('messageStatusUpdate', { messageId, status: 'delivered' });
-            }
-        } catch (error) {
-            log.error({ err: error }, `Failed to update message ${messageId} to delivered`);
+            if (senderSocketId) io.to(senderSocketId).emit('messagesReadUpdate', { roomId, readerUid: socket.user.uid });
+          }
         }
-    });
-
-    socket.on('messagesRead', async ({ roomId, readerUid }) => {
-        try {
-            await ChatMessage.updateMany(
-                { roomId, receiverUid: socket.user.uid, status: { $ne: 'read' } },
-                { status: 'read' }
-            );
-            const readerSocketId = onlineUsers.get(readerUid);
-            if (readerSocketId) {
-                io.to(readerSocketId).emit('messagesReadUpdate', { roomId, readerUid: socket.user.uid });
-            }
-        } catch (error) {
-            log.error({ err: error }, `Failed to update messages in room ${roomId} to read`);
-        }
+      } catch (error) {
+        log.error({ err: error }, 'Failed to update chat read status');
+      }
     });
 
     socket.on("subscribeToProfile", (profileId) => {
