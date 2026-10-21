@@ -1295,6 +1295,97 @@ export default {
       }
     }
 
+    const chatRoute = url.pathname.match(/^\/api\/chat\/(history\/([^/]+)|conversations|send)$/);
+    if (chatRoute) {
+      const methodAllowed = chatRoute[1] === "history/" + chatRoute[2] ? request.method === "GET"
+        : chatRoute[1] === "conversations" ? request.method === "GET" : request.method === "POST";
+      if (!methodAllowed) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Chat service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        if (chatRoute[1] === "conversations") {
+          const response = await connection.fetch("https://internal.invalid/internal/chat/conversations", {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
+          });
+          const result = await response.json().catch(() => ({ error: "Chat conversations unavailable" }));
+          return json(result, response.status);
+        }
+        if (chatRoute[1].startsWith("history/")) {
+          let roomId;
+          try { roomId = decodeURIComponent(chatRoute[2]); } catch { return json({ error: "Invalid room ID" }, 400); }
+          const limitRaw = url.searchParams.get("limit");
+          const skipRaw = url.searchParams.get("skip");
+          const limit = limitRaw === null ? 50 : Number(limitRaw);
+          const skip = skipRaw === null ? 0 : Number(skipRaw);
+          if (!Number.isInteger(limit) || !Number.isInteger(skip) || limit < 1 || skip < 0) return json({ error: "Invalid pagination" }, 400);
+          const response = await connection.fetch("https://internal.invalid/internal/chat/history", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, roomId, limit, skip })
+          });
+          const result = await response.json().catch(() => ({ error: "Chat history unavailable" }));
+          return json(result, response.status);
+        }
+        const payload = await request.json().catch(() => null);
+        const response = await connection.fetch("https://internal.invalid/internal/chat/send", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, payload })
+        });
+        const result = await response.json().catch(() => ({ error: "Unable to send chat message" }));
+        if (!response.ok) return json(result, response.status);
+        const authorization = request.headers.get("authorization") || "";
+        const idToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+        if (!idToken || !env.FIREBASE_DATABASE_URL) {
+          await connection.fetch("https://internal.invalid/internal/chat/rollback", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, messageId: result._id })
+          }).catch(() => {});
+          return json({ error: "Realtime chat is not configured" }, 503);
+        }
+        let databaseBase;
+        try {
+          const configured = new URL(env.FIREBASE_DATABASE_URL);
+          if (configured.protocol !== "https:" || !configured.hostname.endsWith("firebasedatabase.app") && !configured.hostname.endsWith("firebaseio.com")) throw new Error("Invalid database URL");
+          databaseBase = configured.toString().replace(/\/+$/, "");
+        } catch {
+          await connection.fetch("https://internal.invalid/internal/chat/rollback", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, messageId: result._id })
+          }).catch(() => {});
+          return json({ error: "Realtime chat is not configured" }, 503);
+        }
+        const room = encodeURIComponent(result.roomId);
+        const messageKey = encodeURIComponent(String(result._id));
+        const realtimeResponse = await fetch(
+          databaseBase + "/chats/" + room + "/" + messageKey + ".json?auth=" + encodeURIComponent(idToken),
+          {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              _id: String(result._id), roomId: result.roomId,
+              senderUid: result.senderUid, receiverUid: result.receiverUid,
+              messageContent: result.messageContent,
+              timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
+            })
+          }
+        ).catch(() => null);
+        if (!realtimeResponse || !realtimeResponse.ok) {
+          await connection.fetch("https://internal.invalid/internal/chat/rollback", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, messageId: result._id })
+          }).catch(() => {});
+          return json({ error: "Realtime chat write was rejected; check Firebase Realtime Database rules and configuration" }, 503);
+        }
+        return json(result, 201);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Chat service unavailable" }, 503);
+      }
+    }
+
     return json({ error: "Route not migrated yet" }, 501);
   },
 
