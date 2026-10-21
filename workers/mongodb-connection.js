@@ -381,6 +381,21 @@ export class MongoDBConnection {
     }
   }
 
+  async getNotifications(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const notifications = await (await this.getClient()).db().collection("notifications")
+        .find({ recipientUid: uid, status: "pending" })
+        .sort({ createdAt: -1 })
+        .toArray();
+      return { status: 200, body: notifications };
+    } catch {
+      return { status: 503, body: { error: "Notification service unavailable" } };
+    }
+  }
+
   async getPotentialMatches(uid, filters = {}) {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid match request" } };
@@ -970,6 +985,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.recordSwipe(body.claims.sub, body.targetUid, body.action, body.canonical === true);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/notifications") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getNotifications(body.claims.sub);
       return json(result.body, result.status);
     }
 
