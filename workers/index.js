@@ -77,6 +77,44 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/auth/login") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      const payload = await request.json().catch(() => null);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return json({ error: "Request must contain either a Firebase token or email/password." }, 400);
+      }
+      if (payload.email || payload.password) {
+        return json({ error: "Password-based administrator login is not yet supported by the serverless API." }, 501);
+      }
+      if (typeof payload.token !== "string" || !payload.token || payload.token.length > 10000) {
+        return json({ error: "Request must contain either a Firebase token or email/password." }, 400);
+      }
+      if (!env.MONGODB_CONNECTION) return json({ error: "Profile service unavailable" }, 503);
+      try {
+        const authRequest = new Request(request.url, {
+          method: "GET",
+          headers: { authorization: "Bearer " + payload.token }
+        });
+        const claims = await authenticateFirebaseRequest(authRequest, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/profile", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims })
+        });
+        const user = await response.json().catch(() => ({ error: "Profile service unavailable" }));
+        if (!response.ok) return json(user, response.status);
+        const responsePayload = { token: payload.token, user };
+        if (user.mustSetPassword === true) responsePayload.requiresPasswordSetup = true;
+        return json(responsePayload);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Invalid or expired token" }, 401);
+        return json({ error: "An unexpected error occurred during login." }, 500);
+      }
+    }
+
     // The legacy Express logout endpoint is stateless: the client clears its
     // Firebase session/token. Keep the response contract for existing clients.
     if (url.pathname === "/api/auth/logout") {
