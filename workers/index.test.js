@@ -1167,3 +1167,75 @@ test("WebXPay callback rejects invalid signatures and does not settle an order",
   assert.equal(response.status, 400);
   assert.equal(called, false);
 });
+
+
+test("WebXPay purchase settlement grants benefits once and is idempotent", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "0123456789abcdef01234567";
+  const purchase = { _id: new ObjectId(orderId), userId: new ObjectId("abcdef0123456789abcdef01"), status: "pending", itemId: "super-like-5" };
+  const user = { _id: purchase.userId, purchasedSuperLikes: 0 };
+  let userUpdates = 0;
+  const purchases = {
+    async findOne(filter) { return String(filter._id) === orderId ? purchase : null; },
+    async updateOne(filter, update) {
+      if (String(filter._id) !== orderId || purchase.status !== filter.status) return { modifiedCount: 0 };
+      Object.assign(purchase, update.$set || {});
+      return { modifiedCount: 1 };
+    }
+  };
+  const subscriptions = { async findOne() { return null; }, async updateOne() { return { modifiedCount: 0 }; } };
+  const users = {
+    async updateOne(filter, update) {
+      userUpdates += 1;
+      if (update.$inc?.purchasedSuperLikes) user.purchasedSuperLikes += update.$inc.purchasedSuperLikes;
+      Object.assign(user, update.$set || {});
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) { return name === "purchases" ? purchases : name === "subscriptions" ? subscriptions : users; } };
+  const client = { db: () => db, startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} }) };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => client;
+  const first = await connection.settleWebXPay(orderId, "00", "T123");
+  const second = await connection.settleWebXPay(orderId, "00", "T123");
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.match(second.body.message, /already processed/i);
+  assert.equal(purchase.status, "completed");
+  assert.equal(user.purchasedSuperLikes, 5);
+  assert.equal(userUpdates, 1);
+});
+
+test("WebXPay subscription settlement activates the plan and sets an expiry once", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "1123456789abcdef01234567";
+  const subscription = { _id: new ObjectId(orderId), userId: new ObjectId("abcdef0123456789abcdef02"), status: "pending", plan: "monthly" };
+  const user = { _id: subscription.userId, plan: "basic" };
+  let userUpdates = 0;
+  const purchases = { async findOne() { return null; } };
+  const subscriptions = {
+    async findOne(filter) { return String(filter._id) === orderId ? subscription : null; },
+    async updateOne(filter, update) {
+      if (String(filter._id) !== orderId || subscription.status !== filter.status) return { modifiedCount: 0 };
+      Object.assign(subscription, update.$set || {});
+      return { modifiedCount: 1 };
+    }
+  };
+  const users = {
+    async updateOne(filter, update) {
+      userUpdates += 1;
+      Object.assign(user, update.$set || {});
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) { return name === "purchases" ? purchases : name === "subscriptions" ? subscriptions : users; } };
+  const client = { db: () => db, startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} }) };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => client;
+  const result = await connection.settleWebXPay(orderId, "00", "T456");
+  assert.equal(result.status, 200);
+  assert.equal(subscription.status, "active");
+  assert.ok(subscription.endDate instanceof Date);
+  assert.equal(user.plan, "premium");
+  assert.equal(userUpdates, 1);
+});
