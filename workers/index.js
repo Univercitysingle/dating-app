@@ -50,8 +50,8 @@ export default {
       try {
         const id = env.MONGODB_CONNECTION.idFromName("readiness-probe");
         const connection = env.MONGODB_CONNECTION.get(id);
-        const result = await connection.ping();
-        if (!result || result.ok !== true) {
+        const probe = await connection.fetch("https://internal.invalid/internal/ping", { method: "POST" });
+        if (!probe.ok) {
           return json({ status: "not_ready", dependencies: { mongodb: "unavailable" } }, 503);
         }
         return json({ status: "ready", dependencies: { mongodb: "ok", firebase: "configuration_present" } });
