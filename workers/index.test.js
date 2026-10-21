@@ -1406,7 +1406,8 @@ test("chat history refuses cross-user access and limits result pagination", asyn
 
 
 test("password-based superadmin login signs a Firebase custom token only for the configured hash", async () => {
-  const bcrypt = await import("bcryptjs");
+  const bcryptModule = await import("bcryptjs");
+  const bcrypt = bcryptModule.default || bcryptModule;
   const { privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
