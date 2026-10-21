@@ -153,6 +153,53 @@ test("POST /api/auth/logout rejects unsupported methods", async () => {
   assert.deepEqual(await response.json(), { error: "Method not allowed" });
 });
 
+test("swipe endpoints reject anonymous requests and invalid methods", async () => {
+  const anonymous = await worker.fetch(new Request("https://dating-app.test/api/swipe/like", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: "target" })
+  }), { FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {} });
+  assert.equal(anonymous.status, 401);
+  const wrongMethod = await worker.fetch(request("/api/swipe/pass"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(wrongMethod.status, 405);
+});
+
+test("swipe persistence rejects self-swipes and blocked targets", async () => {
+  const connection = new MongoDBConnection({}, {});
+  assert.equal((await connection.recordSwipe("user-1", "user-1", "like")).status, 400);
+  const users = {
+    findOne: async (query) => query.uid === "user-1" ? { blocked: ["user-2"] } : { blocked: [] }
+  };
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const blocked = await connection.recordSwipe("user-1", "user-2", "like");
+  assert.equal(blocked.status, 403);
+});
+
+test("like swipe creates a pending match and notification", async () => {
+  let insertedMatch, insertedNotification, recordedSwipe;
+  const users = {
+    findOne: async (query) => ({ uid: query.uid, blocked: [] }),
+    updateOne: async (_query, update) => { recordedSwipe = update.$set.lastSwipe; return { matchedCount: 1 }; }
+  };
+  const matches = {
+    findOne: async () => null,
+    insertOne: async (doc) => { insertedMatch = doc; return { insertedId: "match-id" }; },
+    updateOne: async () => ({ matchedCount: 1 })
+  };
+  const notifications = {
+    insertOne: async (doc) => { insertedNotification = doc; },
+    deleteOne: async () => ({ deletedCount: 0 })
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "matches" ? matches : notifications }) });
+  const result = await connection.recordSwipe("user-1", "user-2", "like");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "pending");
+  assert.deepEqual(result.body.likedBy, ["user-1"]);
+  assert.equal(insertedMatch.user1Uid, "user-1");
+  assert.equal(insertedNotification.type, "like");
+  assert.equal(insertedNotification.recipientUid, "user-2");
+  assert.equal(recordedSwipe.targetUserId, "user-2");
+});
+
 test("match read endpoints reject anonymous requests", async () => {
   for (const path of ["/api/matches", "/api/matches/confirmed"]) {
     const response = await worker.fetch(request(path), {
