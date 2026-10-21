@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
+import { constants, generateKeyPairSync, privateEncrypt } from "node:crypto";
 import worker, { RateLimiter, MongoDBConnection } from "./index.js";
 
 function request(path, method = "GET") {
@@ -1103,4 +1105,65 @@ test("scheduled handler only runs in staging and delegates to the MongoDB Durabl
   await waited;
   assert.equal(delegated, 1);
   await worker.scheduled({ cron: "0 * * * *" }, { MIGRATION_STAGE: "production" }, { waitUntil() { assert.fail("production job must not run before cutover"); } });
+});
+
+
+test("WebXPay callback verifies the signed response before asking MongoDB to settle", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const orderId = "0123456789abcdef01234567";
+  const signedPayload = orderId + "|T123456|2026-10-21 12:00:00|1|00|Approved";
+  const payment = Buffer.from(signedPayload, "utf8").toString("base64");
+  const signature = privateEncrypt({
+    key: privateKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, Buffer.from(signedPayload, "utf8")).toString("base64");
+  let settled = null;
+  const env = {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-id"; },
+      get() {
+        return { async fetch(url, init) {
+          assert.ok(url.endsWith("/internal/webxpay-settle"));
+          settled = JSON.parse(init.body);
+          return new Response(JSON.stringify({ success: true }), { status: 200 });
+        } };
+      }
+    }
+  };
+  const body = new URLSearchParams({ payment, signature, custom_fields: "" });
+  const response = await worker.fetch(new Request("https://dating-app.test/api/webxpay/response", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body
+  }), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(settled, { orderId, statusCode: "00", reference: "T123456" });
+});
+
+test("WebXPay callback rejects invalid signatures and does not settle an order", async () => {
+  const { publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  let called = false;
+  const payment = Buffer.from("0123456789abcdef01234567|T123|date|1|00|Approved").toString("base64");
+  const response = await worker.fetch(new Request("https://dating-app.test/api/webxpay/response", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ payment, signature: Buffer.from("not a signature").toString("base64") })
+  }), {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-id"; },
+      get() { return { async fetch() { called = true; return new Response("{}", { status: 200 }); } }; }
+    }
+  });
+  assert.equal(response.status, 400);
+  assert.equal(called, false);
 });
