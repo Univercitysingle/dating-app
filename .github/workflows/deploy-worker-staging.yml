@@ -32,6 +32,9 @@ jobs:
       B2_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
       B2_APPLICATION_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       B2_APPLICATION_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      WEBXPAY_PUBLIC_KEY: ${{ secrets.WEBXPAY_PUBLIC_KEY }}
+      WEBXPAY_SECRET_KEY: ${{ secrets.WEBXPAY_SECRET_KEY }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -68,7 +71,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@4 deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "MONGODB_DATABASE:$MONGODB_DATABASE" --var "CDN_HOSTNAME:$CDN_HOSTNAME" 2>&1 | tee /tmp/wrangler-deploy.log
+          deploy_args=(deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "MONGODB_DATABASE:$MONGODB_DATABASE" --var "CDN_HOSTNAME:$CDN_HOSTNAME")
+          if [[ -n "$FRONTEND_URL" ]]; then deploy_args+=(--var "FRONTEND_URL:$FRONTEND_URL"); fi
+          npx --yes wrangler@4 "${deploy_args[@]}" 2>&1 | tee /tmp/wrangler-deploy.log
           WORKER_URL="$(grep -Eo 'https://dating-app-api-staging\.[a-z0-9-]+\.workers\.dev' /tmp/wrangler-deploy.log | tail -n 1 || true)"
           if [[ -z "$WORKER_URL" ]]; then
             echo "Could not determine the workers.dev URL from Wrangler output. Check the deployment log and verify the account's Workers subdomain."
@@ -88,6 +93,17 @@ jobs:
           printf '%s' "$B2_BUCKET_NAME" | npx --yes wrangler@4 secret put B2_BUCKET_NAME --config wrangler.jsonc --env staging
           printf '%s' "$B2_APPLICATION_KEY_ID" | npx --yes wrangler@4 secret put B2_APPLICATION_KEY_ID --config wrangler.jsonc --env staging
           printf '%s' "$B2_APPLICATION_KEY" | npx --yes wrangler@4 secret put B2_APPLICATION_KEY --config wrangler.jsonc --env staging
+
+      - name: Configure optional WebXPay staging secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$WEBXPAY_PUBLIC_KEY" ]]; then
+            printf '%s' "$WEBXPAY_PUBLIC_KEY" | npx --yes wrangler@4 secret put WEBXPAY_PUBLIC_KEY --config wrangler.jsonc --env staging
+          fi
+          if [[ -n "$WEBXPAY_SECRET_KEY" ]]; then
+            printf '%s' "$WEBXPAY_SECRET_KEY" | npx --yes wrangler@4 secret put WEBXPAY_SECRET_KEY --config wrangler.jsonc --env staging
+          fi
 
       - name: Verify staging liveness
         env:
