@@ -1359,6 +1359,118 @@ export class MongoDBConnection {
     }
   }
 
+  async getAdminSupportTickets(uid, params = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    const page = Number.isFinite(Number(params.page)) ? Math.max(1, Math.floor(Number(params.page))) : 1;
+    const limit = Number.isFinite(Number(params.limit)) ? Math.min(100, Math.max(1, Math.floor(Number(params.limit)))) : 10;
+    const allowedStatuses = ["Open", "In Progress", "Waiting for Customer", "Closed"];
+    const query = {};
+    if (typeof params.status === "string" && params.status) {
+      if (!allowedStatuses.includes(params.status)) return { status: 400, body: { message: "Invalid ticket status" } };
+      query.status = params.status;
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const ticketsCollection = db.collection("supporttickets");
+      const [tickets, total] = await Promise.all([
+        ticketsCollection.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+        ticketsCollection.countDocuments(query)
+      ]);
+      const userIds = tickets.map(ticket => ticket.userId).filter(Boolean);
+      const { ObjectId } = await import("mongodb");
+      const normalizedIds = userIds.map(value => typeof value === "string" && /^[a-fA-F0-9]{24}$/.test(value) ? new ObjectId(value) : value);
+      const users = normalizedIds.length ? await db.collection("users").find(
+        { _id: { $in: normalizedIds } }, { projection: { name: 1, email: 1 } }
+      ).toArray() : [];
+      const userMap = new Map(users.map(user => [String(user._id), user]));
+      return { status: 200, body: {
+        tickets: tickets.map(ticket => ({ ...ticket, userId: userMap.get(String(ticket.userId)) || null })),
+        totalPages: Math.ceil(total / limit), currentPage: page
+      } };
+    } catch {
+      return { status: 503, body: { message: "Unable to load support tickets" } };
+    }
+  }
+
+  async getAdminSupportTicket(uid, ticketId) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId)) return { status: 400, body: { message: "Invalid ticket ID" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId) });
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      const [user, messages] = await Promise.all([
+        db.collection("users").findOne({ _id: ticket.userId }, { projection: { name: 1, email: 1 } }),
+        db.collection("ticketmessages").find({ ticketId: new ObjectId(ticketId) }).sort({ createdAt: 1 }).toArray()
+      ]);
+      const senderIds = messages.map(message => message.senderId).filter(Boolean);
+      const senders = senderIds.length ? await db.collection("users").find(
+        { _id: { $in: senderIds } }, { projection: { name: 1 } }
+      ).toArray() : [];
+      const senderMap = new Map(senders.map(sender => [String(sender._id), sender]));
+      return { status: 200, body: {
+        ticket: { ...ticket, userId: user || null },
+        messages: messages.map(message => ({ ...message, senderId: senderMap.get(String(message.senderId)) || null }))
+      } };
+    } catch {
+      return { status: 503, body: { message: "Unable to load support ticket" } };
+    }
+  }
+
+  async addAdminSupportMessage(uid, ticketId, payload = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId)) return { status: 400, body: { message: "Invalid ticket ID" } };
+    if (!payload || typeof payload.message !== "string" || !payload.message.trim() || payload.message.length > 4000) {
+      return { status: 400, body: { message: "A message between 1 and 4000 characters is required" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const adminUser = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!adminUser) return { status: 403, body: { message: "Forbidden" } };
+      const ticketObjectId = new ObjectId(ticketId);
+      const ticket = await db.collection("supporttickets").findOne({ _id: ticketObjectId });
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      const now = new Date();
+      const message = {
+        ticketId: ticketObjectId, senderId: adminUser._id, message: payload.message.trim(),
+        isFromAdmin: true, createdAt: now, updatedAt: now
+      };
+      const inserted = await db.collection("ticketmessages").insertOne(message);
+      await db.collection("supporttickets").updateOne(
+        { _id: ticketObjectId }, { $set: { status: "Waiting for Customer", updatedAt: now } }
+      );
+      return { status: 201, body: { ...message, _id: inserted.insertedId } };
+    } catch {
+      return { status: 503, body: { message: "Unable to add support message" } };
+    }
+  }
+
+  async updateAdminSupportStatus(uid, ticketId, payload = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId)) return { status: 400, body: { message: "Invalid ticket ID" } };
+    const allowedStatuses = ["Open", "In Progress", "Waiting for Customer", "Closed"];
+    if (!payload || !allowedStatuses.includes(payload.status)) return { status: 400, body: { message: "Invalid ticket status" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const result = await db.collection("supporttickets").findOneAndUpdate(
+        { _id: new ObjectId(ticketId) },
+        { $set: { status: payload.status, updatedAt: new Date() } },
+        { returnDocument: "after" }
+      );
+      if (!result) return { status: 404, body: { message: "Ticket not found" } };
+      return { status: 200, body: result };
+    } catch {
+      return { status: 503, body: { message: "Unable to update support ticket" } };
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
