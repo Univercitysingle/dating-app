@@ -551,6 +551,53 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/users/subscription/upload-slip") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!isB2Configured(env)) return json({ message: "Bank-slip storage is not configured" }, 503);
+        if (typeof claims.sub !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(claims.sub)) return json({ message: "Invalid user identity" }, 400);
+        const form = await request.formData().catch(() => null);
+        const file = form && form.get("bankSlip");
+        const planId = form && form.get("planId");
+        const allowedTypes = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif" };
+        if (!file || typeof file.arrayBuffer !== "function" || !allowedTypes[file.type] ||
+            typeof planId !== "string" || !["basic_1m", "premium_1m", "premium_3m"].includes(planId)) {
+          return json({ message: "A valid bank-slip image and planId are required" }, 400);
+        }
+        if (file.size < 1 || file.size > 5 * 1024 * 1024) return json({ message: "Bank slip must be 5 MB or smaller" }, 400);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const isJpeg = file.type === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+        const isPng = file.type === "image/png" && bytes.length >= 8 &&
+          bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+          bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+        const signature = bytes.length >= 6 ? String.fromCharCode(...bytes.slice(0, 6)) : "";
+        const isGif = file.type === "image/gif" && (signature === "GIF87a" || signature === "GIF89a");
+        if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
+        const key = "bank-slips-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
+        try { await putPrivateObject(env, key, bytes, file.type, claims.sub, "bank-slip"); }
+        catch { return json({ message: "Bank-slip upload failed" }, 503); }
+        if (!env.MONGODB_CONNECTION) {
+          await deletePrivateObject(env, key).catch(() => {});
+          return json({ message: "Subscription service unavailable" }, 503);
+        }
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/bank-slip-upload", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, key, contentType: file.type, size: file.size, planId })
+        });
+        const result = await response.json().catch(() => ({ error: "Subscription service unavailable" }));
+        if (!response.ok) await deletePrivateObject(env, key).catch(() => {});
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Bank-slip upload failed" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/photos" && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
@@ -1142,6 +1189,84 @@ export default {
         return json(body, response.status);
       } catch {
         return json({ error: "Invalid payment signature or callback." }, 400);
+      }
+    }
+
+    if (url.pathname === "/api/admin/subscriptions/pending") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Administration service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/admin/bank-slip-pending", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
+        });
+        const body = await response.json().catch(() => ({ error: "Administration service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Administration service unavailable" }, 503);
+      }
+    }
+
+    const bankSlipAction = url.pathname.match(/^\/api\/admin\/subscriptions\/([a-fA-F0-9]{24})\/(approve|reject)$/);
+    if (bankSlipAction) {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      const payload = await request.json().catch(() => ({}));
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Administration service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/admin/bank-slip-moderate", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, subscriptionId: bankSlipAction[1], action: bankSlipAction[2], reason: payload && payload.reason })
+        });
+        const body = await response.json().catch(() => ({ error: "Administration service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Administration service unavailable" }, 503);
+      }
+    }
+
+    const bankSlipView = url.pathname.match(/^\/api\/admin\/bank-slips\/([^/]+)$/);
+    if (bankSlipView) {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      let key;
+      try { key = decodeURIComponent(bankSlipView[1]); } catch { return json({ error: "Invalid bank-slip key" }, 400); }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Bank-slip service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const authorization = await connection.fetch("https://internal.invalid/internal/admin/bank-slip-authorize", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, key })
+        });
+        const authBody = await authorization.json().catch(() => ({ error: "Bank-slip authorization unavailable" }));
+        if (!authorization.ok) return json(authBody, authorization.status);
+        if (!isB2Configured(env)) return json({ error: "Bank-slip storage is not configured" }, 503);
+        const object = await getPrivateObject(env, key);
+        const body = object.Body && typeof object.Body.transformToWebStream === "function" ? object.Body.transformToWebStream() : object.Body;
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "content-type": authBody.contentType || object.ContentType || "application/octet-stream",
+            "cache-control": "private, no-store",
+            "content-disposition": "inline",
+            "x-content-type-options": "nosniff"
+          }
+        });
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Bank slip not found" }, 404);
       }
     }
 
