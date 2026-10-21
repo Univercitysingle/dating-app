@@ -156,11 +156,18 @@ export class MongoDBConnection {
             { $lte: [{ $add: [{ $ifNull: ["$totalPhotoSize", 0] }, photo.size] }, 25 * 1024 * 1024] }
           ]
         }
-      }, {
-        $push: { photos: { url: photo.url, order: photo.order, size: photo.size } },
-        $inc: { totalPhotoSize: photo.size },
-        $set: { updatedAt: new Date() }
-      }, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } });
+      }, [{
+        $set: {
+          photos: {
+            $concatArrays: [
+              { $ifNull: ["$photos", []] },
+              [{ url: photo.url, order: { $size: { $ifNull: ["$photos", []] } }, size: photo.size }]
+            ]
+          },
+          totalPhotoSize: { $add: [{ $ifNull: ["$totalPhotoSize", 0] }, photo.size] },
+          updatedAt: new Date()
+        }
+      }], { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } });
       if (result) return { status: 201, body: { success: true, fileUrl: photo.url } };
       const user = await users.findOne({ uid }, { projection: { photos: 1, totalPhotoSize: 1 } });
       if (!user) return { status: 404, body: { message: "User not found" } };
