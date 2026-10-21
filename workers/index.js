@@ -631,8 +631,7 @@ export default {
       }
     }
 
-    if (url.pathname === "/api/users/subscription/upload-slip") {
-      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    if (url.pathname === "/api/users/subscription/upload-slip" && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
