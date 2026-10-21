@@ -26,4 +26,8 @@ The workflow sets `API_ORIGIN` to `https://dating-app-api-staging.enadoctemp.wor
 4. Verify the Cloudflare Pages deployment URL, `/login`, Firebase sign-in, and authenticated same-origin `/api/*` calls.
 5. Keep production DNS and `main` unchanged until end-to-end acceptance tests pass and a separate cutover decision is made.
 
+### If the preview hostname returns `DNS_PROBE_FINISHED_NXDOMAIN`
+
+The branch preview hostname is not guaranteed to exist until a Pages deployment has succeeded. Do not assume the project name or manually construct the final URL. First open the workflow run above and confirm that **Deploy frontend to Cloudflare Pages** succeeded; then copy the deployment/preview URL from Cloudflare Pages → the selected project → Deployments. If no new run appears after a branch commit, use **Run workflow** in GitHub Actions with branch `migrate-to-serverless`. If the workflow fails during project discovery, inspect the names printed in its log and confirm the API token can list Pages projects. A DNS failure happens before React, Firebase, or the API proxy is reached.
+
 The workflow fails closed when required credentials are missing, the Cloudflare API cannot list projects, or a project cannot be selected unambiguously. Never deploy with placeholder Firebase configuration.
