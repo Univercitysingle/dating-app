@@ -114,6 +114,45 @@ export class MongoDBConnection {
 
 
 
+
+  async updateBlockedUser(currentUid, targetUid, action) {
+    if (typeof currentUid !== "string" || !currentUid || currentUid.length > 128 ||
+        typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
+        !["block", "unblock"].includes(action)) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    if (currentUid === targetUid) {
+      return { status: 400, body: { error: action === "block" ? "Cannot block yourself." : "Cannot unblock yourself." } };
+    }
+    try {
+      const db = (await this.getClient()).db();
+      const users = db.collection("users");
+      if (action === "block") {
+        const target = await users.findOne({ uid: targetUid }, { projection: { _id: 1 } });
+        if (!target) return { status: 404, body: { error: "User to block not found." } };
+        const current = await users.updateOne({ uid: currentUid }, { $addToSet: { blocked: targetUid } });
+        if (!current.matchedCount) return { status: 404, body: { error: "Current user not found during update." } };
+        const user1Uid = currentUid < targetUid ? currentUid : targetUid;
+        const user2Uid = currentUid < targetUid ? targetUid : currentUid;
+        await db.collection("matches").updateOne(
+          { user1Uid, user2Uid },
+          { $set: { status: "unmatched" }, $unset: { likedBy: "" } }
+        );
+        return { status: 200, body: { message: "User " + targetUid + " successfully blocked." } };
+      }
+      const current = await users.updateOne({ uid: currentUid }, { $pull: { blocked: targetUid } });
+      if (!current.matchedCount) return { status: 404, body: { error: "Current user not found." } };
+      return { status: 200, body: { message: "User " + targetUid + " successfully unblocked." } };
+    } catch {
+      return {
+        status: 500,
+        body: { error: action === "block"
+          ? "An unexpected error occurred while blocking user."
+          : "An unexpected error occurred while unblocking user." }
+      };
+    }
+  }
+
   async getUserProfile(targetUid, viewerUid) {
     if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
         typeof viewerUid !== "string" || !viewerUid || viewerUid.length > 128) {
@@ -270,6 +309,17 @@ export class MongoDBConnection {
       return json({ status: result.ok ? "ok" : "unavailable" }, result.ok ? 200 : 503);
     }
 
+
+
+    if (url.pathname === "/internal/block") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          typeof body.targetUid !== "string" || typeof body.action !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.updateBlockedUser(body.claims.sub, body.targetUid, body.action);
+      return json(result.body, result.status);
+    }
 
     if (url.pathname === "/internal/public-profile") {
       const body = await request.json().catch(() => null);
