@@ -37,12 +37,12 @@ const getChatHistory = async (req, res) => {
       return res.status(403).json({ error: "Unauthorized to view this chat history." });
     }
 
-    if (!roomId) {
-      return res.status(400).json({ error: "Room ID is required" });
+    if (typeof roomId !== 'string' || !roomId || roomId.length > 256) {
+      return res.status(400).json({ error: "Valid room ID is required" });
     }
 
-    const limit = parseInt(req.query.limit) || 50;
-    const skip = parseInt(req.query.skip) || 0;
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+    const skip = Math.max(0, Number.parseInt(req.query.skip, 10) || 0);
 
     const messages = await ChatMessage.find({ roomId })
       .sort({ timestamp: 1 })
@@ -110,10 +110,25 @@ const getConversations = async (req, res) => {
 const sendMessageHttp = async (req, res) => {
   try {
     const senderUid = req.user.uid;
-    const { roomId, messageContent, receiverUid } = req.body;
+    const { roomId, messageContent, receiverUid } = req.body || {};
 
-    if (!roomId || !messageContent || !receiverUid) {
-      return res.status(400).json({ error: "Missing roomId, messageContent, or receiverUid." });
+    if (typeof roomId !== 'string' || !roomId || roomId.length > 256 ||
+        typeof messageContent !== 'string' || !messageContent.trim() || messageContent.length > 2000 ||
+        typeof receiverUid !== 'string' || !receiverUid || receiverUid === senderUid) {
+      return res.status(400).json({ error: "Invalid room, receiver, or message content. Messages must contain 1 to 2000 characters." });
+    }
+
+    const { authorizeRoom } = require('../services/chatAuthorization');
+    if (!(await authorizeRoom(senderUid, roomId, receiverUid))) {
+      return res.status(403).json({ error: "Not authorized to message this user in this conversation." });
+    }
+
+    const sender = await User.findOne({ uid: senderUid });
+    if (!sender) return res.status(401).json({ error: "Authenticated user not found." });
+    if (sender.plan === 'basic') {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const count = await ChatMessage.countDocuments({ roomId, senderUid, timestamp: { $gte: since } });
+      if (count >= 2) return res.status(429).json({ error: "Free users are limited to 2 messages per 24 hours." });
     }
 
     const chatMessage = new ChatMessage({
