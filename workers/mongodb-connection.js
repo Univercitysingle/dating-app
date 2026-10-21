@@ -220,7 +220,7 @@ export class MongoDBConnection {
         if (Array.isArray(profile.photos)) {
           profile.photos = profile.photos.map(photo => {
             if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
-            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\\/+/, "") };
+            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + photo.url.replace(/^\/+/, "") };
           });
         }
         const match = matchByUid.get(likedUid);
