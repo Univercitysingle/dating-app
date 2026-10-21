@@ -166,6 +166,27 @@ export default {
     }
 
 
+    if (url.pathname === "/api/swipe/undo") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: "Swipe service unavailable" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/undo-swipe", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims })
+        });
+        const body = await response.json().catch(() => ({ error: "Swipe service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Swipe service unavailable" }, 503);
+      }
+    }
+
     const swipeAction = url.pathname.match(/^\/api\/swipe\/(like|pass|superlike)$/);
     if (swipeAction) {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
