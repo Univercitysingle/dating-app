@@ -1101,7 +1101,7 @@ export class MongoDBConnection {
         { $limit: 200 },
         { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
-        { $project: { "user.password": 0, "user.lastLoginIp": 0, "user.email": 1, "user.name": 1, "user.uid": 1 } }
+        { $project: { _id: 1, userId: 1, plan: 1, planId: 1, durationDays: 1, superLikes: 1, undos: 1, bankSlipUrl: 1, bankSlipContentType: 1, bankSlipSize: 1, status: 1, createdAt: 1, updatedAt: 1, "user.email": 1, "user.name": 1, "user.uid": 1 } }
       ]).toArray();
       return { status: 200, body: records.map(record => ({ ...record, user: record.user || null })) };
     } catch {
