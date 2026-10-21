@@ -183,7 +183,7 @@ export class MongoDBConnection {
   async recordSwipe(uid, targetUid, action) {
     if (typeof uid !== "string" || !uid || uid.length > 128 ||
         typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
-        !["like", "pass"].includes(action)) {
+        !["like", "pass", "superlike"].includes(action)) {
       return { status: 400, body: { error: "Invalid swipe request" } };
     }
     if (uid === targetUid) return { status: 400, body: { error: "Cannot swipe on yourself." } };
@@ -191,7 +191,7 @@ export class MongoDBConnection {
       const db = (await this.getClient()).db();
       const users = db.collection("users");
       const [currentUser, targetUser] = await Promise.all([
-        users.findOne({ uid }, { projection: { blocked: 1 } }),
+        users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1 } }),
         users.findOne({ uid: targetUid }, { projection: { blocked: 1 } })
       ]);
       if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
@@ -201,6 +201,19 @@ export class MongoDBConnection {
       }
       if (Array.isArray(targetUser.blocked) && targetUser.blocked.includes(uid)) {
         return { status: 403, body: { error: "This user has blocked you." } };
+      }
+
+      let superLikeSpent = null;
+      if (action === "superlike") {
+        if (Number(currentUser.purchasedSuperLikes) > 0) {
+          const consumed = await users.updateOne({ uid, purchasedSuperLikes: { $gt: 0 } }, { $inc: { purchasedSuperLikes: -1 } });
+          if (consumed.matchedCount) superLikeSpent = "purchasedSuperLikes";
+        }
+        if (!superLikeSpent) {
+          const consumed = await users.updateOne({ uid, "superLikes.count": { $gt: 0 } }, { $inc: { "superLikes.count": -1 } });
+          if (consumed.matchedCount) superLikeSpent = "superLikes.count";
+        }
+        if (!superLikeSpent) return { status: 400, body: { error: "No super likes remaining." } };
       }
 
       let match = await db.collection("matches").findOne({
@@ -214,27 +227,29 @@ export class MongoDBConnection {
         const inserted = await db.collection("matches").insertOne({
           user1Uid: uid,
           user2Uid: targetUid,
-          status: action === "like" ? "pending" : "unmatched",
-          likedBy: action === "like" ? [uid] : [],
-          superLike: false,
+          status: action === "pass" ? "unmatched" : "pending",
+          likedBy: action === "pass" ? [] : [uid],
+          superLike: action === "superlike",
           createdAt: now,
           updatedAt: now
         });
-        match = { _id: inserted.insertedId, user1Uid: uid, user2Uid: targetUid, status: action === "like" ? "pending" : "unmatched", likedBy: action === "like" ? [uid] : [], superLike: false };
-      } else if (action === "like") {
-        await db.collection("matches").updateOne({ _id: match._id }, { $addToSet: { likedBy: uid }, $set: { updatedAt: now } });
+        match = { _id: inserted.insertedId, user1Uid: uid, user2Uid: targetUid, status: action === "pass" ? "unmatched" : "pending", likedBy: action === "pass" ? [] : [uid], superLike: action === "superlike" };
+      } else if (action === "like" || action === "superlike") {
+        const update = { $addToSet: { likedBy: uid }, $set: { updatedAt: now } };
+        if (action === "superlike") update.$set.superLike = true;
+        await db.collection("matches").updateOne({ _id: match._id }, update);
         match = await db.collection("matches").findOne({ _id: match._id });
       } else {
         await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: "unmatched", updatedAt: now } });
         match.status = "unmatched";
       }
 
-      if (action === "like") {
+      if (action === "like" || action === "superlike") {
         const likedBy = Array.isArray(match.likedBy) ? match.likedBy : [];
         const finalStatus = likedBy.includes(match.user1Uid) && likedBy.includes(match.user2Uid) ? "matched" : "pending";
         await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: finalStatus, updatedAt: now } });
         match.status = finalStatus;
-        const notificationType = finalStatus === "matched" ? "match" : "like";
+        const notificationType = finalStatus === "matched" ? "match" : action === "superlike" ? "superlike" : "like";
         await db.collection("notifications").insertOne({
           recipientUid: targetUid,
           senderUid: uid,
