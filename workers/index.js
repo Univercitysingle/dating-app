@@ -458,9 +458,19 @@ export default {
         }
         if (file.size < 1 || file.size > 5 * 1024 * 1024) return json({ message: "Photo must be 5 MB or smaller" }, 400);
         if (typeof claims.sub !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(claims.sub)) return json({ message: "Invalid user identity" }, 400);
+        const fileBytes = await file.arrayBuffer();
+        const bytes = new Uint8Array(fileBytes);
+        const isJpeg = file.type === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+        const isPng = file.type === "image/png" && bytes.length >= 8 &&
+          bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+          bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+        const isGif = file.type === "image/gif" && bytes.length >= 6 &&
+          String.fromCharCode(...bytes.slice(0, 6)) === "GIF89a" || file.type === "image/gif" && bytes.length >= 6 &&
+          String.fromCharCode(...bytes.slice(0, 6)) === "GIF87a";
+        if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         try {
-          await env.MEDIA_BUCKET.put(key, await file.arrayBuffer(), {
+          await env.MEDIA_BUCKET.put(key, fileBytes, {
             httpMetadata: { contentType: file.type },
             customMetadata: { ownerUid: claims.sub, purpose: "profile-photo" }
           });
