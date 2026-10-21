@@ -889,7 +889,11 @@ export class MongoDBConnection {
         result.push(profile);
       }
       return { status: 200, body: result };
-    } catch {
+    } catch (error) {
+      console.error("MongoDB discovery query failed", {
+        name: error && typeof error.name === "string" ? error.name : "Error",
+        code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined
+      });
       return { status: 503, body: { error: "Discovery service unavailable" } };
     }
   }
