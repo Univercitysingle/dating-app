@@ -207,11 +207,14 @@ test("Firebase token login rejects invalid tokens without provisioning users", a
   assert.deepEqual(await response.json(), { error: "Invalid or expired token" });
 });
 
-test("password-based administrator login fails closed until migrated", async () => {
+test("password-based administrator login fails closed when secure signing secrets are missing", async () => {
   const response = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "admin@example.com", password: "secret" })
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "admin@example.com", password: "not-a-real-password" })
   }), { FIREBASE_PROJECT_ID: "test-project" });
-  assert.equal(response.status, 501);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /not configured/i);
 });
 
 test("POST /api/auth/logout preserves the legacy stateless logout response", async () => {
