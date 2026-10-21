@@ -62,6 +62,13 @@ export default {
       }
     }
 
+    // The legacy Express logout endpoint is stateless: the client clears its
+    // Firebase session/token. Keep the response contract for existing clients.
+    if (url.pathname === "/api/auth/logout") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      return json({ message: "Logged out successfully." });
+    }
+
     if (url.pathname === "/api/auth/verify") {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
