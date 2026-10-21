@@ -1758,7 +1758,8 @@ export class MongoDBConnection {
     if (url.pathname.startsWith("/internal/admin/") && [
       "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
       "/internal/admin/transactions", "/internal/admin/analytics", "/internal/admin/user-create",
-      "/internal/admin/user-update", "/internal/admin/user-delete", "/internal/admin/user-plan"
+      "/internal/admin/user-update", "/internal/admin/user-delete", "/internal/admin/user-plan",
+      "/internal/admin/payment-logs", "/internal/admin/login-history", "/internal/admin/audit-logs"
     ].includes(url.pathname)) {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
@@ -1771,6 +1772,9 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/user-plan") result = await this.updateAdminUserPlan(body.claims.sub, body.userId, body.payload || {});
       else if (url.pathname === "/internal/admin/stats") result = await this.getAdminDashboardStats(body.claims.sub);
       else if (url.pathname === "/internal/admin/transactions") result = await this.getAdminTransactions(body.claims.sub);
+      else if (url.pathname === "/internal/admin/payment-logs") result = await this.getAdminLogs(body.claims.sub, "payment", body.search || "");
+      else if (url.pathname === "/internal/admin/login-history") result = await this.getAdminLogs(body.claims.sub, "login", body.search || "");
+      else if (url.pathname === "/internal/admin/audit-logs") result = await this.getAdminLogs(body.claims.sub, "audit", body.search || "");
       else result = await this.getAdminAnalyticsSummary(body.claims.sub, body.params || {});
       return json(result.body, result.status);
     }
