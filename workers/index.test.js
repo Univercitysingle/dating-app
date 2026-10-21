@@ -96,3 +96,20 @@ test("MongoDB Durable Object exposes no general-purpose HTTP operation", async (
   const response = await connection.fetch(request("/internal/query", "POST"));
   assert.equal(response.status, 404);
 });
+
+test("Firebase verification endpoint rejects missing bearer credentials", async () => {
+  const response = await worker.fetch(request("/api/auth/verify"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Unauthorized" });
+});
+
+test("Firebase verification endpoint fails closed when project configuration is missing", async () => {
+  const response = await worker.fetch(request("/api/auth/verify"), {});
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "Authentication is not configured" });
+});
+
+test("Firebase verification endpoint rejects unsupported methods", async () => {
+  const response = await worker.fetch(request("/api/auth/verify", "POST"), { FIREBASE_PROJECT_ID: "test-project" });
+  assert.equal(response.status, 405);
+});
