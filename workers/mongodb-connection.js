@@ -859,6 +859,173 @@ export class MongoDBConnection {
     }
   }
 
+  async createPendingPurchase(uid, itemId) {
+    const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100 };
+    const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost" };
+    if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, itemId)) {
+      return { status: 400, body: { error: "Invalid item ID." } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const now = new Date();
+      const purchase = {
+        userId: user._id,
+        itemId,
+        itemName: names[itemId],
+        itemPrice: String(prices[itemId]),
+        status: "pending",
+        createdAt: now,
+        updatedAt: now
+      };
+      const inserted = await db.collection("purchases").insertOne(purchase);
+      return {
+        status: 201,
+        body: {
+          orderId: String(inserted.insertedId),
+          price: prices[itemId],
+          itemName: names[itemId],
+          user: {
+            name: typeof user.name === "string" ? user.name : "User",
+            email: typeof user.email === "string" ? user.email : "",
+            contactNumber: user.mobileNumber || user.phoneNumber || "0711234567"
+          }
+        }
+      };
+    } catch {
+      return { status: 503, body: { error: "Purchase service unavailable" } };
+    }
+  }
+
+  async createPendingSubscription(uid, plan) {
+    const prices = { weekly: 800, monthly: 3000, yearly: 10000 };
+    if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, plan)) {
+      return { status: 400, body: { error: "Invalid subscription plan." } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const user = await users.findOne({ uid });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const active = await db.collection("subscriptions").findOne({
+        userId: user._id,
+        status: "active",
+        endDate: { $gt: new Date() }
+      }, { projection: { _id: 1 } });
+      if (active) return { status: 409, body: { error: "You already have an active subscription." } };
+      const now = new Date();
+      const subscription = {
+        userId: user._id,
+        plan,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now
+      };
+      const inserted = await db.collection("subscriptions").insertOne(subscription);
+      return {
+        status: 201,
+        body: {
+          orderId: String(inserted.insertedId),
+          price: prices[plan],
+          plan,
+          user: {
+            name: typeof user.name === "string" ? user.name : "User",
+            email: typeof user.email === "string" ? user.email : "",
+            contactNumber: user.mobileNumber || user.phoneNumber || "0711234567"
+          }
+        }
+      };
+    } catch {
+      return { status: 503, body: { error: "Subscription service unavailable" } };
+    }
+  }
+
+  async settleWebXPay(orderId, statusCode, reference = "") {
+    if (typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId) ||
+        !["0", "00", "15"].includes(String(statusCode))) {
+      return { status: 400, body: { error: "Invalid payment response" } };
+    }
+    let outcome = { status: 503, body: { error: "Payment settlement unavailable" } };
+    let session;
+    try {
+      const client = await this.getClient();
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(client);
+      session = client.startSession();
+      await session.withTransaction(async () => {
+        const purchases = db.collection("purchases");
+        const subscriptions = db.collection("subscriptions");
+        const purchase = await purchases.findOne({ _id: new ObjectId(orderId) }, { session });
+        const subscription = purchase ? null : await subscriptions.findOne({ _id: new ObjectId(orderId) }, { session });
+        const record = purchase || subscription;
+        if (!record) {
+          outcome = { status: 404, body: { error: "Transaction not found." } };
+          return;
+        }
+        const success = statusCode === "0" || statusCode === "00";
+        const completedState = purchase ? "completed" : "active";
+        if (record.status === completedState) {
+          outcome = { status: 200, body: { success: true, message: "Payment already processed." } };
+          return;
+        }
+        if (record.status !== "pending") {
+          outcome = { status: 409, body: { error: "Transaction is no longer pending." } };
+          return;
+        }
+        const now = new Date();
+        const collection = purchase ? purchases : subscriptions;
+        const nextStatus = success ? completedState : (purchase ? "rejected" : "cancelled");
+        const changed = await collection.updateOne(
+          { _id: record._id, status: "pending" },
+          { $set: { status: nextStatus, paymentReference: String(reference).slice(0, 128), updatedAt: now } },
+          { session }
+        );
+        if (!changed.modifiedCount) {
+          outcome = { status: 409, body: { error: "Transaction was already processed." } };
+          throw new Error("PAYMENT_STATE_CHANGED");
+        }
+        if (!success) {
+          outcome = { status: 200, body: { success: true, processed: false, status: "declined" } };
+          return;
+        }
+        if (purchase) {
+          const userUpdate = {};
+          if (purchase.itemId === "super-like-5") userUpdate.$inc = { purchasedSuperLikes: 5 };
+          else if (purchase.itemId === "undo-swipes-5") userUpdate.$inc = { purchasedUndoSwipes: 5 };
+          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };
+          if (Object.keys(userUpdate).length) {
+            userUpdate.$set = { ...(userUpdate.$set || {}), updatedAt: now };
+            const changedUser = await db.collection("users").updateOne({ _id: purchase.userId }, userUpdate, { session });
+            if (!changedUser.matchedCount) throw new Error("PAYMENT_USER_MISSING");
+          }
+        } else {
+          const durations = { weekly: 7, monthly: 30, yearly: 365 };
+          const days = durations[subscription.plan];
+          if (!days) throw new Error("UNSUPPORTED_SUBSCRIPTION_PLAN");
+          await subscriptions.updateOne(
+            { _id: subscription._id, status: "active" },
+            { $set: { startDate: now, endDate: new Date(now.getTime() + days * 86400000), updatedAt: now } },
+            { session }
+          );
+          const changedUser = await db.collection("users").updateOne(
+            { _id: subscription.userId },
+            { $set: { plan: "premium", trialExpires: null, updatedAt: now } },
+            { session }
+          );
+          if (!changedUser.matchedCount) throw new Error("PAYMENT_USER_MISSING");
+        }
+        outcome = { status: 200, body: { success: true, message: "Payment verified and processed successfully." } };
+      });
+      return outcome;
+    } catch (error) {
+      if (outcome.status === 404 || outcome.status === 409) return outcome;
+      return { status: 503, body: { error: "Payment settlement unavailable" } };
+    } finally {
+      if (session) await session.endSession().catch(() => {});
+    }
+  }
+
   async getSubscriptionHistory(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
@@ -1859,6 +2026,22 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/scheduled-expirations") {
       const result = await this.runScheduledExpirations();
       return json(result);
+    }
+
+    if (url.pathname === "/internal/create-purchase" || url.pathname === "/internal/create-subscription") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      const result = url.pathname === "/internal/create-purchase"
+        ? await this.createPendingPurchase(body.claims.sub, body.itemId)
+        : await this.createPendingSubscription(body.claims.sub, body.plan);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/webxpay-settle") {
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body.orderId !== "string" || typeof body.statusCode !== "string") return json({ error: "Invalid request" }, 400);
+      const result = await this.settleWebXPay(body.orderId, body.statusCode, body.reference || "");
+      return json(result.body, result.status);
     }
 
     if (url.pathname === "/internal/ping") {
