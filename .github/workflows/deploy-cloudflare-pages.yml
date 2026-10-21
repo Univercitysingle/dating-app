@@ -87,7 +87,7 @@ jobs:
           if [[ "$curl_exit" -ne 0 || ! "$http_status" =~ ^2[0-9][0-9]$ ]]; then
             echo "::error::Cloudflare Pages project discovery failed (HTTP ${http_status:-unknown}, curl exit $curl_exit)."
             if jq -e . >/dev/null 2>&1 <<< "$response"; then
-              jq -r '(.errors // [])[]? | "Cloudflare error code: (.code // "unknown"); message: (.message // "No message")"' <<< "$response"
+              jq -r '(.errors // [])[]? | "Cloudflare error code: " + ((.code // "unknown") | tostring) + "; message: " + (.message // "No message")' <<< "$response"
             else
               echo "Cloudflare returned a non-JSON error response; response body omitted."
             fi
@@ -95,7 +95,7 @@ jobs:
           fi
           if [[ "$(jq -r '.success' <<< "$response")" != "true" ]]; then
             echo "::error::Cloudflare rejected the Pages project request:"
-            jq -r '(.errors // [])[]? | "Cloudflare error code: (.code // "unknown"); message: (.message // "No message")"' <<< "$response"
+              jq -r '(.errors // [])[]? | "Cloudflare error code: " + ((.code // "unknown") | tostring) + "; message: " + (.message // "No message")' <<< "$response"
             exit 1
           fi
           mapfile -t all_projects < <(jq -r '.result[].name' <<< "$response")
