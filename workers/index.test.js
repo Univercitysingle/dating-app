@@ -1308,3 +1308,32 @@ test("bank-slip admin retrieval and moderation deny non-admin users", async () =
   assert.equal((await connection.getPendingBankSlipSubscriptions("ordinary-user")).status, 403);
   assert.equal((await connection.moderateBankSlipSubscription("ordinary-user", "0123456789abcdef01234567", "approve")).status, 403);
 });
+
+
+test("bank-slip deletion is limited to the owner's pending submission", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = "3123456789abcdef01234567";
+  const userId = new ObjectId("abcdef0123456789abcdef04");
+  const key = "bank-slips-user-1-12345678-1234-4234-8234-123456789abc.jpg";
+  const subscription = { _id: new ObjectId(id), userId, status: "pending", bankSlipUrl: key };
+  const users = { async findOne() { return { _id: userId }; } };
+  const subscriptions = {
+    async findOne(filter) {
+      return String(filter._id) === id && String(filter.userId) === String(userId) && filter.status === "pending" ? { bankSlipUrl: key } : null;
+    },
+    async updateOne(filter, update) {
+      if (String(filter._id) !== id || String(filter.userId) !== String(userId) || subscription.status !== filter.status) return { modifiedCount: 0 };
+      Object.assign(subscription, update.$set || {});
+      for (const field of Object.keys(update.$unset || {})) delete subscription[field];
+      return { modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : subscriptions; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const result = await connection.deleteOwnPendingBankSlip("user-1", id);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.key, key);
+  assert.equal(subscription.status, "cancelled");
+  assert.equal(subscription.bankSlipUrl, undefined);
+});
