@@ -41,7 +41,8 @@ export class MongoDBConnection {
   getMediaUrl(path) {
     let clean = String(path || "");
     while (clean.startsWith("/")) clean = clean.slice(1);
-    if (this.env.MEDIA_PUBLIC_BASE_URL) {
+    const isNewR2Photo = clean.startsWith("photos-") && [".jpg", ".jpeg", ".png", ".gif"].some(ext => clean.endsWith(ext));
+    if (this.env.MEDIA_PUBLIC_BASE_URL && isNewR2Photo) {
       try {
         const base = new URL(this.env.MEDIA_PUBLIC_BASE_URL);
         if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
@@ -171,7 +172,7 @@ export class MongoDBConnection {
 
   async removeUploadedPhoto(uid, key) {
     if (typeof uid !== "string" || !uid || typeof key !== "string" || !key.startsWith("photos-" + uid + "-") ||
-        key.length > 256 || ![".jpg", ".jpeg", ".png", ".gif"].some(ext => key.endsWith(ext))) {
+        key.length > 256 || ![".jpg", ".jpeg", ".png", ".gif", ".webp"].some(ext => key.endsWith(ext))) {
       return { status: 400, body: { message: "Invalid photo key" } };
     }
     try {
