@@ -62,6 +62,7 @@ export class MongoDBConnection {
     const subscriptions = db.collection("subscriptions");
     const users = db.collection("users");
     let expiredSubscriptions = 0;
+    let expiredTrialsCount = 0;
     let downgradedUsers = 0;
 
     // Bounded batches keep each Cron invocation within Worker execution limits.
@@ -112,7 +113,6 @@ export class MongoDBConnection {
       trialExpires: { $lt: now, $ne: null }
     }).sort({ trialExpires: 1 }).limit(500).toArray();
 
-    let expiredTrialsCount = 0;
     for (const user of expiredTrials) {
       const active = await subscriptions.findOne({
         userId: user._id,
