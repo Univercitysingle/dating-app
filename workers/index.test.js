@@ -897,3 +897,25 @@ test("purchase and subscription status reject malformed IDs before database acce
   assert.equal((await connection.getPurchaseStatus("user-1", "not-an-id")).status, 400);
   assert.equal((await connection.getSubscriptionStatus("user-1", "not-an-id")).status, 400);
 });
+
+
+test("purchase and subscription status cannot be read by a different user", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ownUserId = new ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa");
+  const otherUserId = new ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb");
+  const purchaseId = new ObjectId("cccccccccccccccccccccccc");
+  const subscriptionId = new ObjectId("dddddddddddddddddddddddd");
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({
+      collection: (name) => {
+        if (name === "users") return { findOne: async () => ({ _id: ownUserId }) };
+        if (name === "purchases") return { findOne: async () => ({ _id: purchaseId, userId: otherUserId, status: "completed" }) };
+        if (name === "subscriptions") return { findOne: async () => ({ _id: subscriptionId, userId: otherUserId, status: "active", plan: "monthly" }) };
+        throw new Error("Unexpected collection");
+      }
+    })
+  });
+  assert.equal((await connection.getPurchaseStatus("user-1", String(purchaseId))).status, 403);
+  assert.equal((await connection.getSubscriptionStatus("user-1", String(subscriptionId))).status, 403);
+});
