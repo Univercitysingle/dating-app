@@ -52,6 +52,7 @@ test("GET /ready does not expose probe errors", async () => {
   const response = await worker.fetch(request("/ready"), {
     FIREBASE_PROJECT_ID: "test-project",
     MONGODB_URI: "mongodb://unused",
+    MONGODB_DATABASE: "test",
     MONGODB_CONNECTION: {
       idFromName: (name) => name,
       get: () => ({ fetch: async () => { throw new Error("private database detail"); } })
@@ -132,4 +133,14 @@ test("current-user profile endpoint rejects unsupported methods", async () => {
     MONGODB_CONNECTION: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response("unexpected") }) }
   });
   assert.equal(response.status, 405);
+});
+
+test("MongoDB Durable Object rejects malformed internal profile requests", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const response = await connection.fetch(new Request("https://do.test/internal/profile", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ uid: "" })
+  }));
+  assert.equal(response.status, 400);
 });
