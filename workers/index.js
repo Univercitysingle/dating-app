@@ -583,6 +583,10 @@ export default {
         const body = await response.json().catch(() => ({ error: "Discovery service unavailable" }));
         return json(body, response.status);
       } catch (error) {
+        console.error("Discovery route failed", {
+          name: error && typeof error.name === "string" ? error.name : "Error",
+          message: error && typeof error.message === "string" ? error.message.slice(0, 240) : undefined
+        });
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
         return json({ error: "Discovery service unavailable" }, 503);
