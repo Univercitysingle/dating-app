@@ -79,19 +79,22 @@ export default {
       }
     }
 
+
     if (url.pathname === "/api/users/me") {
-      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (request.method !== "GET" && request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       if (!env.MONGODB_CONNECTION) return json({ error: "Profile service unavailable" }, 503);
-
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
+        const payload = request.method === "PUT" ? await request.json().catch(() => null) : null;
+        if (request.method === "PUT" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+          return json({ error: "A JSON profile object is required" }, 400);
+        }
         const response = await connection.fetch("https://internal.invalid/internal/profile", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims })
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify(request.method === "PUT" ? { claims, update: payload } : { claims })
         });
         const body = await response.json().catch(() => ({ error: "Profile service unavailable" }));
         return json(body, response.status);
