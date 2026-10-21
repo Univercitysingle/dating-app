@@ -35,6 +35,10 @@ jobs:
       WEBXPAY_PUBLIC_KEY: ${{ secrets.WEBXPAY_PUBLIC_KEY }}
       WEBXPAY_SECRET_KEY: ${{ secrets.WEBXPAY_SECRET_KEY }}
       FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+      FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
+      SUPER_ADMIN_PASSWORD_HASH: ${{ secrets.SUPER_ADMIN_PASSWORD_HASH }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -103,6 +107,28 @@ jobs:
           fi
           if [[ -n "$WEBXPAY_SECRET_KEY" ]]; then
             printf '%s' "$WEBXPAY_SECRET_KEY" | npx --yes wrangler@4 secret put WEBXPAY_SECRET_KEY --config wrangler.jsonc --env staging
+          fi
+
+      - name: Configure optional Firebase Realtime Database secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$FIREBASE_DATABASE_URL" ]]; then
+            printf '%s' "$FIREBASE_DATABASE_URL" | npx --yes wrangler@4 secret put FIREBASE_DATABASE_URL --config wrangler.jsonc --env staging
+          fi
+
+      - name: Configure optional superadmin authentication secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+          fi
+          if [[ -n "$SUPER_ADMIN_EMAIL" ]]; then
+            printf '%s' "$SUPER_ADMIN_EMAIL" | npx --yes wrangler@4 secret put SUPER_ADMIN_EMAIL --config wrangler.jsonc --env staging
+          fi
+          if [[ -n "$SUPER_ADMIN_PASSWORD_HASH" ]]; then
+            printf '%s' "$SUPER_ADMIN_PASSWORD_HASH" | npx --yes wrangler@4 secret put SUPER_ADMIN_PASSWORD_HASH --config wrangler.jsonc --env staging
           fi
 
       - name: Verify staging liveness
