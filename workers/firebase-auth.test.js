@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { authenticateFirebaseRequest, verifyFirebaseIdToken, FirebaseTokenError } from "./firebase-auth.js";
+import { authenticateFirebaseRequest, verifyFirebaseIdToken, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 
 const projectId = "test-project";
 const now = 1_800_000_000;
@@ -65,7 +65,7 @@ for (const [label, overrides] of [
 }
 
 test("rejects when Google signing keys cannot be fetched", async () => {
-  await assert.rejects(verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl: mockFetch([], 503) }), FirebaseTokenError);
+  await assert.rejects(verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl: mockFetch([], 503) }), FirebaseKeyServiceError);
 });
 
 test("rejects a key ID that is not in Google's key set", async () => {
