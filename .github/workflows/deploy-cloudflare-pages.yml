@@ -1,6 +1,11 @@
 name: Deploy dating-app frontend to Cloudflare Pages
 
 on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - '.github/workflows/deploy-cloudflare-pages.yml'
   workflow_dispatch:
 
 permissions:
