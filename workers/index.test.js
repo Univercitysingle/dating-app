@@ -1508,6 +1508,8 @@ test("password-based superadmin login signs a Firebase custom token only for the
   assert.equal(claims.uid, "superadmin_uid");
   assert.equal(claims.role, "superadmin");
   assert.equal(claims.claims, undefined);
+  assert.equal(claims.iss, "firebase-adminsdk@test-project.iam.gserviceaccount.com");
+  assert.equal(claims.aud, "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit");
 });
 
 
