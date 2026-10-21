@@ -1211,6 +1211,153 @@ export class MongoDBConnection {
     }
   }
 
+  async requireAdmin(uid, allowSuperadminOnly = false) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { message: "Invalid user identity" } };
+    try {
+      const user = await this.getDatabase(await this.getClient()).collection("users").findOne(
+        { uid }, { projection: { role: 1 } }
+      );
+      if (!user || !["admin", "superadmin"].includes(user.role) || (allowSuperadminOnly && user.role !== "superadmin")) {
+        return { status: 403, body: { message: "Forbidden" } };
+      }
+      return { status: 200, role: user.role };
+    } catch {
+      return { status: 503, body: { message: "Administration service unavailable" } };
+    }
+  }
+
+  async getAdminUsers(uid, params = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    const page = Number.isFinite(Number(params.page)) ? Math.max(1, Math.floor(Number(params.page))) : 1;
+    const limit = Number.isFinite(Number(params.limit)) ? Math.min(100, Math.max(1, Math.floor(Number(params.limit)))) : 10;
+    const query = {};
+    if (typeof params.role === "string" && ["user", "contributor", "admin", "superadmin"].includes(params.role)) query.role = params.role;
+    if (typeof params.search === "string" && params.search.trim()) {
+      const escaped = params.search.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\  async fetch(request) {
+");
+      query.$or = [{ name: { $regex: escaped, $options: "i" } }, { email: { $regex: escaped, $options: "i" } }];
+    }
+    const allowedSort = ["createdAt", "name", "email", "lastActiveAt", "role"];
+    const sortField = allowedSort.includes(params.sortBy) ? params.sortBy : "createdAt";
+    const sortDirection = params.sortOrder === "asc" ? 1 : -1;
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const [items, totalUsers] = await Promise.all([
+        users.find(query, { projection: { password: 0, lastLoginIp: 0 } })
+          .sort({ [sortField]: sortDirection, _id: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
+        users.countDocuments(query)
+      ]);
+      return { status: 200, body: { users: items, totalPages: Math.ceil(totalUsers / limit), currentPage: page, totalUsers } };
+    } catch {
+      return { status: 503, body: { message: "Unable to list users" } };
+    }
+  }
+
+  async getAdminUser(uid, userId) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) return { status: 400, body: { message: "Invalid user ID" } };
+    try {
+      const { ObjectId } = await import("mongodb");
+      const user = await this.getDatabase(await this.getClient()).collection("users").findOne(
+        { _id: new ObjectId(userId) }, { projection: { password: 0, lastLoginIp: 0 } }
+      );
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      return { status: 200, body: user };
+    } catch {
+      return { status: 503, body: { message: "Administration service unavailable" } };
+    }
+  }
+
+  async getAdminDashboardStats(uid) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const [totalUsers, newUsers, activeUsers, pendingReports] = await Promise.all([
+        db.collection("users").countDocuments({}),
+        db.collection("users").countDocuments({ createdAt: { $gte: since } }),
+        db.collection("users").countDocuments({ lastActiveAt: { $gte: since } }),
+        db.collection("reports").countDocuments({ status: "pending_review" })
+      ]);
+      return { status: 200, body: { totalUsers, newUsers, activeUsers, pendingReports } };
+    } catch {
+      return { status: 503, body: { message: "Unable to load dashboard statistics" } };
+    }
+  }
+
+  async getAdminTransactions(uid) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const [purchases, subscriptions] = await Promise.all([
+        db.collection("purchases").aggregate([
+          { $sort: { createdAt: -1 } },
+          { $limit: 500 },
+          { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
+          { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+          { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
+        ]).toArray(),
+        db.collection("subscriptions").aggregate([
+          { $sort: { createdAt: -1 } },
+          { $limit: 500 },
+          { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
+          { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+          { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
+        ]).toArray()
+      ]);
+      const result = [
+        ...purchases.map(p => ({ ...p, type: "Store Item", itemName: p.itemName, price: p.itemPrice })),
+        ...subscriptions.map(s => ({ ...s, type: "Subscription", itemName: String(s.plan || "") + " Plan", price: ({ weekly: "800 LKR", monthly: "3000 LKR", yearly: "10000 LKR" })[s.plan] || "N/A" }))
+      ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 500);
+      return { status: 200, body: result };
+    } catch {
+      return { status: 503, body: { message: "Unable to load transactions" } };
+    }
+  }
+
+  async getAdminAnalyticsSummary(uid, params = {}) {
+    const access = await this.requireAdmin(uid);
+    if (access.status !== 200) return access;
+    let startDate;
+    let endDate;
+    if (params.startDate || params.endDate) {
+      startDate = new Date(params.startDate);
+      endDate = new Date(params.endDate);
+      if (!params.startDate || !params.endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+        return { status: 400, body: { message: "Valid startDate and endDate are required together" } };
+      }
+    } else {
+      endDate = new Date();
+      startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const dateFilter = { createdAt: { $gte: startDate, $lte: endDate } };
+      const [totalUsers, paidUsers, signups, reportedUsers] = await Promise.all([
+        db.collection("users").countDocuments({}),
+        db.collection("subscriptions").countDocuments({ status: "active" }),
+        db.collection("users").aggregate([
+          { $match: dateFilter },
+          { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
+          { $sort: { _id: 1 } }
+        ]).toArray(),
+        db.collection("reports").distinct("reportedUserUid")
+      ]);
+      return { status: 200, body: {
+        userStats: { total: totalUsers, paid: paidUsers, unpaid: Math.max(0, totalUsers - paidUsers) },
+        signupsPerDay: signups,
+        locations: [],
+        reportedUsersCount: reportedUsers.length
+      } };
+    } catch {
+      return { status: 503, body: { message: "Unable to load analytics summary" } };
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
