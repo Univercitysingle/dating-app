@@ -78,3 +78,12 @@ jobs:
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
         run: curl --fail --silent --show-error "$WORKER_URL/ready"
+
+      - name: Verify authentication route rejects anonymous requests
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/auth-response.json --write-out '%{http_code}' "$WORKER_URL/api/auth/verify")"
+          test "$STATUS" = "401" || { echo "Expected unauthenticated request to return 401; received $STATUS"; cat /tmp/auth-response.json; exit 1; }
