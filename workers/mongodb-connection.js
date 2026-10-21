@@ -38,6 +38,24 @@ export class MongoDBConnection {
     return this.clientPromise;
   }
 
+  getMediaUrl(path) {
+    let clean = String(path || "");
+    while (clean.startsWith("/")) clean = clean.slice(1);
+    if (this.env.MEDIA_PUBLIC_BASE_URL) {
+      try {
+        const base = new URL(this.env.MEDIA_PUBLIC_BASE_URL);
+        if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
+          const prefix = base.pathname.endsWith("/") ? base.pathname.slice(0, -1) : base.pathname;
+          const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
+          return base.origin + prefix + "/" + encoded;
+        }
+      } catch {
+        // Fall back to the existing CDN hostname for legacy media only.
+      }
+    }
+    return "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + clean;
+  }
+
   getDatabase(client) {
     // Honor the explicit environment database when set; otherwise preserve the URI default.
     return client.db(this.env.MONGODB_DATABASE || undefined);
@@ -325,7 +343,7 @@ export class MongoDBConnection {
           if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
           let path = photo.url;
           while (path.startsWith("/")) path = path.slice(1);
-          return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + path };
+          return { ...photo, url: this.getMediaUrl(path) };
         });
       }
       return { status: 200, body: { undoneUser: profile } };
@@ -535,7 +553,7 @@ export class MongoDBConnection {
             if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
             let path = photo.url;
             while (path.startsWith("/")) path = path.slice(1);
-            return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + path };
+            return { ...photo, url: this.getMediaUrl(path) };
           });
         }
         return { ...item, user: profile };
@@ -588,7 +606,7 @@ export class MongoDBConnection {
               if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
               let path = photo.url;
               while (path.startsWith("/")) path = path.slice(1);
-              return { ...photo, url: "https://" + (this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev") + "/" + path };
+              return { ...photo, url: this.getMediaUrl(path) };
             });
           }
           return [profile];
