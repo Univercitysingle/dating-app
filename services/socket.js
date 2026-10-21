@@ -1,47 +1,7 @@
 const socketIo = require("socket.io");
 const ChatMessage = require('../models/ChatMessage');
 const MAX_MESSAGE_LENGTH = 2000;
-async function authorizeRoom(userUid, roomId, peerUid) {
-  if (typeof roomId !== 'string' || !roomId || roomId.length > 256) return false;
-  if (peerUid && (peerUid === userUid || typeof peerUid !== 'string')) return false;
-
-  const existing = await ChatMessage.findOne({
-    roomId,
-    $or: [
-      { senderUid: userUid },
-      { receiverUid: userUid },
-    ],
-  }).select('_id').lean();
-  if (existing) {
-    if (!peerUid) return true;
-    const pairMessage = await ChatMessage.findOne({
-      roomId,
-      $or: [
-        { senderUid: userUid, receiverUid: peerUid },
-        { senderUid: peerUid, receiverUid: userUid },
-      ],
-    }).select('_id').lean();
-    if (pairMessage) return true;
-  }
-
-  if (!peerUid) return false;
-  const expectedRooms = [
-    [userUid, peerUid].sort().join('-'),
-    [userUid, peerUid].join('-'),
-    [peerUid, userUid].join('-'),
-  ];
-  if (!expectedRooms.includes(roomId)) return false;
-
-  const match = await require('../models/Match').findOne({
-    status: 'matched',
-    $or: [
-      { user1Uid: userUid, user2Uid: peerUid },
-      { user1Uid: peerUid, user2Uid: userUid },
-    ],
-  }).select('_id').lean();
-  return !!match;
-}
-
+const { authorizeRoom } = require('./chatAuthorization');
 
 const User = require('../models/User');
 const { buildLogger } = require('../utils/logger');
