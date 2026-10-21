@@ -190,3 +190,35 @@ test("MongoDB Durable Object rejects malformed internal profile requests", async
   }));
   assert.equal(response.status, 400);
 });
+
+test("profile updates whitelist fields and preserve legacy response shape", async () => {
+  const stored = { _id: "mongo-id", uid: "user-1", email: "user@example.com", isOnboardingComplete: false, name: "Old", role: "user" };
+  let updateDoc;
+  const users = {
+    findOne: async () => ({ isOnboardingComplete: false }),
+    updateOne: async (_query, update) => { updateDoc = update; Object.assign(stored, update.$set); return { modifiedCount: 1 }; }
+  };
+  const subscriptions = { findOne: async () => null };
+  const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : subscriptions }) });
+  const result = await connection.updateCurrentUserProfile("user-1", {
+    name: "New Name", role: "admin", password: "do-not-store", bio: "Hello",
+    socialMediaLinks: { instagram: "@ok", unsafe: "drop" }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(stored.name, "New Name");
+  assert.equal(stored.role, "user");
+  assert.equal(stored.password, undefined);
+  assert.deepEqual(updateDoc.$set.socialMediaLinks, { instagram: "@ok" });
+  assert.equal(result.body.id, "mongo-id");
+  assert.equal(result.body.email, "user@example.com");
+  assert.equal(result.body.bio, "Hello");
+});
+
+test("profile updates reject underage birthdays and malformed mobile numbers", async () => {
+  const users = { findOne: async () => ({ isOnboardingComplete: false }) };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  assert.equal((await connection.updateCurrentUserProfile("user-1", { birthday: "2015-01-01" })).status, 400);
+  assert.equal((await connection.updateCurrentUserProfile("user-1", { mobileNumber: "123" })).status, 400);
+});
