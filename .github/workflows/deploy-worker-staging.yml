@@ -28,6 +28,10 @@ jobs:
       FIREBASE_PROJECT_ID: it-services-1841e
       MONGODB_DATABASE: test
       CDN_HOSTNAME: ${{ secrets.CDN_HOSTNAME }}
+      B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+      B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}
+      B2_APPLICATION_KEY_ID: ${{ secrets.B2_APPLICATION_KEY_ID }}
+      B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -46,6 +50,10 @@ jobs:
           test -n "$MONGODB_URI" || { echo "Missing GitHub secret MONGODB_URI"; exit 1; }
           test -n "$FIREBASE_PROJECT_ID" || { echo "Missing FIREBASE_PROJECT_ID configuration"; exit 1; }
           test -n "$CDN_HOSTNAME" || { echo "Missing GitHub secret CDN_HOSTNAME (legacy CDN hostname)"; exit 1; }
+          test -n "$B2_ENDPOINT" || { echo "Missing GitHub secret B2_ENDPOINT"; exit 1; }
+          test -n "$B2_BUCKET_NAME" || { echo "Missing GitHub secret B2_BUCKET_NAME"; exit 1; }
+          test -n "$B2_APPLICATION_KEY_ID" || { echo "Missing GitHub secret B2_APPLICATION_KEY_ID"; exit 1; }
+          test -n "$B2_APPLICATION_KEY" || { echo "Missing GitHub secret B2_APPLICATION_KEY"; exit 1; }
 
       - name: Install Worker dependencies
         working-directory: workers
@@ -71,6 +79,15 @@ jobs:
       - name: Configure staging MongoDB secret
         shell: bash
         run: printf '%s' "$MONGODB_URI" | npx --yes wrangler@4 secret put MONGODB_URI --config wrangler.jsonc --env staging
+
+      - name: Configure staging Backblaze B2 secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$B2_ENDPOINT" | npx --yes wrangler@4 secret put B2_ENDPOINT --config wrangler.jsonc --env staging
+          printf '%s' "$B2_BUCKET_NAME" | npx --yes wrangler@4 secret put B2_BUCKET_NAME --config wrangler.jsonc --env staging
+          printf '%s' "$B2_APPLICATION_KEY_ID" | npx --yes wrangler@4 secret put B2_APPLICATION_KEY_ID --config wrangler.jsonc --env staging
+          printf '%s' "$B2_APPLICATION_KEY" | npx --yes wrangler@4 secret put B2_APPLICATION_KEY --config wrangler.jsonc --env staging
 
       - name: Verify staging liveness
         env:
