@@ -48,11 +48,72 @@ export class MongoDBConnection {
     }
   }
 
-  async fetch(request) {
-    if (request.method !== "POST" || new URL(request.url).pathname !== "/internal/ping") {
-      return json({ error: "Not found" }, 404);
+  async getCurrentUserProfile(uid) {
+    if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
     }
-    const result = await this.ping();
-    return json({ status: result.ok ? "ok" : "unavailable" }, result.ok ? 200 : 503);
+
+    try {
+      const client = await this.getClient();
+      const db = client.db(this.env.MONGODB_DATABASE || undefined);
+      const user = await db.collection("users").findOne(
+        { uid },
+        { projection: { password: 0, lastLoginIp: 0 } }
+      );
+
+      if (!user) return { status: 404, body: { error: "User not found" } };
+
+      const activeSubscription = await db.collection("subscriptions").findOne(
+        { userId: user._id, status: "active" },
+        { projection: { _id: 1 } }
+      );
+
+      if (user.birthday) {
+        const birthday = new Date(user.birthday);
+        if (!Number.isNaN(birthday.getTime())) {
+          const today = new Date();
+          let age = today.getFullYear() - birthday.getFullYear();
+          const monthDiff = today.getMonth() - birthday.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthday.getDate())) age--;
+          user.age = age;
+        }
+      }
+      if (user.isOnboardingComplete === undefined) user.isOnboardingComplete = true;
+      user.isPremium = Boolean(activeSubscription);
+      user.id = String(user._id);
+      delete user.password;
+      delete user.lastLoginIp;
+
+      if (Array.isArray(user.photos)) {
+        for (const photo of user.photos) {
+          if (photo && typeof photo.url === "string" && photo.url && !/^https?:\/\//i.test(photo.url)) {
+            photo.url = `https://${this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev"}/${photo.url.replace(/^\/+/, "")}`;
+          }
+        }
+      }
+
+      return { status: 200, body: user };
+    } catch {
+      return { status: 503, body: { error: "Profile service unavailable" } };
+    }
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (request.method !== "POST") return json({ error: "Not found" }, 404);
+
+    if (url.pathname === "/internal/ping") {
+      const result = await this.ping();
+      return json({ status: result.ok ? "ok" : "unavailable" }, result.ok ? 200 : 503);
+    }
+
+    if (url.pathname === "/internal/profile") {
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body.uid !== "string") return json({ error: "Invalid request" }, 400);
+      const result = await this.getCurrentUserProfile(body.uid);
+      return json(result.body, result.status);
+    }
+
+    return json({ error: "Not found" }, 404);
   }
 }
