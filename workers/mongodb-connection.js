@@ -769,13 +769,22 @@ export class MongoDBConnection {
       }
 
       const pipeline = [];
-      const hasLocation = maxDistance !== null && currentUser.location &&
-        Array.isArray(currentUser.location.coordinates) && currentUser.location.coordinates.length === 2 &&
-        currentUser.location.coordinates.every(Number.isFinite);
+      const coordinates = currentUser.location?.coordinates;
+      // Mongoose's legacy schema defaults missing locations to [0, 0]. That is
+      // a placeholder, not a usable location; do not run $geoNear for it.
+      const hasLocation = maxDistance !== null &&
+        Array.isArray(coordinates) && coordinates.length === 2 &&
+        coordinates.every(Number.isFinite) &&
+        coordinates[0] >= -180 && coordinates[0] <= 180 &&
+        coordinates[1] >= -90 && coordinates[1] <= 90 &&
+        !(coordinates[0] === 0 && coordinates[1] === 0);
       if (hasLocation) {
+        // $geoNear requires a 2dsphere index. Ensure it exists in MongoDB
+        // instead of turning every distance-filtered Discover request into 503.
+        await db.collection("users").createIndex({ location: "2dsphere" });
         pipeline.push({
           $geoNear: {
-            near: { type: "Point", coordinates: currentUser.location.coordinates },
+            near: { type: "Point", coordinates },
             distanceField: "distanceMeters",
             maxDistance: maxDistance * 1000,
             spherical: true,
@@ -892,7 +901,9 @@ export class MongoDBConnection {
     } catch (error) {
       console.error("MongoDB discovery query failed", {
         name: error && typeof error.name === "string" ? error.name : "Error",
-        code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined
+        code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined,
+        codeName: error && typeof error.codeName === "string" ? error.codeName : undefined,
+        message: error && typeof error.message === "string" ? error.message.slice(0, 240) : undefined
       });
       return { status: 503, body: { error: "Discovery service unavailable" } };
     }
