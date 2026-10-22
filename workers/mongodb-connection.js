@@ -897,7 +897,7 @@ export class MongoDBConnection {
                           $filter: {
                             input: "$regularUsers",
                             as: "regularUser",
-                            cond: { $not: [{ $in: ["$$regularUser.uid", "$$boostedIds"] }] }
+                            cond: { $not: [{ $in: ["$regularUser.uid", { $ifNull: ["$boostedIds", []] }] }] }
                           }
                         },
                         { $max: [0, { $subtract: [20, { $size: "$boostedUsers" }] }] }
@@ -1036,6 +1036,9 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
+      // Apply the legacy unique-index repair before inserting any pending
+      // subscription; otherwise MongoDB rejects every missing Stripe ID as null.
+      await this.ensureSubscriptionIndexes(db);
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
