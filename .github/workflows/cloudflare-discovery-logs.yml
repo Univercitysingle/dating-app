@@ -31,7 +31,7 @@ jobs:
             exit 1
           fi
           TO_MS=$(date -u +%s%3N)
-          FROM_MS=$((TO_MS - 172800000))
+          FROM_MS=$((TO_MS - 21600000))
           BODY=$(jq -n --argjson from "$FROM_MS" --argjson to "$TO_MS" '{
             queryId: "adhoc-dating-app-discovery-debug",
             timeframe: {from: $from, to: $to},
@@ -74,6 +74,8 @@ jobs:
                 if (.source | type) == "object" then
                   {
                     error: (.source.error // null),
+                    message: (.source.message // null),
+                    name: (.source.name // null),
                     code: (.source.code // null),
                     codeName: (.source.codeName // null),
                     route: (.source.route // null)
