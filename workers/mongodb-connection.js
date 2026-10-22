@@ -52,33 +52,37 @@ export class MongoDBConnection {
 
   getMediaUrl(path) {
     let clean = String(path || "").trim();
-    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(new RegExp("/+$"), "");
-    if (clean.startsWith("https://") || clean.startsWith("http://")) {
+    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(/\/+$/, "");
+    if (/^https?:\/\//i.test(clean)) {
       try {
         const parsed = new URL(clean);
         const frontendHost = frontend ? new URL(frontend).host : "";
-        // Only rewrite legacy image URLs that incorrectly point to the Pages SPA.
-        if (!frontendHost || parsed.host !== frontendHost || !parsed.pathname.startsWith("/photos-")) return clean;
+        const isLegacyFrontendUrl = frontendHost && parsed.host === frontendHost;
+        if (!isLegacyFrontendUrl) return clean;
         clean = parsed.pathname;
       } catch {
         return clean;
       }
     }
-    while (clean.startsWith("/")) clean = clean.slice(1);
+
+    clean = clean.replace(/^\/+/, "");
+    clean = clean.replace(/^(?:api\/media|media)\//i, "");
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-    // CDN_HOSTNAME is the configured private-B2 proxy and is the canonical
-    // public URL for both newly uploaded and previously stored profile photos.
     const configured = String(this.env.CDN_HOSTNAME || "").trim();
     if (configured) {
-      const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
-      if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
-        base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encoded;
-        return base.toString();
+      try {
+        const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
+        if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
+          base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encoded;
+          return base.toString();
+        }
+      } catch {
+        // Fall through to the Worker media route if the CDN value is invalid.
       }
     }
-    // If the CDN variable is absent, keep existing photos accessible through
-    // the authenticated app Worker media route instead of inventing a host.
-    if (frontend && clean.startsWith("photos-")) return frontend + "/api/media/" + encoded;
+    if (frontend && /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(clean)) {
+      return frontend + "/api/media/" + encoded;
+    }
     return clean;
   }
 
