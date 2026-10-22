@@ -244,12 +244,41 @@ export default {
       url.pathname.match(/^\/media\/([^/]+)$/) ||
       url.pathname.match(/^\/(photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp))$/i);
     if (mediaMatch) {
-      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
+      if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
       let key;
       try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
       // Support current UUID-based keys and older timestamp-based keys, including WebP.
       if (!/^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
       if (!isB2Configured(env)) return json({ error: "Media storage unavailable" }, 503);
+      if (request.method === "PUT") {
+        if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+        try {
+          const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+          if (typeof claims.sub !== "string" || !key.startsWith("photos-" + claims.sub + "-")) {
+            return json({ error: "Photo does not belong to the current user" }, 403);
+          }
+          const contentType = request.headers.get("content-type") || "";
+          const extensionByType = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif" };
+          const extension = extensionByType[contentType];
+          if (!extension || !key.toLowerCase().endsWith("." + extension)) return json({ error: "Unsupported image type" }, 400);
+          const bytes = new Uint8Array(await request.arrayBuffer());
+          if (bytes.length < 1 || bytes.length > 5 * 1024 * 1024) return json({ error: "Photo must be 5 MB or smaller" }, 400);
+          const jpeg = contentType === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+          const png = contentType === "image/png" && bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+          const gifSignature = bytes.length >= 6 ? String.fromCharCode(...bytes.slice(0, 6)) : "";
+          const gif = contentType === "image/gif" && (gifSignature === "GIF89a" || gifSignature === "GIF87a");
+          if (!jpeg && !png && !gif) return json({ error: "File content does not match its image type" }, 400);
+          await putPrivateObject(env, key, bytes, contentType, claims.sub);
+          return json({ uploaded: true }, 201);
+        } catch (error) {
+          if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+          if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+          console.error("Private media proxy upload failed", {
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Upload failed"
+          });
+          return json({ error: "Media upload failed" }, 503);
+        }
+      }
       try {
         const object = await getPrivateObject(env, key);
         const headers = new Headers({ "content-type": object.ContentType || "application/octet-stream", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" });
@@ -746,11 +775,25 @@ export default {
         if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         try {
-          // Store objects privately in B2; CDN_HOSTNAME is the public proxy URL
-          // used by clients to retrieve the object through this Worker.
-          await putPrivateObject(env, key, fileBytes, file.type, claims.sub);
-        } catch {
-          return json({ message: "Photo upload failed" }, 503);
+          // Use CDN_HOSTNAME for the write path too. The proxy authenticates the
+          // caller and stores the object in the private B2 bucket.
+          const proxyResponse = await fetch(getCdnObjectUrl(env, key), {
+            method: "PUT",
+            headers: {
+              "authorization": request.headers.get("authorization") || "",
+              "content-type": file.type
+            },
+            body: fileBytes
+          });
+          if (!proxyResponse.ok) {
+            console.error("Photo proxy upload failed", { status: proxyResponse.status });
+            return json({ message: "Photo upload failed through CDN_HOSTNAME" }, proxyResponse.status >= 400 && proxyResponse.status < 600 ? 503 : 503);
+          }
+        } catch (error) {
+          console.error("Photo proxy upload failed", {
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Proxy request failed"
+          });
+          return json({ message: "Photo upload failed through CDN_HOSTNAME" }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
