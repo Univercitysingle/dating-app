@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
-import { constants, generateKeyPairSync, privateEncrypt } from "node:crypto";
+import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
 import worker, { RateLimiter, MongoDBConnection } from "./index.js";
 
 function request(path, method = "GET") {
@@ -1621,3 +1621,94 @@ test("chat conversations use a valid inclusion projection and return successfull
   assert.deepEqual(userProjection, { _id: 1, uid: 1, blocked: 1 });
 });
 
+test("chat message remains saved when Firebase Realtime Database rejects the sync write", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" }
+  });
+  const now = Math.floor(Date.now() / 1000);
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const header = encode({ alg: "RS256", typ: "JWT", kid: "test-key" });
+  const claims = encode({
+    aud: "test-project",
+    iss: "https://securetoken.google.com/test-project",
+    sub: "sender-uid",
+    user_id: "sender-uid",
+    iat: now,
+    exp: now + 3600,
+    auth_time: now
+  });
+  const unsigned = header + "." + claims;
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  let rollbackCalled = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    const target = String(input);
+    if (target === "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com") {
+      return new Response(JSON.stringify({
+        keys: [{ ...publicJwk, kid: "test-key", alg: "RS256", use: "sig" }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (target.startsWith("https://test-project-default-rtdb.firebaseio.com/")) {
+      return new Response(JSON.stringify({ error: "Permission denied" }), {
+        status: 401, headers: { "content-type": "application/json" }
+      });
+    }
+    throw new Error("Unexpected network request in chat sync test");
+  };
+  const connection = {
+    idFromName: name => name,
+    get: () => ({
+      fetch: async (input) => {
+        const target = String(input);
+        if (target.endsWith("/internal/chat/send")) {
+          return new Response(JSON.stringify({
+            _id: "message-id",
+            roomId: "sender-uid-receiver-uid",
+            senderUid: "sender-uid",
+            receiverUid: "receiver-uid",
+            messageContent: "hello",
+            timestamp: new Date(now * 1000).toISOString()
+          }), { status: 201, headers: { "content-type": "application/json" } });
+        }
+        if (target.endsWith("/internal/chat/rollback")) {
+          rollbackCalled = true;
+          return new Response(JSON.stringify({ success: true }), { status: 200 });
+        }
+        throw new Error("Unexpected Durable Object request in chat sync test");
+      }
+    })
+  };
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/chat/send", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + token,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        roomId: "sender-uid-receiver-uid",
+        receiverUid: "receiver-uid",
+        messageContent: "hello"
+      })
+    }), {
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_DATABASE_URL: "https://test-project-default-rtdb.firebaseio.com",
+      MONGODB_CONNECTION: connection
+    });
+    assert.equal(response.status, 201);
+    const body = await response.json();
+    assert.equal(body._id, "message-id");
+    assert.equal(body.realtimeSync, false);
+    assert.equal(body.messageContent, "hello");
+    assert.equal(rollbackCalled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+\n
