@@ -11,10 +11,14 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
       return { toArray: async () => [] };
     }
   };
+  const matches = {
+    createIndex: async () => "index-created"
+  };
   const db = {
     collection(name) {
-      assert.equal(name, "users");
-      return users;
+      if (name === "users") return users;
+      if (name === "matches") return matches;
+      assert.fail(`Unexpected collection: ${name}`);
     }
   };
   const connection = Object.create(MongoDBConnection.prototype);
