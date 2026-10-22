@@ -834,7 +834,7 @@ export class MongoDBConnection {
           $project: {
             combinedUsers: {
               $let: {
-                vars: { boostedIds: "$boostedUsers.uid" },
+                vars: { boostedIds: { $ifNull: ["$boostedUsers.uid", []] } },
                 in: {
                   $concatArrays: [
                     "$boostedUsers",
