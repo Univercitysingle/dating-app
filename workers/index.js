@@ -756,10 +756,13 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        // Photo storage is managed by the CDN proxy Worker. This API Worker
-        // requires CDN_HOSTNAME, not direct Backblaze B2 credentials.
+        // Upload through the configured Backblaze B2 S3 API. The CDN Worker
+        // serves the stored object for reads; it does not need to accept PUTs.
         if (!env.CDN_HOSTNAME) {
-          return json({ message: "Photo storage proxy is not configured" }, 503);
+          return json({ message: "Photo CDN is not configured" }, 503);
+        }
+        if (!isB2Configured(env)) {
+          return json({ message: "Photo storage is not configured" }, 503);
         }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("photo");
@@ -782,58 +785,17 @@ export default {
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         let cdnUrl;
         try {
-          const authorization = request.headers.get("authorization") || "";
-          // Existing CDN deployments may expose media under /api/media/:key,
-          // /media/:key, or the legacy root /:key route. Probe the alternatives
-          // only on 404; other statuses are real upload failures and must not be
-          // hidden by retrying a different URL.
-          const proxyUrls = [
-            getCdnObjectUrl(env, key, "api"),
-            (() => {
-              const mediaUrl = new URL(getCdnObjectUrl(env, key, "root"));
-              mediaUrl.pathname = mediaUrl.pathname.replace(/\/[^/]+$/, "/media/" + encodeURIComponent(key));
-              return mediaUrl.toString();
-            })(),
-            getCdnObjectUrl(env, key, "root")
-          ];
-          const attemptedStatuses = [];
-          for (let index = 0; index < proxyUrls.length; index += 1) {
-            const proxyResponse = await fetch(proxyUrls[index], {
-              method: "PUT",
-              headers: {
-                authorization,
-                "content-type": file.type
-              },
-              body: fileBytes
-            });
-            attemptedStatuses.push({ route: new URL(proxyUrls[index]).pathname, status: proxyResponse.status });
-            if (proxyResponse.status === 404 && index < proxyUrls.length - 1) continue;
-            if (!proxyResponse.ok) {
-              const proxyError = (await proxyResponse.text().catch(() => "")).slice(0, 240);
-              console.error("Photo CDN proxy upload failed", {
-                attempts: attemptedStatuses,
-                response: proxyError || "Proxy returned an empty error response"
-              });
-              return json({
-                message: "Photo storage proxy upload failed",
-                proxyStatus: proxyResponse.status,
-                attemptedRoutes: attemptedStatuses
-              }, 503);
-            }
-            cdnUrl = proxyUrls[index];
-            break;
-          }
-          if (!cdnUrl) return json({
-            message: "Photo storage proxy upload failed",
-            proxyStatus: attemptedStatuses.at(-1)?.status || 502,
-            attemptedRoutes: attemptedStatuses
-          }, 503);
+          // The CDN proxy has returned 404 for all tested PUT routes. Upload
+          // directly to the same configured B2 bucket using server-side
+          // credentials, then expose the object through the CDN's read URL.
+          await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
+          cdnUrl = getCdnObjectUrl(env, key, "root");
         } catch (error) {
-          console.error("Photo CDN proxy upload failed", {
+          console.error("Photo storage upload failed", {
             name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
-            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Proxy upload failed"
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Storage upload failed"
           });
-          return json({ message: "Photo storage proxy upload failed" }, 503);
+          return json({ message: "Photo storage upload failed" }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
