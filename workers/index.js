@@ -1422,17 +1422,23 @@ export default {
         const idToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
         // MongoDB is the source of truth. Realtime Database is a best-effort
         // notification/sync layer and must never invalidate a saved message.
-        const databaseUrl = env.FIREBASE_DATABASE_URL ||
-          (env.FIREBASE_PROJECT_ID ? `https://${env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com` : "");
+        // The current staging Firebase RTDB is deactivated. MongoDB is the
+        // source of truth, and the frontend polls message history, so RTDB sync
+        // stays off unless an operator explicitly enables a live database.
+        const realtimeSyncEnabled = env.ENABLE_FIREBASE_REALTIME_SYNC === "true";
+        const databaseUrl = realtimeSyncEnabled
+          ? (env.FIREBASE_DATABASE_URL ||
+            (env.FIREBASE_PROJECT_ID ? `https://${env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com` : ""))
+          : "";
         let realtimeSync = false;
         let databaseBase = "";
-        if (!idToken || !databaseUrl) {
+        if (realtimeSyncEnabled && (!idToken || !databaseUrl)) {
           console.warn("Firebase Realtime Database chat sync is not configured", {
             phase: "write-realtime-chat-message",
             hasIdToken: Boolean(idToken),
             hasDatabaseUrl: Boolean(databaseUrl)
           });
-        } else {
+        } else if (realtimeSyncEnabled) {
           try {
             const configured = new URL(databaseUrl);
             if (configured.protocol !== "https:" ||
@@ -1446,7 +1452,7 @@ export default {
             });
           }
         }
-        if (idToken && databaseBase) {
+        if (realtimeSyncEnabled && idToken && databaseBase) {
           const room = encodeURIComponent(result.roomId);
           const messageKey = encodeURIComponent(String(result._id));
           let realtimeResponse = null;
