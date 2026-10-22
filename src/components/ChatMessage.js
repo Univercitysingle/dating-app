@@ -12,19 +12,16 @@ const CDN_BASE = configuredCdn
 const isPhotoKey = (value) =>
   /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(value);
 
-const resolveAvatarUrl = (value) => {
-  if (!value) return 'https://placehold.co/100x100';
-
+const extractPhotoKey = (value) => {
+  if (!value) return '';
   let path = String(value).trim();
   try {
     if (/^https?:\/\//i.test(path)) {
       const parsed = new URL(path);
       if (parsed.pathname.startsWith('/api/media/')) {
         path = decodeURIComponent(parsed.pathname.slice('/api/media/'.length));
-      } else if (isPhotoKey(parsed.pathname.slice(1))) {
-        path = decodeURIComponent(parsed.pathname.slice(1));
       } else {
-        return path;
+        path = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
       }
     } else if (path.startsWith('/api/media/')) {
       path = decodeURIComponent(path.slice('/api/media/'.length));
@@ -34,16 +31,18 @@ const resolveAvatarUrl = (value) => {
       path = decodeURIComponent(path.replace(/^\/+/, ''));
     }
   } catch {
-    return 'https://placehold.co/100x100';
+    return '';
   }
+  return isPhotoKey(path) ? path : '';
+};
 
-  if (isPhotoKey(path)) {
-    return CDN_BASE
-      ? `${CDN_BASE}/${encodeURIComponent(path)}`
-      : `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(path)}`;
-  }
-
-  return value;
+const resolveAvatarUrl = (value) => {
+  if (!value) return 'https://placehold.co/100x100';
+  const key = extractPhotoKey(value);
+  if (!key) return value;
+  return CDN_BASE
+    ? `${CDN_BASE}/${encodeURIComponent(key)}`
+    : `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(key)}`;
 };
 
 const MessageStatus = ({ status }) => {
@@ -62,17 +61,29 @@ const MessageStatus = ({ status }) => {
 const ChatMessage = ({ message, currentUser, otherUser }) => {
   const isSender = currentUser && message.senderUid === currentUser.uid;
   const userProfile = isSender ? currentUser : otherUser;
-  const avatarUrl = resolveAvatarUrl(userProfile?.photos?.[0]?.url);
+  const photoValue = userProfile?.photos?.[0]?.url;
+  const avatarUrl = resolveAvatarUrl(photoValue);
+  const photoKey = extractPhotoKey(photoValue);
+  const workerFallbackUrl = photoKey
+    ? `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(photoKey)}`
+    : '';
 
   return (
     <div className={`flex items-start gap-3 ${isSender ? 'flex-row-reverse' : ''}`}>
       <img
         src={avatarUrl}
+        data-worker-fallback={workerFallbackUrl}
         alt={userProfile?.name || 'User Avatar'}
         className="w-10 h-10 rounded-full object-cover"
         onError={(event) => {
-          if (event.currentTarget.src !== 'https://placehold.co/100x100') {
-            event.currentTarget.src = 'https://placehold.co/100x100';
+          const image = event.currentTarget;
+          const fallback = image.dataset.workerFallback;
+          if (fallback && image.src !== fallback) {
+            image.src = fallback;
+            return;
+          }
+          if (image.src !== 'https://placehold.co/100x100') {
+            image.src = 'https://placehold.co/100x100';
           }
         }}
       />
