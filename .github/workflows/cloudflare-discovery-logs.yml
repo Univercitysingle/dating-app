@@ -40,7 +40,7 @@ jobs:
             parameters: {
               datasets: ["cloudflare-workers"],
               needle: {
-                value: "MongoServerError|Location40081|\\$in requires an array|run-discovery-aggregation|MongoDB discovery query failed|Discovery service unavailable|Realtime chat write was rejected|Realtime chat is not configured|FirebaseTokenError|FirebaseKeyServiceError|Unauthorized",
+                value: "MongoServerError|Location40081|\\$in requires an array|run-discovery-aggregation|MongoDB discovery query failed|Discovery service unavailable|Firebase Realtime Database chat write failed|Firebase Realtime Database chat sync is not configured|Firebase Realtime Database chat sync URL is invalid|Realtime chat write was rejected|Realtime chat is not configured|FirebaseTokenError|FirebaseKeyServiceError|Unauthorized",
                 isRegex: true,
                 matchCase: false
               }
