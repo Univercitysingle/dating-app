@@ -91,3 +91,5 @@ jobs:
           if [[ "$COUNT" -eq 0 ]]; then
             echo "No matching events in the last 6 hours. Check Workers Logs enablement and whether the failure was reproduced during this time range."
           fi
+
+# Re-run targeted observability query after subscription 503 reproduction (2026-10-22).
