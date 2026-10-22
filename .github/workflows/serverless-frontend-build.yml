@@ -51,3 +51,5 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Build React frontend
         run: npm run build
+      - name: Run frontend unit tests
+        run: npm run test:frontend -- --runInBand
