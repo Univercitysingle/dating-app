@@ -24,6 +24,14 @@
       "vars": {
         "MIGRATION_STAGE": "staging"
       },
+      "observability": {
+        "enabled": true,
+        "logs": {
+          "enabled": true,
+          "invocation_logs": true,
+          "head_sampling_rate": 1
+        }
+      },
       "durable_objects": {
         "bindings": [
           { "name": "RATE_LIMITER", "class_name": "RateLimiter" },
