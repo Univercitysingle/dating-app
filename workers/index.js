@@ -1439,7 +1439,7 @@ export default {
                 (!configured.hostname.endsWith("firebasedatabase.app") && !configured.hostname.endsWith("firebaseio.com"))) {
               throw new Error("Invalid Firebase Realtime Database URL");
             }
-            databaseBase = configured.toString().replace(/\\/+$/, "");
+            databaseBase = configured.toString().replace(/\/+$/, "");
           } catch {
             console.error("Firebase Realtime Database chat sync URL is invalid", {
               phase: "write-realtime-chat-message"
