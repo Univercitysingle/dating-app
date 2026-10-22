@@ -754,8 +754,10 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        if (!isB2Configured(env)) {
-          return json({ message: "Photo storage is not configured" }, 503);
+        // Photo storage is managed by the CDN proxy Worker. This API Worker
+        // requires CDN_HOSTNAME, not direct Backblaze B2 credentials.
+        if (!env.CDN_HOSTNAME) {
+          return json({ message: "Photo storage proxy is not configured" }, 503);
         }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("photo");
@@ -777,17 +779,30 @@ export default {
         if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         try {
-          // The API Worker has already authenticated the Firebase user and
-          // validated ownership of this object key. Write to B2 directly rather
-          // than making a second authenticated HTTP request through CDN_HOSTNAME.
-          // CDN_HOSTNAME is only used to construct the public-facing media URL.
-          await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
-        } catch (error) {
-          console.error("Photo B2 upload failed", {
-            name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
-            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "B2 upload failed"
+          const authorization = request.headers.get("authorization") || "";
+          const proxyUrl = getCdnObjectUrl(env, key);
+          const proxyResponse = await fetch(proxyUrl, {
+            method: "PUT",
+            headers: {
+              authorization,
+              "content-type": file.type
+            },
+            body: fileBytes
           });
-          return json({ message: "Photo storage upload failed" }, 503);
+          if (!proxyResponse.ok) {
+            const proxyError = (await proxyResponse.text().catch(() => "")).slice(0, 240);
+            console.error("Photo CDN proxy upload failed", {
+              status: proxyResponse.status,
+              response: proxyError || "Proxy returned an empty error response"
+            });
+            return json({ message: "Photo storage proxy upload failed", proxyStatus: proxyResponse.status }, 503);
+          }
+        } catch (error) {
+          console.error("Photo CDN proxy upload failed", {
+            name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Proxy upload failed"
+          });
+          return json({ message: "Photo storage proxy upload failed" }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
