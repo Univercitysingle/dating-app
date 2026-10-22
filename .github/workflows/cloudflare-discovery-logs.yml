@@ -33,7 +33,7 @@ jobs:
           TO_MS=$(date -u +%s%3N)
           FROM_MS=$((TO_MS - 21600000))
           BODY=$(jq -n --argjson from "$FROM_MS" --argjson to "$TO_MS" '{
-            queryId: "adhoc-dating-app-discovery-debug",
+            queryId: "adhoc-dating-app-discovery-debug-2",
             timeframe: {from: $from, to: $to},
             view: "events",
             limit: 100,
