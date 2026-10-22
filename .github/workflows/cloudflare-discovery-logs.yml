@@ -37,11 +37,6 @@ jobs:
             limit: 100,
             parameters: {
               datasets: ["cloudflare-workers"],
-              needle: {
-                value: "MongoDB discovery|Discovery route failed|Discovery service unavailable|users/discover",
-                isRegex: true,
-                matchCase: false
-              }
             }
           }')
           HTTP_CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
@@ -71,16 +66,15 @@ jobs:
               source: (
                 if (.source | type) == "object" then
                   {
-                    message: (.source.message // .source[0] // null),
                     error: (.source.error // null),
                     code: (.source.code // null),
                     codeName: (.source.codeName // null),
                     route: (.source.route // null)
                   }
                 else
-                  (.source | tostring | .[0:1200])
+                  null
                 end
-              )
+              ) )
             }' response.json
           COUNT=$(jq '.result.events.events // [] | length' response.json)
           echo "Matching events returned: $COUNT"
