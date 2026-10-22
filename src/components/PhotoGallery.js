@@ -42,7 +42,13 @@ const PhotoGallery = ({ photos, onEdit }) => {
       {/* Main Image */}
       <img
         crossOrigin="anonymous"
-        src={photos[currentPhotoIndex].url}
+        src={(() => {
+          const value = photos[currentPhotoIndex]?.url || '';
+          if (/^photos-[A-Za-z0-9_-]+-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(value)) {
+            return `/api/media/${encodeURIComponent(value)}`;
+          }
+          return value;
+        })()}
         alt={`User photo ${currentPhotoIndex + 1}`}
         className="w-full h-full object-cover"
       />
