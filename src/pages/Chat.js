@@ -71,7 +71,7 @@ function Chat() {
 
     // Firebase Realtime Database Listener for Realtime Serverless Messages
     let chatRef;
-    if (database && chatId) {
+    if (process.env.REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC === 'true' && database && chatId) {
       try {
         chatRef = ref(database, `chats/${chatId}`);
         onChildAdded(chatRef, (snapshot) => {
