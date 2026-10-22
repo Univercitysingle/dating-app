@@ -33,6 +33,25 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
   const project = capturedPipeline.find((stage) => stage.$project?.combinedUsers).$project.combinedUsers;
   const condition = project.$let.in.$concatArrays[1].$slice[0].$filter.cond;
   assert.ok(Array.isArray(condition.$not), "$not must receive an array expression in MongoDB aggregation");
-  assert.deepEqual(condition.$not[0].$in, ["$$regularUser.uid", "$$boostedIds"]);
+  assert.deepEqual(condition.$not[0].$in, ["$regularUser.uid", { $ifNull: ["$boostedIds", []] }]);
   assert.deepEqual(project.$let.vars.boostedIds, { $map: { input: { $ifNull: ["$boostedUsers", []] }, as: "boostedUser", in: "$boostedUser.uid" } });
+});
+
+
+test("pending subscription repairs the Stripe index before attempting insertion", async () => {
+  const order = [];
+  const user = { _id: "user-object-id", uid: "user-1", name: "Test User" };
+  const subscriptions = {
+    async findOne() { order.push("check-active"); return null; },
+    async insertOne(doc) { order.push("insert"); assert.equal(doc.status, "pending"); return { insertedId: "subscription-id" }; }
+  };
+  const users = { async findOne() { order.push("find-user"); return user; } };
+  const db = { collection(name) { return name === "users" ? users : subscriptions; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  connection.ensureSubscriptionIndexes = async () => { order.push("repair-index"); };
+  const result = await connection.createPendingSubscription("user-1", "monthly");
+  assert.equal(result.status, 201);
+  assert.deepEqual(order, ["repair-index", "find-user", "check-active", "insert"]);
 });
