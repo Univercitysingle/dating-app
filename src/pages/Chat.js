@@ -19,6 +19,9 @@ function Chat() {
   const { chatId } = useParams();
   const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const historyPollRef = useRef(null);
+  const addMessageRef = useRef(addMessage);
+  useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
 
   const messages = allMessages[chatId] || [];
 
@@ -29,6 +32,31 @@ function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Keep the room hydrated from MongoDB even if Firebase RTDB or Socket.IO
+    // realtime delivery is unavailable. The API enforces participant access.
+    let cancelled = false;
+    const syncHistory = async () => {
+      try {
+        const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
+        if (!cancelled && Array.isArray(result?.messages)) {
+          result.messages.forEach(message => addMessageRef.current(message));
+        }
+      } catch (historyError) {
+        if (!cancelled) logger.debug('Chat history refresh unavailable:', historyError?.status || 'network error');
+      }
+    };
+    if (user?.uid && chatId) {
+      syncHistory();
+      historyPollRef.current = setInterval(syncHistory, 3000);
+    }
+    return () => {
+      cancelled = true;
+      if (historyPollRef.current) clearInterval(historyPollRef.current);
+      historyPollRef.current = null;
+    };
+  }, [chatId, user?.uid]);
 
   useEffect(() => {
     // Socket.IO Room Joining
@@ -132,13 +160,19 @@ function Chat() {
     // Fallback or serverless HTTP transmission
     if (!sentViaSocket) {
       try {
-        await apiClient.post('/chat/send', {
+        const savedMessage = await apiClient.post('/chat/send', {
           roomId: chatId,
           messageContent,
           receiverUid,
         });
+        if (savedMessage && savedMessage._id) {
+          addMessage({ ...savedMessage, _id: String(savedMessage._id), roomId: savedMessage.roomId || chatId });
+        }
       } catch (sendErr) {
         logger.error('Failed to send message via HTTP fallback:', sendErr);
+        removeMessage(chatId, tempId);
+        setInput(messageContent);
+        setError('Message could not be saved. Please try again.');
       }
     }
   };
