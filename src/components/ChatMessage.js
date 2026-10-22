@@ -4,22 +4,46 @@ const MEDIA_API_ORIGIN =
   process.env.REACT_APP_MEDIA_API_ORIGIN ||
   'https://dating-app-api-staging.enadoctemp.workers.dev';
 
-const resolveAvatarUrl = (url) => {
-  if (!url) return 'https://placehold.co/100x100';
+const configuredCdn = String(process.env.REACT_APP_CDN_HOSTNAME || '').trim();
+const CDN_BASE = configuredCdn
+  ? (configuredCdn.startsWith('https://') ? configuredCdn : `https://${configuredCdn}`).replace(/\/+$/, '')
+  : '';
 
-  if (/^photos-[A-Za-z0-9_-]+-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(url)) {
-    return `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(url)}`;
+const isPhotoKey = (value) =>
+  /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(value);
+
+const resolveAvatarUrl = (value) => {
+  if (!value) return 'https://placehold.co/100x100';
+
+  let path = String(value).trim();
+  try {
+    if (/^https?:\/\//i.test(path)) {
+      const parsed = new URL(path);
+      if (parsed.pathname.startsWith('/api/media/')) {
+        path = decodeURIComponent(parsed.pathname.slice('/api/media/'.length));
+      } else if (isPhotoKey(parsed.pathname.slice(1))) {
+        path = decodeURIComponent(parsed.pathname.slice(1));
+      } else {
+        return path;
+      }
+    } else if (path.startsWith('/api/media/')) {
+      path = decodeURIComponent(path.slice('/api/media/'.length));
+    } else if (path.startsWith('api/media/')) {
+      path = decodeURIComponent(path.slice('api/media/'.length));
+    } else {
+      path = decodeURIComponent(path.replace(/^\/+/, ''));
+    }
+  } catch {
+    return 'https://placehold.co/100x100';
   }
 
-  if (url.startsWith('/api/media/')) {
-    return `${MEDIA_API_ORIGIN}${url}`;
+  if (isPhotoKey(path)) {
+    return CDN_BASE
+      ? `${CDN_BASE}/${encodeURIComponent(path)}`
+      : `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(path)}`;
   }
 
-  if (url.startsWith('api/media/')) {
-    return `${MEDIA_API_ORIGIN}/${url}`;
-  }
-
-  return url;
+  return value;
 };
 
 const MessageStatus = ({ status }) => {
