@@ -7,6 +7,10 @@ const MEDIA_API_ORIGIN =
 const resolveAvatarUrl = (url) => {
   if (!url) return 'https://placehold.co/100x100';
 
+  if (/^photos-[A-Za-z0-9_-]+-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(url)) {
+    return `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(url)}`;
+  }
+
   if (url.startsWith('/api/media/')) {
     return `${MEDIA_API_ORIGIN}${url}`;
   }
