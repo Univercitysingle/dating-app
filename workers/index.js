@@ -1445,20 +1445,35 @@ export default {
         }
         const room = encodeURIComponent(result.roomId);
         const messageKey = encodeURIComponent(String(result._id));
-        const realtimeResponse = await fetch(
-          databaseBase + "/chats/" + room + "/" + messageKey + ".json?auth=" + encodeURIComponent(idToken),
-          {
-            method: "PUT",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              _id: String(result._id), roomId: result.roomId,
-              senderUid: result.senderUid, receiverUid: result.receiverUid,
-              messageContent: result.messageContent,
-              timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
-            })
-          }
-        ).catch(() => null);
+        let realtimeResponse = null;
+        let realtimeNetworkError = null;
+        try {
+          realtimeResponse = await fetch(
+            databaseBase + "/chats/" + room + "/" + messageKey + ".json?auth=" + encodeURIComponent(idToken),
+            {
+              method: "PUT",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                _id: String(result._id), roomId: result.roomId,
+                senderUid: result.senderUid, receiverUid: result.receiverUid,
+                messageContent: result.messageContent,
+                timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
+              })
+            }
+          );
+        } catch (error) {
+          realtimeNetworkError = error && typeof error.message === "string" ? error.message.slice(0, 160) : "Network request failed";
+        }
         if (!realtimeResponse || !realtimeResponse.ok) {
+          const firebaseErrorBody = realtimeResponse
+            ? (await realtimeResponse.clone().text().catch(() => "")).slice(0, 240)
+            : "";
+          console.error("Firebase Realtime Database chat write failed", {
+            phase: "write-realtime-chat-message",
+            status: realtimeResponse ? realtimeResponse.status : null,
+            databaseHost: new URL(databaseBase).hostname,
+            error: firebaseErrorBody || realtimeNetworkError || "No response from Firebase"
+          });
           await connection.fetch("https://internal.invalid/internal/chat/rollback", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ claims, messageId: result._id })
