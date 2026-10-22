@@ -52,11 +52,13 @@ export class MongoDBConnection {
 
   getMediaUrl(path) {
     let clean = String(path || "").trim();
-    // Normalize older URLs that accidentally point at the Pages SPA fallback.
-    // The /api prefix is already routed from Pages to the staging Worker.
-    if (/^https?:\/\//i.test(clean)) {
+    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(/\\/+$/, "");
+    if (/^https?:\\/\\//i.test(clean)) {
       try {
         const parsed = new URL(clean);
+        const frontendHost = frontend ? new URL(frontend).host : "";
+        // Only rewrite legacy image URLs that incorrectly point to the Pages SPA.
+        if (!frontendHost || parsed.host !== frontendHost || !/^\\/photos-/.test(parsed.pathname)) return clean;
         clean = parsed.pathname;
       } catch {
         return clean;
@@ -64,14 +66,13 @@ export class MongoDBConnection {
     }
     while (clean.startsWith("/")) clean = clean.slice(1);
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(/\/+$/, "");
-    if (frontend && /^photos-/.test(clean)) {
+    if (frontend && clean.startsWith("photos-")) {
       return frontend + "/api/media/" + encoded;
     }
-    // Fallback for deployments that do not define FRONTEND_URL.
+    // Preserve the existing CDN URL shape for non-photo media keys.
     const configured = String(this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev").trim();
-    const base = /^https?:\/\//i.test(configured) ? configured.replace(/\/+$/, "") : "https://" + configured.replace(/\/+$/, "");
-    return base + "/media/" + encoded;
+    const base = /^https?:\\/\\//i.test(configured) ? configured.replace(/\\/+$/, "") : "https://" + configured.replace(/\\/+$/, "");
+    return base + "/" + encoded;
   }
 
   getDatabase(client) {
