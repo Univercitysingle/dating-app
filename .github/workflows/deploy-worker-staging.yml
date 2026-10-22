@@ -71,6 +71,8 @@ jobs:
           test -n "$B2_BUCKET_NAME" || { echo "Missing GitHub secret AWS_S3_BUCKET_NAME"; exit 1; }
           test -n "$B2_APPLICATION_KEY_ID" || { echo "Missing GitHub secret AWS_ACCESS_KEY_ID"; exit 1; }
           test -n "$B2_APPLICATION_KEY" || { echo "Missing GitHub secret AWS_SECRET_ACCESS_KEY"; exit 1; }
+          test -n "$WEBXPAY_PUBLIC_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_PUBLIC_KEY"; exit 1; }
+          test -n "$WEBXPAY_SECRET_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_SECRET_KEY"; exit 1; }
 
       - name: Install Worker dependencies
         working-directory: workers
@@ -108,16 +110,12 @@ jobs:
           printf '%s' "$B2_APPLICATION_KEY_ID" | npx --yes wrangler@4 secret put B2_APPLICATION_KEY_ID --config wrangler.jsonc --env staging
           printf '%s' "$B2_APPLICATION_KEY" | npx --yes wrangler@4 secret put B2_APPLICATION_KEY --config wrangler.jsonc --env staging
 
-      - name: Configure optional WebXPay staging secrets
+      - name: Configure WebXPay staging secrets
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "$WEBXPAY_PUBLIC_KEY" ]]; then
-            printf '%s' "$WEBXPAY_PUBLIC_KEY" | npx --yes wrangler@4 secret put WEBXPAY_PUBLIC_KEY --config wrangler.jsonc --env staging
-          fi
-          if [[ -n "$WEBXPAY_SECRET_KEY" ]]; then
-            printf '%s' "$WEBXPAY_SECRET_KEY" | npx --yes wrangler@4 secret put WEBXPAY_SECRET_KEY --config wrangler.jsonc --env staging
-          fi
+          printf '%s' "$WEBXPAY_PUBLIC_KEY" | npx --yes wrangler@4 secret put WEBXPAY_PUBLIC_KEY --config wrangler.jsonc --env staging
+          printf '%s' "$WEBXPAY_SECRET_KEY" | npx --yes wrangler@4 secret put WEBXPAY_SECRET_KEY --config wrangler.jsonc --env staging
 
       - name: Configure Firebase Realtime Database secret when available
         shell: bash
