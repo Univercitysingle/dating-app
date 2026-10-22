@@ -23,6 +23,7 @@ export class MongoDBConnection {
     this.env = env;
     this.clientPromise = null;
     this.discoveryMatchIndexesPromise = null;
+    this.subscriptionIndexMigrationPromise = null;
   }
 
   async getClient() {
@@ -65,6 +66,41 @@ export class MongoDBConnection {
   getDatabase(client) {
     // Honor the explicit environment database when set; otherwise preserve the URI default.
     return client.db(this.env.MONGODB_DATABASE || undefined);
+  }
+
+  async ensureSubscriptionIndexes(db) {
+    if (!this.subscriptionIndexMigrationPromise) {
+      const subscriptions = db.collection("subscriptions");
+      this.subscriptionIndexMigrationPromise = (async () => {
+        // Legacy unique indexes treat missing/null Stripe IDs as the same value,
+        // blocking non-Stripe pending subscriptions. Enforce uniqueness only for
+        // actual string Stripe subscription IDs.
+        try {
+          await subscriptions.dropIndex("stripeSubscriptionId_1");
+        } catch (error) {
+          if (!error || ![26, 27].includes(error.code)) throw error;
+        }
+        await subscriptions.createIndex(
+          { stripeSubscriptionId: 1 },
+          {
+            name: "stripeSubscriptionId_1",
+            unique: true,
+            partialFilterExpression: { stripeSubscriptionId: { $type: "string" } }
+          }
+        );
+      })().catch((error) => {
+        this.subscriptionIndexMigrationPromise = null;
+        console.error("MongoDB subscription index migration failed", {
+          phase: "ensure-subscription-index",
+          name: error && typeof error.name === "string" ? error.name : "Error",
+          code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined,
+          codeName: error && typeof error.codeName === "string" ? error.codeName : undefined,
+          message: error && typeof error.message === "string" ? error.message.slice(0, 240) : undefined
+        });
+        throw error;
+      });
+    }
+    return this.subscriptionIndexMigrationPromise;
   }
 
   async runScheduledExpirations(now = new Date(), scope = "all") {
@@ -411,6 +447,7 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
       const db = this.getDatabase(await this.getClient());
+      await this.ensureSubscriptionIndexes(db);
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found." } };
