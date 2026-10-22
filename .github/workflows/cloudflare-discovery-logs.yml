@@ -39,6 +39,11 @@ jobs:
             limit: 100,
             parameters: {
               datasets: ["cloudflare-workers"],
+              needle: {
+                value: "MongoDB discovery|Discovery route failed|MongoDB discovery query failed|Discovery service unavailable|users/discover|api/chat/send|Realtime chat is not configured",
+                isRegex: true,
+                matchCase: false
+              }
             }
           }')
           HTTP_CODE=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
