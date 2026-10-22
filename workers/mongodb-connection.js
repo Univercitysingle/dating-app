@@ -79,7 +79,7 @@ export class MongoDBConnection {
     // If the CDN variable is absent, keep existing photos accessible through
     // the authenticated app Worker media route instead of inventing a host.
     if (frontend && clean.startsWith("photos-")) return frontend + "/api/media/" + encoded;
-    throw new Error("CDN_HOSTNAME is not configured for media URLs");
+    return clean;
   }
 
   getDatabase(client) {
