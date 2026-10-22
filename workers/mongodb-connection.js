@@ -1025,7 +1025,14 @@ export class MongoDBConnection {
           }
         }
       };
-    } catch {
+    } catch (error) {
+      console.error("MongoDB subscription creation failed", {
+        phase: "create-pending-subscription",
+        name: error && typeof error.name === "string" ? error.name : "Error",
+        code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined,
+        codeName: error && typeof error.codeName === "string" ? error.codeName : undefined,
+        message: error && typeof error.message === "string" ? error.message.slice(0, 240) : undefined
+      });
       return { status: 503, body: { error: "Subscription service unavailable" } };
     }
   }
