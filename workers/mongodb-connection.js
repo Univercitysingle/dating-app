@@ -861,8 +861,19 @@ export class MongoDBConnection {
         { $project: { uid: 1 } }
       );
 
+      // Ensure both match lookup paths are indexed. The correlated $lookup
+      // runs for every eligible profile; missing indexes can scan matches repeatedly.
+      phase = "ensure-discovery-match-indexes";
+      const matches = db.collection("matches");
+      await Promise.all([
+        matches.createIndex({ user1Uid: 1, user2Uid: 1 }, { name: "discover_user1_user2" }),
+        matches.createIndex({ user2Uid: 1, user1Uid: 1 }, { name: "discover_user2_user1" })
+      ]);
+
       phase = "run-discovery-aggregation";
-      const uidDocs = await db.collection("users").aggregate(pipeline).toArray();
+      // Bound the aggregation so a missing/ineffective index cannot hold the
+      // Durable Object request open for minutes.
+      const uidDocs = await db.collection("users").aggregate(pipeline, { maxTimeMS: 15000 }).toArray();
       const orderedUids = uidDocs.map(doc => doc.uid).filter(value => typeof value === "string");
       if (orderedUids.length === 0) return { status: 200, body: [] };
 
