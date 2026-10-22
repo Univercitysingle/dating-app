@@ -93,3 +93,4 @@ jobs:
           fi
 
 # Re-run targeted observability query after subscription 503 reproduction (2026-10-22).
+# Follow-up query after index migration and discovery aggregation fixes were deployed.
