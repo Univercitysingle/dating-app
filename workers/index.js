@@ -192,6 +192,7 @@ export class RateLimiter {
   }
 }
 
+// Deploy this Worker together with MongoDBConnection changes so staging uses the same tested bundle.
 export { MongoDBConnection } from "./mongodb-connection.js";
 
 export default {
