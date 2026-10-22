@@ -78,6 +78,7 @@ jobs:
                     name: (.source.name // null),
                     code: (.source.code // null),
                     codeName: (.source.codeName // null),
+                    phase: (.source.phase // null),
                     route: (.source.route // null)
                   }
                 else
@@ -88,5 +89,5 @@ jobs:
           COUNT=$(jq '.result.events.events // [] | length' response.json)
           echo "Matching events returned: $COUNT"
           if [[ "$COUNT" -eq 0 ]]; then
-            echo "No matching events in the last 48 hours. Check Workers Logs enablement and whether the failure was reproduced during this time range."
+            echo "No matching events in the last 6 hours. Check Workers Logs enablement and whether the failure was reproduced during this time range."
           fi
