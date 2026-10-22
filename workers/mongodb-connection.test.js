@@ -33,6 +33,6 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
   const project = capturedPipeline.find((stage) => stage.$project?.combinedUsers).$project.combinedUsers;
   const condition = project.$let.in.$concatArrays[1].$slice[0].$filter.cond;
   assert.ok(Array.isArray(condition.$not), "$not must receive an array expression in MongoDB aggregation");
-  assert.deepEqual(condition.$not[0].$in, ["$regularUser.uid", "$boostedIds"]);
+  assert.deepEqual(condition.$not[0].$in, ["$$regularUser.uid", "$$boostedIds"]);
   assert.deepEqual(project.$let.vars.boostedIds, { $ifNull: ["$boostedUsers.uid", []] });
 });
