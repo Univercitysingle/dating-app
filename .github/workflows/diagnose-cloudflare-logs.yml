@@ -29,13 +29,16 @@ jobs:
 
           FROM="$(date -u -d '60 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')"
           TO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-          PAYLOAD="$(jq -n --arg account "$CF_ACCOUNT_ID" --arg from "$FROM" --arg to "$TO" '
-            {
-              query: "query($account: String!, $from: String!, $to: String!) { viewer { accounts(filter: {accountTag: $account}) { workersTraceEventsAdaptive(limit: 100, filter: {datetime_geq: $from, datetime_leq: $to, scriptName: \"dating-app-api-staging\"}) { dimensions { datetime scriptName eventType outcome requestMethod requestPath statusCode entrypoint durableObjectId } } } } }"
-            }'
-          )"
+          PAYLOAD="$(jq -n --arg account "$CF_ACCOUNT_ID" --arg from "$FROM" --arg to "$TO" '{
+            query: "query($account: String!, $from: String!, $to: String!) { viewer { accounts(filter: {accountTag: $account}) { workersTraceEventsAdaptive(limit: 100, filter: {datetime_geq: $from, datetime_leq: $to, scriptName: \"dating-app-api-staging\"}) { dimensions { datetime scriptName eventType outcome requestMethod requestPath statusCode entrypoint durableObjectId } } } } }",
+            variables: {account: $account, from: $from, to: $to}
+          }')"
 
-          HTTP_CODE="$(curl --silent --show-error --output /tmp/cf-response.json --write-out '%{http_code}'             --request POST 'https://api.cloudflare.com/client/v4/graphql'             --header "Authorization: Bearer $CF_API_TOKEN"             --header 'Content-Type: application/json'             --data "$PAYLOAD")"
+          HTTP_CODE="$(curl --silent --show-error --output /tmp/cf-response.json --write-out '%{http_code}' \
+            --request POST 'https://api.cloudflare.com/client/v4/graphql' \
+            --header "Authorization: Bearer $CF_API_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data "$PAYLOAD")"
 
           echo "Cloudflare GraphQL HTTP status: $HTTP_CODE"
           if [ "$HTTP_CODE" != "200" ]; then
