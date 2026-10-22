@@ -533,7 +533,7 @@ export class MongoDBConnection {
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (Array.isArray(profile.photos)) {
         profile.photos = profile.photos.map(photo => {
-          if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
+          if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
           let path = photo.url;
           while (path.startsWith("/")) path = path.slice(1);
           return { ...photo, url: this.getMediaUrl(path) };
@@ -743,7 +743,7 @@ export class MongoDBConnection {
         }
         if (Array.isArray(profile.photos)) {
           profile.photos = profile.photos.map(photo => {
-            if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
+            if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
             let path = photo.url;
             while (path.startsWith("/")) path = path.slice(1);
             return { ...photo, url: this.getMediaUrl(path) };
@@ -796,7 +796,7 @@ export class MongoDBConnection {
           if (profile._id !== undefined) profile.id = String(profile._id);
           if (Array.isArray(profile.photos)) {
             profile.photos = profile.photos.map(photo => {
-              if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http")) return photo;
+              if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
               let path = photo.url;
               while (path.startsWith("/")) path = path.slice(1);
               return { ...photo, url: this.getMediaUrl(path) };
@@ -998,7 +998,7 @@ export class MongoDBConnection {
         }
         if (Array.isArray(profile.photos)) {
           profile.photos = profile.photos.map(photo => {
-            if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
+            if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
             return { ...photo, url: this.getMediaUrl(photo.url) };
           });
         }
@@ -1439,7 +1439,7 @@ export class MongoDBConnection {
         }
         if (Array.isArray(profile.photos)) {
           profile.photos = profile.photos.map(photo => {
-            if (!photo || typeof photo.url !== "string" || !photo.url || photo.url.startsWith("http://") || photo.url.startsWith("https://")) return photo;
+            if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
             return { ...photo, url: this.getMediaUrl(photo.url) };
           });
         }
@@ -1770,7 +1770,7 @@ export class MongoDBConnection {
       }
       if (Array.isArray(profile.photos)) {
         profile.photos = profile.photos.map(photo => {
-          if (!photo || typeof photo.url !== "string" || !photo.url || /^https?:\/\//i.test(photo.url)) return photo;
+          if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
           return { ...photo, url: this.getMediaUrl(photo.url) };
         });
       }
