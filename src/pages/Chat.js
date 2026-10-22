@@ -15,7 +15,7 @@ function Chat() {
   const [otherUser, setOtherUser] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const { user } = useAuth();
-  const { socket, allMessages, addMessage } = useSocket();
+  const { socket, allMessages, addMessage, removeMessage } = useSocket();
   const { chatId } = useParams();
   const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -172,7 +172,7 @@ function Chat() {
         logger.error('Failed to send message via HTTP fallback:', sendErr);
         removeMessage(chatId, tempId);
         setInput(messageContent);
-        setError('Message could not be saved. Please try again.');
+        logger.warn('The message was not persisted; the draft has been restored.');
       }
     }
   };
