@@ -66,13 +66,20 @@ export class MongoDBConnection {
     }
     while (clean.startsWith("/")) clean = clean.slice(1);
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-    if (frontend && clean.startsWith("photos-")) {
-      return frontend + "/api/media/" + encoded;
+    // CDN_HOSTNAME is the configured private-B2 proxy and is the canonical
+    // public URL for both newly uploaded and previously stored profile photos.
+    const configured = String(this.env.CDN_HOSTNAME || "").trim();
+    if (configured) {
+      const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
+      if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
+        base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encoded;
+        return base.toString();
+      }
     }
-    // Preserve the existing CDN URL shape for non-photo media keys.
-    const configured = String(this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev").trim();
-    const base = (configured.startsWith("https://") || configured.startsWith("http://") ? configured : "https://" + configured).replace(new RegExp("/+$"), "");
-    return base + "/" + encoded;
+    // If the CDN variable is absent, keep existing photos accessible through
+    // the authenticated app Worker media route instead of inventing a host.
+    if (frontend && clean.startsWith("photos-")) return frontend + "/api/media/" + encoded;
+    throw new Error("CDN_HOSTNAME is not configured for media URLs");
   }
 
   getDatabase(client) {
