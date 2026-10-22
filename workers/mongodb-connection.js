@@ -72,6 +72,11 @@ export class MongoDBConnection {
     if (!this.subscriptionIndexMigrationPromise) {
       const subscriptions = db.collection("subscriptions");
       this.subscriptionIndexMigrationPromise = (async () => {
+        // Lightweight unit-test collection doubles do not implement index APIs.
+        // Production MongoDB collections expose both methods.
+        if (typeof subscriptions.dropIndex !== "function" || typeof subscriptions.createIndex !== "function") {
+          return;
+        }
         // Legacy unique indexes treat missing/null Stripe IDs as the same value,
         // blocking non-Stripe pending subscriptions. Enforce uniqueness only for
         // actual string Stripe subscription IDs.
