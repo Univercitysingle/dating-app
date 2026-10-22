@@ -777,25 +777,17 @@ export default {
         if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         try {
-          // Use CDN_HOSTNAME for the write path too. The proxy authenticates the
-          // caller and stores the object in the private B2 bucket.
-          const proxyResponse = await fetch(getCdnObjectUrl(env, key), {
-            method: "PUT",
-            headers: {
-              "authorization": request.headers.get("authorization") || "",
-              "content-type": file.type
-            },
-            body: fileBytes
-          });
-          if (!proxyResponse.ok) {
-            console.error("Photo proxy upload failed", { status: proxyResponse.status });
-            return json({ message: "Photo upload failed through CDN_HOSTNAME" }, 503);
-          }
+          // The API Worker has already authenticated the Firebase user and
+          // validated ownership of this object key. Write to B2 directly rather
+          // than making a second authenticated HTTP request through CDN_HOSTNAME.
+          // CDN_HOSTNAME is only used to construct the public-facing media URL.
+          await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
         } catch (error) {
-          console.error("Photo proxy upload failed", {
-            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Proxy request failed"
+          console.error("Photo B2 upload failed", {
+            name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "B2 upload failed"
           });
-          return json({ message: "Photo upload failed through CDN_HOSTNAME" }, 503);
+          return json({ message: "Photo storage upload failed" }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
