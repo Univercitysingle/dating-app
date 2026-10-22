@@ -74,7 +74,7 @@ jobs:
                 else
                   null
                 end
-              ) )
+              )
             }' response.json
           COUNT=$(jq '.result.events.events // [] | length' response.json)
           echo "Matching events returned: $COUNT"
