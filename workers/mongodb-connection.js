@@ -52,13 +52,13 @@ export class MongoDBConnection {
 
   getMediaUrl(path) {
     let clean = String(path || "").trim();
-    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(/\\/+$/, "");
-    if (/^https?:\\/\\//i.test(clean)) {
+    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(new RegExp("/+$"), "");
+    if (clean.startsWith("https://") || clean.startsWith("http://")) {
       try {
         const parsed = new URL(clean);
         const frontendHost = frontend ? new URL(frontend).host : "";
         // Only rewrite legacy image URLs that incorrectly point to the Pages SPA.
-        if (!frontendHost || parsed.host !== frontendHost || !/^\\/photos-/.test(parsed.pathname)) return clean;
+        if (!frontendHost || parsed.host !== frontendHost || !parsed.pathname.startsWith("/photos-")) return clean;
         clean = parsed.pathname;
       } catch {
         return clean;
@@ -71,7 +71,7 @@ export class MongoDBConnection {
     }
     // Preserve the existing CDN URL shape for non-photo media keys.
     const configured = String(this.env.CDN_HOSTNAME || "dateme.enadoctemp.workers.dev").trim();
-    const base = /^https?:\\/\\//i.test(configured) ? configured.replace(/\\/+$/, "") : "https://" + configured.replace(/\\/+$/, "");
+    const base = (configured.startsWith("https://") || configured.startsWith("http://") ? configured : "https://" + configured).replace(new RegExp("/+$"), "");
     return base + "/" + encoded;
   }
 
