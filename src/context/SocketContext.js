@@ -91,7 +91,7 @@ export const SocketProvider = ({ children }) => {
 
   // Firebase Realtime Database Real-Time Notification Listener (Serverless Sync)
   useEffect(() => {
-    if (user && user.uid && database) {
+    if (process.env.REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC === 'true' && user && user.uid && database) {
       let notifRef;
       try {
         notifRef = ref(database, `notifications/${user.uid}`);
