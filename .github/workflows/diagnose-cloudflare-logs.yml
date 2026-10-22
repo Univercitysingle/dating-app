@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Query recent Cloudflare Worker traces
+      - name: Query recent Cloudflare Worker logs
         env:
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -27,39 +27,52 @@ jobs:
             exit 1
           fi
 
-          FROM="$(date -u -d '60 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')"
-          TO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-          PAYLOAD="$(jq -n --arg account "$CF_ACCOUNT_ID" --arg from "$FROM" --arg to "$TO" '{
-            query: "query($account: String!, $from: String!, $to: String!) { viewer { accounts(filter: {accountTag: $account}) { workersTraceEventsAdaptive(limit: 100, filter: {datetime_geq: $from, datetime_leq: $to, scriptName: \"dating-app-api-staging\"}) { dimensions { datetime scriptName eventType outcome requestMethod requestPath statusCode entrypoint durableObjectId } } } } }",
-            variables: {account: $account, from: $from, to: $to}
+          FROM_MS="$(date -u -d '60 minutes ago' +%s%3N)"
+          TO_MS="$(date -u +%s%3N)"
+          PAYLOAD="$(jq -n --argjson from "$FROM_MS" --argjson to "$TO_MS" '{
+            queryId: "adhoc-dating-app-staging-logs",
+            timeframe: {from: $from, to: $to},
+            view: "events",
+            limit: 100,
+            parameters: {
+              datasets: ["cloudflare-workers"],
+              filterCombination: "and",
+              filters: [
+                {key: "$metadata.service", operation: "eq", type: "string", value: "dating-app-api-staging"}
+              ]
+            }
           }')"
 
           HTTP_CODE="$(curl --silent --show-error --output /tmp/cf-response.json --write-out '%{http_code}' \
-            --request POST 'https://api.cloudflare.com/client/v4/graphql' \
+            --request POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/observability/telemetry/query" \
             --header "Authorization: Bearer $CF_API_TOKEN" \
             --header 'Content-Type: application/json' \
             --data "$PAYLOAD")"
 
-          echo "Cloudflare GraphQL HTTP status: $HTTP_CODE"
+          echo "Cloudflare Observability HTTP status: $HTTP_CODE"
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "Cloudflare API response (secrets are not printed):"
             jq '{success, errors: [.errors[]? | {code, message}]}' /tmp/cf-response.json
             exit 1
           fi
 
           if jq -e '.errors and (.errors | length > 0)' /tmp/cf-response.json >/dev/null; then
-            echo "Cloudflare GraphQL returned errors:"
             jq '{errors: [.errors[]? | {message}]}' /tmp/cf-response.json
             exit 1
           fi
 
-          echo "Recent staging Worker trace events (up to 100):"
+          echo "Recent logs for dating-app-api-staging (up to 100):"
           jq -r '
-            [.data.viewer.accounts[0].workersTraceEventsAdaptive[].dimensions? // empty]
-            | if length == 0 then
-                "No trace events returned for dating-app-api-staging in the last 60 minutes. Check token permissions and the Worker Observability settings."
+            (.result.events.events // []) as $events
+            | if ($events | length) == 0 then
+                "No Worker log events matched in the last 60 minutes. Check Observability permissions, log retention, and the service filter."
               else
-                (["UTC time","event","outcome","method","path","status","entrypoint"] | @tsv),
-                (.[] | [(.datetime // ""),(.eventType // ""),(.outcome // ""),(.requestMethod // ""),(.requestPath // ""),((.statusCode // "")|tostring),(.entrypoint // "")] | @tsv)
+                (["timestamp","level","status","trigger","message"] | @tsv),
+                ($events[] | [
+                  ((.["$metadata"].timestamp // .timestamp // "") | tostring),
+                  (.["$metadata"].level // ""),
+                  ((.["$metadata"].statusCode // .["$workers"].statusCode // "") | tostring),
+                  (.["$metadata"].trigger // .["$workers"].trigger // ""),
+                  ((.["$metadata"].message // .["$metadata"].error // .source.message // .source // "") | tostring | gsub("[\\r\\n\\t]"; " "))
+                ] | @tsv)
               end
           ' /tmp/cf-response.json
