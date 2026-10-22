@@ -589,8 +589,10 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid match request" } };
     }
+    let phase = "connect-to-mongodb";
     try {
       const db = this.getDatabase(await this.getClient());
+      phase = "load-current-user";
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
       const query = {
@@ -768,6 +770,7 @@ export class MongoDBConnection {
         baseMatchQuery.birthday = { $gte: minDate, $lte: maxDate };
       }
 
+      phase = "build-discovery-query";
       const pipeline = [];
       const coordinates = currentUser.location?.coordinates;
       // Mongoose's legacy schema defaults missing locations to [0, 0]. That is
@@ -781,6 +784,7 @@ export class MongoDBConnection {
       if (hasLocation) {
         // $geoNear requires a 2dsphere index. Ensure it exists in MongoDB
         // instead of turning every distance-filtered Discover request into 503.
+        phase = "ensure-location-index";
         await db.collection("users").createIndex({ location: "2dsphere" });
         pipeline.push({
           $geoNear: {
@@ -857,14 +861,17 @@ export class MongoDBConnection {
         { $project: { uid: 1 } }
       );
 
+      phase = "run-discovery-aggregation";
       const uidDocs = await db.collection("users").aggregate(pipeline).toArray();
       const orderedUids = uidDocs.map(doc => doc.uid).filter(value => typeof value === "string");
       if (orderedUids.length === 0) return { status: 200, body: [] };
 
+      phase = "load-discovered-profiles-and-superlikes";
       const [candidateUsers, superLikeMatches] = await Promise.all([
         db.collection("users").find({ uid: { $in: orderedUids } }).toArray(),
         db.collection("matches").find({ user2Uid: uid, superLike: true }).project({ user1Uid: 1 }).toArray()
       ]);
+      phase = "serialize-discovered-profiles";
       const usersByUid = new Map(candidateUsers.map(user => [user.uid, user]));
       const superLikedBy = new Set(superLikeMatches.map(match => match.user1Uid));
       const result = [];
@@ -900,6 +907,7 @@ export class MongoDBConnection {
       return { status: 200, body: result };
     } catch (error) {
       console.error("MongoDB discovery query failed", {
+        phase,
         name: error && typeof error.name === "string" ? error.name : "Error",
         code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined,
         codeName: error && typeof error.codeName === "string" ? error.codeName : undefined,
