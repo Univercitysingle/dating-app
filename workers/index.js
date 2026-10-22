@@ -783,14 +783,20 @@ export default {
         let cdnUrl;
         try {
           const authorization = request.headers.get("authorization") || "";
-          // Existing profile-photo links use the root /:key route. Try the
-          // explicit API route first, then fall back to the legacy route only
-          // when the proxy reports that the route is not found.
+          // Existing CDN deployments may expose media under /api/media/:key,
+          // /media/:key, or the legacy root /:key route. Probe the alternatives
+          // only on 404; other statuses are real upload failures and must not be
+          // hidden by retrying a different URL.
           const proxyUrls = [
             getCdnObjectUrl(env, key, "api"),
+            (() => {
+              const mediaUrl = new URL(getCdnObjectUrl(env, key, "root"));
+              mediaUrl.pathname = mediaUrl.pathname.replace(/\/[^/]+$/, "/media/" + encodeURIComponent(key));
+              return mediaUrl.toString();
+            })(),
             getCdnObjectUrl(env, key, "root")
           ];
-          let lastStatus = 502;
+          const attemptedStatuses = [];
           for (let index = 0; index < proxyUrls.length; index += 1) {
             const proxyResponse = await fetch(proxyUrls[index], {
               method: "PUT",
@@ -800,20 +806,28 @@ export default {
               },
               body: fileBytes
             });
-            if (proxyResponse.status === 404 && index === 0) continue;
+            attemptedStatuses.push({ route: new URL(proxyUrls[index]).pathname, status: proxyResponse.status });
+            if (proxyResponse.status === 404 && index < proxyUrls.length - 1) continue;
             if (!proxyResponse.ok) {
-              lastStatus = proxyResponse.status;
               const proxyError = (await proxyResponse.text().catch(() => "")).slice(0, 240);
               console.error("Photo CDN proxy upload failed", {
-                status: proxyResponse.status,
+                attempts: attemptedStatuses,
                 response: proxyError || "Proxy returned an empty error response"
               });
-              return json({ message: "Photo storage proxy upload failed", proxyStatus: proxyResponse.status }, 503);
+              return json({
+                message: "Photo storage proxy upload failed",
+                proxyStatus: proxyResponse.status,
+                attemptedRoutes: attemptedStatuses
+              }, 503);
             }
             cdnUrl = proxyUrls[index];
             break;
           }
-          if (!cdnUrl) return json({ message: "Photo storage proxy upload failed", proxyStatus: lastStatus }, 503);
+          if (!cdnUrl) return json({
+            message: "Photo storage proxy upload failed",
+            proxyStatus: attemptedStatuses.at(-1)?.status || 502,
+            attemptedRoutes: attemptedStatuses
+          }, 503);
         } catch (error) {
           console.error("Photo CDN proxy upload failed", {
             name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
