@@ -7,11 +7,22 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+function withTimeout(promise, timeoutMs, operation) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
 export class MongoDBConnection {
   constructor(state, env) {
     this.state = state;
     this.env = env;
     this.clientPromise = null;
+    this.discoveryMatchIndexesPromise = null;
   }
 
   async getClient() {
@@ -785,7 +796,7 @@ export class MongoDBConnection {
         // $geoNear requires a 2dsphere index. Ensure it exists in MongoDB
         // instead of turning every distance-filtered Discover request into 503.
         phase = "ensure-location-index";
-        await db.collection("users").createIndex({ location: "2dsphere" });
+        await withTimeout(db.collection("users").createIndex({ location: "2dsphere" }), 8000, "Discovery location index creation");
         pipeline.push({
           $geoNear: {
             near: { type: "Point", coordinates },
@@ -861,14 +872,23 @@ export class MongoDBConnection {
         { $project: { uid: 1 } }
       );
 
-      // Ensure both match lookup paths are indexed. The correlated $lookup
-      // runs for every eligible profile; missing indexes can scan matches repeatedly.
-      phase = "ensure-discovery-match-indexes";
-      const matches = db.collection("matches");
-      await Promise.all([
-        matches.createIndex({ user1Uid: 1, user2Uid: 1 }, { name: "discover_user1_user2" }),
-        matches.createIndex({ user2Uid: 1, user1Uid: 1 }, { name: "discover_user2_user1" })
-      ]);
+      // Do not block every Discover request on index DDL. Index creation can wait
+      // behind MongoDB locks and previously held this Durable Object request open
+      // for over two minutes. Start it once per DO instance in the background;
+      // the aggregation itself remains bounded by maxTimeMS below.
+      if (!this.discoveryMatchIndexesPromise) {
+        const matches = db.collection("matches");
+        this.discoveryMatchIndexesPromise = Promise.all([
+          matches.createIndex({ user1Uid: 1, user2Uid: 1 }, { name: "discover_user1_user2" }),
+          matches.createIndex({ user2Uid: 1, user1Uid: 1 }, { name: "discover_user2_user1" })
+        ]).catch((error) => {
+          this.discoveryMatchIndexesPromise = null;
+          console.error("MongoDB discovery index creation failed", {
+            name: error && typeof error.name === "string" ? error.name : "Error",
+            message: error && typeof error.message === "string" ? error.message.slice(0, 200) : undefined
+          });
+        });
+      }
 
       phase = "run-discovery-aggregation";
       // Bound the aggregation so a missing/ineffective index cannot hold the
