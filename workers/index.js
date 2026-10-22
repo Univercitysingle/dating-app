@@ -1420,67 +1420,68 @@ export default {
         if (!response.ok) return json(result, response.status);
         const authorization = request.headers.get("authorization") || "";
         const idToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-        // Match the frontend's Firebase configuration fallback when the explicit
-        // Realtime Database URL secret is not supplied to the Worker.
+        // MongoDB is the source of truth. Realtime Database is a best-effort
+        // notification/sync layer and must never invalidate a saved message.
         const databaseUrl = env.FIREBASE_DATABASE_URL ||
           (env.FIREBASE_PROJECT_ID ? `https://${env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com` : "");
+        let realtimeSync = false;
+        let databaseBase = "";
         if (!idToken || !databaseUrl) {
-          await connection.fetch("https://internal.invalid/internal/chat/rollback", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, messageId: result._id })
-          }).catch(() => {});
-          return json({ error: "Realtime chat is not configured" }, 503);
-        }
-        let databaseBase;
-        try {
-          const configured = new URL(databaseUrl);
-          if (configured.protocol !== "https:" || !configured.hostname.endsWith("firebasedatabase.app") && !configured.hostname.endsWith("firebaseio.com")) throw new Error("Invalid database URL");
-          databaseBase = configured.toString().replace(/\/+$/, "");
-        } catch {
-          await connection.fetch("https://internal.invalid/internal/chat/rollback", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, messageId: result._id })
-          }).catch(() => {});
-          return json({ error: "Realtime chat is not configured" }, 503);
-        }
-        const room = encodeURIComponent(result.roomId);
-        const messageKey = encodeURIComponent(String(result._id));
-        let realtimeResponse = null;
-        let realtimeNetworkError = null;
-        try {
-          realtimeResponse = await fetch(
-            databaseBase + "/chats/" + room + "/" + messageKey + ".json?auth=" + encodeURIComponent(idToken),
-            {
-              method: "PUT",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                _id: String(result._id), roomId: result.roomId,
-                senderUid: result.senderUid, receiverUid: result.receiverUid,
-                messageContent: result.messageContent,
-                timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
-              })
-            }
-          );
-        } catch (error) {
-          realtimeNetworkError = error && typeof error.message === "string" ? error.message.slice(0, 160) : "Network request failed";
-        }
-        if (!realtimeResponse || !realtimeResponse.ok) {
-          const firebaseErrorBody = realtimeResponse
-            ? (await realtimeResponse.clone().text().catch(() => "")).slice(0, 240)
-            : "";
-          console.error("Firebase Realtime Database chat write failed", {
+          console.warn("Firebase Realtime Database chat sync is not configured", {
             phase: "write-realtime-chat-message",
-            status: realtimeResponse ? realtimeResponse.status : null,
-            databaseHost: new URL(databaseBase).hostname,
-            error: firebaseErrorBody || realtimeNetworkError || "No response from Firebase"
+            hasIdToken: Boolean(idToken),
+            hasDatabaseUrl: Boolean(databaseUrl)
           });
-          await connection.fetch("https://internal.invalid/internal/chat/rollback", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, messageId: result._id })
-          }).catch(() => {});
-          return json({ error: "Realtime chat write was rejected; check Firebase Realtime Database rules and configuration" }, 503);
+        } else {
+          try {
+            const configured = new URL(databaseUrl);
+            if (configured.protocol !== "https:" ||
+                (!configured.hostname.endsWith("firebasedatabase.app") && !configured.hostname.endsWith("firebaseio.com"))) {
+              throw new Error("Invalid Firebase Realtime Database URL");
+            }
+            databaseBase = configured.toString().replace(/\\/+$/, "");
+          } catch {
+            console.error("Firebase Realtime Database chat sync URL is invalid", {
+              phase: "write-realtime-chat-message"
+            });
+          }
         }
-        return json(result, 201);
+        if (idToken && databaseBase) {
+          const room = encodeURIComponent(result.roomId);
+          const messageKey = encodeURIComponent(String(result._id));
+          let realtimeResponse = null;
+          let realtimeNetworkError = null;
+          try {
+            realtimeResponse = await fetch(
+              databaseBase + "/chats/" + room + "/" + messageKey + ".json?auth=" + encodeURIComponent(idToken),
+              {
+                method: "PUT",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  _id: String(result._id), roomId: result.roomId,
+                  senderUid: result.senderUid, receiverUid: result.receiverUid,
+                  messageContent: result.messageContent,
+                  timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
+                })
+              }
+            );
+          } catch (error) {
+            realtimeNetworkError = error && typeof error.message === "string" ? error.message.slice(0, 160) : "Network request failed";
+          }
+          realtimeSync = Boolean(realtimeResponse && realtimeResponse.ok);
+          if (!realtimeSync) {
+            const firebaseErrorBody = realtimeResponse
+              ? (await realtimeResponse.clone().text().catch(() => "")).slice(0, 240)
+              : "";
+            console.error("Firebase Realtime Database chat write failed", {
+              phase: "write-realtime-chat-message",
+              status: realtimeResponse ? realtimeResponse.status : null,
+              databaseHost: new URL(databaseBase).hostname,
+              error: firebaseErrorBody || realtimeNetworkError || "No response from Firebase"
+            });
+          }
+        }
+        return json({ ...result, realtimeSync }, 201);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
