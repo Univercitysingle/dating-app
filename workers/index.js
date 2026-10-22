@@ -261,6 +261,8 @@ export default {
           const extensionByType = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif" };
           const extension = extensionByType[contentType];
           if (!extension || !key.toLowerCase().endsWith("." + extension)) return json({ error: "Unsupported image type" }, 400);
+          const declaredLength = Number(request.headers.get("content-length") || 0);
+          if (declaredLength > 5 * 1024 * 1024) return json({ error: "Photo must be 5 MB or smaller" }, 413);
           const bytes = new Uint8Array(await request.arrayBuffer());
           if (bytes.length < 1 || bytes.length > 5 * 1024 * 1024) return json({ error: "Photo must be 5 MB or smaller" }, 400);
           const jpeg = contentType === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
@@ -787,7 +789,7 @@ export default {
           });
           if (!proxyResponse.ok) {
             console.error("Photo proxy upload failed", { status: proxyResponse.status });
-            return json({ message: "Photo upload failed through CDN_HOSTNAME" }, proxyResponse.status >= 400 && proxyResponse.status < 600 ? 503 : 503);
+            return json({ message: "Photo upload failed through CDN_HOSTNAME" }, 503);
           }
         } catch (error) {
           console.error("Photo proxy upload failed", {
