@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { API_URL } from '../utils/constants';
@@ -119,7 +119,7 @@ export const SocketProvider = ({ children }) => {
     }
   }, [user?.uid]);
 
-  const addMessage = (newMessage) => {
+  const addMessage = useCallback((newMessage) => {
     setAllMessages(prevMessages => {
       const roomMessages = prevMessages[newMessage.roomId] || [];
       if (roomMessages.some(m => String(m._id) === String(newMessage._id))) {
@@ -143,10 +143,17 @@ export const SocketProvider = ({ children }) => {
         [newMessage.roomId]: [...roomMessages, newMessage],
       };
     });
-  };
+  }, []);
+
+  const removeMessage = useCallback((roomId, messageId) => {
+    setAllMessages(prevMessages => ({
+      ...prevMessages,
+      [roomId]: (prevMessages[roomId] || []).filter(message => String(message._id) !== String(messageId)),
+    }));
+  }, []);
 
   return (
-    <SocketContext.Provider value={{ socket, allMessages, addMessage }}>
+    <SocketContext.Provider value={{ socket, allMessages, addMessage, removeMessage }}>
       {children}
     </SocketContext.Provider>
   );
