@@ -589,10 +589,8 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid match request" } };
     }
-    let phase = "connect-to-mongodb";
     try {
       const db = this.getDatabase(await this.getClient());
-      phase = "load-current-user";
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
       const query = {
@@ -735,8 +733,10 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid discovery request" } };
     }
+    let phase = "connect-to-mongodb";
     try {
       const db = this.getDatabase(await this.getClient());
+      phase = "load-current-user";
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
 
