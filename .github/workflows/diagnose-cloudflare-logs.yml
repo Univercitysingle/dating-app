@@ -1,0 +1,62 @@
+name: Diagnose Cloudflare staging logs
+
+on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - ".github/workflows/diagnose-cloudflare-logs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query recent Cloudflare Worker traces
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -eu
+          if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${CF_API_TOKEN:-}" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is missing from repository Actions secrets."
+            exit 1
+          fi
+
+          FROM="$(date -u -d '60 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')"
+          TO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          PAYLOAD="$(jq -n --arg account "$CF_ACCOUNT_ID" --arg from "$FROM" --arg to "$TO" '
+            {
+              query: "query($account: String!, $from: String!, $to: String!) { viewer { accounts(filter: {accountTag: $account}) { workersTraceEventsAdaptive(limit: 100, filter: {datetime_geq: $from, datetime_leq: $to, scriptName: \"dating-app-api-staging\"}) { dimensions { datetime scriptName eventType outcome requestMethod requestPath statusCode entrypoint durableObjectId } } } } }"
+            }'
+          )"
+
+          HTTP_CODE="$(curl --silent --show-error --output /tmp/cf-response.json --write-out '%{http_code}'             --request POST 'https://api.cloudflare.com/client/v4/graphql'             --header "Authorization: Bearer $CF_API_TOKEN"             --header 'Content-Type: application/json'             --data "$PAYLOAD")"
+
+          echo "Cloudflare GraphQL HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Cloudflare API response (secrets are not printed):"
+            jq '{success, errors: [.errors[]? | {code, message}]}' /tmp/cf-response.json
+            exit 1
+          fi
+
+          if jq -e '.errors and (.errors | length > 0)' /tmp/cf-response.json >/dev/null; then
+            echo "Cloudflare GraphQL returned errors:"
+            jq '{errors: [.errors[]? | {message}]}' /tmp/cf-response.json
+            exit 1
+          fi
+
+          echo "Recent staging Worker trace events (up to 100):"
+          jq -r '
+            [.data.viewer.accounts[0].workersTraceEventsAdaptive[].dimensions? // empty]
+            | if length == 0 then
+                "No trace events returned for dating-app-api-staging in the last 60 minutes. Check token permissions and the Worker Observability settings."
+              else
+                (["UTC time","event","outcome","method","path","status","entrypoint"] | @tsv),
+                (.[] | [(.datetime // ""),(.eventType // ""),(.outcome // ""),(.requestMethod // ""),(.requestPath // ""),((.statusCode // "")|tostring),(.entrypoint // "")] | @tsv)
+              end
+          ' /tmp/cf-response.json
