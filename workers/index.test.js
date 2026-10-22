@@ -1711,4 +1711,4 @@ test("chat message remains saved when Firebase Realtime Database rejects the syn
     globalThis.fetch = originalFetch;
   }
 });
-\n
+
