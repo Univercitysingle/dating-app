@@ -22,7 +22,7 @@ export const SocketProvider = ({ children }) => {
   // Socket.IO is not available on the Cloudflare Workers API. Keep it enabled for
   // legacy deployments, but disable it explicitly for the serverless Pages build.
   useEffect(() => {
-    if (process.env.REACT_APP_ENABLE_SOCKET === 'false') return;
+    if (process.env.REACT_APP_ENABLE_SOCKET !== 'true') return;
     if (user && user.uid) {
       const token = localStorage.getItem("authToken");
       if (token) {
