@@ -198,9 +198,20 @@ export class MongoDBConnection {
   async ping() {
     try {
       const client = await this.getClient();
-      await this.getDatabase(client).command({ ping: 1 });
+      const db = this.getDatabase(client);
+      await db.command({ ping: 1 });
+      // The deployment readiness probe uses this method. Run the index
+      // migration there so staging is repaired before authenticated traffic
+      // attempts to create its first subscription.
+      await this.ensureSubscriptionIndexes(db);
       return { ok: true };
-    } catch {
+    } catch (error) {
+      console.error("MongoDB readiness probe failed", {
+        phase: "mongodb-readiness",
+        name: error && typeof error.name === "string" ? error.name : "Error",
+        code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined,
+        message: error && typeof error.message === "string" ? error.message.slice(0, 200) : undefined
+      });
       return { ok: false };
     }
   }
