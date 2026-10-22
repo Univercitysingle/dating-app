@@ -8,6 +8,17 @@ const JSON_HEADERS = {
   "cache-control": "no-store"
 };
 
+function getCdnObjectUrl(env, key) {
+  const configured = String(env.CDN_HOSTNAME || "").trim();
+  if (!configured) throw new Error("CDN_HOSTNAME is not configured");
+  const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
+  if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
+    throw new Error("CDN_HOSTNAME must be an HTTPS proxy URL without credentials or query parameters");
+  }
+  base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encodeURIComponent(key);
+  return base.toString();
+}
+
 
 
 function normalizeWebXPayPublicKey(value) {
@@ -238,15 +249,13 @@ export default {
       try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
       // Support current UUID-based keys and older timestamp-based keys, including WebP.
       if (!/^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
-      if (!isB2Configured(env)) return json({ error: "Media storage unavailable" }, 503);
       try {
-        const object = await getPrivateObject(env, key);
-        const headers = new Headers({ "content-type": object.ContentType || "application/octet-stream", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" });
-        if (object.ContentLength !== undefined) headers.set("content-length", String(object.ContentLength));
-        if (request.method === "HEAD") return new Response(null, { status: 200, headers });
-        const body = object.Body && typeof object.Body.transformToWebStream === "function" ? object.Body.transformToWebStream() : object.Body;
-        return new Response(body, { status: 200, headers });
-      } catch { return json({ error: "Media not found" }, 404); }
+        // CDN_HOSTNAME is the configured private-B2 proxy. Redirect media reads
+        // there instead of bypassing the proxy with direct S3 API requests.
+        return Response.redirect(getCdnObjectUrl(env, key), 302);
+      } catch {
+        return json({ error: "Media proxy is not configured" }, 503);
+      }
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
@@ -735,9 +744,25 @@ export default {
         if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         try {
-          await putPrivateObject(env, key, fileBytes, file.type, claims.sub);
-        } catch {
-          return json({ message: "Photo upload failed" }, 503);
+          // Route photo writes through the same private-B2 proxy configured for reads.
+          const uploadResponse = await fetch(getCdnObjectUrl(env, key), {
+            method: "PUT",
+            headers: {
+              "content-type": file.type,
+              "x-amz-meta-owneruid": claims.sub,
+              "x-amz-meta-purpose": "profile-photo"
+            },
+            body: fileBytes
+          });
+          if (!uploadResponse.ok) {
+            console.error("Photo proxy upload failed", { status: uploadResponse.status });
+            return json({ message: "Photo upload failed through CDN_HOSTNAME proxy" }, 503);
+          }
+        } catch (error) {
+          console.error("Photo proxy upload failed", {
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Proxy request failed"
+          });
+          return json({ message: "Photo upload failed through CDN_HOSTNAME proxy" }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
@@ -756,11 +781,7 @@ export default {
         }
         return json({
           ...result,
-          cdnUrl: (function () {
-            const configured = String(env.CDN_HOSTNAME || new URL(request.url).host).trim();
-            const base = /^https:\/\//i.test(configured) ? configured.replace(/\/+$/, "") : "https://" + configured.replace(/\/+$/, "");
-            return base + "/" + encodeURIComponent(key);
-          })()
+          cdnUrl: getCdnObjectUrl(env, key)
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
