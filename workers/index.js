@@ -229,13 +229,15 @@ export default {
 
     // Serve private B2 profile images through the existing CDN hostname.
     // Accept both the legacy /<object-key> URL and the explicit /media/<key> form.
-    const mediaMatch = url.pathname.match(/^\/media\/([^/]+)$/) ||
-      url.pathname.match(/^\/(photos-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\.(jpg|jpeg|png|gif))$/i);
+    const mediaMatch = url.pathname.match(/^\/api\/media\/([^/]+)$/) ||
+      url.pathname.match(/^\/media\/([^/]+)$/) ||
+      url.pathname.match(/^\/(photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp))$/i);
     if (mediaMatch) {
       if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
       let key;
       try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
-      if (!/^photos-[A-Za-z0-9_-]{1,128}-[0-9a-f-]{36}\.(jpg|jpeg|png|gif)$/i.test(key)) return json({ error: "Media not found" }, 404);
+      // Support current UUID-based keys and older timestamp-based keys, including WebP.
+      if (!/^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
       if (!isB2Configured(env)) return json({ error: "Media storage unavailable" }, 503);
       try {
         const object = await getPrivateObject(env, key);
