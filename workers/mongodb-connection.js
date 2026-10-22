@@ -844,7 +844,7 @@ export class MongoDBConnection {
                           $filter: {
                             input: "$regularUsers",
                             as: "regularUser",
-                            cond: { $not: [{ $in: ["$regularUser.uid", "$boostedIds"] }] }
+                            cond: { $not: [{ $in: ["$regularUser.uid", "$$boostedIds"] }] }
                           }
                         },
                         { $max: [0, { $subtract: [20, { $size: "$boostedUsers" }] }] }
