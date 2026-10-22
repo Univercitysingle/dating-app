@@ -93,6 +93,11 @@ export class MongoDBConnection {
             partialFilterExpression: { stripeSubscriptionId: { $type: "string" } }
           }
         );
+        console.info("MongoDB subscription index migration completed", {
+          phase: "ensure-subscription-index",
+          index: "stripeSubscriptionId_1",
+          policy: "unique-string-values-only"
+        });
       })().catch((error) => {
         this.subscriptionIndexMigrationPromise = null;
         console.error("MongoDB subscription index migration failed", {
