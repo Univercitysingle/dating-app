@@ -8,16 +8,16 @@ const JSON_HEADERS = {
   "cache-control": "no-store"
 };
 
-function getCdnObjectUrl(env, key) {
+function getCdnObjectUrl(env, key, route = "root") {
   const configured = String(env.CDN_HOSTNAME || "").trim();
   if (!configured) throw new Error("CDN_HOSTNAME is not configured");
   const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
     throw new Error("CDN_HOSTNAME must be an HTTPS proxy URL without credentials or query parameters");
   }
-  // The storage proxy exposes media objects under /api/media/:key.
-  // A root-level /:key URL returns 404 on the proxy Worker.
-  base.pathname = base.pathname.replace(/\/+$/, "") + "/api/media/" + encodeURIComponent(key);
+  const prefix = base.pathname.replace(/\/+$/, "");
+  const objectPath = route === "api" ? "/api/media/" : "/";
+  base.pathname = prefix + objectPath + encodeURIComponent(key);
   return base.toString();
 }
 
@@ -780,25 +780,40 @@ export default {
           String.fromCharCode(...bytes.slice(0, 6)) === "GIF87a";
         if (!isJpeg && !isPng && !isGif) return json({ message: "File content does not match an allowed image type" }, 400);
         const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
+        let cdnUrl;
         try {
           const authorization = request.headers.get("authorization") || "";
-          const proxyUrl = getCdnObjectUrl(env, key);
-          const proxyResponse = await fetch(proxyUrl, {
-            method: "PUT",
-            headers: {
-              authorization,
-              "content-type": file.type
-            },
-            body: fileBytes
-          });
-          if (!proxyResponse.ok) {
-            const proxyError = (await proxyResponse.text().catch(() => "")).slice(0, 240);
-            console.error("Photo CDN proxy upload failed", {
-              status: proxyResponse.status,
-              response: proxyError || "Proxy returned an empty error response"
+          // Existing profile-photo links use the root /:key route. Try the
+          // explicit API route first, then fall back to the legacy route only
+          // when the proxy reports that the route is not found.
+          const proxyUrls = [
+            getCdnObjectUrl(env, key, "api"),
+            getCdnObjectUrl(env, key, "root")
+          ];
+          let lastStatus = 502;
+          for (let index = 0; index < proxyUrls.length; index += 1) {
+            const proxyResponse = await fetch(proxyUrls[index], {
+              method: "PUT",
+              headers: {
+                authorization,
+                "content-type": file.type
+              },
+              body: fileBytes
             });
-            return json({ message: "Photo storage proxy upload failed", proxyStatus: proxyResponse.status }, 503);
+            if (proxyResponse.status === 404 && index === 0) continue;
+            if (!proxyResponse.ok) {
+              lastStatus = proxyResponse.status;
+              const proxyError = (await proxyResponse.text().catch(() => "")).slice(0, 240);
+              console.error("Photo CDN proxy upload failed", {
+                status: proxyResponse.status,
+                response: proxyError || "Proxy returned an empty error response"
+              });
+              return json({ message: "Photo storage proxy upload failed", proxyStatus: proxyResponse.status }, 503);
+            }
+            cdnUrl = proxyUrls[index];
+            break;
           }
+          if (!cdnUrl) return json({ message: "Photo storage proxy upload failed", proxyStatus: lastStatus }, 503);
         } catch (error) {
           console.error("Photo CDN proxy upload failed", {
             name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
@@ -823,7 +838,7 @@ export default {
         }
         return json({
           ...result,
-          cdnUrl: getCdnObjectUrl(env, key)
+          cdnUrl
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
