@@ -673,7 +673,7 @@ test("discovery returns ordered public profiles with super-like metadata", async
     aggregate: (value) => { pipeline = value; return { toArray: async () => [{ uid: "candidate" }] }; },
     find: () => ({ toArray: async () => [candidate] })
   };
-  const matches = { find: () => ({ project: () => ({ toArray: async () => [{ user1Uid: "candidate" }] }) }) };
+  const matches = { createIndex: async () => "index-created", find: () => ({ project: () => ({ toArray: async () => [{ user1Uid: "candidate" }] }) }) };
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
   connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
   const result = await connection.discoverUsers("current", { relationshipGoals: "Long-term relationship" });
