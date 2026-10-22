@@ -15,7 +15,9 @@ function getCdnObjectUrl(env, key) {
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
     throw new Error("CDN_HOSTNAME must be an HTTPS proxy URL without credentials or query parameters");
   }
-  base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encodeURIComponent(key);
+  // The storage proxy exposes media objects under /api/media/:key.
+  // A root-level /:key URL returns 404 on the proxy Worker.
+  base.pathname = base.pathname.replace(/\/+$/, "") + "/api/media/" + encodeURIComponent(key);
   return base.toString();
 }
 
