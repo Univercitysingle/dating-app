@@ -1,7 +1,7 @@
 function getObjectUrl(env, key) {
   const configured = String(env.CDN_HOSTNAME || "").trim();
   if (!configured) throw new Error("CDN_HOSTNAME is not configured");
-  const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
+  const base = new URL(/^https?:\/\//i.test(configured) ? configured : "https://" + configured);
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
     throw new Error("CDN_HOSTNAME must be an HTTPS proxy URL without credentials or query parameters");
   }
