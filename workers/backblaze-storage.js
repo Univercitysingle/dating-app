@@ -24,8 +24,13 @@ async function proxyRequest(env, key, init) {
   return response;
 }
 
-export async function putPrivateObject(env, key, body, contentType, ownerUid, purpose = "profile-photo") {
+export async function putPrivateObject(env, key, body, contentType, ownerUid, purpose = "profile-photo", authorization = "") {
   const headers = new Headers({ "content-type": contentType || "application/octet-stream" });
+  // The API Worker has already validated this Firebase ID token. Forward it so
+  // the CDN proxy can independently enforce the same user/key ownership check.
+  if (typeof authorization === "string" && /^Bearer\s+\S+$/i.test(authorization)) {
+    headers.set("authorization", authorization);
+  }
   // Metadata is informational only; authorization is enforced by the API Worker
   // before a write is sent to the private CDN storage proxy.
   if (ownerUid) headers.set("x-object-owner", ownerUid);

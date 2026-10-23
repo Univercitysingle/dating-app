@@ -21,7 +21,7 @@ test("storage operations route uploads, reads, and deletes through the configure
   try {
     const env = { CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" };
     const key = "photos-user-00000000-0000-0000-0000-000000000000.jpg";
-    await putPrivateObject(env, key, new Uint8Array([1, 2, 3]), "image/jpeg", "user", "profile-photo");
+    await putPrivateObject(env, key, new Uint8Array([1, 2, 3]), "image/jpeg", "user", "profile-photo", "Bearer test-firebase-id-token");
     const object = await getPrivateObject(env, key);
     assert.equal(object.ContentType, "image/jpeg");
     assert.equal(object.ContentLength, 11);
@@ -33,6 +33,7 @@ test("storage operations route uploads, reads, and deletes through the configure
       ["DELETE", "https://dateme.enadoctemp.workers.dev/" + key]
     ]);
     assert.equal(new Headers(calls[0].headers).get("content-type"), "image/jpeg");
+    assert.equal(new Headers(calls[0].headers).get("authorization"), "Bearer test-firebase-id-token");
   } finally {
     globalThis.fetch = originalFetch;
   }
