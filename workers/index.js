@@ -257,10 +257,9 @@ export default {
       // Support current UUID-based keys and older timestamp-based keys, including WebP.
       if (!/^photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
       if (!isCdnConfigured(env)) return json({ error: "Media storage unavailable" }, 503);
-      // Route every legacy/API media read to the configured CDN host. The API Worker
-      // is a compatibility redirect only; image bytes are served by CDN_HOSTNAME.
-      if ((request.method === "GET" || request.method === "HEAD") &&
-          (url.pathname.startsWith("/api/media/") || url.pathname.startsWith("/media/"))) {
+      // Route every profile-image read (legacy root, /media, and /api/media)
+      // to the configured CDN host. The API Worker never serves image bytes.
+      if (request.method === "GET" || request.method === "HEAD") {
         return new Response(null, {
           status: 302,
           headers: {
