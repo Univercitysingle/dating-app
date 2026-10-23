@@ -1,85 +1,42 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isCdnConfigured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
+import { isB2Configured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
-test("CDN storage is enabled only when CDN_HOSTNAME is configured", () => {
-  assert.equal(isCdnConfigured({}), false);
-  assert.equal(isCdnConfigured({ CDN_HOSTNAME: " " }), false);
-  assert.equal(isCdnConfigured({ CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" }), true);
+const validB2 = {
+  B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
+  B2_BUCKET_NAME: "dateapp",
+  B2_APPLICATION_KEY_ID: "test-key-id",
+  B2_APPLICATION_KEY: "test-application-key"
+};
+
+test("B2 storage is enabled only when all private storage settings are present", () => {
+  assert.equal(isB2Configured({}), false);
+  assert.equal(isB2Configured({ ...validB2, B2_APPLICATION_KEY: "" }), false);
+  assert.equal(isB2Configured(validB2), true);
 });
 
-test("storage operations route uploads, reads, and deletes through the configured CDN host root", async () => {
-  const originalFetch = globalThis.fetch;
-  const calls = [];
-  globalThis.fetch = async (url, init = {}) => {
-    calls.push({ url: String(url), method: init.method || "GET", headers: init.headers });
-    if ((init.method || "GET") === "GET") {
-      return new Response("image-bytes", { status: 200, headers: { "content-type": "image/jpeg", "content-length": "11" } });
-    }
-    return new Response(null, { status: 204 });
-  };
-  try {
-    const env = { CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" };
-    const key = "photos-user-00000000-0000-0000-0000-000000000000.jpg";
-    await putPrivateObject(env, key, new Uint8Array([1, 2, 3]), "image/jpeg");
-    const object = await getPrivateObject(env, key);
-    assert.equal(object.ContentType, "image/jpeg");
-    assert.equal(object.ContentLength, 11);
-    assert.equal(await new Response(object.Body).text(), "image-bytes");
-    await deletePrivateObject(env, key);
-    assert.deepEqual(calls.map(call => [call.method, call.url]), [
-      ["PUT", "https://dateme.enadoctemp.workers.dev/" + key],
-      ["GET", "https://dateme.enadoctemp.workers.dev/" + key],
-      ["DELETE", "https://dateme.enadoctemp.workers.dev/" + key]
-    ]);
-    assert.equal(new Headers(calls[0].headers).get("content-type"), "image/jpeg");
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("object routes always use the CDN origin root even if CDN_HOSTNAME contains a stale path", async () => {
-  const originalFetch = globalThis.fetch;
-  const calls = [];
-  globalThis.fetch = async (url) => {
-    calls.push(String(url));
-    return new Response(null, { status: 204 });
-  };
-  try {
-    await putPrivateObject(
-      { CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/api/media/" },
-      "photos-user-123.jpg",
-      new Uint8Array([1]),
-      "image/jpeg"
-    );
-    assert.deepEqual(calls, ["https://dateme.enadoctemp.workers.dev/photos-user-123.jpg"]);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("CDN_HOSTURL and CDN_HOST_URL are accepted as upload-routing aliases", () => {
-  assert.equal(isCdnConfigured({ CDN_HOSTURL: "https://dateme.enadoctemp.workers.dev/" }), true);
-  assert.equal(isCdnConfigured({ CDN_HOST_URL: "https://dateme.enadoctemp.workers.dev/" }), true);
-  assert.equal(isCdnConfigured({ CDN_HOST: "https://dateme.enadoctemp.workers.dev/" }), true);
-});
-
-test("storage proxy errors are surfaced to the caller", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response("not allowed", { status: 403 });
-  try {
-    await assert.rejects(
-      getPrivateObject({ CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev" }, "photos-user-00000000-0000-0000-0000-000000000000.jpg"),
-      /CDN storage proxy returned HTTP 403/
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("invalid CDN proxy URLs are rejected", async () => {
+test("B2 operations reject missing configuration before attempting network access", async () => {
   await assert.rejects(
-    getPrivateObject({ CDN_HOSTNAME: "http://dateme.enadoctemp.workers.dev" }, "photos-user-00000000-0000-0000-0000-000000000000.jpg"),
-    /HTTPS proxy URL/
+    putPrivateObject({}, "photos-user-123.jpg", new Uint8Array([1]), "image/jpeg"),
+    /Backblaze B2 storage configuration is incomplete/
+  );
+  await assert.rejects(
+    getPrivateObject({}, "photos-user-123.jpg"),
+    /Backblaze B2 storage configuration is incomplete/
+  );
+  await assert.rejects(
+    deletePrivateObject({}, "photos-user-123.jpg"),
+    /Backblaze B2 storage configuration is incomplete/
+  );
+});
+
+test("B2 endpoint validation rejects non-Backblaze and non-HTTPS endpoints", async () => {
+  await assert.rejects(
+    putPrivateObject({ ...validB2, B2_ENDPOINT: "http://s3.us-west-004.backblazeb2.com" }, "photos-user-123.jpg", new Uint8Array([1]), "image/jpeg"),
+    /B2_ENDPOINT must be an HTTPS Backblaze S3 endpoint/
+  );
+  await assert.rejects(
+    getPrivateObject({ ...validB2, B2_ENDPOINT: "https://s3.example.com" }, "photos-user-123.jpg"),
+    /B2_ENDPOINT must be an HTTPS Backblaze S3 endpoint/
   );
 });
