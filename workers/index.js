@@ -1,7 +1,7 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
-import { isCdnConfigured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
+import { isB2Configured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -720,7 +720,10 @@ export default {
         // Upload bytes through the CDN proxy configured by CDN_HOSTNAME; keep this
         // API route for Firebase authentication and profile metadata updates.
         if (!isCdnConfigured(env)) {
-          return json({ message: "Photo storage is not configured (CDN_HOSTNAME is missing)" }, 503);
+          return json({ message: "Photo CDN is not configured (CDN_HOSTNAME is missing)" }, 503);
+        }
+        if (!isB2Configured(env)) {
+          return json({ message: "Photo storage is not configured" }, 503);
         }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("photo");
@@ -750,7 +753,7 @@ export default {
           // Send image bytes to the configured CDN_HOSTNAME proxy. The browser request
           // stays on this authenticated API route; storage writes never target Pages
           // or a hard-coded host.
-          await putPrivateObject(env, key, fileBytes, file.type);
+          await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
           cdnUrl = getAppMediaUrl(env, key);
         } catch (error) {
           console.error("Photo storage upload failed", {
@@ -789,7 +792,8 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        if (!isCdnConfigured(env)) return json({ message: "Photo storage is not configured" }, 503);
+        if (!isCdnConfigured(env)) return json({ message: "Photo CDN is not configured" }, 503);
+        if (!isB2Configured(env)) return json({ message: "Photo storage is not configured" }, 503);
         const payload = await request.json().catch(() => null);
         if (!payload || typeof payload.photoUrl !== "string" || !payload.photoUrl) return json({ error: "photoUrl is required." }, 400);
         let key = payload.photoUrl;
