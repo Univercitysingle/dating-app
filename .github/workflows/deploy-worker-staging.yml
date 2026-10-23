@@ -149,6 +149,66 @@ jobs:
             printf '%s' "$CRON_SECRET" | npx --yes wrangler@4 secret put CRON_SECRET --config wrangler.jsonc --env staging
           fi
 
+      - name: Verify Backblaze B2 photo storage write/read/delete
+        shell: bash
+        working-directory: workers
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+          const endpoint = process.env.B2_ENDPOINT;
+          const region = new URL(endpoint).hostname.match(/^s3[.-]([a-z0-9-]+)\\.backblazeb2\\.com$/i)?.[1];
+          if (!region) throw new Error("B2_ENDPOINT has an unsupported Backblaze region hostname");
+          const client = new S3Client({
+            region,
+            endpoint,
+            forcePathStyle: true,
+            credentials: {
+              accessKeyId: process.env.B2_APPLICATION_KEY_ID,
+              secretAccessKey: process.env.B2_APPLICATION_KEY
+            }
+          });
+          const key = `photos-healthcheck-${Date.now()}.txt`;
+          let uploaded = false;
+          try {
+            await client.send(new PutObjectCommand({
+              Bucket: process.env.B2_BUCKET_NAME,
+              Key: key,
+              Body: "dating-app-b2-healthcheck",
+              ContentType: "text/plain"
+            }));
+            uploaded = true;
+            const result = await client.send(new GetObjectCommand({
+              Bucket: process.env.B2_BUCKET_NAME,
+              Key: key
+            }));
+            const body = await result.Body.transformToString();
+            if (body !== "dating-app-b2-healthcheck") throw new Error("B2 read-back content mismatch");
+            console.log("Backblaze B2 write/read check passed.");
+          } finally {
+            if (uploaded) await client.send(new DeleteObjectCommand({
+              Bucket: process.env.B2_BUCKET_NAME,
+              Key: key
+            }));
+          }
+          NODE
+
+      - name: Verify frontend media proxy routes to B2
+        shell: bash
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL || 'https://dating-app-staging.pages.dev' }}
+        run: |
+          set -euo pipefail
+          PROBE_KEY="photos-media-probe-$(date -u +%s%3N).webp"
+          HTTP_CODE="$(curl --silent --show-error --output /tmp/media-probe.json --write-out '%{http_code}' "$FRONTEND_URL/api/media/$PROBE_KEY")"
+          RESPONSE_ERROR="$(jq -r '.error // empty' /tmp/media-probe.json 2>/dev/null || true)"
+          if [[ "$HTTP_CODE" != "404" || "$RESPONSE_ERROR" != "Media not found" ]]; then
+            echo "::error::Frontend media route/B2 read check failed (HTTP $HTTP_CODE, error '$RESPONSE_ERROR')."
+            cat /tmp/media-probe.json
+            exit 1
+          fi
+          echo "Frontend /api/media route reached B2 and correctly reported a missing probe object."
+
       - name: Verify staging liveness
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
