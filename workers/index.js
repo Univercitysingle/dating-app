@@ -747,7 +747,9 @@ export default {
           String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
           String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
         if (!isJpeg && !isPng && !isGif && !isWebp) return json({ message: "File content does not match an allowed image type" }, 400);
-        const key = "photos-" + claims.sub + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
+        // Keep the legacy CDN proxy object-key format (UID + millisecond timestamp).
+        // The deployed media proxy accepts timestamp keys; UUID suffixes are rejected by its route validation.
+        const key = "photos-" + claims.sub + "-" + Date.now() + "." + allowedTypes[file.type];
         let cdnUrl;
         try {
           // The CDN proxy has returned 404 for all tested PUT routes. Upload
