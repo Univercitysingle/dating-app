@@ -750,7 +750,7 @@ export default {
           // Send image bytes to the configured CDN_HOSTNAME proxy. The browser request
           // stays on this authenticated API route; storage writes never target Pages
           // or a hard-coded host.
-          await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo", request.headers.get("authorization"));
+          await putPrivateObject(env, key, fileBytes, file.type);
           cdnUrl = getAppMediaUrl(env, key);
         } catch (error) {
           console.error("Photo storage upload failed", {
