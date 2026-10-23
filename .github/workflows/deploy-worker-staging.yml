@@ -145,25 +145,12 @@ jobs:
             printf '%s' "$CRON_SECRET" | npx --yes wrangler@4 secret put CRON_SECRET --config wrangler.jsonc --env staging
           fi
 
-      - name: Verify CDN_HOSTNAME photo storage write/read/delete
+      - name: Verify CDN_HOSTNAME configuration
         shell: bash
         run: |
           set -euo pipefail
-          CDN_BASE="${CDN_HOSTNAME%/}"
-          PROBE_KEY="photos-healthcheck-$(date -u +%s%3N).jpg"
-          # A tiny valid 1x1 JPEG lets the real CDN proxy prove all storage methods.
-          printf '%s' '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EAH/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EAH/2Q==' | base64 -d > /tmp/cdn-probe.jpg
-          cleanup() { curl --silent --show-error --request DELETE "$CDN_BASE/$PROBE_KEY" >/dev/null || true; }
-          trap cleanup EXIT
-          PUT_CODE="$(curl --silent --show-error --output /tmp/cdn-put-response.txt --write-out '%{http_code}' --request PUT -H 'content-type: image/jpeg' --data-binary @/tmp/cdn-probe.jpg "$CDN_BASE/$PROBE_KEY")"
-          [[ "$PUT_CODE" =~ ^2[0-9][0-9]$ ]] || { echo "::error::CDN_HOSTNAME upload failed with HTTP $PUT_CODE"; cat /tmp/cdn-put-response.txt; exit 1; }
-          GET_CODE="$(curl --silent --show-error --output /tmp/cdn-probe-read.jpg --write-out '%{http_code}' "$CDN_BASE/$PROBE_KEY")"
-          [[ "$GET_CODE" =~ ^2[0-9][0-9]$ ]] || { echo "::error::CDN_HOSTNAME read failed with HTTP $GET_CODE"; cat /tmp/cdn-probe-read.jpg; exit 1; }
-          cmp /tmp/cdn-probe.jpg /tmp/cdn-probe-read.jpg || { echo "::error::CDN_HOSTNAME read-back did not match uploaded bytes"; exit 1; }
-          DELETE_CODE="$(curl --silent --show-error --output /tmp/cdn-delete-response.txt --write-out '%{http_code}' --request DELETE "$CDN_BASE/$PROBE_KEY")"
-          [[ "$DELETE_CODE" =~ ^2[0-9][0-9]$ ]] || { echo "::error::CDN_HOSTNAME delete failed with HTTP $DELETE_CODE"; cat /tmp/cdn-delete-response.txt; exit 1; }
-          trap - EXIT
-          echo "CDN_HOSTNAME storage proxy write/read/delete check passed."
+          [[ "$CDN_HOSTNAME" =~ ^https://[^/]+/?$ ]] || { echo "::error::CDN_HOSTNAME must be an HTTPS origin such as https://dateme.enadoctemp.workers.dev/"; exit 1; }
+          echo "CDN_HOSTNAME is a valid HTTPS origin. Profile images are written to B2 by the API Worker and retrieved through this CDN origin."
       - name: Verify staging liveness
         env:
           WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
