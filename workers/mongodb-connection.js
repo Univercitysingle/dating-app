@@ -52,36 +52,44 @@ export class MongoDBConnection {
 
   getMediaUrl(path) {
     let clean = String(path || "").trim();
-    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(/\/+$/, "");
-    if (/^https?:\/\//i.test(clean)) {
+    const frontend = String(this.env.FRONTEND_URL || "").trim().replace(/\\/+$/, "");
+    const configured = String(this.env.CDN_HOSTNAME || "").trim();
+    let frontendHost = "";
+    let cdnHost = "";
+    try { if (frontend) frontendHost = new URL(frontend).host; } catch {}
+    try { if (configured) cdnHost = new URL(/^https:\\/\\//i.test(configured) ? configured : "https://" + configured).host; } catch {}
+
+    if (/^https?:\\/\\//i.test(clean)) {
       try {
         const parsed = new URL(clean);
-        const frontendHost = frontend ? new URL(frontend).host : "";
-        const isLegacyFrontendUrl = frontendHost && parsed.host === frontendHost;
-        if (!isLegacyFrontendUrl) return clean;
-        clean = parsed.pathname;
+        // Rewrite legacy CDN URLs to the media route on the current frontend.
+        if (parsed.host === frontendHost || (cdnHost && parsed.host === cdnHost)) {
+          clean = parsed.pathname;
+        } else {
+          return clean;
+        }
       } catch {
         return clean;
       }
     }
 
-    clean = clean.replace(/^\/+/, "");
-    clean = clean.replace(/^(?:api\/media|media)\//i, "");
+    clean = clean.replace(/^\\/+/, "");
+    clean = clean.replace(/^(?:api\\/media|media)\\//i, "");
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-    const configured = String(this.env.CDN_HOSTNAME || "").trim();
+    const isGeneratedPhotoKey = /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\\.(?:jpg|jpeg|png|gif|webp)$/i.test(clean);
+    if (frontend && isGeneratedPhotoKey) {
+      return frontend + "/api/media/" + encoded;
+    }
     if (configured) {
       try {
-        const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
+        const base = new URL(/^https:\\/\\//i.test(configured) ? configured : "https://" + configured);
         if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
-          base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encoded;
+          base.pathname = base.pathname.replace(/\\/+$/, "") + "/" + encoded;
           return base.toString();
         }
       } catch {
         // Fall through to the Worker media route if the CDN value is invalid.
       }
-    }
-    if (frontend && /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(clean)) {
-      return frontend + "/api/media/" + encoded;
     }
     return clean;
   }
