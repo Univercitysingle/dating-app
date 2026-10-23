@@ -294,8 +294,6 @@ jobs:
           DELETE /api/users/photos
           POST /api/users/block/test-user
           POST /api/users/unblock/test-user
-          POST /api/users/subscription/upload-slip
-          DELETE /api/users/subscription/upload-slip
           POST /api/swipe/like
           POST /api/swipe/pass
           POST /api/swipe/superlike
