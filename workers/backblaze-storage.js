@@ -1,59 +1,49 @@
-function getObjectUrl(env, key) {
-  const configured = String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim();
-  if (!configured) throw new Error("CDN_HOSTNAME is not configured");
-  const base = new URL(/^https?:\/\//i.test(configured) ? configured : "https://" + configured);
-  if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
-    throw new Error("CDN_HOSTNAME must be an HTTPS proxy URL without credentials or query parameters");
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+
+function createClient(env) {
+  const endpoint = env.B2_ENDPOINT;
+  const bucket = env.B2_BUCKET_NAME;
+  const accessKeyId = env.B2_APPLICATION_KEY_ID;
+  const secretAccessKey = env.B2_APPLICATION_KEY;
+  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
+    throw new Error("Backblaze B2 storage configuration is incomplete");
   }
-  // CDN_HOSTNAME is the proxy origin, e.g. https://dateme.enadoctemp.workers.dev/.
-  // Always address object keys from the origin root; never inherit a stale /api/media
-  // or other path suffix from an incorrectly configured secret.
-  base.pathname = "/" + encodeURIComponent(key);
-  return base.toString();
-}
-
-export function isCdnConfigured(env) {
-  return Boolean(String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim());
-}
-
-async function proxyRequest(env, key, init) {
-  const target = getObjectUrl(env, key);
-  const response = await fetch(target, init);
-  if (!response.ok) {
-    // Log the configured destination host, verb, and a short sanitized proxy
-    // response excerpt. Never log the user's object key or auth material.
-    const targetUrl = new URL(target);
-    const method = String(init.method || "GET").toUpperCase();
-    const detail = (await response.text().catch(() => ""))
-      .replace(/[\r\n\t]+/g, " ")
-      .replace(/https?:\/\/\S+/gi, "[url]")
-      .slice(0, 100);
-    const suffix = detail ? "; proxy response: " + detail : "";
-    const error = new Error("CDN storage proxy returned HTTP " + response.status + " for " + method + " " + targetUrl.host + suffix);
-    error.statusCode = response.status;
-    error.targetHost = targetUrl.host;
-    error.method = method;
-    throw error;
+  const parsed = new URL(endpoint);
+  if (parsed.protocol !== "https:" || !/\.backblazeb2\.com$/i.test(parsed.hostname) ||
+      parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/") {
+    throw new Error("B2_ENDPOINT must be an HTTPS Backblaze S3 endpoint");
   }
-  return response;
+  const regionMatch = parsed.hostname.match(/^s3[.-]([a-z0-9-]+)\.backblazeb2\.com$/i);
+  if (!regionMatch) throw new Error("B2_ENDPOINT must include a valid Backblaze region");
+  return { client: new S3Client({
+    region: regionMatch[1],
+    endpoint: parsed.origin,
+    forcePathStyle: true,
+    credentials: { accessKeyId, secretAccessKey }
+  }), bucket };
 }
 
-export async function putPrivateObject(env, key, body, contentType) {
-  // The API Worker validates Firebase authentication and the photo key before
-  // writing. Match the CDN proxy contract: bytes plus content type, to /<object-key>.
-  const headers = new Headers({ "content-type": contentType || "application/octet-stream" });
-  await proxyRequest(env, key, { method: "PUT", headers, body });
+export function isB2Configured(env) {
+  return Boolean(env.B2_ENDPOINT && env.B2_BUCKET_NAME && env.B2_APPLICATION_KEY_ID && env.B2_APPLICATION_KEY);
+}
+
+export async function putPrivateObject(env, key, body, contentType, ownerUid, purpose = "profile-photo") {
+  const { client, bucket } = createClient(env);
+  await client.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+    Metadata: { owneruid: ownerUid, purpose }
+  }));
 }
 
 export async function getPrivateObject(env, key) {
-  const response = await proxyRequest(env, key, { method: "GET" });
-  return {
-    ContentType: response.headers.get("content-type") || "application/octet-stream",
-    ContentLength: response.headers.has("content-length") ? Number(response.headers.get("content-length")) : undefined,
-    Body: response.body
-  };
+  const { client, bucket } = createClient(env);
+  return client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
 }
 
 export async function deletePrivateObject(env, key) {
-  await proxyRequest(env, key, { method: "DELETE" });
+  const { client, bucket } = createClient(env);
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
