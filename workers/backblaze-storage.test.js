@@ -8,7 +8,7 @@ test("CDN storage is enabled only when CDN_HOSTNAME is configured", () => {
   assert.equal(isCdnConfigured({ CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" }), true);
 });
 
-test("storage operations route uploads, reads, and deletes through the configured CDN host URL", async () => {
+test("storage operations route uploads, reads, and deletes through the configured CDN host root", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
@@ -33,6 +33,26 @@ test("storage operations route uploads, reads, and deletes through the configure
       ["DELETE", "https://dateme.enadoctemp.workers.dev/" + key]
     ]);
     assert.equal(new Headers(calls[0].headers).get("content-type"), "image/jpeg");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("object routes always use the CDN origin root even if CDN_HOSTNAME contains a stale path", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response(null, { status: 204 });
+  };
+  try {
+    await putPrivateObject(
+      { CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/api/media/" },
+      "photos-user-123.jpg",
+      new Uint8Array([1]),
+      "image/jpeg"
+    );
+    assert.deepEqual(calls, ["https://dateme.enadoctemp.workers.dev/photos-user-123.jpg"]);
   } finally {
     globalThis.fetch = originalFetch;
   }
