@@ -149,7 +149,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node -e 'const raw=process.env.CDN_HOSTNAME.trim(); const u=new URL(/^https?:\\/\\//i.test(raw)?raw:"https://"+raw); if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash||(u.pathname!=="/"&&u.pathname!=="")) process.exit(1)' || { echo "::error::CDN_HOSTNAME must be an HTTPS CDN origin, with or without a trailing slash."; exit 1; }
+          node -e 'const raw=process.env.CDN_HOSTNAME.trim(); const u=new URL(/^https?:\/\//i.test(raw)?raw:"https://"+raw); if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash||(u.pathname!=="/"&&u.pathname!=="")) process.exit(1)' || { echo "::error::CDN_HOSTNAME must be an HTTPS CDN origin, with or without a trailing slash."; exit 1; }
           echo "CDN_HOSTNAME is a valid HTTPS origin. Profile images are written to B2 by the API Worker and retrieved through this CDN origin."
       - name: Verify staging liveness
         env:
