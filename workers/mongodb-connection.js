@@ -342,7 +342,7 @@ export class MongoDBConnection {
 
   async addUploadedPhoto(uid, photo) {
     if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid) ||
-        !photo || typeof photo.url !== "string" || !photo.url.startsWith("photos-" + uid + "-") || photo.url.length > 256 || ![".jpg", ".jpeg", ".png", ".gif"].some(ext => photo.url.endsWith(ext)) ||
+        !photo || typeof photo.url !== "string" || !photo.url.startsWith("photos-" + uid + "-") || photo.url.length > 256 || ![".jpg", ".jpeg", ".png", ".gif", ".webp"].some(ext => photo.url.endsWith(ext)) ||
         !Number.isInteger(photo.size) || photo.size < 1 || photo.size > 5 * 1024 * 1024) {
       return { status: 400, body: { message: "Invalid photo metadata" } };
     }
