@@ -1,17 +1,31 @@
 import React, { useState } from 'react';
 import apiClient from '../api/apiClient';
 
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
 const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
     setError(null);
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setError('Choose a JPEG, PNG, or GIF image.');
+      input.value = '';
+      return;
+    }
+    if (file.size < 1 || file.size > MAX_PHOTO_SIZE) {
+      setError('Photo must be smaller than 5 MB.');
+      input.value = '';
+      return;
+    }
 
+    setIsUploading(true);
     const formData = new FormData();
     formData.append('photo', file);
 
@@ -22,6 +36,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       setError(err.data?.message || 'Failed to upload photo.');
     } finally {
       setIsUploading(false);
+      input.value = '';
     }
   };
 
@@ -40,7 +55,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       <input
         id="photo-upload"
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif"
         onChange={handleFileChange}
         className="hidden"
         disabled={isUploading || isDisabled}
