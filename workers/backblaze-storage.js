@@ -20,12 +20,16 @@ async function proxyRequest(env, key, init) {
   const target = getObjectUrl(env, key);
   const response = await fetch(target, init);
   if (!response.ok) {
-    // Log the configured destination host and verb without logging the user's
-    // object key or any authentication material. This distinguishes a wrong
-    // CDN_HOSTNAME secret from a rejection by the intended CDN proxy.
+    // Log the configured destination host, verb, and a short sanitized proxy
+    // response excerpt. Never log the user's object key or auth material.
     const targetUrl = new URL(target);
     const method = String(init.method || "GET").toUpperCase();
-    const error = new Error("CDN storage proxy returned HTTP " + response.status + " for " + method + " " + targetUrl.host);
+    const detail = (await response.text().catch(() => ""))
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/https?:\/\/\S+/gi, "[url]")
+      .slice(0, 100);
+    const suffix = detail ? "; proxy response: " + detail : "";
+    const error = new Error("CDN storage proxy returned HTTP " + response.status + " for " + method + " " + targetUrl.host + suffix);
     error.statusCode = response.status;
     error.targetHost = targetUrl.host;
     error.method = method;
