@@ -23,6 +23,16 @@ function getCdnObjectUrl(env, key, route = "root") {
 
 
 
+function getAppMediaUrl(env, key) {
+  const frontend = String(env.FRONTEND_URL || "").trim();
+  if (!frontend) throw new Error("FRONTEND_URL is not configured");
+  const base = new URL(frontend);
+  if (base.protocol !== "https:" && base.hostname !== "localhost") {
+    throw new Error("FRONTEND_URL must use HTTPS");
+  }
+  return new URL("/api/media/" + encodeURIComponent(key), base.origin).toString();
+}
+
 function normalizeWebXPayPublicKey(value) {
   if (typeof value !== "string" || !value.trim()) throw new Error("WebXPay public key is not configured");
   let key = value.trim();
@@ -790,7 +800,7 @@ export default {
           // directly to the same configured B2 bucket using server-side
           // credentials, then expose the object through the CDN's read URL.
           await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
-          cdnUrl = getCdnObjectUrl(env, key, "root");
+          cdnUrl = getAppMediaUrl(env, key);
         } catch (error) {
           console.error("Photo storage upload failed", {
             name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
