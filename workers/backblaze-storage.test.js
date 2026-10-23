@@ -38,7 +38,13 @@ test("storage operations route uploads, reads, and deletes through the configure
   }
 });
 
-test("CDN_HOSTURL and CDN_HOST_URL are accepted as upload-routing aliases", () => {\n  assert.equal(isCdnConfigured({ CDN_HOSTURL: "https://dateme.enadoctemp.workers.dev/" }), true);\n  assert.equal(isCdnConfigured({ CDN_HOST_URL: "https://dateme.enadoctemp.workers.dev/" }), true);\n  assert.equal(isCdnConfigured({ CDN_HOST: "https://dateme.enadoctemp.workers.dev/" }), true);\n});\n\ntest("storage proxy errors are surfaced to the caller", async () => {
+test("CDN_HOSTURL and CDN_HOST_URL are accepted as upload-routing aliases", () => {
+  assert.equal(isCdnConfigured({ CDN_HOSTURL: "https://dateme.enadoctemp.workers.dev/" }), true);
+  assert.equal(isCdnConfigured({ CDN_HOST_URL: "https://dateme.enadoctemp.workers.dev/" }), true);
+  assert.equal(isCdnConfigured({ CDN_HOST: "https://dateme.enadoctemp.workers.dev/" }), true);
+});
+
+test("storage proxy errors are surfaced to the caller", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response("not allowed", { status: 403 });
   try {
