@@ -5,8 +5,10 @@ function getObjectUrl(env, key) {
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
     throw new Error("CDN_HOSTNAME must be an HTTPS proxy URL without credentials or query parameters");
   }
-  const prefix = base.pathname.replace(/\/+$/, "");
-  base.pathname = prefix + "/" + encodeURIComponent(key);
+  // CDN_HOSTNAME is the proxy origin, e.g. https://dateme.enadoctemp.workers.dev/.
+  // Always address object keys from the origin root; never inherit a stale /api/media
+  // or other path suffix from an incorrectly configured secret.
+  base.pathname = "/" + encodeURIComponent(key);
   return base.toString();
 }
 
@@ -26,7 +28,7 @@ async function proxyRequest(env, key, init) {
 
 export async function putPrivateObject(env, key, body, contentType) {
   // The API Worker validates Firebase authentication and the photo key before
-  // writing. Match the proven CDN proxy upload contract: bytes plus content type.
+  // writing. Match the CDN proxy contract: bytes plus content type, to /<object-key>.
   const headers = new Headers({ "content-type": contentType || "application/octet-stream" });
   await proxyRequest(env, key, { method: "PUT", headers, body });
 }
