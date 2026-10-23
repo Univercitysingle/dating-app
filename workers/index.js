@@ -258,6 +258,18 @@ export default {
       // Support current UUID-based keys and older timestamp-based keys, including WebP.
       if (!/^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
       if (!isCdnConfigured(env)) return json({ error: "Media storage unavailable" }, 503);
+      // Compatibility route: legacy profile records and frontend bundles may still
+      // request /api/media/<key> on Pages. Redirect reads to the canonical CDN URL
+      // instead of proxying them through the API Worker.
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/api/media/")) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: getAppMediaUrl(env, key),
+            "cache-control": "public, max-age=300"
+          }
+        });
+      }
       if (request.method === "PUT") {
         if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
         try {
