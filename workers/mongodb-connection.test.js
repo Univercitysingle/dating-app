@@ -55,3 +55,17 @@ test("pending subscription repairs the Stripe index before attempting insertion"
   assert.equal(result.status, 201);
   assert.deepEqual(order, ["repair-index", "find-user", "check-active", "insert"]);
 });
+
+
+test("profile photo keys use the serverless frontend media route instead of the legacy CDN proxy", () => {
+  const connection = new MongoDBConnection({}, {
+    FRONTEND_URL: "https://dating-app-staging.pages.dev",
+    CDN_HOSTNAME: "dateme.enadoctemp.workers.dev"
+  });
+  const key = "photos-user-1234567890123.webp";
+  assert.equal(connection.getMediaUrl(key), "https://dating-app-staging.pages.dev/api/media/" + key);
+  assert.equal(
+    connection.getMediaUrl("https://dateme.enadoctemp.workers.dev/" + key),
+    "https://dating-app-staging.pages.dev/api/media/" + key
+  );
+});
