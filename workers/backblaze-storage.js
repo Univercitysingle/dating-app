@@ -27,6 +27,10 @@ export function isB2Configured(env) {
   return Boolean(env.B2_ENDPOINT && env.B2_BUCKET_NAME && env.B2_APPLICATION_KEY_ID && env.B2_APPLICATION_KEY);
 }
 
+export function isCdnConfigured(env) {
+  return Boolean(String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim());
+}
+
 export async function putPrivateObject(env, key, body, contentType, ownerUid, purpose = "profile-photo") {
   const { client, bucket } = createClient(env);
   await client.send(new PutObjectCommand({
