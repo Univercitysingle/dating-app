@@ -336,10 +336,6 @@ jobs:
           GET /api/purchase/status/0123456789abcdef01234567
           POST /api/subscription
           GET /api/subscription/status/0123456789abcdef01234567
-          GET /api/admin/subscriptions/pending
-          POST /api/admin/subscriptions/0123456789abcdef01234567/approve
-          POST /api/admin/subscriptions/0123456789abcdef01234567/reject
-          GET /api/admin/bank-slips/test-key
           GET /api/chat/history/test-room
           GET /api/chat/conversations
           POST /api/chat/send
