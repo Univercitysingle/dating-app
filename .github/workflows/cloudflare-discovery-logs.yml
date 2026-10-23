@@ -40,7 +40,7 @@ jobs:
             parameters: {
               datasets: ["cloudflare-workers"],
               needle: {
-                value: "MongoServerError|Location40081|\\$in requires an array|run-discovery-aggregation|MongoDB discovery query failed|Discovery service unavailable|MongoDB subscription creation failed|MongoDB subscription index migration completed|MongoDB subscription index migration failed|MongoDB readiness probe failed|ensure-subscription-index|Subscription service unavailable|create-pending-subscription|Firebase Realtime Database chat write failed|Firebase Realtime Database chat sync is not configured|Firebase Realtime Database chat sync URL is invalid|Realtime chat write was rejected|Realtime chat is not configured|FirebaseTokenError|FirebaseKeyServiceError|Unauthorized",
+                value: "MongoServerError|Location40081|\\$in requires an array|run-discovery-aggregation|MongoDB discovery query failed|Discovery service unavailable|MongoDB subscription creation failed|MongoDB subscription index migration completed|MongoDB subscription index migration failed|MongoDB readiness probe failed|ensure-subscription-index|Subscription service unavailable|create-pending-subscription|Firebase Realtime Database chat write failed|Firebase Realtime Database chat sync is not configured|Firebase Realtime Database chat sync URL is invalid|Realtime chat write was rejected|Realtime chat is not configured|FirebaseTokenError|FirebaseKeyServiceError|Unauthorized|Photo storage upload failed|CDN storage proxy returned HTTP|CDN_HOSTNAME is not configured|Photo metadata service unavailable",
                 isRegex: true,
                 matchCase: false
               }
