@@ -40,11 +40,17 @@ const extractPhotoKey = (value) => {
   return isPhotoKey(path) ? path : '';
 };
 
+const CDN_HOST_URL = (
+  process.env.REACT_APP_CDN_HOSTURL ||
+  process.env.REACT_APP_CDN_HOSTNAME ||
+  'https://dateme.enadoctemp.workers.dev/'
+).trim().replace(/\\/+$/, '');
+
 const resolvePhotoUrl = (value) => {
   if (!value) return PLACEHOLDER_IMAGE;
   const key = extractPhotoKey(value);
   if (!key) return value;
-  return `/api/media/${encodeURIComponent(key)}`;
+  return `${CDN_HOST_URL}/${encodeURIComponent(key)}`;
 };
 
 const resolveWorkerPhotoUrl = (value) => {
