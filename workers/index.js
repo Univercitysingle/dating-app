@@ -9,7 +9,7 @@ const JSON_HEADERS = {
 };
 
 function getCdnObjectUrl(env, key, route = "root") {
-  const configured = String(env.CDN_HOSTNAME || "").trim();
+  const configured = String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim();
   if (!configured) throw new Error("CDN_HOSTNAME is not configured");
   const base = new URL(/^https?:\/\//i.test(configured) ? configured : "https://" + configured);
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
@@ -721,7 +721,7 @@ export default {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         // Upload through the configured Backblaze B2 S3 API. The CDN Worker
         // serves the stored object for reads; it does not need to accept PUTs.
-        if (!env.CDN_HOSTNAME) {
+        if (!isCdnConfigured(env)) {
           return json({ message: "Photo CDN is not configured" }, 503);
         }
         if (!isCdnConfigured(env)) {
