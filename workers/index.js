@@ -248,20 +248,19 @@ export default {
 
     // Serve private B2 profile images through the existing CDN hostname.
     // Accept both the legacy /<object-key> URL and the explicit /media/<key> form.
-    const mediaMatch = url.pathname.match(/^\/api\/media\/([^/]+)$/) ||
-      url.pathname.match(/^\/media\/([^/]+)$/) ||
-      url.pathname.match(/^\/(photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp))$/i);
+    const mediaMatch = url.pathname.match(/^\/(?:api\/media|media)\/([^/]+)$/) ||
+      url.pathname.match(/^\/(photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|gif|webp))$/i);
     if (mediaMatch) {
       if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
       let key;
       try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
       // Support current UUID-based keys and older timestamp-based keys, including WebP.
-      if (!/^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
+      if (!/^photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
       if (!isCdnConfigured(env)) return json({ error: "Media storage unavailable" }, 503);
-      // Compatibility route: legacy profile records and frontend bundles may still
-      // request /api/media/<key> on Pages. Redirect reads to the canonical CDN URL
-      // instead of proxying them through the API Worker.
-      if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/api/media/")) {
+      // Route every legacy/API media read to the configured CDN host. The API Worker
+      // is a compatibility redirect only; image bytes are served by CDN_HOSTNAME.
+      if ((request.method === "GET" || request.method === "HEAD") &&
+          (url.pathname.startsWith("/api/media/") || url.pathname.startsWith("/media/"))) {
         return new Response(null, {
           status: 302,
           headers: {
@@ -719,13 +718,10 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        // Upload through the configured Backblaze B2 S3 API. The CDN Worker
-        // serves the stored object for reads; it does not need to accept PUTs.
+        // Upload bytes through the CDN proxy configured by CDN_HOSTNAME; keep this
+        // API route for Firebase authentication and profile metadata updates.
         if (!isCdnConfigured(env)) {
-          return json({ message: "Photo CDN is not configured" }, 503);
-        }
-        if (!isCdnConfigured(env)) {
-          return json({ message: "Photo storage is not configured" }, 503);
+          return json({ message: "Photo storage is not configured (CDN_HOSTNAME is missing)" }, 503);
         }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("photo");
@@ -752,9 +748,9 @@ export default {
         const key = "photos-" + claims.sub + "-" + Date.now() + "." + allowedTypes[file.type];
         let cdnUrl;
         try {
-          // The CDN proxy has returned 404 for all tested PUT routes. Upload
-          // directly to the same configured B2 bucket using server-side
-          // credentials, then expose the object through the CDN's read URL.
+          // Send image bytes to the configured CDN_HOSTNAME proxy. The browser request
+          // stays on this authenticated API route; storage writes never target Pages
+          // or a hard-coded host.
           await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
           cdnUrl = getAppMediaUrl(env, key);
         } catch (error) {
