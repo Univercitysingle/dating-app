@@ -18,9 +18,6 @@ const purchaseSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  bankSlipUrl: {
-    type: String,
-  },
   status: {
     type: String,
     enum: ['pending', 'completed', 'rejected'],
