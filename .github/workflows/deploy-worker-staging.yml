@@ -157,7 +157,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
           const endpoint = process.env.B2_ENDPOINT;
-          const region = new URL(endpoint).hostname.match(/^s3[.-]([a-z0-9-]+)\\.backblazeb2\\.com$/i)?.[1];
+          const region = new URL(endpoint).hostname.match(/^s3[.-]([a-z0-9-]+)\.backblazeb2\.com$/i)?.[1];
           if (!region) throw new Error("B2_ENDPOINT has an unsupported Backblaze region hostname");
           const client = new S3Client({
             region,
