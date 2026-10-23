@@ -31,8 +31,11 @@ jobs:
       WEBXPAY_PUBLIC_KEY: ${{ secrets.WEBXPAY_PUBLIC_KEY }}
       WEBXPAY_SECRET_KEY: ${{ secrets.WEBXPAY_SECRET_KEY }}
       FRONTEND_URL: ${{ secrets.STAGING_FRONTEND_URL || 'https://dating-app-staging.pages.dev' }}
-      FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL || secrets.REACT_APP_FIREBASE_DATABASE_URL }}
+      FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL || secrets.REACT_APP_FIREBASE_REALTIME_DATABASE || secrets.REACT_APP_FIREBASE_DATABASE_URL }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      FIREBASE_CREDENTIALS_BASE64: ${{ secrets.FIREBASE_CREDENTIALS_BASE64 }}
+      FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+      FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
       SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
       SUPER_ADMIN_PASSWORD_HASH: ${{ secrets.SUPER_ADMIN_PASSWORD_HASH }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -110,13 +113,23 @@ jobs:
             echo "FIREBASE_DATABASE_URL was not exposed to this workflow; preserving any existing staging Worker secret."
           fi
 
-      - name: Configure optional superadmin authentication secrets
+      - name: Configure optional Firebase service-account secret
         shell: bash
         run: |
           set -euo pipefail
           if [[ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]]; then
             printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+          elif [[ -n "$FIREBASE_CREDENTIALS_BASE64" ]]; then
+            node -e 'const s=Buffer.from(process.env.FIREBASE_CREDENTIALS_BASE64,"base64").toString("utf8"); const j=JSON.parse(s); if(!j.client_email || !j.private_key) process.exit(2); process.stdout.write(JSON.stringify(j));' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+          elif [[ -n "$FIREBASE_CLIENT_EMAIL" && -n "$FIREBASE_PRIVATE_KEY" ]]; then
+            node -e 'const j={project_id:process.env.FIREBASE_PROJECT_ID,client_email:process.env.FIREBASE_CLIENT_EMAIL,private_key:process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g,"\n")}; if(!j.client_email || !j.private_key.includes("PRIVATE KEY")) process.exit(2); process.stdout.write(JSON.stringify(j));' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+          else
+            echo "No supported Firebase service-account secret was provided; preserving any existing Worker secret."
           fi
+      - name: Configure optional superadmin authentication secrets
+        shell: bash
+        run: |
+          set -euo pipefail
           if [[ -n "$SUPER_ADMIN_EMAIL" ]]; then
             printf '%s' "$SUPER_ADMIN_EMAIL" | npx --yes wrangler@4 secret put SUPER_ADMIN_EMAIL --config wrangler.jsonc --env staging
           fi
