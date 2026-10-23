@@ -8,7 +8,7 @@ test("CDN storage is enabled only when CDN_HOSTNAME is configured", () => {
   assert.equal(isCdnConfigured({ CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" }), true);
 });
 
-test("storage operations use root-level object URLs on CDN_HOSTNAME", async () => {
+test("storage operations route uploads, reads, and deletes through the configured CDN host URL", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, init = {}) => {
@@ -38,7 +38,7 @@ test("storage operations use root-level object URLs on CDN_HOSTNAME", async () =
   }
 });
 
-test("storage proxy errors are surfaced to the caller", async () => {
+test("CDN_HOSTURL and CDN_HOST_URL are accepted as upload-routing aliases", () => {\n  assert.equal(isCdnConfigured({ CDN_HOSTURL: "https://dateme.enadoctemp.workers.dev/" }), true);\n  assert.equal(isCdnConfigured({ CDN_HOST_URL: "https://dateme.enadoctemp.workers.dev/" }), true);\n  assert.equal(isCdnConfigured({ CDN_HOST: "https://dateme.enadoctemp.workers.dev/" }), true);\n});\n\ntest("storage proxy errors are surfaced to the caller", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response("not allowed", { status: 403 });
   try {
