@@ -1,5 +1,5 @@
 function getObjectUrl(env, key) {
-  const configured = String(env.CDN_HOSTNAME || "").trim();
+  const configured = String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim();
   if (!configured) throw new Error("CDN_HOSTNAME is not configured");
   const base = new URL(/^https?:\/\//i.test(configured) ? configured : "https://" + configured);
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
@@ -11,7 +11,7 @@ function getObjectUrl(env, key) {
 }
 
 export function isCdnConfigured(env) {
-  return Boolean(String(env.CDN_HOSTNAME || "").trim());
+  return Boolean(String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim());
 }
 
 async function proxyRequest(env, key, init) {
