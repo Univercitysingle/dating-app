@@ -1,7 +1,7 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
-import { isB2Configured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
+import { isCdnConfigured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -24,13 +24,8 @@ function getCdnObjectUrl(env, key, route = "root") {
 
 
 function getAppMediaUrl(env, key) {
-  const frontend = String(env.FRONTEND_URL || "").trim();
-  if (!frontend) throw new Error("FRONTEND_URL is not configured");
-  const base = new URL(frontend);
-  if (base.protocol !== "https:" && base.hostname !== "localhost") {
-    throw new Error("FRONTEND_URL must use HTTPS");
-  }
-  return new URL("/api/media/" + encodeURIComponent(key), base.origin).toString();
+  // Profile URLs must point directly at the configured CDN proxy, never Pages/API.
+  return getCdnObjectUrl(env, key, "root");
 }
 
 function normalizeWebXPayPublicKey(value) {
@@ -262,7 +257,7 @@ export default {
       try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
       // Support current UUID-based keys and older timestamp-based keys, including WebP.
       if (!/^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
-      if (!isB2Configured(env)) return json({ error: "Media storage unavailable" }, 503);
+      if (!isCdnConfigured(env)) return json({ error: "Media storage unavailable" }, 503);
       if (request.method === "PUT") {
         if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
         try {
@@ -271,7 +266,7 @@ export default {
             return json({ error: "Photo does not belong to the current user" }, 403);
           }
           const contentType = request.headers.get("content-type") || "";
-          const extensionByType = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif" };
+          const extensionByType = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" };
           const extension = extensionByType[contentType];
           if (!extension || !key.toLowerCase().endsWith("." + extension)) return json({ error: "Unsupported image type" }, 400);
           const declaredLength = Number(request.headers.get("content-length") || 0);
@@ -282,7 +277,10 @@ export default {
           const png = contentType === "image/png" && bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
           const gifSignature = bytes.length >= 6 ? String.fromCharCode(...bytes.slice(0, 6)) : "";
           const gif = contentType === "image/gif" && (gifSignature === "GIF89a" || gifSignature === "GIF87a");
-          if (!jpeg && !png && !gif) return json({ error: "File content does not match its image type" }, 400);
+          const webp = contentType === "image/webp" && bytes.length >= 12 &&
+            String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
+            String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+          if (!jpeg && !png && !gif && !webp) return json({ error: "File content does not match its image type" }, 400);
           await putPrivateObject(env, key, bytes, contentType, claims.sub);
           return json({ uploaded: true }, 201);
         } catch (error) {
@@ -714,7 +712,7 @@ export default {
         if (!env.CDN_HOSTNAME) {
           return json({ message: "Photo CDN is not configured" }, 503);
         }
-        if (!isB2Configured(env)) {
+        if (!isCdnConfigured(env)) {
           return json({ message: "Photo storage is not configured" }, 503);
         }
         const form = await request.formData().catch(() => null);
@@ -780,7 +778,7 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        if (!isB2Configured(env)) return json({ message: "Photo storage is not configured" }, 503);
+        if (!isCdnConfigured(env)) return json({ message: "Photo storage is not configured" }, 503);
         const payload = await request.json().catch(() => null);
         if (!payload || typeof payload.photoUrl !== "string" || !payload.photoUrl) return json({ error: "photoUrl is required." }, 400);
         let key = payload.photoUrl;
