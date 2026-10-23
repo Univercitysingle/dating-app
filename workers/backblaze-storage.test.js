@@ -1,39 +1,59 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isB2Configured, getPrivateObject } from "./backblaze-storage.js";
+import { isCdnConfigured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
 
-test("Backblaze storage is disabled until all credentials and bucket settings exist", () => {
-  assert.equal(isB2Configured({}), false);
-  assert.equal(isB2Configured({
-    B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
-    B2_BUCKET_NAME: "private-media",
-    B2_APPLICATION_KEY_ID: "key-id"
-  }), false);
-  assert.equal(isB2Configured({
-    B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
-    B2_BUCKET_NAME: "private-media",
-    B2_APPLICATION_KEY_ID: "key-id",
-    B2_APPLICATION_KEY: "secret"
-  }), true);
+test("CDN storage is enabled only when CDN_HOSTNAME is configured", () => {
+  assert.equal(isCdnConfigured({}), false);
+  assert.equal(isCdnConfigured({ CDN_HOSTNAME: " " }), false);
+  assert.equal(isCdnConfigured({ CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" }), true);
 });
 
-test("Backblaze endpoint validation rejects non-HTTPS and non-Backblaze endpoints", async () => {
+test("storage operations use root-level object URLs on CDN_HOSTNAME", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), method: init.method || "GET", headers: init.headers });
+    if ((init.method || "GET") === "GET") {
+      return new Response("image-bytes", { status: 200, headers: { "content-type": "image/jpeg", "content-length": "11" } });
+    }
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const env = { CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" };
+    const key = "photos-user-00000000-0000-0000-0000-000000000000.jpg";
+    await putPrivateObject(env, key, new Uint8Array([1, 2, 3]), "image/jpeg", "user", "profile-photo");
+    const object = await getPrivateObject(env, key);
+    assert.equal(object.ContentType, "image/jpeg");
+    assert.equal(object.ContentLength, 11);
+    assert.equal(await new Response(object.Body).text(), "image-bytes");
+    await deletePrivateObject(env, key);
+    assert.deepEqual(calls.map(call => [call.method, call.url]), [
+      ["PUT", "https://dateme.enadoctemp.workers.dev/" + key],
+      ["GET", "https://dateme.enadoctemp.workers.dev/" + key],
+      ["DELETE", "https://dateme.enadoctemp.workers.dev/" + key]
+    ]);
+    assert.equal(new Headers(calls[0].headers).get("content-type"), "image/jpeg");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("storage proxy errors are surfaced to the caller", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("not allowed", { status: 403 });
+  try {
+    await assert.rejects(
+      getPrivateObject({ CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev" }, "photos-user-00000000-0000-0000-0000-000000000000.jpg"),
+      /CDN storage proxy returned HTTP 403/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("invalid CDN proxy URLs are rejected", async () => {
   await assert.rejects(
-    getPrivateObject({
-      B2_ENDPOINT: "http://s3.us-west-004.backblazeb2.com",
-      B2_BUCKET_NAME: "private-media",
-      B2_APPLICATION_KEY_ID: "key-id",
-      B2_APPLICATION_KEY: "secret"
-    }, "photos-user-00000000-0000-0000-0000-000000000000.jpg"),
-    /HTTPS Backblaze S3 endpoint/
-  );
-  await assert.rejects(
-    getPrivateObject({
-      B2_ENDPOINT: "https://example.com",
-      B2_BUCKET_NAME: "private-media",
-      B2_APPLICATION_KEY_ID: "key-id",
-      B2_APPLICATION_KEY: "secret"
-    }, "photos-user-00000000-0000-0000-0000-000000000000.jpg"),
-    /HTTPS Backblaze S3 endpoint/
+    getPrivateObject({ CDN_HOSTNAME: "http://dateme.enadoctemp.workers.dev" }, "photos-user-00000000-0000-0000-0000-000000000000.jpg"),
+    /HTTPS proxy URL/
   );
 });
