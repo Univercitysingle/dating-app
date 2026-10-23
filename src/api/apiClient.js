@@ -1,4 +1,6 @@
 import logger from '../utils/logger';
+import { getAuth } from 'firebase/auth';
+import app from '../firebase';
 
 const apiClient = {
   async request(method, path, data = null, options = {}) {
@@ -13,7 +15,22 @@ const apiClient = {
         headers.set('Content-Type', 'application/json');
     }
 
-    const token = localStorage.getItem("authToken");
+    // Prefer the live Firebase user so Firebase can refresh an expired ID token
+    // before protected API calls. localStorage is retained for legacy/custom
+    // auth flows where the Firebase client has no current user.
+    let token = null;
+    try {
+      const firebaseUser = getAuth(app).currentUser;
+      token = firebaseUser
+        ? await firebaseUser.getIdToken()
+        : localStorage.getItem("authToken");
+      if (token && firebaseUser) localStorage.setItem("authToken", token);
+    } catch (error) {
+      logger.warn("Unable to refresh Firebase ID token before API request.", {
+        message: error && typeof error.message === "string" ? error.message : "Token refresh failed",
+      });
+      token = null;
+    }
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
