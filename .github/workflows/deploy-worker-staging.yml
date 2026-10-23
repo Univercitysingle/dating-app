@@ -118,11 +118,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]]; then
-            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
-          elif [[ -n "$FIREBASE_CREDENTIALS_BASE64" ]]; then
-            node -e 'const s=Buffer.from(process.env.FIREBASE_CREDENTIALS_BASE64,"base64").toString("utf8"); const j=JSON.parse(s); if(!j.client_email || !j.private_key) process.exit(2); process.stdout.write(JSON.stringify(j));' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" | node -e 'let s="";process.stdin.setEncoding("utf8");process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{try{const j=JSON.parse(s);if(!j.client_email||!j.private_key)throw Error();process.stdout.write(JSON.stringify(j));}catch{console.error("FIREBASE_SERVICE_ACCOUNT_JSON is not valid service-account JSON.");process.exit(2)}})' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
           elif [[ -n "$FIREBASE_CLIENT_EMAIL" && -n "$FIREBASE_PRIVATE_KEY" ]]; then
-            node -e 'const j={project_id:process.env.FIREBASE_PROJECT_ID,client_email:process.env.FIREBASE_CLIENT_EMAIL,private_key:process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g,"\n")}; if(!j.client_email || !j.private_key.includes("PRIVATE KEY")) process.exit(2); process.stdout.write(JSON.stringify(j));' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+            node -e 'const j={project_id:process.env.FIREBASE_PROJECT_ID,client_email:process.env.FIREBASE_CLIENT_EMAIL,private_key:process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g,"\n")}; if(!j.client_email || !j.private_key.includes("PRIVATE KEY")) {console.error("Firebase client email/private key are incomplete.");process.exit(2)} process.stdout.write(JSON.stringify(j));' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
+          elif [[ -n "$FIREBASE_CREDENTIALS_BASE64" ]]; then
+            node -e 'const s=Buffer.from(process.env.FIREBASE_CREDENTIALS_BASE64,"base64").toString("utf8"); let j; try{j=JSON.parse(s)}catch{console.error("FIREBASE_CREDENTIALS_BASE64 does not decode to valid JSON; set FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY or correct the base64 secret.");process.exit(2)} if(!j.client_email||!j.private_key){console.error("Decoded Firebase credentials lack client_email/private_key.");process.exit(2)} process.stdout.write(JSON.stringify(j));' | npx --yes wrangler@4 secret put FIREBASE_SERVICE_ACCOUNT_JSON --config wrangler.jsonc --env staging
           else
             echo "No supported Firebase service-account secret was provided; preserving any existing Worker secret."
           fi
