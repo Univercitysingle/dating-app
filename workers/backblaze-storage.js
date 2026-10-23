@@ -17,10 +17,18 @@ export function isCdnConfigured(env) {
 }
 
 async function proxyRequest(env, key, init) {
-  const response = await fetch(getObjectUrl(env, key), init);
+  const target = getObjectUrl(env, key);
+  const response = await fetch(target, init);
   if (!response.ok) {
-    const error = new Error("CDN storage proxy returned HTTP " + response.status);
+    // Log the configured destination host and verb without logging the user's
+    // object key or any authentication material. This distinguishes a wrong
+    // CDN_HOSTNAME secret from a rejection by the intended CDN proxy.
+    const targetUrl = new URL(target);
+    const method = String(init.method || "GET").toUpperCase();
+    const error = new Error("CDN storage proxy returned HTTP " + response.status + " for " + method + " " + targetUrl.host);
     error.statusCode = response.status;
+    error.targetHost = targetUrl.host;
+    error.method = method;
     throw error;
   }
   return response;
