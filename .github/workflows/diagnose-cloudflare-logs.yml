@@ -37,7 +37,7 @@ jobs:
             parameters: {
               datasets: ["cloudflare-workers"],
               needle: {
-                value: "MongoDB discovery|Discovery service unavailable|MongoDB discovery query failed|MongoServerError|Location40081|\\$in requires an array|Realtime chat write was rejected|Realtime chat is not configured|FirebaseTokenError|FirebaseKeyServiceError|Unauthorized",
+                value: "MongoDB discovery|Discovery service unavailable|MongoDB discovery query failed|MongoServerError|Location40081|\\$in requires an array|Photo storage upload failed|Private media proxy read failed|Media storage unavailable|Photo CDN is not configured|Photo storage is not configured|Photo metadata service unavailable|Photo upload failed|Media upload failed|Realtime chat write was rejected|Realtime chat is not configured|FirebaseTokenError|FirebaseKeyServiceError|Unauthorized",
                 isRegex: true,
                 matchCase: false
               }
