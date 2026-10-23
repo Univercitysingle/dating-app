@@ -65,6 +65,22 @@ test("GET /favicon.ico returns an empty response instead of an unmigrated-route 
   assert.equal(await response.text(), "");
 });
 
+test("legacy /api/media reads redirect to the configured CDN hostname", async () => {
+  const key = "photos-D6gTK2fprqcNk7hSWpWFPx8kdgE2-1757226432186.jpg";
+  const response = await worker.fetch(request("/api/media/" + key), {
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/"
+  });
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"),
+    "https://dateme.enadoctemp.workers.dev/" + key);
+});
+
+test("legacy /api/media reads fail closed when CDN_HOSTNAME is missing", async () => {
+  const response = await worker.fetch(request("/api/media/photos-user-1757226432186.jpg"), {});
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "Media storage unavailable" });
+});
+
 test("GET /health returns a non-sensitive liveness response", async () => {
   const response = await worker.fetch(request("/health"), { MIGRATION_STAGE: "test" });
   assert.equal(response.status, 200);
