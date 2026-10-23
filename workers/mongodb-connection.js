@@ -1889,7 +1889,7 @@ export class MongoDBConnection {
 
       if (Array.isArray(user.photos)) {
         for (const photo of user.photos) {
-          if (photo && typeof photo.url === "string" && photo.url && !/^https?:\/\//i.test(photo.url)) {
+          if (photo && typeof photo.url === "string" && photo.url) {
             photo.url = this.getMediaUrl(photo.url);
           }
         }
