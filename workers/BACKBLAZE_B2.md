@@ -21,7 +21,7 @@ npx wrangler@4 secret put B2_ENDPOINT --env staging
 
 Paste each value when prompted. These commands store the values in Cloudflare, not in source control. If your organization treats bucket name and endpoint as non-secret, they may instead be set as staging-only Wrangler variables. Never commit the application key.
 
-The staging deployment injects the existing `CDN_HOSTNAME` GitHub Actions secret into the Worker; do not hardcode the CDN hostname in `wrangler.jsonc`. For backward compatibility, photo URLs use the legacy `https://<CDN_HOSTNAME>/<object-key>` form. The CDN hostname must route the root-level generated photo key paths to this Worker proxy (which also accepts `/media/:key`). The workflow maps the legacy S3-compatible GitHub secrets `AWS_S3_ENDPOINT`, `AWS_S3_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to the Worker’s `B2_*` settings. The route permits only generated profile-photo keys; it does not provide bucket listing or arbitrary object access. Bank slips must not use this public-photo proxy.
+The staging deployment injects the existing `CDN_HOSTNAME` GitHub Actions secret into the Worker; do not hardcode the CDN hostname in `wrangler.jsonc`. For backward compatibility, photo URLs use the legacy `https://<CDN_HOSTNAME>/<object-key>` form. The CDN hostname must route the root-level generated photo key paths to this Worker proxy (which also accepts `/media/:key`). The workflow maps the legacy S3-compatible GitHub secrets `AWS_S3_ENDPOINT`, `AWS_S3_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` to the Worker’s `B2_*` settings. The route permits only generated profile-photo keys; it does not provide bucket listing or arbitrary object access.
 
 ## Validate before relying on it
 
@@ -32,4 +32,4 @@ The staging deployment injects the existing `CDN_HOSTNAME` GitHub Actions secret
 - Delete the photo and confirm the B2 object is gone.
 - Confirm invalid keys return 404 and that no application key appears in browser responses or logs.
 
-Automated tests validate configuration guards; they do not prove access to your real B2 account. Bank-slip storage, WebXPay settlement/callback verification, RTDB chat rules, scheduled expiration jobs, and full frontend end-to-end parity remain separate migration gates.
+Automated tests validate configuration guards; they do not prove access to your real B2 account. WebXPay settlement/callback verification, RTDB chat rules, scheduled expiration jobs, and full frontend end-to-end parity remain separate migration gates.
