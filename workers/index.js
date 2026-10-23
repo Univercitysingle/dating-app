@@ -301,7 +301,20 @@ export default {
         if (request.method === "HEAD") return new Response(null, { status: 200, headers });
         const body = object.Body && typeof object.Body.transformToWebStream === "function" ? object.Body.transformToWebStream() : object.Body;
         return new Response(body, { status: 200, headers });
-      } catch { return json({ error: "Media not found" }, 404); }
+      } catch (error) {
+        const status = error && (error.$metadata?.httpStatusCode || error.statusCode);
+        const missing = status === 404 || error?.name === "NoSuchKey" || error?.name === "NotFound";
+        if (!missing) {
+          console.error("Private media proxy read failed", {
+            name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
+            code: error && typeof error.Code === "string" ? error.Code.slice(0, 80) : undefined,
+            status: typeof status === "number" ? status : undefined,
+            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Storage read failed"
+          });
+          return json({ error: "Media storage unavailable" }, 503);
+        }
+        return json({ error: "Media not found" }, 404);
+      }
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
