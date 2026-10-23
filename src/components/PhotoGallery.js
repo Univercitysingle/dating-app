@@ -44,7 +44,7 @@ const CDN_HOST_URL = (
   process.env.REACT_APP_CDN_HOSTURL ||
   process.env.REACT_APP_CDN_HOSTNAME ||
   'https://dateme.enadoctemp.workers.dev/'
-.trim().replace(/\/+$/, '');
+ ).trim().replace(/\/+$/, '');
 
 const resolvePhotoUrl = (value) => {
   if (!value) return PLACEHOLDER_IMAGE;
