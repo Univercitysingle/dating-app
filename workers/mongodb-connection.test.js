@@ -57,15 +57,19 @@ test("pending subscription repairs the Stripe index before attempting insertion"
 });
 
 
-test("profile photo keys use the serverless frontend media route instead of the legacy CDN proxy", () => {
+test("profile photo URLs always use CDN_HOSTNAME, including legacy frontend media URLs", () => {
   const connection = new MongoDBConnection({}, {
     FRONTEND_URL: "https://dating-app-staging.pages.dev",
-    CDN_HOSTNAME: "dateme.enadoctemp.workers.dev"
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/"
   });
   const key = "photos-user-1234567890123.webp";
-  assert.equal(connection.getMediaUrl(key), "https://dating-app-staging.pages.dev/api/media/" + key);
+  assert.equal(connection.getMediaUrl(key), "https://dateme.enadoctemp.workers.dev/" + key);
+  assert.equal(
+    connection.getMediaUrl("https://dating-app-staging.pages.dev/api/media/" + key),
+    "https://dateme.enadoctemp.workers.dev/" + key
+  );
   assert.equal(
     connection.getMediaUrl("https://dateme.enadoctemp.workers.dev/" + key),
-    "https://dating-app-staging.pages.dev/api/media/" + key
+    "https://dateme.enadoctemp.workers.dev/" + key
   );
 });
