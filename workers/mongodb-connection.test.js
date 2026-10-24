@@ -38,7 +38,7 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
 });
 
 
-test("pending WebXPay subscriptions avoid null collisions with the legacy Stripe unique index", async () => {
+test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and PayHere unique indexes", async () => {
   const order = [];
   const user = { _id: "user-object-id", uid: "user-1", name: "Test User" };
   let insertedSubscription;
@@ -61,6 +61,8 @@ test("pending WebXPay subscriptions avoid null collisions with the legacy Stripe
   assert.equal(result.status, 201);
   assert.deepEqual(order, ["find-user", "check-active", "insert"]);
   assert.match(insertedSubscription.stripeSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
+  assert.match(insertedSubscription.payhereSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
+  assert.notEqual(insertedSubscription.stripeSubscriptionId, insertedSubscription.payhereSubscriptionId);
 });
 
 
