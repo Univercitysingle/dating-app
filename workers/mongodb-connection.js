@@ -2210,6 +2210,138 @@ export class MongoDBConnection {
     return roomId;
   }
 
+  async createCall(uid, payload) {
+    const { roomId, receiverUid, type, offer } = payload || {};
+    if (typeof uid !== "string" || !uid || typeof receiverUid !== "string" || !receiverUid ||
+        receiverUid === uid || typeof roomId !== "string" ||
+        ![uid + "-" + receiverUid, receiverUid + "-" + uid].includes(roomId) ||
+        !["audio", "video"].includes(type) || !offer || offer.type !== "offer" ||
+        typeof offer.sdp !== "string" || offer.sdp.length > 200000) {
+      return { status: 400, body: { error: "Invalid call request" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const [caller, receiver] = await Promise.all([
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } }),
+        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } })
+      ]);
+      if (!caller || !receiver) return { status: 404, body: { error: "Call participant not found" } };
+      const now = new Date();
+      if ((caller.suspendedUntil && new Date(caller.suspendedUntil) > now) ||
+          (receiver.suspendedUntil && new Date(receiver.suspendedUntil) > now) ||
+          (Array.isArray(caller.blocked) && caller.blocked.includes(receiverUid)) ||
+          (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid))) {
+        return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
+      }
+      const calls = db.collection("callSessions");
+      const active = await calls.findOne({
+        roomId, status: { $in: ["ringing", "accepted"] },
+        $or: [{ callerUid: uid }, { receiverUid: uid }]
+      }, { projection: { _id: 1 } });
+      if (active) return { status: 409, body: { error: "There is already an active call in this conversation" } };
+      const call = {
+        roomId, callerUid: uid, receiverUid, type, status: "ringing",
+        offer: { type: "offer", sdp: offer.sdp }, answer: null, signals: [],
+        createdAt: now, updatedAt: now
+      };
+      const inserted = await calls.insertOne(call);
+      call._id = inserted.insertedId;
+      return { status: 201, body: call };
+    } catch (error) {
+      console.error("Call creation failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Unable to start call" } };
+    }
+  }
+
+  async getCallState(uid, roomId) {
+    if (typeof uid !== "string" || !uid || typeof roomId !== "string" ||
+        roomId.length > 260 || roomId.length < 3) {
+      return { status: 400, body: { error: "Invalid call room" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const call = await db.collection("callSessions").findOne({
+        roomId, status: { $in: ["ringing", "accepted"] },
+        $or: [{ callerUid: uid }, { receiverUid: uid }]
+      }, { sort: { createdAt: -1 } });
+      if (!call) return { status: 200, body: { call: null, signals: [] } };
+      const signals = (Array.isArray(call.signals) ? call.signals : [])
+        .filter(signal => signal && signal.toUid === uid);
+      return { status: 200, body: { call, signals } };
+    } catch (error) {
+      console.error("Call state lookup failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Unable to retrieve call state" } };
+    }
+  }
+
+  async sendCallSignal(uid, payload) {
+    const { callId, candidate } = payload || {};
+    if (typeof callId !== "string" || !/^[a-fA-F0-9]{24}$/.test(callId) ||
+        !candidate || typeof candidate !== "object" ||
+        typeof candidate.candidate !== "string" || candidate.candidate.length > 10000) {
+      return { status: 400, body: { error: "Invalid ICE candidate" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const { ObjectId } = await import("mongodb");
+      const calls = db.collection("callSessions");
+      const call = await calls.findOne({ _id: new ObjectId(callId), status: { $in: ["ringing", "accepted"] } });
+      if (!call) return { status: 404, body: { error: "Active call not found" } };
+      let toUid;
+      if (call.callerUid === uid) toUid = call.receiverUid;
+      else if (call.receiverUid === uid) toUid = call.callerUid;
+      else return { status: 403, body: { error: "Not a participant in this call" } };
+      await calls.updateOne(
+        { _id: call._id, status: { $in: ["ringing", "accepted"] } },
+        { $push: { signals: { signalId: crypto.randomUUID(), fromUid: uid, toUid, candidate, createdAt: new Date() } },
+          $set: { updatedAt: new Date() } }
+      );
+      return { status: 200, body: { success: true } };
+    } catch (error) {
+      console.error("Call signaling failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Unable to send call signal" } };
+    }
+  }
+
+  async updateCall(uid, payload) {
+    const { callId, action, answer } = payload || {};
+    if (typeof callId !== "string" || !/^[a-fA-F0-9]{24}$/.test(callId) ||
+        !["accept", "decline", "end"].includes(action) ||
+        (action === "accept" && (!answer || answer.type !== "answer" ||
+          typeof answer.sdp !== "string" || answer.sdp.length > 200000))) {
+      return { status: 400, body: { error: "Invalid call action" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const { ObjectId } = await import("mongodb");
+      const calls = db.collection("callSessions");
+      const call = await calls.findOne({ _id: new ObjectId(callId) });
+      if (!call) return { status: 404, body: { error: "Call not found" } };
+      if (call.callerUid !== uid && call.receiverUid !== uid) {
+        return { status: 403, body: { error: "Not a participant in this call" } };
+      }
+      if (!["ringing", "accepted"].includes(call.status)) {
+        return { status: 200, body: { call, alreadyFinished: true } };
+      }
+      if (action !== "end" && uid !== call.receiverUid) {
+        return { status: 403, body: { error: "Only the recipient can accept or decline a call" } };
+      }
+      const next = action === "accept" ? "accepted" : action === "decline" ? "declined" : "ended";
+      const set = { status: next, updatedAt: new Date() };
+      if (action === "accept") set.answer = { type: "answer", sdp: answer.sdp };
+      await calls.updateOne(
+        { _id: call._id, status: { $in: ["ringing", "accepted"] } },
+        { $set: set }
+      );
+      const updated = await calls.findOne({ _id: call._id });
+      return { status: 200, body: { call: updated } };
+    } catch (error) {
+      console.error("Call update failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Unable to update call" } };
+    }
+  }
+
   async getChatHistory(uid, roomId, limit = 50, skip = 0) {
     if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
