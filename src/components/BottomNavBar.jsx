@@ -9,10 +9,6 @@ const Icon = ({ path }) => (
 );
 
 const BottomNavBar = () => {
-  const activeLinkStyle = {
-    color: 'var(--primary-color, #EF4444)', // Using a CSS variable or a fallback
-  };
-
   return (
     <nav
       className="app-bottom-nav fixed bottom-0 left-0 right-0 z-50"
