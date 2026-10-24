@@ -204,13 +204,13 @@ function Chat() {
   }
 
   return (
-    <div className="container mx-auto flex flex-col h-screen max-w-2xl border-x border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center flex-shrink-0">
+    <div className="chat-shell flex flex-col">
+      <header className="chat-header flex justify-between items-center flex-shrink-0 gap-3">
         {otherUser ? (
           <>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{otherUser.name}</h2>
-            <Link to={`/profile/${otherUser.uid}`} className="text-blue-500 hover:text-blue-700">
-              View Profile
+            <div className="flex min-w-0 items-center gap-3"><div aria-hidden="true" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-pink-100 text-base font-bold text-pink-700">{(otherUser.name || '?').trim().charAt(0).toUpperCase()}</div><div className="min-w-0"><h2 className="truncate text-base font-bold text-gray-900">{otherUser.name}</h2><p className="text-xs text-gray-500">Your conversation</p></div></div>
+            <Link to={'/profile/' + otherUser.uid} className="flex-shrink-0 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:border-pink-200 hover:text-pink-700">
+              View profile
             </Link>
           </>
         ) : (
@@ -218,8 +218,8 @@ function Chat() {
         )}
       </header>
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
-      <main className="flex-grow p-4 overflow-y-auto">
-        <div className="space-y-4">
+      <main className="chat-messages flex-grow overflow-y-auto p-5">
+        <div className="mx-auto flex max-w-2xl flex-col gap-4">
           {messages.map((msg) => (
             <ChatMessage
               key={msg._id}
@@ -238,18 +238,18 @@ function Chat() {
           </div>
         )}
       </main>
-      <footer className="bg-white dark:bg-gray-800 p-4 flex-shrink-0">
-        <form onSubmit={sendMessage} className="flex">
+      <footer className="chat-composer flex-shrink-0">
+        <form onSubmit={sendMessage} className="mx-auto flex max-w-2xl">
           <input
             value={input}
             onChange={handleInputChange}
-            className="flex-grow p-2 border rounded-l-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="flex-grow"
             placeholder={isRoomJoined ? "Type a message..." : "Connecting to chat..."}
             disabled={!isRoomJoined}
           />
           <button
             type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded-r-md disabled:bg-blue-300"
+            className="px-4 py-2 text-white disabled:cursor-not-allowed"
             disabled={!isRoomJoined}
           >
             Send
