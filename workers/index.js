@@ -746,15 +746,22 @@ export default {
         // The deployed media proxy accepts timestamp keys; UUID suffixes are rejected by its route validation.
         const key = "photos-" + claims.sub + "-" + Date.now() + "." + allowedTypes[file.type];
         let cdnUrl;
+        let proxyStatus;
         try {
           // The existing CDN proxy accepts PUT /<object-key> and signs the B2
           // request itself. Keep B2 credentials out of this API Worker.
           const proxyUrl = getCdnObjectUrl(env, key, "root");
+          const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
           const proxyResponse = await fetch(proxyUrl, {
             method: "PUT",
-            headers: { "Content-Type": file.type },
+            headers: {
+              "Content-Type": file.type,
+              // The proxy allowlists the staging frontend and API Worker origins.
+              "Origin": frontendOrigin
+            },
             body: fileBytes
           });
+          proxyStatus = proxyResponse.status;
           if (!proxyResponse.ok) {
             const proxyError = await proxyResponse.text().catch(() => "");
             throw new Error("CDN proxy PUT failed with status " + proxyResponse.status +
@@ -764,9 +771,13 @@ export default {
         } catch (error) {
           console.error("Photo storage upload failed", {
             name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
+            proxyStatus,
             message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Storage upload failed"
           });
-          return json({ message: "Photo storage upload failed" }, 503);
+          return json({
+            message: "Photo storage upload failed",
+            ...(proxyStatus ? { proxyStatus } : {})
+          }, 503);
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
