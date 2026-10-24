@@ -464,9 +464,9 @@ function Profile() {
   }
 
   return (
-    <div className="bg-neutral-50 dark:bg-neutral-900 min-h-screen">
-        <div className="container mx-auto p-4">
-            <div className="relative w-full h-96 md:h-[70vh] rounded-lg overflow-hidden shadow-lg mb-6">
+    <div className="profile-page min-h-screen">
+        <div className="page-container mx-auto w-full max-w-5xl p-4 sm:p-6">
+            <div className="profile-hero relative mb-6 h-80 w-full overflow-hidden rounded-3xl md:h-[min(70vh,680px)]">
               <PhotoGallery photos={profile.photos || []} onEdit={isOwnProfile ? () => setIsEditingPhotos(true) : null} />
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                     <h1 className="text-3xl font-bold text-white">{profile.name}, {profile.age}</h1>
