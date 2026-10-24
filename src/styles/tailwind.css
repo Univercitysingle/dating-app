@@ -665,3 +665,61 @@ nav.fixed.bottom-0.left-0.right-0 a svg {
     padding: 20px;
   }
 }
+
+
+/* Route-aware spacing prevents fixed navigation from covering full-height screens. */
+.app-main:has(.chat-shell),
+.app-main:has(.discover-page) {
+  padding-bottom: 0 !important;
+}
+
+.profile-card-photo {
+  background: #f1e4ea;
+  user-select: none;
+}
+
+.discover-page .relative.w-full.h-full.rounded-2xl {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 26px;
+  box-shadow: 0 24px 60px rgba(25, 20, 38, 0.22);
+}
+
+.discover-page .relative.w-full.h-full.rounded-2xl > div:first-child {
+  border-radius: inherit;
+}
+
+.discover-page .discover-stage .relative.w-full.h-full {
+  touch-action: pan-y;
+}
+
+.discover-page .discover-actions {
+  width: 100%;
+  max-width: 520px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.discover-page .discover-actions button {
+  min-width: 54px;
+  min-height: 54px;
+  border: 1px solid rgba(230, 230, 240, 0.95);
+}
+
+.login-card .app-primary-button {
+  background: linear-gradient(135deg, #f05a86, #c92e60);
+}
+
+.login-card button:not(.app-primary-button) {
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .discover-page .discover-stage {
+    padding-top: 0;
+  }
+
+  .discover-page .discover-actions button {
+    min-width: 50px;
+    min-height: 50px;
+  }
+}
