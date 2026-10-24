@@ -1076,10 +1076,10 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
-      // The existing Atlas collection may still have the legacy unique
-      // stripeSubscriptionId index, and the app's DB role may not be allowed to
-      // drop/recreate indexes at request time. Give each WebXPay transaction a
-      // unique non-Stripe marker so the legacy index cannot collide on null.
+      // Atlas still has legacy unique indexes for both Stripe and PayHere
+      // subscription IDs. A WebXPay pending record has neither provider ID, but
+      // those indexes treat multiple nulls as duplicates. Do not require DDL
+      // permissions at request time; use unique internal markers until settlement.
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
@@ -1094,9 +1094,10 @@ export class MongoDBConnection {
         userId: user._id,
         plan,
         status: "pending",
-        // WebXPay does not issue a Stripe subscription ID. Keep this field
-        // unique only for compatibility with the legacy unique MongoDB index.
+        // WebXPay does not issue Stripe or PayHere subscription IDs. Unique
+        // internal markers prevent legacy unique indexes from colliding on null.
         stripeSubscriptionId: "webxpay-pending-" + crypto.randomUUID(),
+        payhereSubscriptionId: "webxpay-pending-" + crypto.randomUUID(),
         createdAt: now,
         updatedAt: now
       };
