@@ -219,18 +219,18 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const active = call && ['ringing', 'accepted'].includes(call.status);
   const videoCall = call?.type === 'video';
 
-  return <section className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+  return <section className="chat-call-panel">
     <div className="flex flex-wrap items-center gap-2">
-      <span className="mr-auto text-sm font-medium text-gray-700 dark:text-gray-200">Call {otherUser?.name || 'user'}</span>
+      <span className="mr-auto text-sm font-semibold text-gray-800">Call {otherUser?.name || 'user'}</span>
       {!active && <>
-        <button type="button" onClick={() => startCall('audio')} className="rounded-md bg-green-600 px-3 py-2 text-sm text-white">Voice call</button>
-        <button type="button" onClick={() => startCall('video')} className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white">Video call</button>
+        <button type="button" onClick={() => startCall('audio')} className="call-action call-action-voice rounded-md px-3 py-2 text-sm text-white">Voice call</button>
+        <button type="button" onClick={() => startCall('video')} className="call-action call-action-video rounded-md px-3 py-2 text-sm text-white">Video call</button>
       </>}
       {incoming && <>
-        <button type="button" onClick={acceptCall} className="rounded-md bg-green-600 px-3 py-2 text-sm text-white">Accept</button>
-        <button type="button" onClick={() => finishCall('decline')} className="rounded-md bg-red-600 px-3 py-2 text-sm text-white">Decline</button>
+        <button type="button" onClick={acceptCall} className="call-action call-action-voice rounded-md px-3 py-2 text-sm text-white">Accept</button>
+        <button type="button" onClick={() => finishCall('decline')} className="call-action call-action-danger rounded-md px-3 py-2 text-sm text-white">Decline</button>
       </>}
-      {active && !incoming && <button type="button" onClick={() => finishCall('end')} className="rounded-md bg-red-600 px-3 py-2 text-sm text-white">Hang up</button>}
+      {active && !incoming && <button type="button" onClick={() => finishCall('end')} className="call-action call-action-danger rounded-md px-3 py-2 text-sm text-white">Hang up</button>}
     </div>
     {status && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
