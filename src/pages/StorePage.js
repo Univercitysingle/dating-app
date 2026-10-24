@@ -60,8 +60,8 @@ const StorePage = () => {
 
   return (
     <>
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-6">Store</h1>
+      <div className="page-container store-page mx-auto w-full max-w-5xl p-4 sm:p-6">
+        <div className="mb-6"><p className="page-eyebrow">MAKE YOUR MOMENT</p><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">The store</h1><p className="mt-2 text-sm text-gray-500">A few extra ways to make a connection.</p></div>
 
         {notification.show && (
           <div className={`border-l-4 p-4 mb-6 ${notification.type === 'success' ? 'bg-green-100 border-green-500 text-green-700' : notification.type === 'error' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-blue-100 border-blue-500 text-blue-700'}`} role="alert">
@@ -72,15 +72,15 @@ const StorePage = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {storeItems.map((item) => (
-            <div key={item.id} className="bg-white p-6 shadow rounded-lg text-center flex flex-col justify-between">
+            <div key={item.id} className="store-card flex flex-col justify-between rounded-2xl p-6 text-center">
               <div>
-                <h2 className="text-xl font-semibold mb-2">{item.name}</h2>
-                <p className="text-gray-600 mb-4">{item.description}</p>
-                <p className="text-lg text-gray-800 font-bold mb-4">{item.price}</p>
+                <h2 className="mb-2 text-xl font-bold tracking-tight text-gray-900">{item.name}</h2>
+                <p className="mb-4 text-sm leading-6 text-gray-500">{item.description}</p>
+                <p className="mb-4 text-lg font-bold text-gray-900">{item.price}</p>
               </div>
               <button
                 onClick={() => handlePurchaseClick(item)}
-                className="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+                className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white"
               >
                 Purchase
               </button>
