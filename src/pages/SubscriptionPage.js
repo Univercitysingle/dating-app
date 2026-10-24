@@ -115,23 +115,42 @@ const SubscriptionPage = () => {
   };
 
   const handleContinue = async () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan || isProcessing) {
+      if (!selectedPlan) {
+        setNotification({ show: true, message: 'Select Weekly, Monthly, or Yearly before continuing.', type: 'error' });
+      }
+      return;
+    }
+
+    // Open the window synchronously during the click gesture so browser popup
+    // blockers do not prevent the IPG checkout after the API request completes.
+    const paymentWindow = window.open('', '_blank');
+    if (!paymentWindow) {
+      setNotification({ show: true, message: 'The payment window was blocked. Allow pop-ups for this site and try again.', type: 'error' });
+      return;
+    }
+    paymentWindow.document.title = 'Connecting to payment gateway';
+    paymentWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 24px">Connecting securely to the payment gateway…</p>';
 
     setIsProcessing(true);
     setNotification({ show: false, message: '', type: 'info' });
 
     try {
       const response = await apiClient.post('/subscription', selectedPlan);
-      const paymentWindow = window.open('', '_blank');
-      if (paymentWindow) {
-        paymentWindow.document.write(response);
-        paymentWindow.document.close();
-      } else {
-        throw new Error('Could not open payment window. Please disable your pop-up blocker.');
+      if (typeof response !== 'string' || !response.trim()) {
+        throw new Error('The payment gateway did not return a checkout form. Please try again.');
       }
+      paymentWindow.document.open();
+      paymentWindow.document.write(response);
+      paymentWindow.document.close();
       setNotification({ show: true, message: 'Redirecting to payment gateway...', type: 'info' });
     } catch (err) {
-      setNotification({ show: true, message: err.response?.data?.message || err.message || 'An error occurred.', type: 'error' });
+      if (!paymentWindow.closed) paymentWindow.close();
+      setNotification({
+        show: true,
+        message: err.data?.error || err.data?.message || err.message || 'Could not start your subscription. Please try again.',
+        type: 'error'
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -171,10 +190,13 @@ const SubscriptionPage = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((plan) => (
-            <div
+            <button
+              type="button"
               key={plan.name}
               onClick={() => handleSelectPlan(plan)}
-              className={`rounded-lg p-6 shadow-card transition-transform duration-300
+              aria-pressed={selectedPlan?.name === plan.name}
+              disabled={currentSubscription?.status === 'active' && !isVerifyingPayment}
+              className={`w-full text-left rounded-lg p-6 shadow-card transition-transform duration-300
                 ${(currentSubscription?.status === 'active' && !isVerifyingPayment) ? 'cursor-not-allowed bg-gray-200' : 'cursor-pointer hover:scale-105'}
                 ${selectedPlan?.name === plan.name ? 'border-4 border-primary' : 'border-2 border-transparent'}
               `}
@@ -191,7 +213,10 @@ const SubscriptionPage = () => {
                   </li>
                 ))}
               </ul>
-            </div>
+              <span className="block mt-4 text-sm font-semibold text-primary-dark">
+                {selectedPlan?.name === plan.name ? 'Selected' : 'Choose this plan'}
+              </span>
+            </button>
           ))}
         </div>
 
