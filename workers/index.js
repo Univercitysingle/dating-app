@@ -785,7 +785,9 @@ export default {
         }
         return json({
           ...result,
-          cdnUrl
+          fileUrl: key,
+          cdnUrl,
+          size: file.size
         }, metadataResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
