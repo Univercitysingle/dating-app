@@ -228,10 +228,6 @@ export class MongoDBConnection {
       const client = await this.getClient();
       const db = this.getDatabase(client);
       await db.command({ ping: 1 });
-      // The deployment readiness probe uses this method. Run the index
-      // migration there so staging is repaired before authenticated traffic
-      // attempts to create its first subscription.
-      await this.ensureSubscriptionIndexes(db);
       return { ok: true };
     } catch (error) {
       console.error("MongoDB readiness probe failed", {
