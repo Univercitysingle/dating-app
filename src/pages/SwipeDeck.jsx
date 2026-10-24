@@ -139,31 +139,31 @@ const SwipeDeck = () => {
   };
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-screen"><p>Loading profiles...</p></div>;
+    return <div className="state-panel flex min-h-[60vh] items-center justify-center"><p>Finding people for you…</p></div>;
   }
 
   if (error) {
-    return <div className="flex justify-center items-center h-screen"><p className="text-red-500">Error: {error}</p></div>;
+    return <div className="state-panel state-error flex min-h-[60vh] items-center justify-center"><p role="alert">We could not load profiles. {error}</p></div>;
   }
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-50 dark:bg-neutral-900">
+    <div className="discover-page flex flex-col bg-neutral-50 dark:bg-neutral-900">
         {swipeError && (
           <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
             {swipeError}
           </div>
         )}
-        <header className="flex-shrink-0 flex justify-between items-center p-4">
-            <h1 className="text-2xl font-bold text-center text-neutral-700 dark:text-neutral-200">Discover</h1>
-            <button onClick={() => setShowFilters(true)} className="p-2 bg-white rounded-full shadow-md" aria-label="Open filter menu">
+        <header className="discover-header flex-shrink-0 flex justify-between items-center px-4 py-4 sm:px-6">
+            <div><p className="page-eyebrow">YOUR NEXT CONNECTION</p><h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-3xl">Discover</h1></div>
+            <button onClick={() => setShowFilters(true)} className="filter-button rounded-full p-3 shadow-sm" aria-label="Open filter menu">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 4a2 2 0 100 4m0-4a2 2 0 110 4m-6 8v-2m0 4v.01M6 14a2 2 0 100-4m0 4a2 2 0 110-4m12 4v-2m0 4v.01M18 14a2 2 0 100-4m0 4a2 2 0 110-4M4 6h16M4 12h16M4 18h16" />
                 </svg>
             </button>
         </header>
 
-        <main className="flex-grow flex flex-col items-center justify-center pt-4">
-            <div className="relative w-[90vw] h-[70vh] max-w-sm">
+        <main className="discover-stage flex flex-grow flex-col items-center justify-center px-3 pt-2">
+            <div className="relative h-[min(66dvh,680px)] w-[min(90vw,410px)] max-w-full">
                 <AnimatePresence>
                     {users.length > 0 ? (
                         users.slice(0, 3).reverse().map((user, index) => {
@@ -190,7 +190,7 @@ const SwipeDeck = () => {
             </div>
         </main>
 
-        <footer className="flex-shrink-0 p-4">
+        <footer className="discover-actions flex-shrink-0 px-4 pb-5 pt-2">
             {users.length > 0 && !newMatchInfo && (
                 <div className="flex justify-center items-center my-4 space-x-4">
                     <button
