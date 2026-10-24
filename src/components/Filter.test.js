@@ -3,13 +3,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import Filter from './Filter';
 
 describe('Filter component', () => {
-  it('should render with default values', () => {
+  it('renders the filter drawer with sensible defaults', () => {
     render(<Filter onApply={() => {}} />);
-    expect(screen.getByText('Age Range: 18 - 100')).toBeInTheDocument();
-    expect(screen.getByText('Max Distance: 100 km')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your preferences' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Minimum age')).toHaveValue('18');
+    expect(screen.getByLabelText('Maximum age')).toHaveValue('100');
+    expect(screen.getByText('100 km')).toBeInTheDocument();
   });
 
-  it('should call onApply with the correct values', () => {
+  it('applies the selected filters in the API-compatible shape', () => {
     const onApply = jest.fn();
     render(<Filter onApply={onApply} />);
 
@@ -24,27 +26,29 @@ describe('Filter component', () => {
     });
   });
 
-  it('should not allow minAge to be greater than maxAge', () => {
+  it('does not allow the minimum age to exceed the maximum', () => {
     render(<Filter onApply={() => {}} />);
-    const sliders = screen.getAllByRole('slider');
-    const minAgeSlider = sliders[0];
-    const maxAgeSlider = sliders[1];
+    fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '30' } });
+    fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '40' } });
 
-    fireEvent.change(maxAgeSlider, { target: { value: '30' } });
-    fireEvent.change(minAgeSlider, { target: { value: '40' } });
-
-    expect(screen.getByText('Age Range: 30 - 30')).toBeInTheDocument();
+    expect(screen.getByText('30–30')).toBeInTheDocument();
   });
 
-  it('should not allow maxAge to be less than minAge', () => {
+  it('does not allow the maximum age to fall below the minimum', () => {
     render(<Filter onApply={() => {}} />);
-    const sliders = screen.getAllByRole('slider');
-    const minAgeSlider = sliders[0];
-    const maxAgeSlider = sliders[1];
+    fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '40' } });
 
-    fireEvent.change(minAgeSlider, { target: { value: '50' } });
-    fireEvent.change(maxAgeSlider, { target: { value: '40' } });
+    expect(screen.getByText('50–50')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Age Range: 50 - 50')).toBeInTheDocument();
+  it('resets preferences without submitting the form', () => {
+    const onApply = jest.fn();
+    render(<Filter onApply={onApply} />);
+    fireEvent.change(screen.getByLabelText('Maximum distance'), { target: { value: '25' } });
+    fireEvent.click(screen.getByText('Reset'));
+
+    expect(screen.getByText('100 km')).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
   });
 });
