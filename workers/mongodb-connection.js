@@ -2268,7 +2268,9 @@ export class MongoDBConnection {
       if (!call) return { status: 200, body: { call: null, signals: [] } };
       const signals = (Array.isArray(call.signals) ? call.signals : [])
         .filter(signal => signal && signal.toUid === uid);
-      return { status: 200, body: { call, signals } };
+      const safeCall = { ...call };
+      delete safeCall.signals;
+      return { status: 200, body: { call: safeCall, signals } };
     } catch (error) {
       console.error("Call state lookup failed", { message: error?.message?.slice(0, 180) });
       return { status: 503, body: { error: "Unable to retrieve call state" } };
@@ -2335,6 +2337,7 @@ export class MongoDBConnection {
         { $set: set }
       );
       const updated = await calls.findOne({ _id: call._id });
+      if (updated) delete updated.signals;
       return { status: 200, body: { call: updated } };
     } catch (error) {
       console.error("Call update failed", { message: error?.message?.slice(0, 180) });
