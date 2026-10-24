@@ -57,6 +57,7 @@ const SwipeDeck = () => {
   const [swipeError, setSwipeError] = useState(null);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({});
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -134,9 +135,17 @@ const SwipeDeck = () => {
   };
 
   const handleApplyFilters = (filters) => {
+    setActiveFilters(filters);
     fetchUsersToSwipe(filters);
     setShowFilters(false);
   };
+
+  const activeFilterCount = Object.entries(activeFilters).filter(([key, value]) => {
+    if (key === 'minAge') return Number(value) !== 18;
+    if (key === 'maxAge') return Number(value) !== 100;
+    if (key === 'maxDistance') return Number(value) !== 100;
+    return Boolean(value);
+  }).length;
 
   if (isLoading) {
     return <div className="state-panel flex min-h-[60vh] items-center justify-center"><p>Finding people for you…</p></div>;
@@ -155,10 +164,12 @@ const SwipeDeck = () => {
         )}
         <header className="discover-header flex-shrink-0 flex justify-between items-center px-4 py-4 sm:px-6">
             <div><p className="page-eyebrow">YOUR NEXT CONNECTION</p><h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-3xl">Discover</h1></div>
-            <button onClick={() => setShowFilters(true)} className="filter-button rounded-full p-3 shadow-sm" aria-label="Open filter menu">
+            <button onClick={() => setShowFilters(true)} className="filter-button rounded-full px-4 py-3 shadow-sm" aria-label="Open filters">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 4a2 2 0 100 4m0-4a2 2 0 110 4m-6 8v-2m0 4v.01M6 14a2 2 0 100-4m0 4a2 2 0 110-4m12 4v-2m0 4v.01M18 14a2 2 0 100-4m0 4a2 2 0 110-4M4 6h16M4 12h16M4 18h16" />
                 </svg>
+                <span>Filters</span>
+                {activeFilterCount > 0 && <span className="filter-count" aria-label={`${activeFilterCount} active filters`}>{activeFilterCount}</span>}
             </button>
         </header>
 
@@ -245,8 +256,16 @@ const SwipeDeck = () => {
         )}
 
         {showFilters && (
-            <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
-                <Filter onApply={handleApplyFilters} />
+            <div
+                className="discover-filter-overlay"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) setShowFilters(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setShowFilters(false);
+                }}
+              >
+                <Filter onApply={handleApplyFilters} onClose={() => setShowFilters(false)} />
             </div>
         )}
     </div>
