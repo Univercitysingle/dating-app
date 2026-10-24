@@ -92,9 +92,9 @@ const Onboarding = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center">Complete Your Profile</h2>
+    <div className="auth-page flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="auth-card w-full max-w-xl space-y-6 rounded-3xl p-6 sm:p-9">
+        <div className="text-center"><p className="page-eyebrow">MAKE IT YOU</p><h2 className="text-3xl font-bold tracking-tight text-gray-900">Complete your profile</h2><p className="mt-2 text-sm text-gray-500">Help people get to know the real you.</p></div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="name">Name</label>
@@ -106,7 +106,7 @@ const Onboarding = () => {
               maxLength="25"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -120,7 +120,7 @@ const Onboarding = () => {
               yearDropdownItemNumber={100}
               scrollableYearDropdown
               dateFormat="yyyy/MM/dd"
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -131,7 +131,7 @@ const Onboarding = () => {
               required
               value={gender}
               onChange={(e) => setGender(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             >
               <option value="">Select Gender</option>
               <option value="Male">Male</option>
@@ -147,7 +147,7 @@ const Onboarding = () => {
               required
               value={personalityType}
               onChange={(e) => setPersonalityType(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             >
               <option value="">Select Personality Type</option>
               {[
@@ -173,7 +173,7 @@ const Onboarding = () => {
                 }
               }}
               maxLength="16"
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div className="flex space-x-4">
@@ -192,7 +192,7 @@ const Onboarding = () => {
                   setHeightFeet(e.target.value.replace(/[^0-9]/g, ''));
                 }}
                 maxLength="2"
-                className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
               />
             </div>
             <div>
@@ -210,7 +210,7 @@ const Onboarding = () => {
                   setHeightInches(e.target.value.replace(/[^0-9]/g, ''));
                 }}
                 maxLength="2"
-                className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
               />
             </div>
           </div>
@@ -223,7 +223,7 @@ const Onboarding = () => {
               required
               value={education}
               onChange={(e) => setEducation(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -234,7 +234,7 @@ const Onboarding = () => {
               required
               value={relationshipGoals}
               onChange={(e) => setRelationshipGoals(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             >
               <option value="">Select Goals</option>
               <option value="Long-term relationship">Long-term relationship</option>
@@ -253,7 +253,7 @@ const Onboarding = () => {
               required
               value={lookingFor}
               onChange={(e) => setLookingFor(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             >
               <option value="">Select What You're Looking For</option>
               <option value="Relationship">Relationship</option>
@@ -266,7 +266,7 @@ const Onboarding = () => {
           <button
             type="button"
             onClick={handleLocation}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white"
           >
             Get Location
           </button>
@@ -279,7 +279,7 @@ const Onboarding = () => {
           <div>
             <button
               type="submit"
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white"
             >
               Save and Continue
             </button>
