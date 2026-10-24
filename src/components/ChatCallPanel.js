@@ -22,10 +22,14 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const pollingRef = useRef(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
 
   useEffect(() => { callRef.current = call; }, [call]);
   useEffect(() => { if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream; }, [localStream]);
-  useEffect(() => { if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream; }, [remoteStream]);
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
+    if (remoteAudioRef.current && remoteStream) remoteAudioRef.current.srcObject = remoteStream;
+  }, [remoteStream]);
 
   const cleanupMedia = useCallback(() => {
     if (peerRef.current) {
@@ -231,6 +235,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     {status && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
     {active && <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      {!videoCall && <audio ref={remoteAudioRef} autoPlay />}
       {videoCall && <div className="relative min-h-40 overflow-hidden rounded-lg bg-black">
         <video ref={remoteVideoRef} autoPlay playsInline className="h-full min-h-40 max-h-72 w-full object-cover" />
         {!remoteStream && <span className="absolute inset-0 flex items-center justify-center text-sm text-white">Waiting for video…</span>}
