@@ -38,22 +38,29 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
 });
 
 
-test("pending subscription repairs the Stripe index before attempting insertion", async () => {
+test("pending WebXPay subscriptions avoid null collisions with the legacy Stripe unique index", async () => {
   const order = [];
   const user = { _id: "user-object-id", uid: "user-1", name: "Test User" };
+  let insertedSubscription;
   const subscriptions = {
     async findOne() { order.push("check-active"); return null; },
-    async insertOne(doc) { order.push("insert"); assert.equal(doc.status, "pending"); return { insertedId: "subscription-id" }; }
+    async insertOne(doc) {
+      order.push("insert");
+      insertedSubscription = doc;
+      assert.equal(doc.status, "pending");
+      return { insertedId: "subscription-id" };
+    }
   };
   const users = { async findOne() { order.push("find-user"); return user; } };
   const db = { collection(name) { return name === "users" ? users : subscriptions; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
-  connection.ensureSubscriptionIndexes = async () => { order.push("repair-index"); };
+  connection.ensureSubscriptionIndexes = async () => { assert.fail("Request-time subscription creation must not require index permissions"); };
   const result = await connection.createPendingSubscription("user-1", "monthly");
   assert.equal(result.status, 201);
-  assert.deepEqual(order, ["repair-index", "find-user", "check-active", "insert"]);
+  assert.deepEqual(order, ["find-user", "check-active", "insert"]);
+  assert.match(insertedSubscription.stripeSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
 });
 
 
