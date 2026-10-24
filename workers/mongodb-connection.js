@@ -2479,6 +2479,20 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if (url.pathname === "/internal/calls/start" ||
+        url.pathname === "/internal/calls/poll" ||
+        url.pathname === "/internal/calls/signal" ||
+        url.pathname === "/internal/calls/action") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/calls/start") result = await this.createCall(body.claims.sub, body.payload);
+      else if (url.pathname === "/internal/calls/poll") result = await this.getCallState(body.claims.sub, body.roomId);
+      else if (url.pathname === "/internal/calls/signal") result = await this.sendCallSignal(body.claims.sub, body.payload);
+      else result = await this.updateCall(body.claims.sub, body.payload);
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/chat/history" ||
         url.pathname === "/internal/chat/conversations" ||
         url.pathname === "/internal/chat/send" ||
