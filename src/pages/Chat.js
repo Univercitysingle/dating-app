@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import logger from '../utils/logger';
 import ChatMessage from '../components/ChatMessage';
+import ChatCallPanel from '../components/ChatCallPanel';
 import { database } from '../firebase';
 import { ref, onChildAdded, off } from 'firebase/database';
 
@@ -216,6 +217,7 @@ function Chat() {
           <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white">Chat Room</h2>
         )}
       </header>
+      {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
       <main className="flex-grow p-4 overflow-y-auto">
         <div className="space-y-4">
           {messages.map((msg) => (
