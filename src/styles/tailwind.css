@@ -82,7 +82,7 @@ select:focus-visible {
 
 /* Consistent, quiet surfaces for the chat experience. */
 .chat-shell {
-  height: min(100dvh, 1000px);
+  height: min(calc(100dvh - var(--bottom-nav-height) - 24px), 900px);
   min-height: 520px;
   max-width: 880px;
   margin: 0 auto;
