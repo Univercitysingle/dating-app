@@ -81,9 +81,9 @@ const Register = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center">Register</h2>
+    <div className="auth-page flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="auth-card w-full max-w-lg space-y-6 rounded-3xl p-6 sm:p-9">
+        <div className="text-center"><p className="page-eyebrow">YOUR NEXT CHAPTER</p><h2 className="text-3xl font-bold tracking-tight text-gray-900">Create your account</h2><p className="mt-2 text-sm text-gray-500">A few details to get your profile started.</p></div>
         <form onSubmit={handleRegister} className="space-y-6">
           <div>
             <label htmlFor="email-address">Email address</label>
@@ -95,7 +95,7 @@ const Register = () => {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -108,7 +108,7 @@ const Register = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -120,7 +120,7 @@ const Register = () => {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -134,7 +134,7 @@ const Register = () => {
               yearDropdownItemNumber={100}
               scrollableYearDropdown
               dateFormat="yyyy/MM/dd"
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             />
           </div>
           <div>
@@ -145,7 +145,7 @@ const Register = () => {
               required
               value={gender}
               onChange={(e) => setGender(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 placeholder-gray-400 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
             >
               <option value="">Select Gender</option>
               <option value="Male">Male</option>
@@ -157,7 +157,7 @@ const Register = () => {
           <button
             type="button"
             onClick={handleLocation}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white"
           >
             Get Location
           </button>
@@ -170,7 +170,7 @@ const Register = () => {
           <div>
             <button
               type="submit"
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white"
             >
               Register
             </button>
