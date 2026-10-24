@@ -15,7 +15,7 @@ describe('Filter component', () => {
     const onApply = jest.fn();
     render(<Filter onApply={onApply} />);
 
-    fireEvent.click(screen.getByText('Apply Filters'));
+    fireEvent.click(screen.getByRole('button', { name: /Apply Filters/ }));
 
     expect(onApply).toHaveBeenCalledWith({
       minAge: 18,
