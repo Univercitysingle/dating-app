@@ -216,18 +216,17 @@ test("MongoDB Durable Object ping fails closed without a URI", async () => {
   assert.deepEqual(await connection.ping(), { ok: false });
 });
 
-test("MongoDB readiness probe applies subscription index migration before reporting healthy", async () => {
+test("MongoDB readiness probe checks connectivity without requiring index-management permissions", async () => {
   const events = [];
   const db = { async command(value) { events.push(value); return { ok: 1 }; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
-  connection.ensureSubscriptionIndexes = async receivedDb => {
-    assert.equal(receivedDb, db);
-    events.push("indexes");
+  connection.ensureSubscriptionIndexes = async () => {
+    assert.fail("Readiness must not require subscription index-management permissions");
   };
   assert.deepEqual(await connection.ping(), { ok: true });
-  assert.deepEqual(events, [{ ping: 1 }, "indexes"]);
+  assert.deepEqual(events, [{ ping: 1 }]);
 });
 
 test("MongoDB Durable Object exposes no general-purpose HTTP operation", async () => {
