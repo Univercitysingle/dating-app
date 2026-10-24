@@ -174,10 +174,10 @@ const SubscriptionPage = () => {
   };
 
   return (
-    <div className="bg-neutral-50 min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-center text-primary-dark mb-2">Choose Your Plan</h1>
-        <p className="text-center text-neutral-600 mb-8">Unlock exclusive features and find your match faster.</p>
+    <div className="page-container subscription-page min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-5xl mx-auto">
+        <p className="page-eyebrow text-center">MORE WAYS TO CONNECT</p><h1 className="text-3xl font-bold tracking-tight text-center text-gray-900 mb-2 sm:text-5xl">Find your kind of premium</h1>
+        <p className="text-center text-gray-500 mb-8">Unlock extra features and spend more time making meaningful connections.</p>
 
         {notification.show && (
             <div className={`border-l-4 p-4 mb-6 ${notification.type === 'success' ? 'bg-green-100 border-green-500 text-green-700' : notification.type === 'error' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-blue-100 border-blue-500 text-blue-700'}`} role="alert">
