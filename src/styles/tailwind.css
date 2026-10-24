@@ -723,3 +723,451 @@ nav.fixed.bottom-0.left-0.right-0 a svg {
     min-height: 50px;
   }
 }
+
+
+/* Discover filter panel — a focused, accessible drawer rather than a generic popup. */
+.discover-filter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  background: rgba(25, 20, 29, 0.54);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: filter-overlay-in 160ms ease-out;
+}
+
+.discover-filter-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 490px);
+  max-height: 100%;
+  overflow: hidden;
+  border-left: 1px solid rgba(40, 28, 39, 0.12);
+  background: #fffdfb;
+  color: #29232d;
+  box-shadow: -18px 0 50px rgba(25, 20, 29, 0.18);
+  animation: filter-panel-in 200ms ease-out;
+}
+
+.discover-filter-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px 28px 22px;
+  border-bottom: 1px solid #eee7e4;
+}
+
+.discover-filter-header .page-eyebrow {
+  margin: 0 0 7px;
+  color: #a3475d;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.discover-filter-header h2 {
+  margin: 0;
+  color: #29232d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(25px, 3vw, 32px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.filter-intro {
+  max-width: 330px;
+  margin: 10px 0 0;
+  color: #746a72;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.filter-close {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #e9dfdf;
+  border-radius: 50%;
+  background: transparent;
+  color: #554650;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.filter-close:hover {
+  border-color: #d8a4b1;
+  background: #fbf0f2;
+}
+
+.discover-filter-panel form {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.discover-filter-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 28px 24px;
+  overscroll-behavior: contain;
+}
+
+.filter-section {
+  padding: 22px 0 24px;
+  border-bottom: 1px solid #eee7e4;
+}
+
+.filter-section:last-child {
+  border-bottom: 0;
+}
+
+.filter-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.filter-section-heading h3 {
+  margin: 0;
+  color: #302832;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.filter-section-heading > span {
+  color: #9a8b93;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.filter-field {
+  min-width: 0;
+  margin-top: 16px;
+}
+
+.filter-section-heading + .filter-field {
+  margin-top: 0;
+}
+
+.filter-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #514650;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.filter-range-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.filter-range-heading output {
+  color: #9e3f5a;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-range-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.filter-range-caption {
+  display: block;
+  margin-bottom: 7px;
+  color: #988b93;
+  font-size: 11px;
+}
+
+.filter-range-pair input,
+.filter-distance-field input {
+  display: block;
+  width: 100%;
+  min-height: 22px;
+  margin: 0;
+  accent-color: #a3475d;
+  cursor: pointer;
+}
+
+.filter-range-scale {
+  display: flex;
+  justify-content: space-between;
+  color: #a09299;
+  font-size: 10px;
+}
+
+.filter-select {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 38px 10px 13px;
+  border: 1px solid #e7dddf;
+  border-radius: 9px;
+  background-color: #fff;
+  color: #352b35;
+  font-size: 13px;
+  line-height: 1.4;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.filter-select:hover {
+  border-color: #cfa8b2;
+}
+
+.filter-select:focus {
+  border-color: #a3475d;
+  box-shadow: 0 0 0 3px rgba(163, 71, 93, 0.1);
+  outline: none;
+}
+
+.filter-hint {
+  margin: 6px 0 0;
+  color: #8b7c85;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.filter-lifestyle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+  row-gap: 2px;
+}
+
+.filter-lifestyle-grid .filter-field {
+  margin-top: 0;
+}
+
+.discover-filter-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px max(18px, env(safe-area-inset-bottom));
+  border-top: 1px solid #eee7e4;
+  background: #fffdfb;
+}
+
+.filter-reset-button {
+  min-height: 48px;
+  padding: 0 17px;
+  border: 1px solid #e5dadd;
+  border-radius: 9px;
+  background: #fff;
+  color: #6f5964;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.filter-reset-button:hover {
+  background: #faf3f4;
+  border-color: #d7b5be;
+}
+
+.filter-apply-button {
+  display: flex;
+  flex: 1;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 18px;
+  border: 1px solid #87364d;
+  border-radius: 9px;
+  background: #87364d;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+
+.filter-apply-button:hover {
+  border-color: #6f293e;
+  background: #6f293e;
+}
+
+.filter-count {
+  display: inline-grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 50%;
+  background: #87364d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.discover-header .filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  color: #43333e;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.discover-header .filter-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* More deliberate editorial styling across the app: fewer gradients, quieter surfaces,
+   and a warm ink-and-berry palette that keeps profile photos in the foreground. */
+:root {
+  --app-accent: #a3475d;
+  --app-accent-strong: #87364d;
+  --app-ink: #29232d;
+  --app-muted: #746a72;
+  --app-surface: #fffdfb;
+  --app-canvas: #f8f5f2;
+  --app-border: #e9e1dd;
+  --app-radius: 12px;
+}
+
+body {
+  background: var(--app-canvas);
+  color: var(--app-ink);
+  font-family: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+}
+
+.page-eyebrow {
+  color: #a3475d;
+  letter-spacing: 0.13em;
+}
+
+.auth-page {
+  background: #f8f5f2;
+}
+
+.auth-card {
+  border-color: #e9e1dd;
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(42, 31, 37, 0.07);
+}
+
+.state-panel,
+.conversation-list,
+.like-card,
+.store-card,
+.subscription-page .grid > div {
+  border-color: #e9e1dd;
+  border-radius: 13px;
+  box-shadow: 0 5px 18px rgba(42, 31, 37, 0.035);
+}
+
+.like-card:hover,
+.store-card:hover {
+  box-shadow: 0 9px 22px rgba(42, 31, 37, 0.07);
+  transform: translateY(-1px);
+}
+
+.app-primary-button {
+  background: #87364d;
+  box-shadow: none;
+}
+
+.app-primary-button:hover:not(:disabled) {
+  background: #6f293e;
+  filter: none;
+  box-shadow: 0 4px 10px rgba(111, 41, 62, 0.13);
+}
+
+.chat-bubble-sent {
+  background: #87364d;
+  border-color: #87364d;
+  box-shadow: none;
+}
+
+.chat-bubble-received {
+  border-color: #e9e1dd;
+  box-shadow: none;
+}
+
+.app-bottom-nav {
+  background: rgba(255, 253, 251, 0.97);
+  box-shadow: 0 -3px 16px rgba(42, 31, 37, 0.035);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+nav.fixed.bottom-0.left-0.right-0 {
+  background: rgba(255, 253, 251, 0.97);
+  box-shadow: 0 -3px 16px rgba(42, 31, 37, 0.035);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@keyframes filter-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes filter-panel-in {
+  from { transform: translateX(14px); }
+  to { transform: translateX(0); }
+}
+
+@media (max-width: 640px) {
+  .discover-filter-overlay {
+    align-items: flex-end;
+  }
+
+  .discover-filter-panel {
+    width: 100%;
+    max-height: min(92dvh, 900px);
+    border: 0;
+    border-top: 1px solid rgba(40, 28, 39, 0.12);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -12px 40px rgba(25, 20, 29, 0.18);
+    animation-name: filter-sheet-in;
+  }
+
+  .discover-filter-header {
+    padding: 22px 20px 17px;
+  }
+
+  .discover-filter-content {
+    padding: 0 20px 18px;
+  }
+
+  .discover-filter-footer {
+    padding: 13px 20px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .filter-lifestyle-grid {
+    column-gap: 12px;
+  }
+}
+
+@keyframes filter-sheet-in {
+  from { transform: translateY(18px); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-filter-overlay,
+  .discover-filter-panel {
+    animation: none;
+  }
+}
