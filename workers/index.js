@@ -722,9 +722,6 @@ export default {
         if (!isCdnConfigured(env)) {
           return json({ message: "Photo CDN is not configured (CDN_HOSTNAME is missing)" }, 503);
         }
-        if (!isB2Configured(env)) {
-          return json({ message: "Photo storage is not configured" }, 503);
-        }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("photo");
         const allowedTypes = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" };
@@ -750,11 +747,20 @@ export default {
         const key = "photos-" + claims.sub + "-" + Date.now() + "." + allowedTypes[file.type];
         let cdnUrl;
         try {
-          // Send image bytes to the configured CDN_HOSTNAME proxy. The browser request
-          // stays on this authenticated API route; storage writes never target Pages
-          // or a hard-coded host.
-          await putPrivateObject(env, key, fileBytes, file.type, claims.sub, "profile-photo");
-          cdnUrl = getAppMediaUrl(env, key);
+          // The existing CDN proxy accepts PUT /<object-key> and signs the B2
+          // request itself. Keep B2 credentials out of this API Worker.
+          const proxyUrl = getCdnObjectUrl(env, key, "root");
+          const proxyResponse = await fetch(proxyUrl, {
+            method: "PUT",
+            headers: { "Content-Type": file.type },
+            body: fileBytes
+          });
+          if (!proxyResponse.ok) {
+            const proxyError = await proxyResponse.text().catch(() => "");
+            throw new Error("CDN proxy PUT failed with status " + proxyResponse.status +
+              (proxyError ? ": " + proxyError.slice(0, 120) : ""));
+          }
+          cdnUrl = proxyUrl;
         } catch (error) {
           console.error("Photo storage upload failed", {
             name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
@@ -764,7 +770,7 @@ export default {
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
-          await deletePrivateObject(env, key).catch(() => {});
+          await fetch(getCdnObjectUrl(env, key, "root"), { method: "DELETE" }).catch(() => {});
           return json({ message: "Photo metadata service unavailable" }, 503);
         }
         const connection = env.MONGODB_CONNECTION.get(id);
@@ -774,7 +780,7 @@ export default {
         });
         const result = await metadataResponse.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!metadataResponse.ok) {
-          await deletePrivateObject(env, key).catch(() => {});
+          await fetch(getCdnObjectUrl(env, key, "root"), { method: "DELETE" }).catch(() => {});
           return json(result, metadataResponse.status);
         }
         return json({
@@ -793,7 +799,6 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!isCdnConfigured(env)) return json({ message: "Photo CDN is not configured" }, 503);
-        if (!isB2Configured(env)) return json({ message: "Photo storage is not configured" }, 503);
         const payload = await request.json().catch(() => null);
         if (!payload || typeof payload.photoUrl !== "string" || !payload.photoUrl) return json({ error: "photoUrl is required." }, 400);
         let key = payload.photoUrl;
@@ -813,7 +818,12 @@ export default {
         });
         const result = await response.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!response.ok) return json(result, response.status);
-        await deletePrivateObject(env, key).catch(() => {});
+        const proxyUrl = getCdnObjectUrl(env, key, "root");
+        const proxyResponse = await fetch(proxyUrl, { method: "DELETE" });
+        if (!proxyResponse.ok) {
+          console.error("Photo CDN proxy delete failed", { status: proxyResponse.status });
+          return json({ message: "Photo metadata was deleted but storage cleanup failed" }, 502);
+        }
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
