@@ -74,7 +74,7 @@ const ChatMessage = ({ message, currentUser, otherUser }) => {
         src={avatarUrl}
         data-worker-fallback={workerFallbackUrl}
         alt={userProfile?.name || 'User Avatar'}
-        className="w-10 h-10 rounded-full object-cover"
+        className="h-10 w-10 flex-shrink-0 rounded-full object-cover ring-2 ring-white shadow-sm"
         onError={(event) => {
           const image = event.currentTarget;
           const fallback = image.dataset.workerFallback;
@@ -88,13 +88,13 @@ const ChatMessage = ({ message, currentUser, otherUser }) => {
         }}
       />
       <div
-        className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow ${
+        className={`chat-bubble max-w-[82%] break-words p-3 sm:max-w-md rounded-2xl shadow-sm ${
           isSender
-            ? 'bg-blue-500 text-white rounded-br-none'
-            : 'bg-white dark:bg-neutral-700 text-gray-800 dark:text-neutral-200 rounded-bl-none'
+            ? 'chat-bubble-sent text-white rounded-br-md'
+             : 'chat-bubble-received text-gray-800 dark:text-neutral-200 rounded-bl-md'
         }`}
       >
-        <p className="text-sm">{message.messageContent}</p>
+        <p className="whitespace-pre-wrap text-sm leading-6">{message.messageContent}</p>
         <div className="flex items-center justify-end mt-1">
           <p className={`text-xs ${isSender ? 'text-blue-200' : 'text-gray-400 dark:text-neutral-400'}`}>
             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
