@@ -39,7 +39,10 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
 
   const handleUploadComplete = (uploadResponse) => {
     // The API response now includes the final CDN URL.
-    const newPhoto = { url: uploadResponse.cdnUrl, order: localPhotos.length };
+    const key = uploadResponse.fileUrl || uploadResponse.photo?.url || '';
+    const cdnUrl = uploadResponse.cdnUrl || (key ? `https://dateme.enadoctemp.workers.dev/${key.split('/').pop()}` : '');
+    if (!cdnUrl) return;
+    const newPhoto = { url: cdnUrl, order: localPhotos.length, size: uploadResponse.size || uploadResponse.photo?.size || 0 };
     setLocalPhotos([...localPhotos, newPhoto]);
   };
 
