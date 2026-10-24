@@ -43,11 +43,11 @@ const LikesPage = () => {
     }, []);
 
     if (loading) {
-        return <div className="text-center p-4">Loading...</div>;
+        return <div className="state-panel mx-4 my-8 text-center">Loading people who liked you…</div>;
     }
 
     if (error) {
-        return <div className="text-center text-red-500 p-4">{error}</div>;
+        return <div className="state-panel state-error mx-4 my-8 text-center" role="alert">{error}</div>;
     }
 
     return (
