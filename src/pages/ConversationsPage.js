@@ -35,12 +35,12 @@ function ConversationsPage() {
   }, [currentUser, fetchConversations]);
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Conversations</h1>
-      {isLoading && <p className="text-center">Loading...</p>}
-      {error && <p className="text-center text-red-500">{error}</p>}
+    <div className="page-container conversations-page mx-auto w-full max-w-3xl p-4 sm:p-6">
+      <div className="mb-6"><p className="page-eyebrow">STAY CONNECTED</p><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Messages</h1><p className="mt-2 text-sm text-gray-500">Pick up where your conversations left off.</p></div>
+      {isLoading && <p className="state-panel text-center">Loading your conversations…</p>}
+      {error && <p className="state-panel state-error text-center" role="alert">{error}</p>}
       {!isLoading && !error && (
-        <div className="bg-white shadow-lg rounded-lg">
+        <div className="conversation-list overflow-hidden rounded-2xl">
           {conversations.length > 0 ? (
             <div>
               {conversations.map((convo) => (
@@ -48,7 +48,7 @@ function ConversationsPage() {
               ))}
             </div>
           ) : (
-            <p className="p-4 text-gray-500">You have no conversations yet.</p>
+            <div className="empty-state p-8 text-center"><p className="text-lg font-semibold text-gray-800">Your next connection starts here</p><p className="mt-2 text-sm text-gray-500">When you start chatting with someone, your conversations will appear here.</p></div>
           )}
         </div>
       )}
