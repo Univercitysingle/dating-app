@@ -122,30 +122,30 @@ const SubscriptionPage = () => {
       return;
     }
 
-    // Open the window synchronously during the click gesture so browser popup
-    // blockers do not prevent the IPG checkout after the API request completes.
-    const paymentWindow = window.open('', '_blank');
-    if (!paymentWindow) {
-      setNotification({ show: true, message: 'The payment window was blocked. Allow pop-ups for this site and try again.', type: 'error' });
-      return;
-    }
-    paymentWindow.document.title = 'Connecting to payment gateway';
-    paymentWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 24px">Connecting securely to the payment gateway…</p>';
-
     setIsProcessing(true);
     setNotification({ show: false, message: '', type: 'info' });
 
     try {
-      const response = await apiClient.post('/subscription', selectedPlan);
+      // Match Store checkout: request the server-generated WebXPay checkout
+      // form, then open a new tab and write the returned HTML into it.
+      const response = await apiClient.post('/subscription', {
+        plan: selectedPlan.plan,
+      });
+
       if (typeof response !== 'string' || !response.trim()) {
         throw new Error('The payment gateway did not return a checkout form. Please try again.');
       }
-      paymentWindow.document.open();
-      paymentWindow.document.write(response);
-      paymentWindow.document.close();
+
+      const paymentWindow = window.open('', '_blank');
+      if (paymentWindow) {
+        paymentWindow.document.write(response);
+        paymentWindow.document.close();
+      } else {
+        throw new Error('Could not open payment window. Please disable your pop-up blocker and try again.');
+      }
+
       setNotification({ show: true, message: 'Redirecting to payment gateway...', type: 'info' });
     } catch (err) {
-      if (!paymentWindow.closed) paymentWindow.close();
       setNotification({
         show: true,
         message: err.data?.error || err.data?.message || err.message || 'Could not start your subscription. Please try again.',
