@@ -1345,6 +1345,43 @@ export default {
       }
     }
 
+    const callRoute = url.pathname.match(/^\/api\/calls\/(start|poll|signal|action)$/);
+    if (callRoute) {
+      const action = callRoute[1];
+      const methodAllowed = action === "poll" ? request.method === "GET" : request.method === "POST";
+      if (!methodAllowed) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Calling service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        let payload = null;
+        let internalPath = "/internal/calls/" + action;
+        if (action === "poll") {
+          const roomId = url.searchParams.get("roomId") || "";
+          const response = await connection.fetch("https://internal.invalid" + internalPath, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, roomId })
+          });
+          const result = await response.json().catch(() => ({ error: "Call state unavailable" }));
+          return json(result, response.status);
+        }
+        payload = await request.json().catch(() => null);
+        if (!payload || typeof payload !== "object") return json({ error: "Invalid call request" }, 400);
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, payload })
+        });
+        const result = await response.json().catch(() => ({ error: "Calling service unavailable" }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Calling service unavailable" }, 503);
+      }
+    }
+
     const chatRoute = url.pathname.match(/^\/api\/chat\/(history\/([^/]+)|conversations|send)$/);
     if (chatRoute) {
       const methodAllowed = chatRoute[1] === "history/" + chatRoute[2] ? request.method === "GET"
