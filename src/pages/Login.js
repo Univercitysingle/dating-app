@@ -249,12 +249,12 @@ function Login() {
 
   return (
     <div
-      className="relative flex flex-col items-center justify-center min-h-screen p-4 pb-8 bg-cover bg-center"
+      className="auth-page login-page relative flex flex-col items-center justify-center min-h-screen p-4 pb-8 bg-cover bg-center"
       style={{ backgroundImage: "url('/bg.webp')" }}
     >
-      <div className="relative z-10 w-full max-w-md p-8 space-y-6 bg-black bg-opacity-25 rounded-lg shadow-xl backdrop-blur-sm">
-        <img src="/logo.jpg" alt="Hart2Hart Logo" className="w-24 h-24 mx-auto rounded-full" />
-        <h2 className="text-2xl font-bold text-center text-white">
+      <div className="auth-card login-card relative z-10 w-full max-w-md space-y-6 rounded-3xl p-6 sm:p-9">
+        <img src="/logo.jpg" alt="Hart2Hart Logo" className="mx-auto h-20 w-20 rounded-2xl object-cover shadow-lg" />
+        <h2 className="text-center text-3xl font-bold tracking-tight text-white">
           {showPhone
             ? 'Phone Login'
             : showReset
@@ -288,7 +288,7 @@ function Login() {
                 placeholder="Email"
                 autoComplete="email"
                 aria-label="Email Address"
-                className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="form-control login-control mt-1 w-full rounded-xl px-4 py-3 text-white"
               />
             </div>
             <div>
@@ -300,13 +300,13 @@ function Login() {
                 placeholder="Password"
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 aria-label="Password"
-                className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="form-control login-control mt-1 w-full rounded-xl px-4 py-3 text-white"
               />
             </div>
             <button
               onClick={handleSubmit}
               disabled={isLoading}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-500 bg-opacity-75 rounded-md hover:bg-indigo-600 hover:bg-opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 disabled:bg-gray-500 disabled:bg-opacity-50"
+              className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-wait disabled:opacity-60"
             >
               {isLoading
                 ? isSignUp
@@ -339,7 +339,7 @@ function Login() {
                     placeholder="+1234567890"
                     autoComplete="tel"
                     aria-label="Phone Number"
-                    className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="form-control login-control mt-1 w-full rounded-xl px-4 py-3 text-white"
                   />
                 </div>
                 {showPhone && <div id="recaptcha-container" />}
@@ -362,7 +362,7 @@ function Login() {
                     placeholder="Enter OTP"
                     autoComplete="one-time-code"
                     aria-label="One-Time Password"
-                    className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="form-control login-control mt-1 w-full rounded-xl px-4 py-3 text-white"
                   />
                 </div>
                 <button
@@ -388,7 +388,7 @@ function Login() {
                 placeholder="Email"
                 autoComplete="email"
                 aria-label="Email for password reset"
-                className="w-full px-3 py-2 mt-1 text-white bg-transparent border border-gray-400 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="form-control login-control mt-1 w-full rounded-xl px-4 py-3 text-white"
               />
             </div>
             <button
@@ -401,7 +401,7 @@ function Login() {
           </>
         )}
 
-        <div className="text-xs text-center text-gray-300 mt-2 space-y-1">
+        <div className="mt-3 space-y-2 text-center text-sm text-gray-300">
           {!showPhone && !showReset && !isSignUp && (
             <>
               <button
