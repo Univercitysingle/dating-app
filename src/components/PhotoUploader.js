@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import apiClient from '../api/apiClient';
 
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const MAX_IMAGE_WIDTH = 600;
 const WEBP_QUALITY = 0.8;
@@ -51,7 +51,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
 
     setError(null);
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      setError('Choose a JPEG, PNG, or GIF image.');
+      setError('Choose a JPEG, PNG, GIF, or WebP image.');
       input.value = '';
       return;
     }
@@ -94,7 +94,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       <input
         id="photo-upload"
         type="file"
-        accept="image/jpeg,image/png,image/gif"
+        accept="image/jpeg,image/png,image/gif,image/webp"
         onChange={handleFileChange}
         className="hidden"
         disabled={isUploading || isDisabled}
