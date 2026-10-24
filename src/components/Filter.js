@@ -205,7 +205,7 @@ const Filter = ({ onApply, onClose = () => {} }) => {
         <footer className="discover-filter-footer">
           <button type="button" className="filter-reset-button" onClick={resetFilters}>Reset</button>
           <button type="submit" className="filter-apply-button">
-            Show people <span aria-hidden="true">→</span>
+            Apply Filters <span aria-hidden="true">→</span>
           </button>
         </footer>
       </form>
