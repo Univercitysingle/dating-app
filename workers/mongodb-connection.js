@@ -1080,9 +1080,10 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
-      // Apply the legacy unique-index repair before inserting any pending
-      // subscription; otherwise MongoDB rejects every missing Stripe ID as null.
-      await this.ensureSubscriptionIndexes(db);
+      // The existing Atlas collection may still have the legacy unique
+      // stripeSubscriptionId index, and the app's DB role may not be allowed to
+      // drop/recreate indexes at request time. Give each WebXPay transaction a
+      // unique non-Stripe marker so the legacy index cannot collide on null.
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
@@ -1097,6 +1098,9 @@ export class MongoDBConnection {
         userId: user._id,
         plan,
         status: "pending",
+        // WebXPay does not issue a Stripe subscription ID. Keep this field
+        // unique only for compatibility with the legacy unique MongoDB index.
+        stripeSubscriptionId: "webxpay-pending-" + crypto.randomUUID(),
         createdAt: now,
         updatedAt: now
       };
