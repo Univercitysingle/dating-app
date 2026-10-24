@@ -2290,6 +2290,9 @@ export class MongoDBConnection {
       const calls = db.collection("callSessions");
       const call = await calls.findOne({ _id: new ObjectId(callId), status: { $in: ["ringing", "accepted"] } });
       if (!call) return { status: 404, body: { error: "Active call not found" } };
+      if (Array.isArray(call.signals) && call.signals.length >= 300) {
+        return { status: 429, body: { error: "Call signaling limit reached" } };
+      }
       let toUid;
       if (call.callerUid === uid) toUid = call.receiverUid;
       else if (call.receiverUid === uid) toUid = call.callerUid;
