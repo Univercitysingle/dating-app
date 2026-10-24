@@ -187,3 +187,79 @@ select:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Floating-feeling bottom navigation with safe-area support. */
+nav.fixed.bottom-0.left-0.right-0 {
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid rgba(230, 230, 240, 0.9);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 -8px 30px rgba(35, 28, 55, 0.06);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+nav.fixed.bottom-0.left-0.right-0 > div {
+  min-height: var(--bottom-nav-height);
+  align-items: stretch;
+}
+
+nav.fixed.bottom-0.left-0.right-0 a {
+  flex: 1;
+  gap: 5px;
+  padding: 10px 6px 8px;
+  color: #858598;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+nav.fixed.bottom-0.left-0.right-0 a:hover {
+  color: var(--app-accent);
+}
+
+nav.fixed.bottom-0.left-0.right-0 a svg {
+  width: 22px;
+  height: 22px;
+}
+
+.chat-call-panel {
+  border-bottom: 1px solid var(--app-border);
+  background: linear-gradient(110deg, #fff 0%, #fff8fb 100%);
+  padding: 12px 20px;
+}
+
+.chat-call-panel .call-action {
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 9px 15px;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: 0 2px 5px rgba(35, 28, 55, 0.06);
+}
+
+.chat-call-panel .call-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(35, 28, 55, 0.1);
+}
+
+.chat-call-panel .call-action-voice {
+  background: #16865b;
+}
+
+.chat-call-panel .call-action-video {
+  background: var(--app-accent);
+}
+
+.chat-call-panel .call-action-danger {
+  background: #d9365d;
+}
+
+@media (max-width: 640px) {
+  nav.fixed.bottom-0.left-0.right-0 a {
+    font-size: 10px;
+  }
+
+  .chat-call-panel {
+    padding: 10px 14px;
+  }
+}
