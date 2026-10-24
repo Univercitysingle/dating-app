@@ -76,18 +76,29 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
             <div className="relative w-full h-full">
                 <img
                     src={imageSources[currentImageIndex]}
-                    alt={name || 'User profile'}
-                    className="w-full h-full object-cover"
+                    alt={name ? `${name}'s profile photo` : 'User profile photo'}
+                    loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    draggable={false}
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = '/logo.jpg';
+                    }}
+                    className="profile-card-photo h-full w-full object-cover"
                 />
 
                 {/* Navigation Areas */}
                 <div className="absolute inset-0 flex">
-                    <div
-                    className="w-1/2 h-full"
+                    <button
+                    type="button"
+                    aria-label="Previous profile photo"
+                    className="h-full w-1/2 bg-transparent"
                     onClick={() => changeImage('prev')}
                     />
-                    <div
-                    className="w-1/2 h-full"
+                    <button
+                    type="button"
+                    aria-label="Next profile photo"
+                    className="h-full w-1/2 bg-transparent"
                     onClick={() => changeImage('next')}
                     />
                 </div>
