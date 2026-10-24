@@ -51,22 +51,22 @@ const LikesPage = () => {
     }
 
     return (
-        <div className="p-4">
-            <h1 className="text-2xl font-bold mb-4">Who Likes You</h1>
+        <div className="page-container likes-page mx-auto w-full max-w-4xl p-4 sm:p-6">
+            <div className="mb-6"><p className="page-eyebrow">A LITTLE SPARK</p><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Who likes you</h1><p className="mt-2 text-sm text-gray-500">See who is interested and start a conversation.</p></div>
             {users.length > 0 ? (
                 <ul className="space-y-4">
                     {users.map(user => (
                         <li
                             key={user._id || user.uid}
-                            className="border rounded-lg p-4 shadow-sm flex justify-between items-center"
+                            className="like-card flex items-center justify-between gap-4 rounded-2xl p-4 sm:p-5"
                         >
-                            <div>
-                                <p className="font-semibold">{user.name}</p>
+                            <div className="min-w-0">
+                                <p className="truncate font-semibold text-gray-900">{user.name}</p>
                                 <p className="text-gray-600 text-sm">{user.bio}</p>
                             </div>
                             <button
                                 onClick={() => handleChat(user.uid)}
-                                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                                className="app-primary-button flex-shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white"
                             >
                                 Chat
                             </button>
@@ -74,7 +74,7 @@ const LikesPage = () => {
                     ))}
                 </ul>
             ) : (
-                <p className="text-center">No users found.</p>
+                <div className="empty-state rounded-2xl p-10 text-center"><p className="text-lg font-semibold text-gray-800">No likes to show just yet</p><p className="mt-2 text-sm text-gray-500">Keep your profile fresh and check back soon.</p></div>
             )}
         </div>
     );
