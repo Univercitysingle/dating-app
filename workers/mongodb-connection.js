@@ -1282,7 +1282,7 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const profile = await db.collection("darkfantasyprofiles").findOne({ uid }, { projection: { _id: 0, uid: 0, consentAt: 0, createdAt: 0 } });
-      return { status: 200, body: profile || { consent: false, interests: [], boundaries: ["private-profile"], visibility: "private" } };
+      return { status: 200, body: profile || { consent: false, interests: [], boundaries: [], visibility: "private" } };
     } catch {
       return { status: 503, body: { error: "Dark Fantasy profile unavailable" } };
     }
