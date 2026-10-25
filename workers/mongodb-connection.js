@@ -3106,6 +3106,15 @@ export class MongoDBConnection {
       return json(result);
     }
 
+    if (url.pathname.startsWith("/internal/dark-fantasy/communities/")) {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Unauthorized" }, 401);
+      const action = url.pathname.split("/").pop();
+      if (!["list", "detail", "join", "posts", "create-post", "comment", "reaction", "decision"].includes(action)) return json({ error: "Not found" }, 404);
+      const result = await this.secretCommunityAction(body.claims.sub, action, { ...body, claimsRole: body.claims.role });
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/dark-fantasy/status" ||
         url.pathname === "/internal/dark-fantasy/profile" ||
         url.pathname === "/internal/dark-fantasy/discover") {
