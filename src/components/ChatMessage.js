@@ -73,6 +73,7 @@ const CallHistoryMessage = ({ call, currentUser }) => {
     : call?.status === 'declined' ? 'Call declined'
     : call?.status === 'ended' ? 'Call ended'
     : call?.status === 'accepted' ? 'Call connected'
+    : call?.status === 'ringing' ? (call?.receiverUid === currentUser?.uid ? 'Incoming call' : 'Outgoing call')
     : 'Call';
   const start = call?.connectedAt ? new Date(call.connectedAt).getTime() : 0;
   const end = call?.endedAt ? new Date(call.endedAt).getTime() : (call?.status === 'accepted' ? Date.now() : 0);
