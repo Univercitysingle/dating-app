@@ -278,9 +278,9 @@ function Chat() {
   }
 
   return (
-    <div className="chat-shell flex flex-col">
-      <header className="chat-header flex flex-shrink-0 items-center justify-between gap-3 px-4 sm:px-5">
-        <Link to="/conversations" aria-label="Back to conversations" className="chat-back-link flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 text-lg text-gray-600 transition hover:border-pink-200 hover:text-pink-700">
+    <div className="chat-shell chat-whatsapp-shell flex flex-col">
+      <header className="chat-header chat-whatsapp-header flex flex-shrink-0 items-center justify-between gap-3 px-3 sm:px-5">
+        <Link to="/conversations" aria-label="Back to conversations" className="chat-back-link flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-lg transition" title="All conversations">
           <span aria-hidden="true">←</span>
         </Link>
         <Link to={otherProfilePath} className="chat-participant-link flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left" aria-label={`View ${otherUser?.name || 'chat participant'}'s profile`}>
@@ -289,17 +289,19 @@ function Chat() {
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-base font-bold text-gray-900">{otherUser?.name || 'Conversation'}</h2>
-            <p className="text-xs text-gray-500">{otherUser ? 'View profile' : 'Profile details loading'}</p>
+            <p className="chat-participant-status text-xs">{otherUser ? 'Your conversation' : 'Profile details loading'}</p>
           </div>
         </Link>
-        <Link to={otherProfilePath} className="chat-profile-action flex-shrink-0 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-pink-200 hover:text-pink-700">
-          Profile
-        </Link>
+        <div className="chat-header-actions flex flex-shrink-0 items-center gap-2">
+          <Link to={otherProfilePath} className="chat-profile-action rounded-full px-3 py-2 text-sm font-semibold transition">
+            <span className="hidden sm:inline">View profile</span><span className="sm:hidden">Profile</span>
+          </Link>
+        </div>
       </header>
       {error && <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800" role="alert">{error}</div>}
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
-      <main className="chat-messages flex-grow overflow-y-auto p-5">
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <main className="chat-messages chat-wallpaper flex-grow overflow-y-auto px-3 py-5 sm:px-6">
+        <div className="chat-message-stack mx-auto flex max-w-3xl flex-col gap-3">
           {[...messages, ...callHistory.map(call => ({
             _id: `call-${call._id}`,
             messageType: 'call',
@@ -318,28 +320,31 @@ function Chat() {
         </div>
         <div ref={messagesEndRef} />
         {isTyping && (
-          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm p-2">
-            <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div>
-            <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse [animation-delay:0.2s]"></div>
-            <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse [animation-delay:0.4s]"></div>
+          <div className="chat-typing-indicator flex items-center gap-1.5" role="status" aria-label="The other person is typing">
+            <span /><span /><span />
           </div>
         )}
       </main>
-      <footer className="chat-composer flex-shrink-0">
-        <form onSubmit={sendMessage} className="mx-auto flex max-w-2xl">
+      <footer className="chat-composer chat-whatsapp-composer flex-shrink-0">
+        <form onSubmit={sendMessage} className="chat-composer-form mx-auto flex w-full max-w-3xl items-center gap-2 sm:gap-3">
+          <span className="chat-composer-mark" aria-hidden="true">♡</span>
           <input
             value={input}
             onChange={handleInputChange}
-            className="flex-grow"
-            placeholder={isRoomJoined ? "Type a message..." : "Connecting to chat..."}
+            className="chat-message-input flex-grow"
+            placeholder={isRoomJoined ? "Write a message…" : "Connecting to chat…"}
+            aria-label="Message"
+            autoComplete="off"
             disabled={!isRoomJoined}
           />
           <button
             type="submit"
-            className="px-4 py-2 text-white disabled:cursor-not-allowed"
-            disabled={!isRoomJoined}
+            className="chat-send-button flex-shrink-0 disabled:cursor-not-allowed"
+            disabled={!isRoomJoined || !input.trim()}
+            aria-label="Send message"
+            title="Send message"
           >
-            Send
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 3-7.2 18-3.7-7.1L3 10.2 21 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10.1 13.9 15 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </button>
         </form>
       </footer>
