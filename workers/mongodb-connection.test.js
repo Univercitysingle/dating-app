@@ -640,7 +640,7 @@ test("paid live-show ticket checkout uses the room's server-side price and recor
   let insertedPurchase;
   const room = {
     roomId: "room-1", hostUid: "creator-1", title: "Evening Live",
-    mode: "broadcast", visibility: "listed", ticketPriceLkr: 1000, status: "active"
+    mode: "broadcast", visibility: "listed", ticketPriceLkr: 1000, status: "active", mediaStatus: "ready"
   };
   const rooms = { async findOne(query) { assert.deepEqual(query, { roomId: "room-1", status: "active" }); return room; } };
   const users = { async findOne(query) {
@@ -678,7 +678,7 @@ test("paid live-show ticket checkout uses the room's server-side price and recor
 test("paid live-show ticket checkout rejects duplicate pending orders", async () => {
   const room = {
     roomId: "room-1", hostUid: "creator-1", title: "Evening Live",
-    mode: "broadcast", visibility: "listed", ticketPriceLkr: 500, status: "active"
+    mode: "broadcast", visibility: "listed", ticketPriceLkr: 500, status: "active", mediaStatus: "ready"
   };
   const db = { collection(name) {
     if (name === "videoRooms") return { async findOne() { return room; } };
