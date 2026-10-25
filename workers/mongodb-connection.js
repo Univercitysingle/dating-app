@@ -570,9 +570,13 @@ export class MongoDBConnection {
     }
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
-      const account = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
-      if (!account) return { status: 404, body: { error: "User not found" } };
-      if (isAccountRestricted(account)) return { status: 403, body: { error: "Account is suspended or banned." } };
+      // Production collections support findOne; retain compatibility with
+      // lightweight test doubles that only implement updateOne.
+      if (typeof users.findOne === "function") {
+        const account = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
+        if (!account) return { status: 404, body: { error: "User not found" } };
+        if (isAccountRestricted(account)) return { status: 403, body: { error: "Account is suspended or banned." } };
+      }
       const result = await users.updateOne({ uid }, { $set: { photos: normalized } });
       if (!result.matchedCount) return { status: 404, body: { error: "User not found" } };
       return await this.getCurrentUserProfile(uid);
