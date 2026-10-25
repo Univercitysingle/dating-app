@@ -35,15 +35,13 @@ const BottomNavBar = () => {
           <Icon path="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           <span className="text-xs">Conversations</span>
         </NavLink>
-        {String(process.env.REACT_APP_DARK_FANTASY_ENABLED || '').toLowerCase() === 'true' && (
-          <NavLink
-            to="/dark-fantasy"
-            className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
-          >
-            <Icon path="M12 3v2m0 14v2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42M3 12h2m14 0h2M5.64 18.36l1.42-1.42m9.88-9.88 1.42-1.42M12 8a4 4 0 100 8 4 4 0 000-8z" />
-            <span className="text-xs">Dark Fantasy</span>
-          </NavLink>
-        )}
+        <NavLink
+          to="/dark-fantasy"
+          className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
+        >
+          <Icon path="M12 3v2m0 14v2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42M3 12h2m14 0h2M5.64 18.36l1.42-1.42m9.88-9.88 1.42-1.42M12 8a4 4 0 100 8 4 4 0 000-8z" />
+          <span className="text-xs">Dark Fantasy</span>
+        </NavLink>
         <NavLink
           to="/profile"
           className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
