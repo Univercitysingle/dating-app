@@ -46,7 +46,9 @@ const DarkFantasyPage = () => {
   const [videoRoomVisibility, setVideoRoomVisibility] = useState('invite');
   const [videoRoomCapacity, setVideoRoomCapacity] = useState('2');
   const [videoRoomTitle, setVideoRoomTitle] = useState('');
+  const [videoRoomTicketPriceLkr, setVideoRoomTicketPriceLkr] = useState('0');
   const [videoRooms, setVideoRooms] = useState([]);
+  const [creatorEarnings, setCreatorEarnings] = useState(null);
   const [videoRoomsLoading, setVideoRoomsLoading] = useState(false);
   const [videoRoomBusy, setVideoRoomBusy] = useState(false);
 
@@ -74,7 +76,9 @@ const DarkFantasyPage = () => {
       .then(result => { if (active) setCatalog(Array.isArray(result?.products) ? result.products : []); })
       .catch(() => { if (active) setCatalogError('Live product data is temporarily unavailable. You can still browse the official collections below.'); })
       .finally(() => { if (active) setCatalogLoading(false); });
-  
+    return () => { active = false; };
+  }, []);
+
   const loadVideoRooms = async () => {
     setVideoRoomsLoading(true);
     try {
@@ -84,16 +88,24 @@ const DarkFantasyPage = () => {
     finally { setVideoRoomsLoading(false); }
   };
 
+  const loadCreatorEarnings = async () => {
+    try {
+      const result = await apiClient.get('/video-rooms/earnings');
+      setCreatorEarnings(result || null);
+    } catch (e) { setError(e.data?.error || e.message || 'Could not load creator earnings.'); }
+  };
+
   const createVideoRoom = async () => {
     setVideoRoomBusy(true); setError(''); setNotice('');
     try {
       const result = await apiClient.post('/video-rooms', {
         mode: videoRoomMode, visibility: videoRoomMode === 'private' ? 'invite' : videoRoomVisibility,
-        capacity: Number(videoRoomCapacity), title: videoRoomTitle.trim()
+        capacity: Number(videoRoomCapacity), title: videoRoomTitle.trim(),
+        ticketPriceLkr: videoRoomMode === 'broadcast' && videoRoomVisibility === 'listed' ? Number(videoRoomTicketPriceLkr) : 0
       });
       if (result?.room) setVideoRooms(current => [result.room, ...current.filter(room => room.roomId !== result.room.roomId)]);
       setNotice(result?.message || 'Room created.');
-      await loadVideoRooms();
+      await Promise.all([loadVideoRooms(), loadCreatorEarnings()]);
     } catch (e) { setError(e.data?.error || e.message || 'Could not create Video Room.'); }
     finally { setVideoRoomBusy(false); }
   };
@@ -103,17 +115,48 @@ const DarkFantasyPage = () => {
     try {
       await apiClient.post('/video-rooms/' + encodeURIComponent(roomId) + '/' + action, {});
       setNotice(action === 'end' ? 'Room ended.' : action === 'leave' ? 'You left the room.' : 'You joined the room. Live media is not connected yet.');
-      await loadVideoRooms();
+      await Promise.all([loadVideoRooms(), loadCreatorEarnings()]);
     } catch (e) { setError(e.data?.error || e.message || 'Could not update Video Room.'); }
     finally { setVideoRoomBusy(false); }
   };
 
-  useEffect(() => {
-    if (section === 'videorooms' && status?.hasAccess) loadVideoRooms();
-  }, [section, status?.hasAccess]);
+  const startRoomTicketCheckout = async (roomId) => {
+    setVideoRoomBusy(true); setError(''); setNotice('');
+    try {
+      const response = await apiClient.post('/video-rooms/' + encodeURIComponent(roomId) + '/ticket', {});
+      if (typeof response !== 'string' || !response.trim()) throw new Error('WebXPay checkout form was not returned.');
+      const parsed = new DOMParser().parseFromString(response, 'text/html');
+      const gatewayForm = parsed.querySelector('form');
+      if (!gatewayForm?.action) throw new Error('Invalid WebXPay checkout form.');
+      const gatewayUrl = new URL(gatewayForm.action);
+      if (gatewayUrl.protocol !== 'https:' || !['stagingxpay.info', 'govpay.webxpay.com'].includes(gatewayUrl.hostname)) {
+        throw new Error('Unapproved payment gateway URL.');
+      }
+      const form = document.createElement('form');
+      form.method = (gatewayForm.method || 'POST').toUpperCase();
+      form.action = gatewayUrl.href;
+      form.target = '_self';
+      form.hidden = true;
+      gatewayForm.querySelectorAll('input[name]').forEach(source => {
+        const field = document.createElement('input');
+        field.type = 'hidden'; field.name = source.name; field.value = source.value;
+        form.appendChild(field);
+      });
+      if (!form.querySelector('input[name="payment"]')) throw new Error('Payment payload is missing.');
+      document.body.appendChild(form);
+      form.requestSubmit();
+    } catch (e) {
+      setError(e.data?.error || e.message || 'Could not start WebXPay checkout.');
+      setVideoRoomBusy(false);
+    }
+  };
 
-  return () => { active = false; };
-  }, []);
+  useEffect(() => {
+    if (section === 'videorooms' && status?.hasAccess) {
+      loadVideoRooms();
+      loadCreatorEarnings();
+    }
+  }, [section, status?.hasAccess]);
 
   useEffect(() => {
     const purchaseId = new URLSearchParams(location.search).get('purchaseId');
@@ -125,7 +168,8 @@ const DarkFantasyPage = () => {
         const result = await apiClient.get(`/purchase/status/${encodeURIComponent(purchaseId)}`);
         if (result?.status === 'completed') {
           clearInterval(timer);
-          setNotice('Payment confirmed. Your add-on access is being refreshed.');
+          setNotice('Payment confirmed. Your purchase is being applied.');
+          await Promise.all([load(), loadVideoRooms(), loadCreatorEarnings()]);
           const url = new URL(window.location.href);
           url.searchParams.delete('purchaseId');
           window.history.replaceState({}, '', url);
@@ -337,13 +381,13 @@ const DarkFantasyPage = () => {
             <h3 className="text-lg font-bold text-slate-950">1. Choose your room format</h3>
             <p className="mt-1 text-sm text-slate-600">This choice determines who can publish video, who can watch, and how people join.</p>
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
-              <button type="button" onClick={() => { setVideoRoomMode('private'); setVideoRoomCapacity('2'); }} aria-pressed={videoRoomMode === 'private'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'private' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
+              <button type="button" onClick={() => { setVideoRoomMode('private'); setVideoRoomCapacity('2'); setVideoRoomTicketPriceLkr('0'); }} aria-pressed={videoRoomMode === 'private'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'private' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
                 <span className="text-xs font-bold uppercase tracking-wider text-violet-700">Private · 1:1</span>
                 <span className="mt-2 block text-base font-bold text-slate-950">Individual show</span>
                 <span className="mt-2 block text-sm leading-5 text-slate-600">Only the host and one specifically invited person can join. No public listing; the host approves the guest.</span>
                 <span className="mt-3 block text-xs font-semibold text-slate-700">2 people · Two-way video</span>
               </button>
-              <button type="button" onClick={() => { setVideoRoomMode('group'); setVideoRoomCapacity('4'); }} aria-pressed={videoRoomMode === 'group'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'group' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
+              <button type="button" onClick={() => { setVideoRoomMode('group'); setVideoRoomCapacity('4'); setVideoRoomTicketPriceLkr('0'); }} aria-pressed={videoRoomMode === 'group'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'group' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
                 <span className="text-xs font-bold uppercase tracking-wider text-violet-700">Interactive · Group</span>
                 <span className="mt-2 block text-base font-bold text-slate-950">Multi-person room</span>
                 <span className="mt-2 block text-sm leading-5 text-slate-600">A host invites several participants. Each admitted person can publish their own camera and microphone when they choose.</span>
@@ -419,10 +463,12 @@ const DarkFantasyPage = () => {
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-950">Create a room</h3><p className="mt-1 text-sm text-slate-600">Room metadata is stored server-side. Cameras never start automatically.</p></div><button type="button" onClick={loadVideoRooms} disabled={videoRoomsLoading || videoRoomBusy} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">{videoRoomsLoading ? 'Refreshing…' : 'Refresh rooms'}</button></div>
             <label htmlFor="video-room-title" className="mt-4 block text-sm font-semibold text-slate-800">Room title (optional)</label>
             <input id="video-room-title" value={videoRoomTitle} onChange={event => setVideoRoomTitle(event.target.value.slice(0, 80))} maxLength={80} placeholder="e.g. Evening chat" className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            {videoRoomMode === 'broadcast' && videoRoomVisibility === 'listed' && <div className="mt-4 max-w-sm"><label htmlFor="video-room-ticket-price" className="block text-sm font-semibold text-slate-800">Live-show ticket price</label><select id="video-room-ticket-price" value={videoRoomTicketPriceLkr} onChange={event => setVideoRoomTicketPriceLkr(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500"><option value="0">Free entry</option><option value="500">LKR 500 per viewer</option><option value="1000">LKR 1,000 per viewer</option><option value="2000">LKR 2,000 per viewer</option><option value="5000">LKR 5,000 per viewer</option></select><p className="mt-2 text-xs leading-5 text-slate-500">Paid tickets use WebXPay in the same window. The current creator share is 70% of ticket value before provider fees, refunds, taxes and payout costs.</p></div>}
             <button type="button" onClick={createVideoRoom} disabled={videoRoomBusy || checking || !status?.hasAccess} className="mt-4 min-h-11 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{videoRoomBusy ? 'Working…' : 'Create room'}</button>
             {!status?.hasAccess && <button type="button" onClick={() => setSection('store')} className="ml-2 mt-4 min-h-11 rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold">View add-on options</button>}
+            {creatorEarnings && <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold text-emerald-950">Creator earnings</h4><button type="button" onClick={loadCreatorEarnings} className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-900">Refresh earnings</button></div><div className="mt-3 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-white p-3"><p className="text-xs text-slate-500">Pending review</p><p className="mt-1 text-lg font-bold text-slate-950">LKR {Number(creatorEarnings.totals?.pendingReviewLkr || 0).toLocaleString()}</p></div><div className="rounded-xl bg-white p-3"><p className="text-xs text-slate-500">Approved</p><p className="mt-1 text-lg font-bold text-slate-950">LKR {Number(creatorEarnings.totals?.approvedLkr || 0).toLocaleString()}</p></div><div className="rounded-xl bg-white p-3"><p className="text-xs text-slate-500">Paid out</p><p className="mt-1 text-lg font-bold text-slate-950">LKR {Number(creatorEarnings.totals?.paidLkr || 0).toLocaleString()}</p></div></div><p className="mt-2 text-xs text-emerald-900">Creator earnings are recorded after WebXPay confirms payment. Earnings remain under review until payout and refund checks are completed; payouts are not automated yet.</p></div>}
             <div className="mt-5 space-y-3">
-              {videoRooms.map(room => <article key={room.roomId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="font-bold text-slate-950">{room.title}</h4><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{room.mode}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">{room.status}</span></div><p className="mt-1 text-xs text-slate-600">{room.hostDisplayName || (room.isHost ? 'You are hosting' : 'Host')} · {room.participantCount}/{room.capacity} people · {room.visibility === 'listed' ? 'Listed' : 'Invite only'}</p><p className="mt-1 text-xs text-amber-800">{room.mediaReady ? 'Media ready' : 'Room saved; live video not connected'}</p></div><div className="flex gap-2">{room.status === 'active' && room.isHost && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'end')} disabled={videoRoomBusy} className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">End room</button>}{room.status === 'active' && !room.isHost && !room.isParticipant && room.visibility === 'listed' && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'join')} disabled={videoRoomBusy} className="rounded-full bg-violet-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Join room</button>}{room.status === 'active' && room.isParticipant && !room.isHost && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'leave')} disabled={videoRoomBusy} className="rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-50">Leave</button>}</div></article>)}
+              {videoRooms.map(room => <article key={room.roomId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="font-bold text-slate-950">{room.title}</h4><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{room.mode}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">{room.status}</span></div><p className="mt-1 text-xs text-slate-600">{room.hostDisplayName || (room.isHost ? 'You are hosting' : 'Host')} · {room.participantCount}/{room.capacity} people · {room.visibility === 'listed' ? 'Listed' : 'Invite only'}</p><p className="mt-1 text-xs font-semibold text-violet-800">{Number(room.ticketPriceLkr) > 0 ? 'Paid entry · LKR ' + Number(room.ticketPriceLkr).toLocaleString() + ' per viewer' : 'Free entry'}</p><p className="mt-1 text-xs text-amber-800">{room.mediaReady ? 'Media ready' : 'Room saved; live video not connected'}</p></div><div className="flex gap-2">{room.status === 'active' && room.isHost && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'end')} disabled={videoRoomBusy} className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">End room</button>}{room.status === 'active' && !room.isHost && !room.isParticipant && room.visibility === 'listed' && Number(room.ticketPriceLkr) > 0 && !room.hasTicket && <button type="button" onClick={() => startRoomTicketCheckout(room.roomId)} disabled={videoRoomBusy} className="rounded-full bg-fuchsia-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Buy ticket · LKR {Number(room.ticketPriceLkr).toLocaleString()}</button>}{room.status === 'active' && !room.isHost && !room.isParticipant && room.visibility === 'listed' && (Number(room.ticketPriceLkr) <= 0 || room.hasTicket) && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'join')} disabled={videoRoomBusy} className="rounded-full bg-violet-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Join room</button>{room.status === 'active' && room.isParticipant && !room.isHost && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'leave')} disabled={videoRoomBusy} className="rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-50">Leave</button>}</div></article>)}
               {!videoRoomsLoading && videoRooms.length === 0 && <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">No rooms to display yet. Create one when your account has access.</p>}
             </div>
           </div>
