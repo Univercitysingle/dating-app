@@ -229,6 +229,8 @@ function Profile() {
   if (!profile) return <p className="p-4">Loading profile...</p>;
 
   const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
+  // Contact details are private on other users' profiles; only the profile owner or superadmin may view them.
+  const canViewSensitiveContact = Boolean(isOwnProfile || currentUser?.role === 'superadmin');
   const isPremium = profile.plan === 'premium';
   const isVerified = profile.isVerified === true;
 
