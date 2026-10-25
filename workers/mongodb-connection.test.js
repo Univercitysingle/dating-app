@@ -633,3 +633,64 @@ test("Secrets Communities enforce post and comment length limits", async () => {
   const result = await connection.secretCommunityAction("member-1", "create-post", { slug: "gay-men", input: { text: "x".repeat(3001) } });
   assert.equal(result.status, 400);
 });
+
+
+test("paid live-show ticket checkout uses the room's server-side price and records the creator split", async () => {
+  const orderId = "0123456789abcdef01234567";
+  let insertedPurchase;
+  const room = {
+    roomId: "room-1", hostUid: "creator-1", title: "Evening Live",
+    mode: "broadcast", visibility: "listed", ticketPriceLkr: 1000, status: "active"
+  };
+  const rooms = { async findOne(query) { assert.deepEqual(query, { roomId: "room-1", status: "active" }); return room; } };
+  const users = { async findOne(query) {
+    if (query.uid === "viewer-1") return { _id: "viewer-object-id", uid: "viewer-1", name: "Viewer" };
+    return null;
+  } };
+  const tickets = { async findOne() { return null; } };
+  const purchases = {
+    async findOne() { return null; },
+    async insertOne(document) { insertedPurchase = document; return { insertedId: orderId }; }
+  };
+  const db = { collection(name) {
+    if (name === "videoRooms") return rooms;
+    if (name === "users") return users;
+    if (name === "videoRoomTickets") return tickets;
+    if (name === "purchases") return purchases;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createPendingVideoRoomTicket("viewer-1", "room-1");
+
+  assert.equal(result.status, 201);
+  assert.equal(result.body.orderId, orderId);
+  assert.equal(result.body.price, 1000);
+  assert.equal(insertedPurchase.viewerUid, "viewer-1");
+  assert.equal(insertedPurchase.creatorUid, "creator-1");
+  assert.equal(insertedPurchase.creatorSharePercent, 70);
+  assert.equal(insertedPurchase.itemPrice, "1000");
+  assert.equal(insertedPurchase.status, "pending");
+});
+
+test("paid live-show ticket checkout rejects duplicate pending orders", async () => {
+  const room = {
+    roomId: "room-1", hostUid: "creator-1", title: "Evening Live",
+    mode: "broadcast", visibility: "listed", ticketPriceLkr: 500, status: "active"
+  };
+  const db = { collection(name) {
+    if (name === "videoRooms") return { async findOne() { return room; } };
+    if (name === "users") return { async findOne() { return { _id: "viewer-object-id", uid: "viewer-1" }; } };
+    if (name === "videoRoomTickets") return { async findOne() { return null; } };
+    if (name === "purchases") return { async findOne() { return { status: "pending" }; } };
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.createPendingVideoRoomTicket("viewer-1", "room-1");
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /already pending/i);
+});
