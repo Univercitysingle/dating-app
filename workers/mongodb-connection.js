@@ -899,6 +899,16 @@ export class MongoDBConnection {
           delete profile.lastLoginIp;
           if (currentUser.role !== "superadmin") stripPrivateContactFields(profile);
           if (profile._id !== undefined) profile.id = String(profile._id);
+          if (profile.birthday) {
+            const birthday = new Date(profile.birthday);
+            if (!Number.isNaN(birthday.getTime())) {
+              const today = new Date();
+              let age = today.getFullYear() - birthday.getFullYear();
+              const month = today.getMonth() - birthday.getMonth();
+              if (month < 0 || (month === 0 && today.getDate() < birthday.getDate())) age--;
+              profile.age = age;
+            }
+          }
           if (Array.isArray(profile.photos)) {
             profile.photos = profile.photos.map(photo => {
               if (!photo || typeof photo.url !== "string" || !photo.url) return photo;
@@ -907,7 +917,7 @@ export class MongoDBConnection {
               return { ...photo, url: this.getMediaUrl(path) };
             });
           }
-          return [profile];
+          return [currentUser.role === "superadmin" ? profile : sanitizePublicProfile(profile)];
         })
       };
     } catch {
