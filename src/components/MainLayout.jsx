@@ -1,19 +1,22 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import BottomNavBar from './BottomNavBar';
 import Footer from './Footer';
 
 const MainLayout = () => {
+  const { pathname } = useLocation();
+  const isChatRoute = pathname.startsWith('/chat/');
+
   return (
-    <div className="app-shell relative min-h-screen flex flex-col">
+    <div className={`app-shell relative min-h-screen flex flex-col${isChatRoute ? " app-shell-chat" : ""}`}>
       <main
-        className="app-main flex-grow"
-        style={{ paddingBottom: 'calc(var(--bottom-nav-height) + 20px)' }}
+        className={`app-main flex-grow${isChatRoute ? " app-main-chat" : ""}`}
+        style={isChatRoute ? undefined : { paddingBottom: 'calc(var(--bottom-nav-height) + 20px)' }}
       >
         {/* The Outlet will render the matched child route component */}
         <Outlet />
       </main>
-      <Footer />
+      {!isChatRoute && <Footer />}
       <BottomNavBar />
     </div>
   );
