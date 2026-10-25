@@ -403,3 +403,39 @@ test("temporarily suspended users cannot change profile fields", async () => {
   assert.equal(result.status, 403);
   assert.equal(writes, 0);
 });
+
+
+test("blocking unmatches the pair and unblocking removes only the block entry", async () => {
+  const userUpdates = [];
+  const matchUpdates = [];
+  const users = {
+    async findOne(query) { return { _id: query.uid + "-id", uid: query.uid }; },
+    async updateOne(query, update) { userUpdates.push({ query, update }); return { matchedCount: 1 }; }
+  };
+  const matches = {
+    async updateOne(query, update) { matchUpdates.push({ query, update }); return { matchedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    assert.fail("Unexpected collection: " + name);
+  } });
+
+  const blocked = await connection.updateBlockedUser("user-a", "user-b", "block");
+  assert.equal(blocked.status, 200);
+  assert.deepEqual(userUpdates[0], {
+    query: { uid: "user-a" }, update: { $addToSet: { blocked: "user-b" } }
+  });
+  assert.deepEqual(matchUpdates[0].query, { user1Uid: "user-a", user2Uid: "user-b" });
+  assert.equal(matchUpdates[0].update.$set.status, "unmatched");
+  assert.ok(matchUpdates[0].update.$unset.likedBy !== undefined);
+
+  const unblocked = await connection.updateBlockedUser("user-a", "user-b", "unblock");
+  assert.equal(unblocked.status, 200);
+  assert.deepEqual(userUpdates[1], {
+    query: { uid: "user-a" }, update: { $pull: { blocked: "user-b" } }
+  });
+  assert.equal(matchUpdates.length, 1, "unblocking must not silently recreate an old match");
+});
