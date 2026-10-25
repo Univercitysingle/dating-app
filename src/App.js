@@ -150,6 +150,7 @@ function App() {
               <Route path="/conversations" element={<ConversationsPage />} />
               <Route path="/matches" element={<ConversationsPage />} />
               <Route path="/chat/:chatId" element={<Chat />} />
+              <Route path="/profile/:userId" element={<Profile />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/premium" element={<SubscriptionPage />} />
               <Route path="/manage-subscription" element={<SubscriptionPage />} />
