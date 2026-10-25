@@ -2256,16 +2256,20 @@ export class MongoDBConnection {
 
   async getCallHistory(uid, roomId) {
     if (typeof uid !== "string" || !uid || typeof roomId !== "string" ||
-        ![roomId].includes(uid + "-" + roomId.split("-").filter(part => part !== uid).join("-")) ||
-        roomId.length > 260 || roomId.length < 3) {
-      // The explicit participant query below is the authorization check; reject malformed rooms early.
-      if (typeof roomId !== "string" || roomId.length < 3 || roomId.length > 260 || !roomId.includes(uid)) {
-        return { status: 400, body: { error: "Invalid call room" } };
-      }
+        roomId.length > 260 || roomId.length < 3 ||
+        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid))) {
+      return { status: 400, body: { error: "Invalid call room" } };
     }
     try {
       const db = this.getDatabase(await this.getClient());
-      const calls = await db.collection("callSessions").find({
+      const callsCollection = db.collection("callSessions");
+      const staleBefore = new Date(Date.now() - 45000);
+      await callsCollection.updateMany(
+        { roomId, status: "ringing", createdAt: { $lt: staleBefore },
+          $or: [{ callerUid: uid }, { receiverUid: uid }] },
+        { $set: { status: "missed", endedAt: new Date(), updatedAt: new Date() } }
+      );
+      const calls = await callsCollection.find({
         roomId, $or: [{ callerUid: uid }, { receiverUid: uid }]
       }).sort({ createdAt: -1 }).limit(30).toArray();
       return { status: 200, body: { calls: calls.map(call => {
