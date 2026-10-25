@@ -67,10 +67,8 @@ function Profile() {
 
   useEffect(() => {
     const logger = console; // Using console for component-level logs for now
-    logger.log(`Profile.js: useEffect triggered. Deps: userId=${userId}, currentUser.uid=${currentUser?.uid}`);
 
     const fetchProfile = async () => {
-        logger.log(`Profile.js: Fetching profile for userId: ${userId}`);
         try {
             const data = await apiClient.get(`/users/${userId}`);
             setProfile(data);
@@ -80,10 +78,8 @@ function Profile() {
     };
 
     const fetchOwnProfile = async () => {
-        logger.log("Profile.js: Fetching own profile (/users/me).");
         try {
             const data = await apiClient.get('/users/me');
-            logger.log("Profile.js: Successfully fetched own profile.", data);
             setProfile(data);
             setEditableFields({
                 education: data.education || '',
@@ -180,16 +176,13 @@ function Profile() {
 
   const handleSaveAll = async () => {
       const logger = console;
-      logger.log("Profile.js: handleSaveAll called.");
       if (!editableFields.mobileNumber) {
           toast.error('Mobile number is required.');
           return;
       }
       setSaveStatus('Saving...');
-      logger.log("Profile.js: Saving profile data...", editableFields);
       try {
           const updatedProfile = await apiClient.put('/users/me', editableFields);
-          logger.log("Profile.js: Successfully saved profile. API response:", updatedProfile);
           setProfile(updatedProfile);
           setUser(updatedProfile); // Update global user state
           toast.success('Profile saved successfully!');
