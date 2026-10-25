@@ -93,7 +93,7 @@ describe('Profile page', () => {
     const settingsButton = screen.getByText('Settings');
     fireEvent.click(settingsButton);
     // After clicking settings, the logout button should be visible
-    expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
   });
 
   it('does not render the Social Media section', async () => {
