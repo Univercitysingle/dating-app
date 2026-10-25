@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MongoDBConnection } from "./mongodb-connection.js";
+import Worker from "./index.js";
 
 test("discovery builds a valid aggregation expression to exclude boosted users from regular results", async () => {
   let capturedPipeline;
@@ -551,4 +552,11 @@ test("Dark Fantasy preferences cannot be saved without explicit consent", async 
   const result = await connection.saveDarkFantasyProfile("adult-user", { consent: false, interests: [], boundaries: [], visibility: "private" });
   assert.equal(result.status, 400);
   assert.match(result.body.error, /consent/i);
+});
+
+
+test("Dark Fantasy API remains unavailable by default without feature approval flags", async () => {
+  const response = await Worker.fetch(new Request("https://api.example.test/api/dark-fantasy/status"), {});
+  assert.equal(response.status, 404);
+  assert.match((await response.json()).error, /not currently available/i);
 });
