@@ -2254,6 +2254,33 @@ export class MongoDBConnection {
     }
   }
 
+  async getCallHistory(uid, roomId) {
+    if (typeof uid !== "string" || !uid || typeof roomId !== "string" ||
+        ![roomId].includes(uid + "-" + roomId.split("-").filter(part => part !== uid).join("-")) ||
+        roomId.length > 260 || roomId.length < 3) {
+      // The explicit participant query below is the authorization check; reject malformed rooms early.
+      if (typeof roomId !== "string" || roomId.length < 3 || roomId.length > 260 || !roomId.includes(uid)) {
+        return { status: 400, body: { error: "Invalid call room" } };
+      }
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const calls = await db.collection("callSessions").find({
+        roomId, $or: [{ callerUid: uid }, { receiverUid: uid }]
+      }).sort({ createdAt: -1 }).limit(30).toArray();
+      return { status: 200, body: { calls: calls.map(call => {
+        const safe = { ...call };
+        delete safe.offer;
+        delete safe.answer;
+        delete safe.signals;
+        return safe;
+      }) } };
+    } catch (error) {
+      console.error("Call history lookup failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Unable to retrieve call history" } };
+    }
+  }
+
   async getCallState(uid, roomId) {
     if (typeof uid !== "string" || !uid || typeof roomId !== "string" ||
         roomId.length > 260 || roomId.length < 3) {
@@ -2261,10 +2288,17 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
-      const call = await db.collection("callSessions").findOne({
+      const calls = db.collection("callSessions");
+      let call = await calls.findOne({
         roomId, status: { $in: ["ringing", "accepted"] },
         $or: [{ callerUid: uid }, { receiverUid: uid }]
       }, { sort: { createdAt: -1 } });
+      if (call?.status === "ringing" && Date.now() - new Date(call.createdAt).getTime() > 45000) {
+        await calls.updateOne({ _id: call._id, status: "ringing" }, {
+          $set: { status: "missed", endedAt: new Date(), updatedAt: new Date() }
+        });
+        call = null;
+      }
       if (!call) return { status: 200, body: { call: null, signals: [] } };
       const signals = (Array.isArray(call.signals) ? call.signals : [])
         .filter(signal => signal && signal.toUid === uid);
@@ -2333,8 +2367,14 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "Only the recipient can accept or decline a call" } };
       }
       const next = action === "accept" ? "accepted" : action === "decline" ? "declined" : "ended";
-      const set = { status: next, updatedAt: new Date() };
-      if (action === "accept") set.answer = { type: "answer", sdp: answer.sdp };
+      const now = new Date();
+      const set = { status: next, updatedAt: now };
+      if (action === "accept") {
+        set.answer = { type: "answer", sdp: answer.sdp };
+        set.connectedAt = now;
+      } else {
+        set.endedAt = now;
+      }
       await calls.updateOne(
         { _id: call._id, status: { $in: ["ringing", "accepted"] } },
         { $set: set }
@@ -2398,6 +2438,64 @@ export class MongoDBConnection {
       return { status: 200, body: [...byRoom.values()] };
     } catch {
       return { status: 503, body: { error: "Chat conversations unavailable" } };
+    }
+  }
+
+  async updateTypingStatus(uid, payload) {
+    const { roomId, isTyping } = payload || {};
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
+        ![uid + "-" + (roomId.split("-").filter(part => part !== uid).join("-")),
+          (roomId.split("-").filter(part => part !== uid).join("-")) + "-" + uid].includes(roomId) ||
+        typeof isTyping !== "boolean") {
+      return { status: 400, body: { error: "Invalid typing status" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const now = new Date();
+      await db.collection("chatTyping").updateOne(
+        { roomId, uid },
+        { $set: { roomId, uid, isTyping, updatedAt: now } },
+        { upsert: true }
+      );
+      return { status: 200, body: { success: true } };
+    } catch {
+      return { status: 503, body: { error: "Typing status unavailable" } };
+    }
+  }
+
+  async getTypingStatus(uid, roomId) {
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) || !roomId.includes(uid)) {
+      return { status: 400, body: { error: "Invalid chat room" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const otherUid = roomId.split("-").filter(part => part !== uid).join("-");
+      const presence = await db.collection("chatTyping").findOne({ roomId, uid: otherUid });
+      const typing = Boolean(presence?.isTyping && Date.now() - new Date(presence.updatedAt).getTime() < 5000);
+      return { status: 200, body: { isTyping: typing } };
+    } catch {
+      return { status: 503, body: { error: "Typing status unavailable" } };
+    }
+  }
+
+  async markChatDelivered(uid, payload) {
+    const { roomId, messageIds } = payload || {};
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
+        !roomId.includes(uid) || !Array.isArray(messageIds) || messageIds.length > 100) {
+      return { status: 400, body: { error: "Invalid delivery receipt" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const ids = messageIds.filter(id => typeof id === "string" && /^[a-fA-F0-9]{24}$/.test(id)).map(id => new ObjectId(id));
+      if (!ids.length) return { status: 200, body: { deliveredCount: 0 } };
+      const db = this.getDatabase(await this.getClient());
+      const result = await db.collection("chatmessages").updateMany(
+        { _id: { $in: ids }, roomId, receiverUid: uid, status: "sent" },
+        { $set: { status: "delivered", deliveredAt: new Date() } }
+      );
+      return { status: 200, body: { deliveredCount: result.modifiedCount } };
+    } catch {
+      return { status: 503, body: { error: "Could not mark messages as delivered" } };
     }
   }
 
@@ -2487,6 +2585,7 @@ export class MongoDBConnection {
 
     if (url.pathname === "/internal/calls/start" ||
         url.pathname === "/internal/calls/poll" ||
+        url.pathname === "/internal/calls/history" ||
         url.pathname === "/internal/calls/signal" ||
         url.pathname === "/internal/calls/action") {
       const body = await request.json().catch(() => null);
@@ -2494,6 +2593,7 @@ export class MongoDBConnection {
       let result;
       if (url.pathname === "/internal/calls/start") result = await this.createCall(body.claims.sub, body.payload);
       else if (url.pathname === "/internal/calls/poll") result = await this.getCallState(body.claims.sub, body.roomId);
+      else if (url.pathname === "/internal/calls/history") result = await this.getCallHistory(body.claims.sub, body.roomId);
       else if (url.pathname === "/internal/calls/signal") result = await this.sendCallSignal(body.claims.sub, body.payload);
       else result = await this.updateCall(body.claims.sub, body.payload);
       return json(result.body, result.status);
@@ -2502,7 +2602,10 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/chat/history" ||
         url.pathname === "/internal/chat/conversations" ||
         url.pathname === "/internal/chat/send" ||
-        url.pathname === "/internal/chat/rollback") {
+        url.pathname === "/internal/chat/rollback" ||
+        url.pathname === "/internal/chat/typing-read" ||
+        url.pathname === "/internal/chat/typing-write" ||
+        url.pathname === "/internal/chat/delivered") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
       let result;
@@ -2512,6 +2615,12 @@ export class MongoDBConnection {
         result = await this.getChatConversations(body.claims.sub);
       } else if (url.pathname === "/internal/chat/send") {
         result = await this.createChatMessage(body.claims.sub, body.payload);
+      } else if (url.pathname === "/internal/chat/typing-read") {
+        result = await this.getTypingStatus(body.claims.sub, body.roomId);
+      } else if (url.pathname === "/internal/chat/typing-write") {
+        result = await this.updateTypingStatus(body.claims.sub, body.payload);
+      } else if (url.pathname === "/internal/chat/delivered") {
+        result = await this.markChatDelivered(body.claims.sub, body.payload);
       } else {
         result = await this.deleteChatMessage(body.claims.sub, body.messageId);
       }
