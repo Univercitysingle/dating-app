@@ -1620,12 +1620,12 @@ export default {
           const credential = btoa(binary);
           iceServers.push({ urls: turnUrls, username, credential });
         }
-        return json({
+        return new Response(JSON.stringify({
           iceServers,
           iceTransportPolicy: "all",
           turnConfigured: turnUrls.length > 0 && Boolean(sharedSecret),
           credentialExpiresAt: turnUrls.length && sharedSecret ? Math.floor(Date.now() / 1000) + 3600 : null
-        }, 200, { "cache-control": "no-store" });
+        }), { status: 200, headers: { ...JSON_HEADERS, "cache-control": "no-store", "pragma": "no-cache" } });
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
