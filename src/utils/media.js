@@ -36,7 +36,7 @@ export function extractPhotoKey(value) {
   return PHOTO_KEY_PATTERN.test(pathname) ? pathname : '';
 }
 
-export function resolvePhotoUrl(value, options = {}) {
+export function resolvePhotoUrl(value) {
   if (!value) return PLACEHOLDER_IMAGE;
   const key = extractPhotoKey(value);
 
