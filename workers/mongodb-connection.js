@@ -264,7 +264,7 @@ export class MongoDBConnection {
     let downgradedUsers = 0;
 
     // Bounded batches keep each Cron invocation within Worker execution limits.
-    if (scope !== "trials") {
+    if (scope === "all" || scope === "subscriptions") {
     const expired = await subscriptions.find({
       status: "active",
       endDate: { $lt: now }
@@ -305,7 +305,7 @@ export class MongoDBConnection {
     }
 
     // Expire trial-based premium access only when there is no active paid plan.
-    if (scope !== "subscriptions") {
+    if (scope === "all" || scope === "trials") {
     const expiredTrials = await users.find({
       plan: "premium",
       trialExpires: { $lt: now, $ne: null }
@@ -336,6 +336,8 @@ export class MongoDBConnection {
         suspendedUntil: { $lte: now }
       }).sort({ suspendedUntil: 1 }).limit(500).toArray();
       for (const user of expiredSuspensions) {
+        if (user.accountStatus !== "temporarily_suspended" || !user.suspendedUntil ||
+            new Date(user.suspendedUntil) > now) continue;
         await users.updateOne(
           { _id: user._id, accountStatus: "temporarily_suspended", suspendedUntil: { $lte: now } },
           {
