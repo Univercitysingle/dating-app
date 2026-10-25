@@ -330,6 +330,31 @@ export default {
         return json({ error: "Request must contain either a Firebase token or email/password." }, 400);
       }
       if (payload.email || payload.password) {
+        // Add a tighter brute-force limit specifically for password-based
+        // administrator authentication, separate from the general API quota.
+        const clientIp = request.headers.get("CF-Connecting-IP");
+        if (env.RATE_LIMITER && clientIp) {
+          try {
+            const limiterId = env.RATE_LIMITER.idFromName("api-ip:" + clientIp);
+            const limiter = env.RATE_LIMITER.get(limiterId);
+            const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ key: "superadmin-login", limit: 5, windowMs: 900000 })
+            });
+            if (!rateResponse.ok) return json({ error: "Login protection service unavailable" }, 503);
+            const rate = await rateResponse.json();
+            if (!rate.allowed) {
+              const retryAfter = Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000));
+              return new Response(JSON.stringify({ error: "Too many administrator login attempts. Please try again later." }), {
+                status: 429,
+                headers: { ...JSON_HEADERS, "retry-after": String(retryAfter) }
+              });
+            }
+          } catch {
+            return json({ error: "Login protection service unavailable" }, 503);
+          }
+        }
         try {
           const token = await createSuperadminCustomToken(env, payload.email, payload.password);
           if (!token) return json({ error: "Invalid credentials" }, 401);
