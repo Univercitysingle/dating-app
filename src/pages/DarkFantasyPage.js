@@ -20,14 +20,13 @@ const boundaryOptions = [
   ['no-unmatched-messages', 'No messages from unmatched users'],
   ['verified-adults-only', 'Prefer verified adults'],
   ['couples-only', 'Couples only'],
-  ['private-profile', 'Keep my profile private'],
 ];
 
 const DarkFantasyPage = () => {
   const location = useLocation();
   const featureEnabled = String(process.env.REACT_APP_DARK_FANTASY_ENABLED || '').toLowerCase() === 'true';
   const [status, setStatus] = useState(null);
-  const [profile, setProfile] = useState({ consent: false, interests: [], boundaries: ['private-profile'], visibility: 'private' });
+  const [profile, setProfile] = useState({ consent: false, interests: [], boundaries: [], visibility: 'private' });
   const [matches, setMatches] = useState([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -40,7 +39,7 @@ const DarkFantasyPage = () => {
       setStatus(nextStatus);
       if (nextStatus.hasAccess) {
         const nextProfile = await apiClient.get('/dark-fantasy/profile');
-        setProfile({ consent: Boolean(nextProfile.consent), interests: nextProfile.interests || [], boundaries: nextProfile.boundaries || ['private-profile'], visibility: nextProfile.visibility || 'private' });
+        setProfile({ consent: Boolean(nextProfile.consent), interests: nextProfile.interests || [], boundaries: nextProfile.boundaries || [], visibility: nextProfile.visibility || 'private' });
       }
     } catch (e) {
       setError(e.data?.error || e.message || 'Dark Fantasy is unavailable right now.');
@@ -126,7 +125,7 @@ const DarkFantasyPage = () => {
     setBusy(true); setError(''); setNotice('');
     try {
       await apiClient.delete('/dark-fantasy/profile');
-      setProfile({ consent: false, interests: [], boundaries: ['private-profile'], visibility: 'private' });
+      setProfile({ consent: false, interests: [], boundaries: [], visibility: 'private' });
       setMatches([]);
       setNotice('Your Dark Fantasy preferences were deleted.');
     } catch (e) { setError(e.data?.error || e.message || 'Could not delete preferences.'); }
