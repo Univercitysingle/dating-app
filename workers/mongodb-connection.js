@@ -1384,6 +1384,8 @@ export class MongoDBConnection {
         return { status: 200, body: { ...community, memberCount, postCount, membershipStatus: membership?.status || "none", canModerate: input.claimsRole === "superadmin" || ["owner", "moderator"].includes(membership?.role), rules: this.getSecretCommunityRules() } };
       }
       if (action === "join") {
+        if (membership?.status === "active") return { status: 200, body: { status: "active", message: "You are already a member." } };
+        if (membership?.status === "requested") return { status: 200, body: { status: "requested", message: "Your membership request is awaiting review." } };
         const now = new Date();
         await db.collection("secretcommunitymemberships").updateOne({ communitySlug: slug, uid }, { $set: { communitySlug: slug, uid, status: "requested", role: "member", requestedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true });
         return { status: 201, body: { status: "requested", message: "Your membership request has been submitted for review." } };
