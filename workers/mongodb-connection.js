@@ -1499,6 +1499,9 @@ export class MongoDBConnection {
           !Number.isInteger(room.ticketPriceLkr) || room.ticketPriceLkr < 1) {
         return { status: 404, body: { error: "This room is not offering paid tickets." } };
       }
+      if (room.mediaStatus !== "ready") {
+        return { status: 409, body: { error: "Ticket sales are disabled until live video is connected and the room is ready." } };
+      }
       if (room.hostUid === uid) return { status: 400, body: { error: "You cannot purchase your own room ticket." } };
       const user = await db.collection("users").findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found." } };
