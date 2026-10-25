@@ -660,6 +660,57 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/support-attachments" && request.method === "POST") {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!isCdnConfigured(env)) return json({ message: "Attachment storage is not configured (CDN_HOSTNAME is missing)" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const form = await request.formData().catch(() => null);
+        const file = form && form.get("file");
+        const ticketId = form && form.get("ticketId");
+        const allowedTypes = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "application/pdf": "pdf" };
+        if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId)) return json({ message: "A valid ticket ID is required" }, 400);
+        if (!file || typeof file.arrayBuffer !== "function" || !allowedTypes[file.type]) return json({ message: "Attach a JPEG, PNG, GIF, WebP image, or PDF" }, 400);
+        if (file.size < 1 || file.size > 10 * 1024 * 1024) return json({ message: "Each attachment must be 10 MB or smaller" }, 400);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const check = async (path) => {
+          const response = await connection.fetch("https://internal.invalid" + path, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, ticketId })
+          });
+          return response.ok;
+        };
+        const ownsTicket = await check("/internal/support-ticket");
+        const isAdmin = ownsTicket ? false : await check("/internal/admin/support-ticket");
+        if (!ownsTicket && !isAdmin) return json({ message: "Ticket not found or you do not have permission to attach files" }, 403);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const validSignature = file.type === "application/pdf"
+          ? bytes.length >= 5 && String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-"
+          : file.type === "image/jpeg" ? bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+          : file.type === "image/png" ? bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
+          : file.type === "image/gif" ? bytes.length >= 6 && ["GIF89a", "GIF87a"].includes(String.fromCharCode(...bytes.slice(0, 6)))
+          : bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+        if (!validSignature) return json({ message: "The file contents do not match the selected file type" }, 400);
+        const key = "support-" + ticketId + "-" + Date.now() + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
+        const proxyUrl = getCdnObjectUrl(env, key, "root");
+        const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
+        const upload = await fetch(proxyUrl, { method: "PUT", headers: { "Content-Type": file.type, "Origin": frontendOrigin }, body: bytes });
+        if (!upload.ok) {
+          const detail = await upload.text().catch(() => "");
+          console.error("Support attachment upload failed", { status: upload.status, detail: detail.slice(0, 120) });
+          return json({ message: "Attachment storage rejected the upload", proxyStatus: upload.status }, 502);
+        }
+        return json({ attachment: { key, url: proxyUrl, name: String(file.name || "attachment").replace(/[\\/\\r\\n]/g, "_").slice(0, 180), type: file.type, size: file.size } }, 201);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        console.error("Support attachment upload failed", { message: String(error && error.message || "unknown").slice(0, 160) });
+        return json({ message: "Support attachment upload failed" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/photos" && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
