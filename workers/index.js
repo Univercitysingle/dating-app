@@ -1387,9 +1387,11 @@ export default {
 
     if (url.pathname === "/api/dark-fantasy/communities" || url.pathname.startsWith("/api/dark-fantasy/communities/")) {
       if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") return json({ error: "Dark Fantasy is not currently available." }, 404);
-      const allowedCountries = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").split(",").map(country => country.trim().toUpperCase()).filter(country => /^[A-Z]{2}$/.test(country));
+      const countrySetting = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").trim().toUpperCase();
+      const globalAccess = countrySetting === "*";
+      const allowedCountries = countrySetting.split(",").map(country => country.trim()).filter(country => /^[A-Z]{2}$/.test(country));
       const requestCountry = String(request.cf?.country || "").toUpperCase();
-      if (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry)) return json({ error: "Dark Fantasy is not available in this region." }, 404);
+      if (!globalAccess && (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry))) return json({ error: "Dark Fantasy is not available in this region." }, 404);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
@@ -1428,10 +1430,11 @@ export default {
       }
       // Fail closed unless an operator configures an approved ISO country allowlist.
       // Cloudflare's country signal is a coarse access control, not proof of residence.
-      const allowedCountries = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "")
-        .split(",").map(country => country.trim().toUpperCase()).filter(country => /^[A-Z]{2}$/.test(country));
+      const countrySetting = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").trim().toUpperCase();
+      const globalAccess = countrySetting === "*";
+      const allowedCountries = countrySetting.split(",").map(country => country.trim()).filter(country => /^[A-Z]{2}$/.test(country));
       const requestCountry = String(request.cf?.country || "").toUpperCase();
-      if (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry)) {
+      if (!globalAccess && (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry))) {
         return json({ error: "Dark Fantasy is not available in this region." }, 404);
       }
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
