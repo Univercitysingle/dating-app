@@ -24,7 +24,7 @@ const boundaryOptions = [
 
 const DarkFantasyPage = () => {
   const location = useLocation();
-  const featureEnabled = String(process.env.REACT_APP_DARK_FANTASY_ENABLED || '').toLowerCase() === 'true';
+  // UI visibility is not controlled by a build-time flag; the API enforces deployment, region, and payment gates.
   const [status, setStatus] = useState(null);
   const [checking, setChecking] = useState(true);
   const [profile, setProfile] = useState({ consent: false, interests: [], boundaries: [], visibility: 'private' });
@@ -35,7 +35,6 @@ const DarkFantasyPage = () => {
   const [section, setSection] = useState('discover');
 
   const load = useCallback(async () => {
-    if (!featureEnabled) return;
     setChecking(true);
     try {
       const nextStatus = await apiClient.get('/dark-fantasy/status');
@@ -49,13 +48,13 @@ const DarkFantasyPage = () => {
     } finally {
       setChecking(false);
     }
-  }, [featureEnabled]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     const purchaseId = new URLSearchParams(location.search).get('purchaseId');
-    if (!featureEnabled || !purchaseId) return undefined;
+    if (!purchaseId) return undefined;
     let attempts = 0;
     const timer = setInterval(async () => {
       attempts += 1;
@@ -78,7 +77,7 @@ const DarkFantasyPage = () => {
       if (attempts >= 20) clearInterval(timer);
     }, 3000);
     return () => clearInterval(timer);
-  }, [featureEnabled, location.search, load]);
+  }, [location.search, load]);
 
   const toggle = (key, value) => setProfile(current => ({
     ...current,
@@ -143,10 +142,6 @@ const DarkFantasyPage = () => {
     catch (e) { setError(e.data?.error || e.message || 'Could not load compatible profiles.'); }
     finally { setBusy(false); }
   };
-
-  if (!featureEnabled) {
-    return <main className="mx-auto max-w-3xl p-6 sm:p-10"><section className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Separate paid add-on</p><h1 className="mt-3 text-3xl font-bold text-gray-900">Dark Fantasy</h1><p className="mt-3 text-gray-600">This optional adult-interest experience is not enabled for this deployment yet.</p></section></main>;
-  }
 
   return (
     <main className="mx-auto w-full max-w-5xl p-4 sm:p-8">
