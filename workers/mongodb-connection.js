@@ -856,7 +856,8 @@ export class MongoDBConnection {
             return { ...photo, url: this.getMediaUrl(path) };
           });
         }
-        return { ...item, user: profile };
+        const responseProfile = currentUser.role === "superadmin" ? profile : sanitizePublicProfile(profile);
+        return { ...item, user: responseProfile };
       });
       return {
         status: 200,
