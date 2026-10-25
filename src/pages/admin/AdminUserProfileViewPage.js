@@ -79,7 +79,12 @@ function AdminUserProfileViewPage() {
 
                  <SectionCard title="Details">
                     <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
-                        <p><strong>Email:</strong> {profile.email}</p>
+                        {adminUser?.role === 'superadmin' && (
+                          <>
+                            <p><strong>Email:</strong> {profile.email || 'N/A'}</p>
+                            <p><strong>Mobile Number:</strong> {profile.mobileNumber || profile.phoneNumber || 'N/A'}</p>
+                          </>
+                        )}
                         <p><strong>Gender:</strong> {profile.gender}</p>
                         <p><strong>Preference:</strong> {profile.preference}</p>
                         <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
