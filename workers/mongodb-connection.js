@@ -1381,7 +1381,7 @@ export class MongoDBConnection {
       if (action === "detail") {
         const memberCount = await db.collection("secretcommunitymemberships").countDocuments({ communitySlug: slug, status: "active" });
         const postCount = await db.collection("secretcommunityposts").countDocuments({ communitySlug: slug, status: "published" });
-        return { status: 200, body: { ...community, memberCount, postCount, membershipStatus: membership?.status || "none", rules: this.getSecretCommunityRules() } };
+        return { status: 200, body: { ...community, memberCount, postCount, membershipStatus: membership?.status || "none", canModerate: input.claimsRole === "superadmin" || ["owner", "moderator"].includes(membership?.role), rules: this.getSecretCommunityRules() } };
       }
       if (action === "join") {
         const now = new Date();
