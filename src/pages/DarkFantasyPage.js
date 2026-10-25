@@ -36,6 +36,11 @@ const DarkFantasyPage = () => {
   const [catalog, setCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState('');
+  const [selectedCommunity, setSelectedCommunity] = useState(null);
+  const [communityPosts, setCommunityPosts] = useState([]);
+  const [communityPostText, setCommunityPostText] = useState('');
+  const [communityCommentDrafts, setCommunityCommentDrafts] = useState({});
+  const [communityBusy, setCommunityBusy] = useState(false);
 
   const load = useCallback(async () => {
     setChecking(true);
@@ -148,6 +153,59 @@ const DarkFantasyPage = () => {
     finally { setBusy(false); }
   };
 
+  const loadCommunity = async (slug) => {
+    setCommunityBusy(true); setError('');
+    try {
+      const detail = await apiClient.get('/dark-fantasy/communities/' + encodeURIComponent(slug));
+      setSelectedCommunity(detail);
+      if (detail.membershipStatus === 'active') setCommunityPosts(await apiClient.get('/dark-fantasy/communities/' + encodeURIComponent(slug) + '/posts'));
+      else setCommunityPosts([]);
+    } catch (e) { setError(e.data?.error || e.message || 'Could not load this community.'); }
+    finally { setCommunityBusy(false); }
+  };
+
+  const requestCommunityMembership = async () => {
+    if (!selectedCommunity) return;
+    setCommunityBusy(true); setError(''); setNotice('');
+    try {
+      const result = await apiClient.post('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/join', {});
+      setSelectedCommunity(current => ({ ...current, membershipStatus: result.status }));
+      setNotice(result.message || 'Membership request submitted.');
+    } catch (e) { setError(e.data?.error || e.message || 'Could not request membership.'); }
+    finally { setCommunityBusy(false); }
+  };
+
+  const createCommunityPost = async () => {
+    if (!selectedCommunity || !communityPostText.trim()) return;
+    setCommunityBusy(true); setError('');
+    try {
+      await apiClient.post('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/posts', { text: communityPostText });
+      setCommunityPostText('');
+      setCommunityPosts(await apiClient.get('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/posts'));
+    } catch (e) { setError(e.data?.error || e.message || 'Could not publish your post.'); }
+    finally { setCommunityBusy(false); }
+  };
+
+  const commentOnCommunityPost = async (postId) => {
+    if (!selectedCommunity || !communityCommentDrafts[postId]?.trim()) return;
+    setCommunityBusy(true); setError('');
+    try {
+      await apiClient.post('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/posts/' + encodeURIComponent(postId) + '/comments', { text: communityCommentDrafts[postId] });
+      setCommunityCommentDrafts(current => ({ ...current, [postId]: '' }));
+      setCommunityPosts(await apiClient.get('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/posts'));
+    } catch (e) { setError(e.data?.error || e.message || 'Could not add your comment.'); }
+    finally { setCommunityBusy(false); }
+  };
+
+  const reactToCommunityPost = async (postId, reaction) => {
+    if (!selectedCommunity) return;
+    setCommunityBusy(true); setError('');
+    try {
+      await apiClient.post('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/posts/' + encodeURIComponent(postId) + '/reaction', { reaction });
+      setCommunityPosts(await apiClient.get('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/posts'));
+    } catch (e) { setError(e.data?.error || e.message || 'Could not update reaction.'); }
+    finally { setCommunityBusy(false); }
+  };
   const discover = async () => {
     setBusy(true); setError(''); setNotice('');
     try { setMatches(await apiClient.get('/dark-fantasy/discover')); }
@@ -173,21 +231,40 @@ const DarkFantasyPage = () => {
 
       {section === "camshows" && <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><div className="flex items-start gap-4"><div className="rounded-xl bg-violet-100 p-3 text-violet-900" aria-hidden="true">🔒</div><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-700">Paid add-on access</p><h2 className="mt-2 text-2xl font-bold text-gray-900">Cam Shows</h2><p className="mt-2 text-sm leading-6 text-gray-600">{status?.hasAccess ? "Your add-on is active. This section will show approved, consent-based adult services when the live cam-show service is available." : "Cam Shows is reserved for eligible adults with an active Dark Fantasy add-on. Public product browsing remains available without a subscription."}</p>{!status?.hasAccess && <button onClick={() => setSection("store")} className="mt-4 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white">View Dark Fantasy add-on</button>}</div></div></section>}
 
-      {section === "communities" && <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><div><p className="text-xs font-semibold uppercase tracking-wider text-violet-700">Private member spaces</p><h2 className="mt-2 text-2xl font-bold text-gray-900">Secrets Communities</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">Choose communities by identity, orientation or relationship style. Category previews are visible to everyone; joining, member lists, posts and discussions require an active Dark Fantasy add-on. Respectful participation, consent and privacy rules apply in every group.</p><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[
-        ["gay-men", "Secret Gay Men", "A private space for gay men to connect and share experiences."],
-        ["lesbian-women", "Secret Lesbian Women", "A private space for lesbian women, friendship and dating connections."],
-        ["bisexual", "Secret Bi & Bi-curious", "For bisexual and bi-curious adults to explore identity and connect without judgement."],
-        ["lgbtq-plus", "Secret LGBTQ+ Community", "A welcoming social space for LGBTQ+ adults and allies where permitted by group rules."],
-        ["trans-nonbinary", "Secret Trans & Non-binary", "Peer connection for transgender and non-binary adults in a respectful environment."],
-        ["swingers-swap", "Secret Swingers & Swap", "For consenting adult couples and individuals interested in ethical swinging and partner-swapping."],
-        ["open-relationships", "Secret Open Relationships", "Discuss consensual non-monogamy, communication, agreements and boundaries."],
-        ["polyamory", "Secret Polyamory & Throuples", "Connect with adults interested in polyamory, triads and other consensual relationship structures."],
-        ["couples", "Secret Couples Connection", "A private space for couples seeking shared social connections and relationship discussions."],
-        ["kink-consent", "Secret Kink & Boundaries", "Discuss kink-related interests, safety, negotiation and consent respectfully."],
-        ["friends-social", "Secret Friends & Social", "Meet people for friendship, community events and supportive conversations."],
-        ["regional", "Secret Local Groups", "Find local interest groups where location-based discovery is available."]
-      ].map(([key, title, description]) => <article key={key} className="rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><h3 className="font-semibold text-gray-900">{title}</h3><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{status?.hasAccess ? "Add-on" : "Locked"}</span></div><p className="mt-2 text-sm leading-5 text-gray-600">{description}</p><p className="mt-3 text-xs text-gray-500">Category preview · community content not yet available</p></article>)}</div>{!status?.hasAccess && <div className="mt-6 rounded-xl border border-violet-200 bg-violet-50 p-4"><h3 className="font-semibold text-violet-950">Unlock Secrets Communities</h3><p className="mt-1 text-sm text-violet-900">An active Dark Fantasy add-on is required to join communities and access member-only content.</p><button onClick={() => setSection("store")} className="mt-3 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white">View Dark Fantasy add-on</button></div>}{status?.hasAccess && <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Your add-on is active, but community creation, membership, posts and moderation tools are not live yet. No private community content is exposed on this page.</p>}</div></section>}
-
+      {section === "communities" && <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-wider text-violet-700">Private member spaces</p>
+        <h2 className="mt-2 text-2xl font-bold text-gray-900">Secrets Communities</h2>
+        <p className="mt-2 text-sm leading-6 text-gray-600">Join a private space for shared identity, orientation or relationship interests. Membership, discussions and reactions are checked by the server on every request.</p>
+        {selectedCommunity ? <div className="mt-5">
+          <button type="button" onClick={() => { setSelectedCommunity(null); setCommunityPosts([]); setError(""); }} className="mb-4 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold">← All communities</button>
+          <div className="rounded-2xl bg-slate-950 p-5 text-white">
+            <div className="flex items-start justify-between gap-3"><div><h3 className="text-xl font-bold">{selectedCommunity.title}</h3><p className="mt-2 text-sm text-slate-200">{selectedCommunity.description}</p></div><span className="rounded-full bg-white/10 px-3 py-1 text-xs">{selectedCommunity.memberCount || 0} members</span></div>
+            <p className="mt-3 text-xs text-slate-300">Membership: {selectedCommunity.membershipStatus || "none"}</p>
+          </div>
+          <div className="mt-4 rounded-xl border border-slate-200 p-4"><h4 className="font-semibold text-gray-900">Community rules</h4><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-gray-600">{(selectedCommunity.rules || []).map((rule, index) => <li key={index}>{rule}</li>)}</ul></div>
+          {selectedCommunity.membershipStatus !== "active" ? <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4"><p className="text-sm text-violet-950">{selectedCommunity.membershipStatus === "requested" ? "Your request is awaiting moderator review." : selectedCommunity.membershipStatus === "rejected" ? "Your previous request was not approved. You may submit a new request." : "Request membership to participate in this private community."}</p><button type="button" onClick={requestCommunityMembership} disabled={communityBusy || selectedCommunity.membershipStatus === "requested"} className="mt-3 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{communityBusy ? "Please wait…" : selectedCommunity.membershipStatus === "requested" ? "Request pending" : "Request to join"}</button></div> : <div className="mt-5">
+            <label className="block text-sm font-semibold text-gray-900" htmlFor="community-post">Start a discussion</label><textarea id="community-post" value={communityPostText} onChange={e => setCommunityPostText(e.target.value)} maxLength={3000} rows={3} placeholder="Share a question or thought with members…" className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm" />
+            <button type="button" onClick={createCommunityPost} disabled={communityBusy || !communityPostText.trim()} className="mt-2 rounded-full bg-violet-800 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Publish post</button>
+            <div className="mt-6 space-y-4"><h4 className="font-semibold text-gray-900">Private discussion feed</h4>{communityPosts.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-gray-500">No posts yet. Start the first discussion.</p> : communityPosts.map(post => <article key={post.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold text-gray-900">{post.author || "Member"}</span><span className="text-xs text-gray-500">{post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}</span></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-700">{post.text}</p><div className="mt-3 flex flex-wrap gap-2">{[["like","Like"],["heart","Heart"],["support","Support"]].map(([reaction,label]) => <button key={reaction} type="button" disabled={communityBusy} onClick={() => reactToCommunityPost(post.id, reaction)} className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold">{label} · {(post.reactions || []).filter(r => r.type === reaction).length}</button>)}</div>
+              <div className="mt-4 space-y-2 border-l-2 border-slate-100 pl-3">{(post.comments || []).map(comment => <div key={comment.id} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-semibold text-gray-700">{comment.author || "Member"}</p><p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{comment.text}</p></div>)}</div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={communityCommentDrafts[post.id] || ""} onChange={e => setCommunityCommentDrafts(current => ({ ...current, [post.id]: e.target.value }))} maxLength={1000} placeholder="Write a respectful comment…" className="min-w-0 flex-1 rounded-full border border-slate-300 px-4 py-2 text-sm" /><button type="button" onClick={() => commentOnCommunityPost(post.id)} disabled={communityBusy || !(communityCommentDrafts[post.id] || "").trim()} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">Comment</button></div>
+            </article>)}</div>
+          </div>}
+        </div> : <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[
+          ["gay-men", "Secret Gay Men", "A private space for gay men to connect and share experiences."],
+          ["lesbian-women", "Secret Lesbian Women", "A private space for lesbian women, friendship and dating connections."],
+          ["bisexual", "Secret Bi & Bi-curious", "For bisexual and bi-curious adults to explore identity and connect without judgement."],
+          ["lgbtq-plus", "Secret LGBTQ+ Community", "A welcoming social space for LGBTQ+ adults."],
+          ["trans-nonbinary", "Secret Trans & Non-binary", "Peer connection for transgender and non-binary adults."],
+          ["swingers-swap", "Secret Swingers & Swap", "For consenting adults interested in ethical swinging and partner-swapping."],
+          ["open-relationships", "Secret Open Relationships", "Discuss consensual non-monogamy, communication and boundaries."],
+          ["polyamory", "Secret Polyamory & Throuples", "Connect around polyamory, triads and consensual relationship structures."],
+          ["couples", "Secret Couples Connection", "A private space for couples seeking shared social connections."],
+          ["kink-consent", "Secret Kink & Boundaries", "Discuss kink-related interests, safety, negotiation and consent."],
+          ["friends-social", "Secret Friends & Social", "Meet people for friendship, community events and supportive conversations."],
+          ["regional", "Secret Local Groups", "Find local interest groups where location-based discovery is available."]
+        ].map(([slug, title, description]) => <button key={slug} type="button" onClick={() => loadCommunity(slug)} className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-violet-400 hover:bg-violet-50"><div className="flex items-start justify-between gap-3"><h3 className="font-semibold text-gray-900">{title}</h3><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">Private</span></div><p className="mt-2 text-sm leading-5 text-gray-600">{description}</p><p className="mt-3 text-xs font-semibold text-violet-800">View community →</p></button>)}</div>}
+      </section>}
       {section === "discover" && checking && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">Checking regional availability and add-on access…</section>}
       {section === "discover" && !checking && !status && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">{error || 'This feature is unavailable in your region or for this deployment.'}</section>}
       {section === "discover" && !checking && status && status.accountEligible === false && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">This account is not eligible</h2><p className="mt-1 text-sm">Dark Fantasy access and purchases are unavailable for suspended or banned accounts.</p></section>}
