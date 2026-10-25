@@ -2455,6 +2455,11 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
+      const conversation = await db.collection("chatmessages").findOne(
+        { roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] },
+        { projection: { _id: 1 } }
+      );
+      if (!conversation) return { status: 403, body: { error: "Not a participant in this conversation" } };
       const now = new Date();
       await db.collection("chatTyping").updateOne(
         { roomId, uid },
@@ -2474,6 +2479,11 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
+      const conversation = await db.collection("chatmessages").findOne(
+        { roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] },
+        { projection: { _id: 1 } }
+      );
+      if (!conversation) return { status: 403, body: { error: "Not a participant in this conversation" } };
       const otherUid = roomId.split("-").filter(part => part !== uid).join("-");
       const presence = await db.collection("chatTyping").findOne({ roomId, uid: otherUid });
       const typing = Boolean(presence?.isTyping && Date.now() - new Date(presence.updatedAt).getTime() < 5000);
