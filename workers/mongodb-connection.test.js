@@ -560,3 +560,38 @@ test("Dark Fantasy API remains unavailable by default without feature approval f
   assert.equal(response.status, 404);
   assert.match((await response.json()).error, /not currently available/i);
 });
+
+
+test("successful Dark Fantasy payment settlement grants a separate 30-day entitlement", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "0123456789abcdef01234567";
+  const userId = new ObjectId("abcdef0123456789abcdef01");
+  const existingExpiry = new Date(Date.now() + 5 * 86400000);
+  let entitlementUpdate;
+  const purchase = { _id: new ObjectId(orderId), userId, itemId: "dark-fantasy-monthly", status: "pending" };
+  const purchases = {
+    async findOne() { return purchase; },
+    async updateOne(query, update) { purchase.status = update.$set.status; return { modifiedCount: 1 }; }
+  };
+  const subscriptions = { async findOne() { assert.fail("A purchase must not be treated as a subscription"); } };
+  const users = {
+    async findOne() { return { darkFantasyAccessUntil: existingExpiry }; },
+    async updateOne(query, update) { entitlementUpdate = update; return { matchedCount: 1 }; }
+  };
+  const db = { collection(name) {
+    if (name === "purchases") return purchases;
+    if (name === "subscriptions") return subscriptions;
+    if (name === "users") return users;
+    assert.fail("Unexpected collection " + name);
+  } };
+  const session = { async withTransaction(callback) { return callback(); }, async endSession() {} };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+  const result = await connection.settleWebXPay(orderId, "00", "provider-reference");
+  assert.equal(result.status, 200);
+  assert.equal(purchase.status, "completed");
+  assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil instanceof Date);
+  assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() >= existingExpiry.getTime() + 29 * 86400000);
+  assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() <= existingExpiry.getTime() + 31 * 86400000);
+});
