@@ -595,3 +595,41 @@ test("successful Dark Fantasy payment settlement grants a separate 30-day entitl
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() >= existingExpiry.getTime() + 29 * 86400000);
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() <= existingExpiry.getTime() + 31 * 86400000);
 });
+
+test("Secrets Communities fail closed without an active Dark Fantasy entitlement", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getDarkFantasyStatus = async () => ({ status: 200, body: { ageEligible: true, accountEligible: true, hasAccess: false } });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => { assert.fail("Database must not be accessed without entitlement"); };
+  const result = await connection.secretCommunityAction("member-1", "detail", { slug: "gay-men" });
+  assert.equal(result.status, 402);
+  assert.match(result.body.error, /active Dark Fantasy add-on/i);
+});
+
+test("Secrets Communities do not expose private posts to users without active membership", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getDarkFantasyStatus = async () => ({ status: 200, body: { ageEligible: true, accountEligible: true, hasAccess: true } });
+  const membership = { findOne: async () => ({ status: "requested", role: "member" }) };
+  const users = { findOne: async () => ({ uid: "member-1", accountStatus: "active" }) };
+  let postReads = 0;
+  const posts = { find() { postReads++; return { sort() { return this; }, limit() { return this; }, toArray: async () => [] }; } };
+  const db = { collection(name) { if (name === "secretcommunitymemberships") return membership; if (name === "users") return users; if (name === "secretcommunityposts") return posts; assert.fail("Unexpected collection " + name); } };
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.secretCommunityAction("member-1", "posts", { slug: "gay-men" });
+  assert.equal(result.status, 403);
+  assert.equal(postReads, 0, "private post collection must not be queried before membership authorization");
+});
+
+test("Secrets Communities enforce post and comment length limits", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getDarkFantasyStatus = async () => ({ status: 200, body: { ageEligible: true, accountEligible: true, hasAccess: true } });
+  const membership = { findOne: async () => ({ status: "active", role: "member" }) };
+  const users = { findOne: async () => ({ uid: "member-1", accountStatus: "active" }) };
+  const posts = { insertOne: async () => { assert.fail("Oversized post must not be written"); }, findOne: async () => null };
+  const db = { collection(name) { if (name === "secretcommunitymemberships") return membership; if (name === "users") return users; if (name === "secretcommunityposts") return posts; assert.fail("Unexpected collection " + name); } };
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.secretCommunityAction("member-1", "create-post", { slug: "gay-men", input: { text: "x".repeat(3001) } });
+  assert.equal(result.status, 400);
+});
