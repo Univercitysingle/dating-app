@@ -9,6 +9,7 @@ const SupportPage = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [attachments, setAttachments] = useState([]);
 
   useEffect(() => {
     fetchTickets();
@@ -32,10 +33,25 @@ const SupportPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      await apiClient.post('/support-tickets', { subject, message });
+      const ticket = await apiClient.post('/support-tickets', { subject, message });
+      if (attachments.length) {
+        const uploaded = [];
+        for (const file of attachments) {
+          const form = new FormData();
+          form.append('ticketId', ticket._id);
+          form.append('file', file);
+          const result = await apiClient.post('/support-attachments', form);
+          uploaded.push(result.attachment);
+        }
+        await apiClient.post('/support-tickets/' + ticket._id + '/messages', {
+          message: 'Attachments added to this ticket.',
+          attachments: uploaded
+        });
+      }
       setShowCreateForm(false);
       setSubject('');
       setMessage('');
+      setAttachments([]);
       fetchTickets();
     } catch (err) {
       setError(err.response?.data?.message || 'An error occurred while creating the ticket.');
@@ -80,6 +96,13 @@ const SupportPage = () => {
                 className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                 required
               ></textarea>
+            </div>
+            <div className="mb-4">
+              <label htmlFor="support-attachments" className="block text-sm font-medium text-gray-700">Attachments (images or PDF, up to 5 files, 10 MB each)</label>
+              <input id="support-attachments" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                onChange={(e) => setAttachments(Array.from(e.target.files || []).slice(0, 5))}
+                className="mt-1 block w-full text-sm" />
+              {attachments.length > 0 && <p className="text-sm text-gray-500 mt-1">{attachments.map(file => file.name).join(', ')}</p>}
             </div>
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
             <button
