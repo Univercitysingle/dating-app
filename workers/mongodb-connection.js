@@ -1333,8 +1333,10 @@ export class MongoDBConnection {
   }
 
   async createPendingPurchase(uid, itemId) {
-    const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100, "dark-fantasy-monthly": 1200 };
-    const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost", "dark-fantasy-monthly": "Dark Fantasy Add-on (30 days)" };
+    const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100, "dark-fantasy-monthly": 1200, "dark-fantasy-creator-monthly": 800, "dark-fantasy-unlimited-pass": 3500 };
+    const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost", "dark-fantasy-monthly": "Dark Fantasy Add-on (30 days)", "dark-fantasy-creator-monthly": "Dark Fantasy Creator Gallery (30 days)", "dark-fantasy-unlimited-pass": "Dark Fantasy Unlimited Pass (30 days)" };
+    const galleryMatch = typeof itemId === "string" ? itemId.match(/^dark-fantasy-gallery:([A-Za-z0-9_-]{1,128})$/) : null;
+    if (galleryMatch) { prices[itemId] = 500; names[itemId] = "Individual Dark Fantasy Gallery Access (30 days)"; }
     if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, itemId)) {
       return { status: 400, body: { error: "Invalid item ID." } };
     }
@@ -1342,6 +1344,16 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
+      if (["dark-fantasy-creator-monthly", "dark-fantasy-unlimited-pass", "dark-fantasy-monthly"].includes(itemId) || galleryMatch) {
+        const status = await this.getDarkFantasyStatus(uid);
+        if (status.status !== 200) return status;
+        if (!status.body.ageEligible || !status.body.accountEligible) return { status: 403, body: { error: "An eligible adult account is required." } };
+        if (galleryMatch) {
+          if (galleryMatch[1] === uid) return { status: 400, body: { error: "You cannot purchase access to your own gallery." } };
+          const creator = await db.collection("users").findOne({ uid: galleryMatch[1], creatorGalleryAccessUntil: { $gt: new Date() } }, { projection: { uid: 1 } });
+          if (!creator) return { status: 404, body: { error: "That gallery is not currently available." } };
+        }
+      }
       const now = new Date();
       const purchase = {
         userId: user._id,
@@ -1482,10 +1494,17 @@ export class MongoDBConnection {
           if (purchase.itemId === "super-like-5") userUpdate.$inc = { purchasedSuperLikes: 5 };
           else if (purchase.itemId === "undo-swipes-5") userUpdate.$inc = { purchasedUndoSwipes: 5 };
           else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };
-          else if (purchase.itemId === "dark-fantasy-monthly") {
-            const existingUser = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { darkFantasyAccessUntil: 1 }, session });
-            const currentExpiry = existingUser?.darkFantasyAccessUntil ? new Date(existingUser.darkFantasyAccessUntil).getTime() : 0;
-            userUpdate.$set = { darkFantasyAccessUntil: new Date(Math.max(now.getTime(), Number.isFinite(currentExpiry) ? currentExpiry : 0) + 30 * 86400000) };
+          else if (["dark-fantasy-monthly", "dark-fantasy-creator-monthly", "dark-fantasy-unlimited-pass"].includes(purchase.itemId)) {
+            const entitlementField = purchase.itemId === "dark-fantasy-monthly" ? "darkFantasyAccessUntil" : purchase.itemId === "dark-fantasy-creator-monthly" ? "creatorGalleryAccessUntil" : "darkFantasyUnlimitedUntil";
+            const existingUser = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { [entitlementField]: 1 }, session });
+            const currentExpiry = existingUser?.[entitlementField] ? new Date(existingUser[entitlementField]).getTime() : 0;
+            userUpdate.$set = { [entitlementField]: new Date(Math.max(now.getTime(), Number.isFinite(currentExpiry) ? currentExpiry : 0) + 30 * 86400000) };
+          } else if (typeof purchase.itemId === "string" && purchase.itemId.startsWith("dark-fantasy-gallery:")) {
+            const creatorUid = purchase.itemId.slice("dark-fantasy-gallery:".length);
+            const existing = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { darkFantasyGalleryAccess: 1 }, session });
+            const access = Array.isArray(existing?.darkFantasyGalleryAccess) ? existing.darkFantasyGalleryAccess.filter(x => x && x.creatorUid !== creatorUid) : [];
+            access.push({ creatorUid, accessUntil: new Date(now.getTime() + 30 * 86400000) });
+            userUpdate.$set = { darkFantasyGalleryAccess: access };
           }
           if (Object.keys(userUpdate).length) {
             userUpdate.$set = { ...(userUpdate.$set || {}), updatedAt: now };
