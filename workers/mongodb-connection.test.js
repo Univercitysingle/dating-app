@@ -365,5 +365,5 @@ test("scheduled moderation expiry restores expired temporary suspensions but nev
   });
   assert.equal(updates[0].update.$set.accountStatus, "active");
   assert.equal(updates[0].update.$set.isProfileVisible, false);
-  assert.ok(updates[0].update.$unset.suspendedUntil);
+  assert.equal(Object.hasOwn(updates[0].update.$unset, "suspendedUntil"), true);
 });
