@@ -255,7 +255,7 @@ export class MongoDBConnection {
   }
 
   async runScheduledExpirations(now = new Date(), scope = "all") {
-    if (!["all", "trials", "subscriptions"].includes(scope)) throw new Error("Invalid expiration scope");
+    if (!["all", "trials", "subscriptions", "moderation"].includes(scope)) throw new Error("Invalid expiration scope");
     const db = this.getDatabase(await this.getClient());
     const subscriptions = db.collection("subscriptions");
     const users = db.collection("users");
@@ -326,6 +326,31 @@ export class MongoDBConnection {
       downgradedUsers += result.modifiedCount || 0;
     }
 
+    }
+
+    // Restore only expired temporary suspensions. Permanent bans are never
+    // automatically lifted by the scheduled job.
+    if (scope === "all" || scope === "moderation") {
+      const expiredSuspensions = await users.find({
+        accountStatus: "temporarily_suspended",
+        suspendedUntil: { $lte: now }
+      }).sort({ suspendedUntil: 1 }).limit(500).toArray();
+      for (const user of expiredSuspensions) {
+        await users.updateOne(
+          { _id: user._id, accountStatus: "temporarily_suspended", suspendedUntil: { $lte: now } },
+          {
+            $set: {
+              accountStatus: "active",
+              isProfileVisible: user.profileVisibilityBeforeSuspension !== false,
+              updatedAt: now
+            },
+            $unset: {
+              suspendedUntil: "", profileVisibilityBeforeSuspension: "",
+              moderationReason: "", suspendedBy: ""
+            }
+          }
+        );
+      }
     }
 
     return {
@@ -1470,7 +1495,7 @@ export class MongoDBConnection {
 
   async moderateReport(uid, reportId, payload = {}) {
     if (typeof reportId !== "string" || !/^[a-fA-F0-9]{24}$/.test(reportId)) return { status: 400, body: { message: "Invalid report ID" } };
-    const actions = ["dismiss", "suspend_user", "ban_user"];
+    const actions = ["dismiss", "suspend_user", "ban_user", "restore_user"];
     if (!payload || !actions.includes(payload.action)) return { status: 400, body: { message: "Invalid action specified." } };
     if (payload.adminNotes !== undefined && (typeof payload.adminNotes !== "string" || payload.adminNotes.length > 4000)) {
       return { status: 400, body: { message: "Admin notes must be text of at most 4000 characters." } };
@@ -1497,11 +1522,41 @@ export class MongoDBConnection {
         status = "resolved_no_action";
       } else if (payload.action === "suspend_user") {
         const until = new Date(now.getTime() + durationDays * 86400000);
-        await db.collection("users").updateOne({ _id: target._id }, { $set: { suspendedUntil: until, isProfileVisible: false, updatedAt: now } });
+        await db.collection("users").updateOne({ _id: target._id }, {
+          $set: {
+            accountStatus: "temporarily_suspended", suspendedUntil: until,
+            profileVisibilityBeforeSuspension: target.profileVisibilityBeforeSuspension !== undefined
+              ? target.profileVisibilityBeforeSuspension : target.isProfileVisible !== false,
+            isProfileVisible: false, suspendedBy: uid,
+            moderationReason: typeof payload.adminNotes === "string" ? payload.adminNotes.trim() : "Policy violation",
+            updatedAt: now
+          }
+        });
         status = "resolved_user_suspended";
-      } else {
-        await db.collection("users").updateOne({ _id: target._id }, { $set: { role: "user", isProfileVisible: false, suspendedUntil: new Date("9999-12-31T00:00:00.000Z"), updatedAt: now } });
+      } else if (payload.action === "ban_user") {
+        await db.collection("users").updateOne({ _id: target._id }, {
+          $set: {
+            role: "user", accountStatus: "permanently_banned", isProfileVisible: false,
+            suspendedUntil: new Date("9999-12-31T00:00:00.000Z"), bannedAt: now, bannedBy: uid,
+            moderationReason: typeof payload.adminNotes === "string" ? payload.adminNotes.trim() : "Policy violation",
+            updatedAt: now
+          },
+          $unset: { profileVisibilityBeforeSuspension: "", suspendedBy: "" }
+        });
         status = "resolved_user_banned";
+      } else {
+        await db.collection("users").updateOne({ _id: target._id }, {
+          $set: {
+            accountStatus: "active",
+            isProfileVisible: target.profileVisibilityBeforeSuspension !== false,
+            updatedAt: now
+          },
+          $unset: {
+            suspendedUntil: "", bannedAt: "", bannedBy: "", moderationReason: "",
+            profileVisibilityBeforeSuspension: "", suspendedBy: ""
+          }
+        });
+        status = "resolved_user_restored";
       }
       const update = { status, updatedAt: now };
       if (typeof payload.adminNotes === "string") update.adminNotes = payload.adminNotes.trim();
@@ -1681,18 +1736,49 @@ export class MongoDBConnection {
       ]);
       if (!reporter) return { status: 404, body: { error: "Reporter user not found." } };
       if (!reported) return { status: 404, body: { error: "Reported user not found." } };
+      const reports = db.collection("reports");
+      const now = new Date();
+      const duplicateSince = new Date(now.getTime() - 30 * 86400000);
+      // Deduplicate a reporter/target pair for 30 days so repeat submissions
+      // cannot inflate the review queue or independent-reporter signal.
+      const duplicate = await reports.findOne({
+        reporterUid, reportedUserUid, createdAt: { $gte: duplicateSince }
+      }, { projection: { _id: 1, status: 1 } });
+      if (duplicate) {
+        return { status: 409, body: {
+          error: "You have already reported this user recently.",
+          existingReportStatus: duplicate.status || "pending_review"
+        } };
+      }
       const report = {
-        reporterUid,
-        reportedUserUid,
-        reason,
-        category,
-        status: "pending_review",
-        adminNotes: "",
-        createdAt: new Date(),
-        updatedAt: new Date()
+        reporterUid, reportedUserUid, reason, category,
+        status: "pending_review", adminNotes: "", createdAt: now, updatedAt: now
       };
-      const result = await db.collection("reports").insertOne(report);
-      return { status: 201, body: { message: "Report submitted successfully.", reportId: result.insertedId.toString() } };
+      const result = await reports.insertOne(report);
+      // Independent reports prioritize human review only; counts never auto-ban.
+      const recentSince = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      let distinctReporterCount = 1;
+      if (typeof reports.distinct === "function") {
+        const reporterIds = await reports.distinct("reporterUid", {
+          reportedUserUid, createdAt: { $gte: recentSince }, status: "pending_review"
+        });
+        distinctReporterCount = Math.max(1, reporterIds.length);
+      } else if (typeof reports.countDocuments === "function") {
+        distinctReporterCount = Math.max(1, await reports.countDocuments({
+          reportedUserUid, createdAt: { $gte: recentSince }, status: "pending_review"
+        }));
+      }
+      const reviewPriority = category === "underage_user" ? "urgent"
+        : (["scam_or_fraud", "harassment_or_bullying", "hateful_conduct"].includes(category) || distinctReporterCount >= 3
+          ? "high" : "normal");
+      await reports.updateOne(
+        { _id: result.insertedId },
+        { $set: { distinctReporterCount24h: distinctReporterCount, reviewPriority, updatedAt: now } }
+      );
+      return { status: 201, body: {
+        message: "Report submitted successfully.", reportId: result.insertedId.toString(),
+        reviewPriority, distinctReporterCount24h: distinctReporterCount
+      } };
     } catch {
       return { status: 503, body: { error: "Report service is temporarily unavailable." } };
     }
