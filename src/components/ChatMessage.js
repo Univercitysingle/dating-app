@@ -1,5 +1,5 @@
 import React from 'react';
-import { extractPhotoKey, resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
+import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const MessageStatus = ({ status }) => {
   if (status === 'read') {
