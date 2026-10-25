@@ -1313,6 +1313,12 @@ export class MongoDBConnection {
       for (const candidate of users) {
         const candidateProfile = profiles.find(p => p.uid === candidate.uid);
         if (!candidateProfile || (Array.isArray(candidate.blocked) && candidate.blocked.map(String).includes(uid))) continue;
+        const birthday = candidate.birthday ? new Date(candidate.birthday) : null;
+        if (!birthday || Number.isNaN(birthday.getTime())) continue;
+        const now = new Date();
+        let age = now.getFullYear() - birthday.getFullYear();
+        if (now.getMonth() < birthday.getMonth() || (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+        if (age < 18) continue;
         const sharedInterestCount = myProfile.interests.filter(x => candidateProfile.interests.includes(x)).length;
         if (!sharedInterestCount) continue;
         const safe = sanitizePublicProfile(candidate);
