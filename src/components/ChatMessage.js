@@ -1,49 +1,5 @@
 import React from 'react';
-
-const MEDIA_API_ORIGIN =
-  process.env.REACT_APP_MEDIA_API_ORIGIN ||
-  'https://dating-app-api-staging.enadoctemp.workers.dev';
-
-const configuredCdn = String(process.env.REACT_APP_CDN_HOSTNAME || '').trim();
-const CDN_BASE = configuredCdn
-  ? (configuredCdn.startsWith('https://') ? configuredCdn : `https://${configuredCdn}`).replace(/\/+$/, '')
-  : '';
-
-const isPhotoKey = (value) =>
-  /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(value);
-
-const extractPhotoKey = (value) => {
-  if (!value) return '';
-  let path = String(value).trim();
-  try {
-    if (/^https?:\/\//i.test(path)) {
-      const parsed = new URL(path);
-      if (parsed.pathname.startsWith('/api/media/')) {
-        path = decodeURIComponent(parsed.pathname.slice('/api/media/'.length));
-      } else {
-        path = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
-      }
-    } else if (path.startsWith('/api/media/')) {
-      path = decodeURIComponent(path.slice('/api/media/'.length));
-    } else if (path.startsWith('api/media/')) {
-      path = decodeURIComponent(path.slice('api/media/'.length));
-    } else {
-      path = decodeURIComponent(path.replace(/^\/+/, ''));
-    }
-  } catch {
-    return '';
-  }
-  return isPhotoKey(path) ? path : '';
-};
-
-const resolveAvatarUrl = (value) => {
-  if (!value) return 'https://placehold.co/100x100';
-  const key = extractPhotoKey(value);
-  if (!key) return value;
-  return CDN_BASE
-    ? `${CDN_BASE}/${encodeURIComponent(key)}`
-    : `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(key)}`;
-};
+import { extractPhotoKey, resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const MessageStatus = ({ status }) => {
   if (status === 'read') {
@@ -106,11 +62,8 @@ const ChatMessage = ({ message, currentUser, otherUser }) => {
   const isSender = currentUser && message.senderUid === currentUser.uid;
   const userProfile = isSender ? currentUser : otherUser;
   const photoValue = userProfile?.photos?.[0]?.url;
-  const avatarUrl = resolveAvatarUrl(photoValue);
-  const photoKey = extractPhotoKey(photoValue);
-  const workerFallbackUrl = photoKey
-    ? `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(photoKey)}`
-    : '';
+  const avatarUrl = resolvePhotoUrl(photoValue);
+  const workerFallbackUrl = resolveWorkerPhotoUrl(photoValue);
 
   return (
     <div className={`flex items-start gap-3 ${isSender ? 'flex-row-reverse' : ''}`}>
@@ -126,8 +79,8 @@ const ChatMessage = ({ message, currentUser, otherUser }) => {
             image.src = fallback;
             return;
           }
-          if (image.src !== 'https://placehold.co/100x100') {
-            image.src = 'https://placehold.co/100x100';
+          if (image.src !== PLACEHOLDER_IMAGE) {
+            image.src = PLACEHOLDER_IMAGE;
           }
         }}
       />
