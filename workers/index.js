@@ -1270,6 +1270,25 @@ export default {
       }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        // Account-scoped quota is independent of the general edge/IP quota.
+        if (env.RATE_LIMITER) {
+          const limiterId = env.RATE_LIMITER.idFromName("report-user:" + claims.sub);
+          const limiter = env.RATE_LIMITER.get(limiterId);
+          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "report", limit: 3, windowMs: 60 * 60 * 1000 })
+          });
+          if (!rateResponse.ok) return json({ error: "Report rate limit service unavailable" }, 503);
+          const rate = await rateResponse.json();
+          if (!rate.allowed) {
+            const retryAfter = Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000));
+            return new Response(JSON.stringify({ error: "Report limit reached. Please retry later." }), {
+              status: 429,
+              headers: { ...JSON_HEADERS, "retry-after": String(retryAfter) }
+            });
+          }
+        }
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/create-report", {
