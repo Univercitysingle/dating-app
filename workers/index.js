@@ -9,7 +9,11 @@ function isCdnConfigured(env) {
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
-  "cache-control": "no-store"
+  "cache-control": "no-store",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+  "strict-transport-security": "max-age=31536000; includeSubDomains"
 };
 
 function getCdnObjectUrl(env, key, route = "root") {
