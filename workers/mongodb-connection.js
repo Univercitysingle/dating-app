@@ -2745,6 +2745,76 @@ export class MongoDBConnection {
     }
   }
 
+
+  async handleVideoRooms(uid, action, roomId, payload = {}) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const rooms = db.collection("videoRooms");
+      const now = new Date();
+      if (action === "create") {
+        const mode = payload.mode, visibility = payload.visibility, capacity = Number(payload.capacity);
+        const title = typeof payload.title === "string" ? payload.title.trim().slice(0, 80) : "";
+        if (!["private", "group", "broadcast"].includes(mode) || !["invite", "listed"].includes(visibility) ||
+            !Number.isInteger(capacity) || (mode === "private" && (capacity !== 2 || visibility !== "invite")) ||
+            (mode === "group" && (capacity < 3 || capacity > 6)) ||
+            (mode === "broadcast" && ![25, 50, 100].includes(capacity))) return { status: 400, body: { error: "Invalid room mode, visibility, or capacity." } };
+        const user = await db.collection("users").findOne({ uid }, { projection: { name: 1, displayName: 1, accountStatus: 1 } });
+        if (!user || isAccountRestricted(user, now)) return { status: 403, body: { error: "This account cannot host a Video Room." } };
+        if (await rooms.countDocuments({ hostUid: uid, status: "active" }) >= 2) return { status: 429, body: { error: "You already have the maximum number of active rooms." } };
+        const room = {
+          roomId: crypto.randomUUID(), hostUid: uid,
+          hostDisplayName: String(user.displayName || user.name || "Host").slice(0, 80),
+          title: title || (mode === "private" ? "Private individual show" : mode === "group" ? "Interactive group room" : "Live broadcast"),
+          mode, visibility, capacity, status: "active",
+          participants: [{ uid, role: "host", joinedAt: now, mediaPublishingAllowed: true }],
+          mediaStatus: "not_connected",
+          bandwidthProfile: mode === "private" ? "adaptive-p2p" : mode === "group" ? "low-bitrate-sfu" : "broadcast-sfu",
+          createdAt: now, updatedAt: now, expiresAt: new Date(now.getTime() + 4 * 60 * 60 * 1000)
+        };
+        await rooms.insertOne(room);
+        return { status: 201, body: { room: { roomId: room.roomId, title: room.title, mode, visibility, capacity, status: room.status, participantCount: 1, isHost: true, mediaReady: false, bandwidthProfile: room.bandwidthProfile, createdAt: now, expiresAt: room.expiresAt }, mediaReady: false, message: "Room created. Live media is not connected until a media transport is configured." } };
+      }
+      if (action === "list") {
+        const found = await rooms.find({ $or: [{ hostUid: uid }, { "participants.uid": uid }, { visibility: "listed", status: "active" }] }).sort({ updatedAt: -1 }).limit(50).toArray();
+        return { status: 200, body: { rooms: found.map(room => ({
+          roomId: room.roomId, hostUid: room.hostUid, hostDisplayName: room.hostDisplayName,
+          title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity,
+          status: room.status, participantCount: (room.participants || []).length,
+          createdAt: room.createdAt, expiresAt: room.expiresAt,
+          isHost: room.hostUid === uid, isParticipant: (room.participants || []).some(p => p.uid === uid),
+          mediaReady: room.mediaStatus === "ready", bandwidthProfile: room.bandwidthProfile
+        })) } };
+      }
+      if (!["join", "leave", "end"].includes(action) || typeof roomId !== "string" || roomId.length > 64) return { status: 400, body: { error: "Invalid room action." } };
+      const room = await rooms.findOne({ roomId, status: "active" });
+      if (!room || (room.expiresAt && new Date(room.expiresAt) < now)) return { status: 404, body: { error: "Active room not found." } };
+      const members = Array.isArray(room.participants) ? room.participants : [];
+      const isMember = members.some(member => member.uid === uid);
+      if (action === "join") {
+        if (room.visibility !== "listed" && room.hostUid !== uid && !isMember) return { status: 403, body: { error: "This room is invite-only." } };
+        if (!isMember && members.length >= room.capacity) return { status: 409, body: { error: "This room is full." } };
+        if (room.mode === "private" && room.hostUid !== uid && !isMember) return { status: 403, body: { error: "Private shows require a direct invitation." } };
+        if (!isMember) await rooms.updateOne({ roomId, status: "active", "participants.uid": { $ne: uid } }, {
+          $push: { participants: { uid, role: room.mode === "broadcast" ? "viewer" : "participant", joinedAt: now, mediaPublishingAllowed: false } },
+          $set: { updatedAt: now }
+        });
+      } else if (action === "leave") {
+        if (!isMember) return { status: 403, body: { error: "You are not a member of this room." } };
+        if (room.hostUid === uid) await rooms.updateOne({ roomId, status: "active" }, { $set: { status: "ended", endedAt: now, updatedAt: now } });
+        else await rooms.updateOne({ roomId, status: "active" }, { $pull: { participants: { uid } }, $set: { updatedAt: now } });
+      } else {
+        if (room.hostUid !== uid) return { status: 403, body: { error: "Only the host can end this room." } };
+        await rooms.updateOne({ roomId, status: "active" }, { $set: { status: "ended", endedAt: now, updatedAt: now } });
+      }
+      const updated = await rooms.findOne({ roomId });
+      return { status: 200, body: { room: updated ? { roomId: updated.roomId, title: updated.title, mode: updated.mode, visibility: updated.visibility, capacity: updated.capacity, status: updated.status, participantCount: (updated.participants || []).length, isHost: updated.hostUid === uid, isParticipant: (updated.participants || []).some(p => p.uid === uid), mediaReady: updated.mediaStatus === "ready", bandwidthProfile: updated.bandwidthProfile } : null, mediaReady: false } };
+    } catch (error) {
+      console.error("Video Room operation failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Video Rooms service unavailable" } };
+    }
+  }
+
   parseChatRoom(roomId) {
     if (typeof roomId !== "string" || roomId.length > 260 || roomId.length < 3) return null;
     return roomId;
@@ -3157,6 +3227,15 @@ export class MongoDBConnection {
       const body = await request.json().catch(() => null);
       if (!body || typeof body.email !== "string") return json({ error: "Invalid request" }, 400);
       const result = await this.ensureSuperadminUser(body.email);
+      return json(result.body, result.status);
+    }
+
+
+    if (url.pathname.startsWith("/internal/video-rooms/")) {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      const action = url.pathname.slice("/internal/video-rooms/".length);
+      const result = await this.handleVideoRooms(body.claims.sub, action, body.roomId, body.payload || {});
       return json(result.body, result.status);
     }
 
