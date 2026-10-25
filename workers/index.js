@@ -1402,6 +1402,7 @@ export default {
         const payload = {};
         if (segments.length === 0 && method === "GET") internalPath += "list";
         else if (segments.length === 1 && method === "GET") { internalPath += "detail"; payload.slug = segments[0]; }
+        else if (segments.length === 2 && segments[1] === "requests" && method === "GET") { internalPath += "requests"; payload.slug = segments[0]; }
         else if (segments.length === 2 && segments[1] === "join" && method === "POST") { internalPath += "join"; payload.slug = segments[0]; }
         else if (segments.length === 2 && segments[1] === "posts" && method === "GET") { internalPath += "posts"; payload.slug = segments[0]; }
         else if (segments.length === 2 && segments[1] === "posts" && method === "POST") { internalPath += "create-post"; payload.slug = segments[0]; payload.input = await request.json().catch(() => null); }
