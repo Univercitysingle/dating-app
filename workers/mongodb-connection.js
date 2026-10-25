@@ -1,3 +1,23 @@
+const PRIVATE_CONTACT_FIELDS = [
+  "email", "emailAddress", "email_address", "mobile", "mobileNumber", "mobile_number",
+  "phone", "phoneNumber", "phone_number", "contactNumber", "contact_number",
+  "telephone", "telephoneNumber", "whatsapp", "whatsApp", "whatsappNumber"
+];
+
+function stripPrivateContactFields(profile) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return profile;
+  for (const key of PRIVATE_CONTACT_FIELDS) delete profile[key];
+  for (const key of ["contact", "contactDetails", "personalContact", "contactInfo"]) {
+    if (profile[key] && typeof profile[key] === "object" && !Array.isArray(profile[key])) {
+      const nested = { ...profile[key] };
+      for (const field of PRIVATE_CONTACT_FIELDS) delete nested[field];
+      if (Object.keys(nested).length) profile[key] = nested;
+      else delete profile[key];
+    }
+  }
+  return profile;
+}
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
@@ -740,12 +760,7 @@ export class MongoDBConnection {
         const profile = { ...item.user };
         delete profile.password;
         delete profile.lastLoginIp;
-        if (currentUser.role !== "superadmin") {
-          delete profile.email;
-          delete profile.mobileNumber;
-          delete profile.phoneNumber;
-          delete profile.contactNumber;
-        }
+        if (currentUser.role !== "superadmin") stripPrivateContactFields(profile);
         if (profile._id !== undefined) profile.id = String(profile._id);
         if (profile.birthday) {
           const birthday = new Date(profile.birthday);
@@ -805,12 +820,7 @@ export class MongoDBConnection {
           const profile = { ...user };
           delete profile.password;
           delete profile.lastLoginIp;
-          if (currentUser.role !== "superadmin") {
-            delete profile.email;
-            delete profile.mobileNumber;
-            delete profile.phoneNumber;
-            delete profile.contactNumber;
-          }
+          if (currentUser.role !== "superadmin") stripPrivateContactFields(profile);
           if (profile._id !== undefined) profile.id = String(profile._id);
           if (Array.isArray(profile.photos)) {
             profile.photos = profile.photos.map(photo => {
@@ -998,10 +1008,7 @@ export class MongoDBConnection {
         const user = usersByUid.get(candidateUid);
         if (!user) continue;
         const profile = { ...user };
-        delete profile.email;
-        delete profile.mobileNumber;
-        delete profile.phoneNumber;
-        delete profile.contactNumber;
+        stripPrivateContactFields(profile);
         delete profile.password;
         delete profile.lastLoginIp;
         if (profile._id !== undefined) profile.id = String(profile._id);
@@ -1593,12 +1600,7 @@ export class MongoDBConnection {
       // Never expose credentials or operational IP metadata in profile responses.
       delete profile.password;
       delete profile.lastLoginIp;
-      if (!isOwner && !isSuperAdmin) {
-        delete profile.email;
-        delete profile.mobileNumber;
-        delete profile.phoneNumber;
-        delete profile.contactNumber;
-      }
+      if (!isOwner && !isSuperAdmin) stripPrivateContactFields(profile);
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
       if (profile.birthday) {
@@ -1765,12 +1767,7 @@ export class MongoDBConnection {
       ]);
       const safeItems = items.map(item => {
         const safeUser = { ...item };
-        if (access.role !== "superadmin") {
-          delete safeUser.email;
-          delete safeUser.mobileNumber;
-          delete safeUser.phoneNumber;
-          delete safeUser.contactNumber;
-        }
+        if (access.role !== "superadmin") stripPrivateContactFields(safeUser);
         return safeUser;
       });
       return { status: 200, body: { users: safeItems, totalPages: Math.ceil(totalUsers / limit), currentPage: page, totalUsers } };
