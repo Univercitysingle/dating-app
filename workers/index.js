@@ -1329,6 +1329,64 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/dark-fantasy" || url.pathname.startsWith("/api/dark-fantasy/")) {
+      // This feature is intentionally fail-closed until jurisdiction, age-assurance,
+      // moderation, and payment-provider approvals are recorded by the operator.
+      if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") {
+        return json({ error: "Dark Fantasy is not currently available." }, 404);
+      }
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      const route = url.pathname.replace(/\/+$/, "");
+      const method = request.method;
+      const allowed =
+        (route === "/api/dark-fantasy/status" && method === "GET") ||
+        (route === "/api/dark-fantasy/profile" && ["GET", "PUT"].includes(method)) ||
+        (route === "/api/dark-fantasy/discover" && method === "GET") ||
+        (route === "/api/dark-fantasy/purchase" && method === "POST");
+      if (!allowed) return json({ error: "Not found" }, 404);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (route === "/api/dark-fantasy/purchase") {
+          if (String(env.DARK_FANTASY_PAYMENTS_APPROVED || "").toLowerCase() !== "true") {
+            return json({ error: "Dark Fantasy payments are not approved for this deployment." }, 503);
+          }
+          if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
+            return json({ error: "Payment gateway is not configured." }, 503);
+          }
+          createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
+          if (!env.MONGODB_CONNECTION) return json({ error: "Purchase service unavailable" }, 503);
+          const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+          const response = await connection.fetch("https://internal.invalid/internal/create-purchase", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, itemId: "dark-fantasy-monthly" })
+          });
+          const order = await response.json().catch(() => ({ error: "Purchase service unavailable" }));
+          if (!response.ok) return json(order, response.status);
+          try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy", "Dark Fantasy Add-on (30 days)"); }
+          catch { return json({ error: "Payment gateway is not configured." }, 503); }
+        }
+        if (!env.MONGODB_CONNECTION) return json({ error: "Dark Fantasy service unavailable" }, 503);
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const internalPath = route === "/api/dark-fantasy/status" ? "/internal/dark-fantasy/status"
+          : route === "/api/dark-fantasy/discover" ? "/internal/dark-fantasy/discover"
+          : "/internal/dark-fantasy/profile";
+        const payload = method === "PUT" ? await request.json().catch(() => null) : null;
+        if (method === "PUT" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+          return json({ error: "Invalid profile payload" }, 400);
+        }
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, ...(method === "PUT" ? { action: "save", payload } : {}) })
+        });
+        const body = await response.json().catch(() => ({ error: "Dark Fantasy service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Dark Fantasy service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/purchase/store-item") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
