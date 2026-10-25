@@ -22,7 +22,9 @@
     "staging": {
       "name": "dating-app-api-staging",
       "vars": {
-        "MIGRATION_STAGE": "staging"
+        "MIGRATION_STAGE": "staging",
+        "DARK_FANTASY_ENABLED": "true",
+        "DARK_FANTASY_ALLOWED_COUNTRIES": "*"
       },
       "observability": {
         "enabled": true,
