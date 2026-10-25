@@ -12,6 +12,8 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [remoteStream, setRemoteStream] = useState(null);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [audioLevel, setAudioLevel] = useState(0);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callRef = useRef(null);
@@ -30,6 +32,64 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
     if (remoteAudioRef.current && remoteStream) remoteAudioRef.current.srcObject = remoteStream;
   }, [remoteStream]);
+
+  useEffect(() => {
+    if (call?.status !== 'accepted' || !call.connectedAt) {
+      setCallDuration(0);
+      return undefined;
+    }
+    const updateDuration = () => {
+      const startedAt = new Date(call.connectedAt).getTime();
+      setCallDuration(Number.isFinite(startedAt) ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0);
+    };
+    updateDuration();
+    const interval = window.setInterval(updateDuration, 1000);
+    return () => window.clearInterval(interval);
+  }, [call?.status, call?.connectedAt]);
+
+  useEffect(() => {
+    if (!localStream) {
+      setAudioLevel(0);
+      return undefined;
+    }
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return undefined;
+    let audioContext;
+    let source;
+    let analyser;
+    let frameId;
+    let stopped = false;
+    try {
+      audioContext = new AudioContextClass();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source = audioContext.createMediaStreamSource(localStream);
+      source.connect(analyser);
+      const samples = new Uint8Array(analyser.fftSize);
+      const measure = () => {
+        if (stopped) return;
+        analyser.getByteTimeDomainData(samples);
+        let sum = 0;
+        for (const sample of samples) {
+          const normalized = (sample - 128) / 128;
+          sum += normalized * normalized;
+        }
+        setAudioLevel(Math.min(1, Math.sqrt(sum / samples.length) * 4));
+        frameId = window.requestAnimationFrame(measure);
+      };
+      measure();
+    } catch (_) {
+      setAudioLevel(0);
+    }
+    return () => {
+      stopped = true;
+      if (frameId) window.cancelAnimationFrame(frameId);
+      try { source?.disconnect(); analyser?.disconnect(); } catch (_) { /* Media already closed. */ }
+      if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(() => {});
+    };
+  }, [localStream]);
+
+  const formatDuration = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
   const cleanupMedia = useCallback(() => {
     if (peerRef.current) {
@@ -219,33 +279,60 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const active = call && ['ringing', 'accepted'].includes(call.status);
   const videoCall = call?.type === 'video';
 
-  return <section className="chat-call-panel">
+  return <section className="chat-call-panel" aria-label="Voice and video calls">
     <div className="flex flex-wrap items-center gap-2">
       <span className="mr-auto text-sm font-semibold text-gray-800">Call {otherUser?.name || 'user'}</span>
       {!active && <>
-        <button type="button" onClick={() => startCall('audio')} className="call-action call-action-voice rounded-md px-3 py-2 text-sm text-white">Voice call</button>
-        <button type="button" onClick={() => startCall('video')} className="call-action call-action-video rounded-md px-3 py-2 text-sm text-white">Video call</button>
+        <button type="button" onClick={() => startCall('audio')} className="call-action call-action-voice call-icon-button" aria-label="Start voice call" title="Start voice call">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 3a14 14 0 0 1-5-5l3-2-2-5z"/></svg>
+        </button>
+        <button type="button" onClick={() => startCall('video')} className="call-action call-action-video call-icon-button" aria-label="Start video call" title="Start video call">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>
+        </button>
       </>}
       {incoming && <>
-        <button type="button" onClick={acceptCall} className="call-action call-action-voice rounded-md px-3 py-2 text-sm text-white">Accept</button>
-        <button type="button" onClick={() => finishCall('decline')} className="call-action call-action-danger rounded-md px-3 py-2 text-sm text-white">Decline</button>
+        <button type="button" onClick={acceptCall} className="call-action call-action-voice call-icon-button" aria-label="Accept incoming call" title="Accept call">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+        </button>
+        <button type="button" onClick={() => finishCall('decline')} className="call-action call-action-danger call-icon-button" aria-label="Decline incoming call" title="Decline call">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
       </>}
-      {active && !incoming && <button type="button" onClick={() => finishCall('end')} className="call-action call-action-danger rounded-md px-3 py-2 text-sm text-white">Hang up</button>}
+      {active && !incoming && <button type="button" onClick={() => finishCall('end')} className="call-action call-action-danger call-icon-button" aria-label="End call" title="End call">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 14.5c4.5-4 11.5-4 16 0l-2.5 4-4-2-1-2h-3l-1 2-4 2z"/></svg>
+      </button>}
     </div>
-    {status && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300" role="status">{status}</p>}
+    {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
-    {active && <div className="mt-3 grid gap-3 sm:grid-cols-2">
-      {!videoCall && <audio ref={remoteAudioRef} autoPlay />}
-      {videoCall && <div className="relative min-h-40 overflow-hidden rounded-lg bg-black">
-        <video ref={remoteVideoRef} autoPlay playsInline className="h-full min-h-40 max-h-72 w-full object-cover" />
-        {!remoteStream && <span className="absolute inset-0 flex items-center justify-center text-sm text-white">Waiting for video…</span>}
+    {active && <div className="mt-3 grid gap-3">
+      {call?.status === 'accepted' && <div className="call-live-status flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+        <span className="call-live-dot" aria-hidden="true" />
+        <span className="text-sm font-semibold text-gray-800">{formatDuration(callDuration)}</span>
+        <span className="text-xs text-gray-500">{videoCall ? 'Video connected' : 'Voice connected'}</span>
+        {localStream && <div className="ml-auto flex items-center gap-2" aria-label={`Microphone audio level ${Math.round(audioLevel * 100)} percent`}>
+          <span className="text-xs text-gray-500">Mic</span>
+          <div className="call-signal-meter" aria-hidden="true">
+            {Array.from({ length: 6 }, (_, index) => <span key={index} className={audioLevel >= (index + 1) / 6 ? 'is-active' : ''} />)}
+          </div>
+        </div>}
       </div>}
-      {videoCall && <div className="min-h-32 overflow-hidden rounded-lg bg-black">
-        <video ref={localVideoRef} autoPlay muted playsInline className="h-full min-h-32 max-h-56 w-full object-cover" />
+      {!videoCall && <audio ref={remoteAudioRef} autoPlay />}
+      {videoCall && <div className="grid gap-3 sm:grid-cols-2">
+        <div className="relative min-h-40 overflow-hidden rounded-xl bg-black">
+          <video ref={remoteVideoRef} autoPlay playsInline className="h-full min-h-40 max-h-72 w-full object-cover" />
+          {!remoteStream && <span className="absolute inset-0 flex items-center justify-center text-sm text-white">Waiting for video…</span>}
+        </div>
+        <div className="min-h-32 overflow-hidden rounded-xl bg-black">
+          <video ref={localVideoRef} autoPlay muted playsInline className="h-full min-h-32 max-h-56 w-full object-cover" />
+        </div>
       </div>}
       {localStream && <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={toggleMute} className="rounded-md border px-3 py-2 text-sm dark:border-gray-600 dark:text-white">{muted ? 'Unmute microphone' : 'Mute microphone'}</button>
-        {videoCall && <button type="button" onClick={toggleCamera} className="rounded-md border px-3 py-2 text-sm dark:border-gray-600 dark:text-white">{cameraOff ? 'Turn camera on' : 'Turn camera off'}</button>}
+        <button type="button" onClick={toggleMute} className="call-utility-button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} title={muted ? 'Unmute microphone' : 'Mute microphone'}>
+          {muted ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}
+        </button>
+        {videoCall && <button type="button" onClick={toggleCamera} className="call-utility-button" aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'} title={cameraOff ? 'Turn camera on' : 'Turn camera off'}>
+          {cameraOff ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m3 3 18 18M10 6h5a2 2 0 0 1 2 2v1l4-2v10l-3-1.5M7 6.5A2 2 0 0 0 5 8v8a2 2 0 0 0 2 2h8"/></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>}
+        </button>}
       </div>}
     </div>}
   </section>;
