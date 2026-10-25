@@ -1604,12 +1604,13 @@ export default {
         if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
         if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
 
-        const iceServers = [
+        const stunServers = [
           { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
           { urls: ["stun:global.stun.twilio.com:3478"] }
         ];
         const turnUrls = String(env.TURN_URLS || "").split(",").map(value => value.trim()).filter(value => /^turns?:[^\s]+$/i.test(value));
         const sharedSecret = env.TURN_SHARED_SECRET;
+        let turnServer = null;
         if (turnUrls.length && sharedSecret) {
           const expiresAt = Math.floor(Date.now() / 1000) + 3600;
           const username = expiresAt + ":" + String(claims.sub).slice(0, 96);
@@ -1617,14 +1618,22 @@ export default {
           const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(username)));
           let binary = "";
           for (const byte of signature) binary += String.fromCharCode(byte);
-          const credential = btoa(binary);
-          iceServers.push({ urls: turnUrls, username, credential });
+          turnServer = { username, credential: btoa(binary) };
         }
+        const turnGroups = [
+          { name: "turn-udp", urls: turnUrls.filter(value => /^turn:/i.test(value) && !/transport=tcp/i.test(value)) },
+          { name: "turn-tcp", urls: turnUrls.filter(value => /^turn:/i.test(value) && /transport=tcp/i.test(value)) },
+          { name: "turn-tls", urls: turnUrls.filter(value => /^turns:/i.test(value) || /:443(?:\?|$)/i.test(value)) }
+        ].filter(group => group.urls.length > 0);
+        const iceServerTiers = [
+          { name: "direct-stun", iceServers: stunServers },
+          ...turnGroups.map(group => ({ name: group.name, iceServers: [{ urls: group.urls, ...turnServer }] })).filter(() => Boolean(turnServer))
+        ];
+        const iceServers = [...stunServers, ...(turnServer ? [{ urls: turnUrls, ...turnServer }] : [])];
         return new Response(JSON.stringify({
-          iceServers,
-          iceTransportPolicy: "all",
-          turnConfigured: turnUrls.length > 0 && Boolean(sharedSecret),
-          credentialExpiresAt: turnUrls.length && sharedSecret ? Math.floor(Date.now() / 1000) + 3600 : null
+          iceServers, iceServerTiers, iceTransportPolicy: "all",
+          turnConfigured: Boolean(turnServer && turnUrls.length),
+          credentialExpiresAt: turnServer ? Math.floor(Date.now() / 1000) + 3600 : null
         }), { status: 200, headers: { ...JSON_HEADERS, "cache-control": "no-store", "pragma": "no-cache" } });
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
