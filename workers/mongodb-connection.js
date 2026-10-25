@@ -2854,14 +2854,22 @@ export class MongoDBConnection {
       }
       if (action === "list") {
         const found = await rooms.find({ $or: [{ hostUid: uid }, { "participants.uid": uid }, { visibility: "listed", status: "active" }] }).sort({ updatedAt: -1 }).limit(50).toArray();
-        return { status: 200, body: { rooms: found.map(room => ({
-          roomId: room.roomId, hostUid: room.hostUid, hostDisplayName: room.hostDisplayName,
-          title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity, ticketPriceLkr: Number(room.ticketPriceLkr) || 0,
-          status: room.status, participantCount: (room.participants || []).length,
-          createdAt: room.createdAt, expiresAt: room.expiresAt,
-          isHost: room.hostUid === uid, isParticipant: (room.participants || []).some(p => p.uid === uid),
-          mediaReady: room.mediaStatus === "ready", bandwidthProfile: room.bandwidthProfile
-        })) } };
+        const listedRooms = await Promise.all(found.map(async room => {
+          const isHost = room.hostUid === uid;
+          const ticket = !isHost && Number(room.ticketPriceLkr) > 0
+            ? await db.collection("videoRoomTickets").findOne({ roomId: room.roomId, viewerUid: uid, status: "paid" }, { projection: { _id: 1 } })
+            : null;
+          return {
+            roomId: room.roomId, hostUid: room.hostUid, hostDisplayName: room.hostDisplayName,
+            title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity, ticketPriceLkr: Number(room.ticketPriceLkr) || 0,
+            status: room.status, participantCount: (room.participants || []).length,
+            createdAt: room.createdAt, expiresAt: room.expiresAt,
+            isHost, hasTicket: isHost || Number(room.ticketPriceLkr) <= 0 || Boolean(ticket),
+            isParticipant: (room.participants || []).some(p => p.uid === uid),
+            mediaReady: room.mediaStatus === "ready", bandwidthProfile: room.bandwidthProfile
+          };
+        }));
+        return { status: 200, body: { rooms: listedRooms } };
       }
       if (!["join", "leave", "end"].includes(action) || typeof roomId !== "string" || roomId.length > 64) return { status: 400, body: { error: "Invalid room action." } };
       const room = await rooms.findOne({ roomId, status: "active" });
