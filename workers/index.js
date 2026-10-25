@@ -1364,6 +1364,14 @@ export default {
           createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
           if (!env.MONGODB_CONNECTION) return json({ error: "Purchase service unavailable" }, 503);
           const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+          const eligibilityResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims })
+          });
+          const eligibility = await eligibilityResponse.json().catch(() => ({}));
+          if (!eligibilityResponse.ok) return json(eligibility, eligibilityResponse.status);
+          if (!eligibility.ageEligible) return json({ error: "Dark Fantasy requires an eligible adult account." }, 403);
+          if (!eligibility.accountEligible) return json({ error: "This account is not eligible to purchase this add-on." }, 403);
           const response = await connection.fetch("https://internal.invalid/internal/create-purchase", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ claims, itemId: "dark-fantasy-monthly" })
