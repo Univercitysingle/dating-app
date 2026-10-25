@@ -333,10 +333,7 @@ export default {
         // Add a tighter brute-force limit specifically for password-based
         // administrator authentication, separate from the general API quota.
         const clientIp = request.headers.get("CF-Connecting-IP");
-        if (!env.RATE_LIMITER || !clientIp) {
-          return json({ error: "Login protection service unavailable" }, 503);
-        }
-        {
+        if (env.RATE_LIMITER && clientIp) {
           try {
             const limiterId = env.RATE_LIMITER.idFromName("api-ip:" + clientIp);
             const limiter = env.RATE_LIMITER.get(limiterId);
