@@ -1642,6 +1642,57 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/video-rooms/earnings") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const response = await connection.fetch("https://internal.invalid/internal/video-rooms/earnings", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, payload: {} })
+        });
+        const body = await response.json().catch(() => ({ error: "Creator earnings unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Creator earnings unavailable" }, 503);
+      }
+    }
+
+    const videoRoomTicketMatch = url.pathname.match(/^\/api\/video-rooms\/([^/]+)\/ticket$/);
+    if (videoRoomTicketMatch) {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
+      if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) return json({ error: "WebXPay payment gateway is not configured." }, 503);
+      try {
+        createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const accessConnection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const accessResponse = await accessConnection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
+        });
+        const access = await accessResponse.json().catch(() => ({}));
+        if (!accessResponse.ok) return json(access, accessResponse.status);
+        if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
+        if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
+        let roomId;
+        try { roomId = decodeURIComponent(videoRoomTicketMatch[1]); } catch { return json({ error: "Invalid room ID." }, 400); }
+        if (!roomId || roomId.length > 64) return json({ error: "Invalid room ID." }, 400);
+        const response = await accessConnection.fetch("https://internal.invalid/internal/create-video-room-ticket", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, roomId })
+        });
+        const order = await response.json().catch(() => ({ error: "Video room ticket checkout unavailable." }));
+        if (!response.ok) return json(order, response.status);
+        try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy", order.itemName || "Live video room ticket"); }
+        catch { return json({ error: "WebXPay payment gateway is not configured." }, 503); }
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Video room ticket checkout unavailable." }, 503);
+      }
+    }
+
     const videoRoomMatch = url.pathname.match(/^\/api\/video-rooms(?:\/([^/]+)\/(join|leave|end))?$/);
     if (videoRoomMatch) {
       const action = videoRoomMatch[2] || (request.method === "GET" ? "list" : "create");
