@@ -439,3 +439,59 @@ test("blocking unmatches the pair and unblocking removes only the block entry", 
   });
   assert.equal(matchUpdates.length, 1, "unblocking must not silently recreate an old match");
 });
+
+
+test("moderation uses explicit temporary and permanent account states and supports restoration", async () => {
+  const ObjectId = (await import("mongodb")).ObjectId;
+  async function runAction(action, extraPayload = {}) {
+    let userUpdate, reportUpdate;
+    const report = {
+      _id: new ObjectId("0123456789abcdef01234567"),
+      reporterUid: "reporter", reportedUserUid: "target", status: "pending_review"
+    };
+    const target = {
+      _id: "target-id", uid: "target", role: "user", isProfileVisible: true
+    };
+    const users = {
+      async findOne(query) {
+        if (query.uid === "admin") return { uid: "admin", role: "superadmin" };
+        if (query.uid === "target") return target;
+        return null;
+      },
+      async updateOne(query, update) {
+        assert.equal(query._id, "target-id");
+        userUpdate = update;
+        return { matchedCount: 1 };
+      }
+    };
+    const reports = {
+      async findOne(query) { assert.equal(String(query._id), String(report._id)); return report; },
+      async updateOne(query, update) { reportUpdate = update; return { matchedCount: 1 }; }
+    };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => ({ collection(name) { return name === "users" ? users : reports; } });
+    const result = await connection.moderateReport("admin", String(report._id), { action, ...extraPayload });
+    assert.equal(result.status, 200);
+    assert.ok(userUpdate);
+    assert.ok(reportUpdate);
+    return { userUpdate, reportUpdate, result };
+  }
+
+  const suspended = await runAction("suspend_user", { durationDays: 2, adminNotes: "Review evidence" });
+  assert.equal(suspended.userUpdate.$set.accountStatus, "temporarily_suspended");
+  assert.equal(suspended.userUpdate.$set.isProfileVisible, false);
+  assert.ok(suspended.userUpdate.$set.suspendedUntil instanceof Date);
+  assert.equal(suspended.reportUpdate.$set.status, "resolved_user_suspended");
+
+  const banned = await runAction("ban_user", { adminNotes: "Confirmed abuse" });
+  assert.equal(banned.userUpdate.$set.accountStatus, "permanently_banned");
+  assert.equal(banned.userUpdate.$set.isProfileVisible, false);
+  assert.ok(banned.userUpdate.$set.bannedAt instanceof Date);
+  assert.equal(banned.reportUpdate.$set.status, "resolved_user_banned");
+
+  const restored = await runAction("restore_user", { adminNotes: "Appeal accepted" });
+  assert.equal(restored.userUpdate.$set.accountStatus, "active");
+  assert.equal(restored.userUpdate.$set.isProfileVisible, true);
+  assert.equal(restored.reportUpdate.$set.status, "resolved_user_restored");
+});
