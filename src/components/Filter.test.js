@@ -22,8 +22,16 @@ describe('Filter component', () => {
       maxAge: 100,
       maxDistance: 100,
       relationshipType: '',
-      familyStatus: '',
     });
+  });
+
+
+  it('omits family status and lifestyle sections', () => {
+    render(<Filter onApply={() => {}} />);
+    expect(screen.queryByText('Family background')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Everyday life' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Pets')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Exercise')).not.toBeInTheDocument();
   });
 
   it('does not allow the minimum age to exceed the maximum', () => {
