@@ -247,3 +247,123 @@ test("profile updates cannot bypass photo upload controls or self-assign verific
   assert.equal(Object.hasOwn(capturedUpdate.$set, "badges"), false, "users must not grant themselves verification or premium badges");
 });
 
+
+
+test("report creation rejects duplicate reporter-target submissions and prioritizes independent reports", async () => {
+  const existingReports = [];
+  const inserted = [];
+  const reports = {
+    async findOne(query) {
+      return existingReports.find(report =>
+        report.reporterUid === query.reporterUid &&
+        report.reportedUserUid === query.reportedUserUid &&
+        report.createdAt >= query.createdAt.$gte
+      ) || null;
+    },
+    async insertOne(doc) {
+      const stored = { ...doc, _id: { toString: () => "report-id-" + inserted.length } };
+      existingReports.push(stored);
+      inserted.push(stored);
+      return { insertedId: stored._id };
+    },
+    async distinct(field, query) {
+      return [...new Set(existingReports
+        .filter(report => report.reportedUserUid === query.reportedUserUid &&
+          report.createdAt >= query.createdAt.$gte && report.status === query.status)
+        .map(report => report[field]))];
+    },
+    async updateOne(filter, update) {
+      const report = existingReports.find(item => item._id === filter._id);
+      if (report) Object.assign(report, update.$set);
+      return { matchedCount: report ? 1 : 0 };
+    }
+  };
+  const users = {
+    async findOne(query) {
+      return query.uid === "missing" ? null : { _id: query.uid, uid: query.uid };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { return name === "users" ? users : reports; } });
+
+  const first = await connection.createReport("reporter-a", {
+    reportedUserUid: "target", category: "spam", reason: "Repeated spam"
+  });
+  assert.equal(first.status, 201);
+  assert.equal(first.body.reviewPriority, "normal");
+  const duplicate = await connection.createReport("reporter-a", {
+    reportedUserUid: "target", category: "spam", reason: "Another report"
+  });
+  assert.equal(duplicate.status, 409);
+  assert.equal(inserted.length, 1);
+
+  const independent = await connection.createReport("reporter-b", {
+    reportedUserUid: "target", category: "spam", reason: "I also observed spam"
+  });
+  assert.equal(independent.status, 201);
+  assert.equal(independent.body.distinctReporterCount24h, 2);
+  assert.equal(independent.body.reviewPriority, "normal");
+
+  const third = await connection.createReport("reporter-c", {
+    reportedUserUid: "target", category: "spam", reason: "More spam"
+  });
+  assert.equal(third.status, 201);
+  assert.equal(third.body.distinctReporterCount24h, 3);
+  assert.equal(third.body.reviewPriority, "high");
+});
+
+test("underage reports receive urgent review priority without automatically suspending the account", async () => {
+  let userUpdateCalls = 0;
+  const reports = {
+    async findOne() { return null; },
+    async insertOne(doc) { return { insertedId: { toString: () => "underage-report" }, doc }; },
+    async distinct() { return ["reporter"]; },
+    async updateOne() { return { matchedCount: 1 }; }
+  };
+  const users = { async findOne(query) { return { _id: query.uid, uid: query.uid }; }, async updateOne() { userUpdateCalls++; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { return name === "users" ? users : reports; } });
+  const result = await connection.createReport("reporter", {
+    reportedUserUid: "target", category: "underage_user", reason: "Appears underage"
+  });
+  assert.equal(result.status, 201);
+  assert.equal(result.body.reviewPriority, "urgent");
+  assert.equal(userUpdateCalls, 0, "report counts must not trigger automatic account punishment");
+});
+
+test("scheduled moderation expiry restores expired temporary suspensions but never permanent bans", async () => {
+  const now = new Date("2026-10-25T12:00:00.000Z");
+  const expired = {
+    _id: "expired-user", accountStatus: "temporarily_suspended",
+    suspendedUntil: new Date("2026-10-24T12:00:00.000Z"),
+    profileVisibilityBeforeSuspension: false
+  };
+  const permanent = {
+    _id: "banned-user", accountStatus: "permanently_banned",
+    suspendedUntil: new Date("9999-12-31T00:00:00.000Z")
+  };
+  const updates = [];
+  const users = {
+    find() { return { sort() { return this; }, limit() { return this; }, async toArray() { return [expired, permanent]; } }; },
+    async updateOne(filter, update) { updates.push({ filter, update }); return { modifiedCount: 1 }; }
+  };
+  const subscriptions = {
+    find() { return { sort() { return this; }, limit() { return this; }, async toArray() { return []; } }; },
+    async updateOne() { return { modifiedCount: 0 }; },
+    async findOne() { return null; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { return name === "users" ? users : subscriptions; } });
+  const result = await connection.runScheduledExpirations(now, "moderation");
+  assert.equal(result.success, true);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].filter, {
+    _id: "expired-user", accountStatus: "temporarily_suspended", suspendedUntil: { $lte: now }
+  });
+  assert.equal(updates[0].update.$set.accountStatus, "active");
+  assert.equal(updates[0].update.$set.isProfileVisible, false);
+  assert.ok(updates[0].update.$unset.suspendedUntil);
+});
