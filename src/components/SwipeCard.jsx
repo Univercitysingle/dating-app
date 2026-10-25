@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import SuperLikeNotification from './SuperLikeNotification';
 import ProfileDetailView from './profile/ProfileDetailView';
+import { resolvePhotoUrl, resolveWorkerPhotoUrl } from '../utils/media';
 
 const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -19,10 +20,12 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   }
 
   const { name, age, photos } = user;
-  const imageSources =
+  const rawImageSources =
     photos && photos.length > 0
-      ? photos.map(p => p.url)
+      ? photos.map(photo => typeof photo === 'string' ? photo : photo?.url).filter(Boolean)
       : ['https://placehold.co/400x600?text=Profile+Image'];
+  const imageSources = rawImageSources.map(resolvePhotoUrl);
+  const workerFallbackUrl = resolveWorkerPhotoUrl(rawImageSources[currentImageIndex]);
 
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {
@@ -81,8 +84,13 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
                     decoding="async"
                     draggable={false}
                     onError={(event) => {
-                      event.currentTarget.onerror = null;
-                      event.currentTarget.src = '/logo.jpg';
+                      const image = event.currentTarget;
+                      if (workerFallbackUrl && image.src !== workerFallbackUrl) {
+                        image.src = workerFallbackUrl;
+                        return;
+                      }
+                      image.onerror = null;
+                      image.src = '/logo.jpg';
                     }}
                     className="profile-card-photo h-full w-full object-cover"
                 />
