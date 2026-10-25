@@ -1587,6 +1587,37 @@ export default {
       }
     }
 
+
+    const videoRoomMatch = url.pathname.match(/^\/api\/video-rooms(?:\/([^/]+)\/(join|leave|end))?$/);
+    if (videoRoomMatch) {
+      const action = videoRoomMatch[2] || (request.method === "GET" ? "list" : "create");
+      if (request.method !== (action === "list" ? "GET" : "POST")) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const accessResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
+        });
+        const access = await accessResponse.json().catch(() => ({}));
+        if (!accessResponse.ok) return json(access, accessResponse.status);
+        if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
+        if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
+        const roomId = videoRoomMatch[1] || null;
+        const payload = action === "create" ? await request.json().catch(() => null) : {};
+        if (action === "create" && (!payload || typeof payload !== "object" || Array.isArray(payload))) return json({ error: "Invalid room setup." }, 400);
+        const response = await connection.fetch("https://internal.invalid/internal/video-rooms/" + action, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, roomId, payload })
+        });
+        const body = await response.json().catch(() => ({ error: "Video Rooms service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Video Rooms service unavailable" }, 503);
+      }
+    }
+
     const callRoute = url.pathname.match(/^\/api\/calls\/(start|poll|history|signal|action)$/);
     if (callRoute) {
       const action = callRoute[1];
