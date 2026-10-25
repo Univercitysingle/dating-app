@@ -340,13 +340,17 @@ test("scheduled moderation expiry restores expired temporary suspensions but nev
     suspendedUntil: new Date("2026-10-24T12:00:00.000Z"),
     profileVisibilityBeforeSuspension: false
   };
+  const legacyExpired = {
+    _id: "legacy-expired-user",
+    suspendedUntil: new Date("2026-10-24T12:00:00.000Z")
+  };
   const permanent = {
     _id: "banned-user", accountStatus: "permanently_banned",
     suspendedUntil: new Date("9999-12-31T00:00:00.000Z")
   };
   const updates = [];
   const users = {
-    find() { return { sort() { return this; }, limit() { return this; }, async toArray() { return [expired, permanent]; } }; },
+    find() { return { sort() { return this; }, limit() { return this; }, async toArray() { return [expired, legacyExpired, permanent]; } }; },
     async updateOne(filter, update) { updates.push({ filter, update }); return { modifiedCount: 1 }; }
   };
   const subscriptions = {
@@ -359,12 +363,16 @@ test("scheduled moderation expiry restores expired temporary suspensions but nev
   connection.getDatabase = () => ({ collection(name) { return name === "users" ? users : subscriptions; } });
   const result = await connection.runScheduledExpirations(now, "moderation");
   assert.equal(result.success, true);
-  assert.equal(updates.length, 1);
+  assert.equal(updates.length, 2);
   assert.deepEqual(updates[0].filter, {
     _id: "expired-user", accountStatus: "temporarily_suspended", suspendedUntil: { $lte: now }
   });
+  assert.deepEqual(updates[1].filter, {
+    _id: "legacy-expired-user", accountStatus: { $exists: false }, suspendedUntil: { $lte: now }
+  });
   assert.equal(updates[0].update.$set.accountStatus, "active");
   assert.equal(updates[0].update.$set.isProfileVisible, false);
+  assert.equal(updates[1].update.$set.accountStatus, "active");
   assert.equal(Object.hasOwn(updates[0].update.$unset, "suspendedUntil"), true);
 });
 
