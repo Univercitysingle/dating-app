@@ -508,7 +508,7 @@ test("moderation uses explicit temporary and permanent account states and suppor
 
 test("Dark Fantasy add-on is a separate fixed-price purchase", async () => {
   let inserted;
-  const users = { async findOne({ uid }) { return uid === "adult-user" ? { _id: "user-id", uid, name: "Adult User", email: "adult@example.com" } : null; } };
+  const users = { async findOne({ uid }) { return uid === "adult-user" ? { _id: "user-id", uid, name: "Adult User", email: "adult@example.com", birthday: new Date("1990-01-01"), accountStatus: "active" } : null; } };
   const purchases = { async insertOne(doc) { inserted = doc; return { insertedId: "0123456789abcdef01234567" }; } };
   const db = { collection(name) { if (name === "users") return users; if (name === "purchases") return purchases; assert.fail("Unexpected collection " + name); } };
   const connection = new MongoDBConnection({}, {});
