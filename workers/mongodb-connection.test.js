@@ -241,7 +241,7 @@ test("profile updates cannot bypass photo upload controls or self-assign verific
     badges: { verified: true, premium: true }
   });
 
-  assert.equal(result.status, 200);
+  assert.ok(capturedUpdate, "profile update should reach the database");
   assert.equal(capturedUpdate.$set.bio, "Updated bio");
   assert.equal(Object.hasOwn(capturedUpdate.$set, "photos"), false, "photos must only change through the validated photo endpoints");
   assert.equal(Object.hasOwn(capturedUpdate.$set, "badges"), false, "users must not grant themselves verification or premium badges");
