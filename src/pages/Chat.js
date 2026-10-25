@@ -292,11 +292,7 @@ function Chat() {
             <p className="chat-participant-status text-xs">{otherUser ? 'Your conversation' : 'Profile details loading'}</p>
           </div>
         </Link>
-        <div className="chat-header-actions flex flex-shrink-0 items-center gap-2">
-          <Link to={otherProfilePath} className="chat-profile-action rounded-full px-3 py-2 text-sm font-semibold transition">
-            <span className="hidden sm:inline">View profile</span><span className="sm:hidden">Profile</span>
-          </Link>
-        </div>
+        <div id={`chat-call-actions-${chatId}`} className="chat-header-actions flex flex-shrink-0 items-center gap-1.5" aria-label="Voice and video call actions" />
       </header>
       {error && <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800" role="alert">{error}</div>}
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
