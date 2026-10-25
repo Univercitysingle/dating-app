@@ -263,7 +263,10 @@ function Profile() {
                                   {subscriptions.map(sub => (
                                     <li key={sub._id} className="p-2 bg-neutral-200 dark:bg-neutral-700 rounded-md">
                                       <p className="font-semibold capitalize">{sub.plan} Plan</p>
-                                      <p className="text-sm">Status: <span className="font-medium capitalize">{sub.status}</span></p>
+                                      <p className="text-sm">Status: <span className="font-medium capitalize">{sub.status === 'cancelled' && sub.cancellationReason === 'payment_timeout' ? 'Cancelled — payment not completed' : sub.status}</span></p>
+                                      {sub.cancellationReason === 'payment_timeout' && (
+                                        <p className="text-sm text-neutral-500">This checkout was automatically cancelled because payment was not completed within 30 minutes. You can start a new subscription if you still want Premium.</p>
+                                      )}
                                       {sub.endDate && (
                                         <p className="text-sm">Expires on: {new Date(sub.endDate).toLocaleDateString()}</p>
                                       )}
