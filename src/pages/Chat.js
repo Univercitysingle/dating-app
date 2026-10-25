@@ -25,6 +25,8 @@ function Chat() {
   useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
 
   const messages = allMessages[chatId] || [];
+  const otherUserUid = chatId ? chatId.split('-').find(uid => uid && uid !== user?.uid) : null;
+  const otherProfilePath = otherUser?.uid || otherUserUid ? `/profile/${encodeURIComponent(otherUser?.uid || otherUserUid)}` : '/profile';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -93,9 +95,6 @@ function Chat() {
         logger.warn('Firebase RTDB listener error:', fbErr);
       }
     }
-
-    const uids = chatId ? chatId.split('-') : [];
-    const otherUserUid = uids.find(uid => uid !== user?.uid);
 
     const fetchOtherUser = async () => {
       try {
@@ -195,28 +194,30 @@ function Chat() {
     }, 2000);
   };
 
-  if (error) {
-    return <p className="text-red-500 p-4">{error}</p>;
-  }
-
   if (!user) {
     return <p className="p-4">Please log in to chat.</p>;
   }
 
   return (
     <div className="chat-shell flex flex-col">
-      <header className="chat-header flex justify-between items-center flex-shrink-0 gap-3">
-        {otherUser ? (
-          <>
-            <div className="flex min-w-0 items-center gap-3"><div aria-hidden="true" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-pink-100 text-base font-bold text-pink-700">{(otherUser.name || '?').trim().charAt(0).toUpperCase()}</div><div className="min-w-0"><h2 className="truncate text-base font-bold text-gray-900">{otherUser.name}</h2><p className="text-xs text-gray-500">Your conversation</p></div></div>
-            <Link to={'/profile/' + otherUser.uid} className="flex-shrink-0 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:border-pink-200 hover:text-pink-700">
-              View profile
-            </Link>
-          </>
-        ) : (
-          <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white">Chat Room</h2>
-        )}
+      <header className="chat-header flex flex-shrink-0 items-center justify-between gap-3 px-4 sm:px-5">
+        <Link to="/conversations" aria-label="Back to conversations" className="chat-back-link flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 text-lg text-gray-600 transition hover:border-pink-200 hover:text-pink-700">
+          <span aria-hidden="true">←</span>
+        </Link>
+        <Link to={otherProfilePath} className="chat-participant-link flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left" aria-label={`View ${otherUser?.name || 'chat participant'}'s profile`}>
+          <div aria-hidden="true" className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-100 text-base font-bold text-pink-700 ring-1 ring-pink-100">
+            {otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : (otherUser?.name || '?').trim().charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold text-gray-900">{otherUser?.name || 'Conversation'}</h2>
+            <p className="text-xs text-gray-500">{otherUser ? 'View profile' : 'Profile details loading'}</p>
+          </div>
+        </Link>
+        <Link to={otherProfilePath} className="chat-profile-action flex-shrink-0 rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-pink-200 hover:text-pink-700">
+          Profile
+        </Link>
       </header>
+      {error && <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800" role="alert">{error}</div>}
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
       <main className="chat-messages flex-grow overflow-y-auto p-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
