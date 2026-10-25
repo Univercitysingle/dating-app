@@ -1487,6 +1487,42 @@ export class MongoDBConnection {
     }
   }
 
+  async createPendingVideoRoomTicket(uid, roomId) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        typeof roomId !== "string" || !roomId || roomId.length > 64) {
+      return { status: 400, body: { error: "Invalid video room ticket request." } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const room = await db.collection("videoRooms").findOne({ roomId, status: "active" });
+      if (!room || room.mode !== "broadcast" || room.visibility !== "listed" ||
+          !Number.isInteger(room.ticketPriceLkr) || room.ticketPriceLkr < 1) {
+        return { status: 404, body: { error: "This room is not offering paid tickets." } };
+      }
+      if (room.hostUid === uid) return { status: 400, body: { error: "You cannot purchase your own room ticket." } };
+      const user = await db.collection("users").findOne({ uid });
+      if (!user) return { status: 404, body: { error: "User not found." } };
+      const existing = await db.collection("videoRoomTickets").findOne({ roomId, viewerUid: uid, status: "paid" });
+      if (existing) return { status: 409, body: { error: "You already have access to this live show." } };
+      const now = new Date();
+      const itemId = "video-room-ticket:" + roomId;
+      const purchase = {
+        userId: user._id, viewerUid: uid, itemId, itemName: "Live show ticket: " + String(room.title || "Video Room").slice(0, 80),
+        itemPrice: String(room.ticketPriceLkr), videoRoomId: roomId, creatorUid: room.hostUid,
+        creatorSharePercent: 70, status: "pending", createdAt: now, updatedAt: now
+      };
+      const inserted = await db.collection("purchases").insertOne(purchase);
+      return { status: 201, body: {
+        orderId: String(inserted.insertedId), price: room.ticketPriceLkr, itemName: purchase.itemName,
+        user: { name: typeof user.name === "string" ? user.name : "User", email: typeof user.email === "string" ? user.email : "",
+          contactNumber: user.mobileNumber || user.phoneNumber || "0711234567" }
+      } };
+    } catch (error) {
+      console.error("Video room ticket checkout creation failed", { message: String(error?.message || "unknown").slice(0, 160) });
+      return { status: 503, body: { error: "Video room ticket checkout unavailable." } };
+    }
+  }
+
   async createPendingSubscription(uid, plan) {
     const prices = { weekly: 800, monthly: 3000, yearly: 10000 };
     if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, plan)) {
@@ -1609,6 +1645,27 @@ export class MongoDBConnection {
             const access = Array.isArray(existing?.darkFantasyGalleryAccess) ? existing.darkFantasyGalleryAccess.filter(x => x && x.creatorUid !== creatorUid) : [];
             access.push({ creatorUid, accessUntil: new Date(now.getTime() + 30 * 86400000) });
             userUpdate.$set = { darkFantasyGalleryAccess: access };
+          } else if (typeof purchase.itemId === "string" && purchase.itemId.startsWith("video-room-ticket:")) {
+            const roomId = String(purchase.videoRoomId || purchase.itemId.slice("video-room-ticket:".length));
+            const viewerUid = String(purchase.viewerUid || "");
+            const creatorUid = String(purchase.creatorUid || "");
+            const grossLkr = Math.max(0, Math.floor(Number(purchase.itemPrice) || 0));
+            if (!viewerUid || !creatorUid || !roomId || grossLkr < 1) throw new Error("INVALID_VIDEO_ROOM_TICKET_PURCHASE");
+            const existingTicket = await db.collection("videoRoomTickets").findOne({ roomId, viewerUid, status: "paid" }, { session });
+            if (!existingTicket) {
+              await db.collection("videoRoomTickets").insertOne({
+                roomId, viewerUid, creatorUid, purchaseId: String(purchase._id), status: "paid",
+                paidAt: now, createdAt: now, updatedAt: now
+              }, { session });
+              const creatorSharePercent = Math.min(90, Math.max(40, Number(purchase.creatorSharePercent) || 70));
+              const creatorAmountLkr = Math.floor(grossLkr * creatorSharePercent / 100);
+              await db.collection("creatorEarnings").insertOne({
+                purchaseId: String(purchase._id), roomId, creatorUid, viewerUid, currency: "LKR",
+                grossAmount: grossLkr, creatorAmount: creatorAmountLkr, platformAmount: grossLkr - creatorAmountLkr,
+                status: "pending_review", payoutStatus: "not_requested",
+                createdAt: now, updatedAt: now
+              }, { session });
+            }
           }
           if (Object.keys(userUpdate).length) {
             userUpdate.$set = { ...(userUpdate.$set || {}), updatedAt: now };
@@ -2752,9 +2809,29 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const rooms = db.collection("videoRooms");
       const now = new Date();
+      if (action === "earnings") {
+        const earnings = await db.collection("creatorEarnings").find({ creatorUid: uid }).sort({ createdAt: -1 }).limit(100).toArray();
+        const totals = earnings.reduce((acc, item) => {
+          const amount = Number(item.creatorAmount) || 0;
+          acc.grossLkr += Number(item.grossAmount) || 0;
+          if (item.status === "pending_review") acc.pendingReviewLkr += amount;
+          else if (item.status === "approved") acc.approvedLkr += amount;
+          if (item.payoutStatus === "paid") acc.paidLkr += amount;
+          return acc;
+        }, { grossLkr: 0, pendingReviewLkr: 0, approvedLkr: 0, paidLkr: 0 });
+        return { status: 200, body: { currency: "LKR", totals, earnings: earnings.map(item => ({
+          roomId: item.roomId, grossAmount: item.grossAmount, creatorAmount: item.creatorAmount,
+          platformAmount: item.platformAmount, status: item.status, payoutStatus: item.payoutStatus, createdAt: item.createdAt
+        })) } };
+      }
       if (action === "create") {
         const mode = payload.mode, visibility = payload.visibility, capacity = Number(payload.capacity);
         const title = typeof payload.title === "string" ? payload.title.trim().slice(0, 80) : "";
+        const ticketPriceLkr = payload.ticketPriceLkr === undefined ? 0 : Number(payload.ticketPriceLkr);
+        if (!Number.isInteger(ticketPriceLkr) || ![0, 500, 1000, 2000, 5000].includes(ticketPriceLkr) ||
+            (ticketPriceLkr > 0 && (mode !== "broadcast" || visibility !== "listed"))) {
+          return { status: 400, body: { error: "Paid tickets are available only for listed broadcasts, at supported LKR prices." } };
+        }
         if (!["private", "group", "broadcast"].includes(mode) || !["invite", "listed"].includes(visibility) ||
             !Number.isInteger(capacity) || (mode === "private" && (capacity !== 2 || visibility !== "invite")) ||
             (mode === "group" && (capacity < 3 || capacity > 6)) ||
@@ -2766,20 +2843,20 @@ export class MongoDBConnection {
           roomId: crypto.randomUUID(), hostUid: uid,
           hostDisplayName: String(user.displayName || user.name || "Host").slice(0, 80),
           title: title || (mode === "private" ? "Private individual show" : mode === "group" ? "Interactive group room" : "Live broadcast"),
-          mode, visibility, capacity, status: "active",
+          mode, visibility, capacity, ticketPriceLkr, status: "active",
           participants: [{ uid, role: "host", joinedAt: now, mediaPublishingAllowed: true }],
           mediaStatus: "not_connected",
           bandwidthProfile: mode === "private" ? "adaptive-p2p" : mode === "group" ? "low-bitrate-sfu" : "broadcast-sfu",
           createdAt: now, updatedAt: now, expiresAt: new Date(now.getTime() + 4 * 60 * 60 * 1000)
         };
         await rooms.insertOne(room);
-        return { status: 201, body: { room: { roomId: room.roomId, title: room.title, mode, visibility, capacity, status: room.status, participantCount: 1, isHost: true, mediaReady: false, bandwidthProfile: room.bandwidthProfile, createdAt: now, expiresAt: room.expiresAt }, mediaReady: false, message: "Room created. Live media is not connected until a media transport is configured." } };
+        return { status: 201, body: { room: { roomId: room.roomId, title: room.title, mode, visibility, capacity, ticketPriceLkr, status: room.status, participantCount: 1, isHost: true, mediaReady: false, bandwidthProfile: room.bandwidthProfile, createdAt: now, expiresAt: room.expiresAt }, mediaReady: false, message: "Room created. Live media is not connected until a media transport is configured." } };
       }
       if (action === "list") {
         const found = await rooms.find({ $or: [{ hostUid: uid }, { "participants.uid": uid }, { visibility: "listed", status: "active" }] }).sort({ updatedAt: -1 }).limit(50).toArray();
         return { status: 200, body: { rooms: found.map(room => ({
           roomId: room.roomId, hostUid: room.hostUid, hostDisplayName: room.hostDisplayName,
-          title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity,
+          title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity, ticketPriceLkr: Number(room.ticketPriceLkr) || 0,
           status: room.status, participantCount: (room.participants || []).length,
           createdAt: room.createdAt, expiresAt: room.expiresAt,
           isHost: room.hostUid === uid, isParticipant: (room.participants || []).some(p => p.uid === uid),
@@ -2792,6 +2869,10 @@ export class MongoDBConnection {
       const members = Array.isArray(room.participants) ? room.participants : [];
       const isMember = members.some(member => member.uid === uid);
       if (action === "join") {
+        if (room.ticketPriceLkr > 0 && room.hostUid !== uid && !isMember) {
+          const ticket = await db.collection("videoRoomTickets").findOne({ roomId, viewerUid: uid, status: "paid" });
+          if (!ticket) return { status: 402, body: { error: "Purchase a ticket through WebXPay to join this live show.", paymentRequired: true, ticketPriceLkr: room.ticketPriceLkr, currency: "LKR" } };
+        }
         if (room.visibility !== "listed" && room.hostUid !== uid && !isMember) return { status: 403, body: { error: "This room is invite-only." } };
         if (!isMember && members.length >= room.capacity) return { status: 409, body: { error: "This room is full." } };
         if (room.mode === "private" && room.hostUid !== uid && !isMember) return { status: 403, body: { error: "Private shows require a direct invitation." } };
@@ -2814,7 +2895,7 @@ export class MongoDBConnection {
         await rooms.updateOne({ roomId, status: "active" }, { $set: { status: "ended", endedAt: now, updatedAt: now } });
       }
       const updated = await rooms.findOne({ roomId });
-      return { status: 200, body: { room: updated ? { roomId: updated.roomId, title: updated.title, mode: updated.mode, visibility: updated.visibility, capacity: updated.capacity, status: updated.status, participantCount: (updated.participants || []).length, isHost: updated.hostUid === uid, isParticipant: (updated.participants || []).some(p => p.uid === uid), mediaReady: updated.mediaStatus === "ready", bandwidthProfile: updated.bandwidthProfile } : null, mediaReady: false } };
+      return { status: 200, body: { room: updated ? { roomId: updated.roomId, title: updated.title, mode: updated.mode, visibility: updated.visibility, capacity: updated.capacity, ticketPriceLkr: Number(updated.ticketPriceLkr) || 0, status: updated.status, participantCount: (updated.participants || []).length, isHost: updated.hostUid === uid, isParticipant: (updated.participants || []).some(p => p.uid === uid), mediaReady: updated.mediaStatus === "ready", bandwidthProfile: updated.bandwidthProfile } : null, mediaReady: false } };
     } catch (error) {
       console.error("Video Room operation failed", { message: error?.message?.slice(0, 180) });
       return { status: 503, body: { error: "Video Rooms service unavailable" } };
@@ -3210,6 +3291,13 @@ export class MongoDBConnection {
       else if (body.action === "save") result = await this.saveDarkFantasyProfile(body.claims.sub, body.payload || {});
       else if (body.action === "delete") result = await this.deleteDarkFantasyProfile(body.claims.sub);
       else result = await this.getDarkFantasyProfile(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/create-video-room-ticket") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.roomId !== "string") return json({ error: "Invalid request" }, 400);
+      const result = await this.createPendingVideoRoomTicket(body.claims.sub, body.roomId);
       return json(result.body, result.status);
     }
 
