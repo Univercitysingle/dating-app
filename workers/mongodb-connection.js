@@ -82,8 +82,11 @@ export class MongoDBConnection {
     if (/^https?:\/\//i.test(clean)) {
       try {
         const parsed = new URL(clean);
-        // Rewrite legacy CDN URLs to the media route on the current frontend.
-        if (parsed.host === frontendHost || (cdnHost && parsed.host === cdnHost)) {
+        // Normalize generated photo keys from the configured CDN, staging frontend,
+        // or legacy hosts to the single configured CDN_HOSTNAME. Never preserve a
+        // legacy hostname for a known generated photo key.
+        const generatedPhotoPath = /(?:^|\/)photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(parsed.pathname);
+        if (parsed.host === frontendHost || (cdnHost && parsed.host === cdnHost) || generatedPhotoPath) {
           clean = parsed.pathname;
         } else {
           return clean;
