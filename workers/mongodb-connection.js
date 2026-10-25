@@ -741,6 +741,8 @@ export class MongoDBConnection {
         if (currentUser.role !== "superadmin") {
           delete profile.email;
           delete profile.mobileNumber;
+          delete profile.phoneNumber;
+          delete profile.contactNumber;
         }
         if (profile._id !== undefined) profile.id = String(profile._id);
         if (profile.birthday) {
@@ -804,6 +806,8 @@ export class MongoDBConnection {
           if (currentUser.role !== "superadmin") {
             delete profile.email;
             delete profile.mobileNumber;
+            delete profile.phoneNumber;
+            delete profile.contactNumber;
           }
           if (profile._id !== undefined) profile.id = String(profile._id);
           if (Array.isArray(profile.photos)) {
@@ -994,6 +998,8 @@ export class MongoDBConnection {
         const profile = { ...user };
         delete profile.email;
         delete profile.mobileNumber;
+        delete profile.phoneNumber;
+        delete profile.contactNumber;
         delete profile.password;
         delete profile.lastLoginIp;
         if (profile._id !== undefined) profile.id = String(profile._id);
@@ -1254,6 +1260,8 @@ export class MongoDBConnection {
         const profile = { ...user };
         delete profile.email;
         delete profile.mobileNumber;
+        delete profile.phoneNumber;
+        delete profile.contactNumber;
         delete profile.password;
         delete profile.lastLoginIp;
         if (profile._id !== undefined) profile.id = String(profile._id);
@@ -1586,6 +1594,8 @@ export class MongoDBConnection {
       if (!isOwner && !isSuperAdmin) {
         delete profile.email;
         delete profile.mobileNumber;
+        delete profile.phoneNumber;
+        delete profile.contactNumber;
       }
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
