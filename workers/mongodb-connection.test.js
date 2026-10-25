@@ -82,3 +82,61 @@ test("profile photo URLs always use CDN_HOSTNAME, including legacy frontend medi
     "https://dateme.enadoctemp.workers.dev/" + key
   );
 });
+
+
+test("public profile responses remove all contact aliases and nested contact fields", async () => {
+  const storedUser = {
+    uid: "target-user",
+    name: "Profile Owner",
+    email: "owner@example.com",
+    email_address: "owner-alt@example.com",
+    mobileNumber: "+971500000001",
+    phone_number: "+971500000002",
+    whatsappNumber: "+971500000003",
+    contactDetails: { email: "nested@example.com", mobile: "+971500000004", label: "private" },
+    bio: "Public biography"
+  };
+  const users = {
+    async findOne(query) {
+      if (query.uid === "target-user") return { ...storedUser, contactDetails: { ...storedUser.contactDetails } };
+      if (query.uid === "ordinary-viewer") return { uid: query.uid, role: "user" };
+      if (query.uid === "admin-viewer") return { uid: query.uid, role: "superadmin" };
+      return null;
+    }
+  };
+  const db = { collection(name) { assert.equal(name, "users"); return users; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const ordinary = await connection.getUserProfile("target-user", "ordinary-viewer");
+  assert.equal(ordinary.status, 200);
+  for (const field of ["email", "email_address", "mobileNumber", "phone_number", "whatsappNumber"]) {
+    assert.equal(Object.hasOwn(ordinary.body, field), false, field + " must not be exposed");
+  }
+  assert.equal(Object.hasOwn(ordinary.body.contactDetails, "email"), false);
+  assert.equal(Object.hasOwn(ordinary.body.contactDetails, "mobile"), false);
+  assert.equal(ordinary.body.contactDetails.label, "private");
+  assert.equal(ordinary.body.bio, "Public biography");
+
+  const owner = await connection.getUserProfile("target-user", "target-user");
+  assert.equal(owner.status, 200);
+  assert.equal(owner.body.email, "owner@example.com");
+
+  const superadmin = await connection.getUserProfile("target-user", "admin-viewer");
+  assert.equal(superadmin.status, 200);
+  assert.equal(superadmin.body.email, "owner@example.com");
+  assert.equal(superadmin.body.mobileNumber, "+971500000001");
+});
+
+test("generated photo URLs from legacy hosts are normalized to CDN_HOSTNAME", () => {
+  const connection = new MongoDBConnection({}, {
+    FRONTEND_URL: "https://dating-app-staging.pages.dev",
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/"
+  });
+  const key = "photos-user-1234567890123.webp";
+  assert.equal(
+    connection.getMediaUrl("https://legacy.example.test/photos/" + key),
+    "https://dateme.enadoctemp.workers.dev/" + key
+  );
+});
