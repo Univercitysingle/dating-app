@@ -1691,7 +1691,6 @@ export class MongoDBConnection {
       // Never expose credentials or operational IP metadata in profile responses.
       delete profile.password;
       delete profile.lastLoginIp;
-      if (isOwner || isSuperAdmin) stripPrivateContactFields(profile);
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
       if (profile.birthday) {
