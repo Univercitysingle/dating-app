@@ -1345,10 +1345,10 @@ export default {
       }
     }
 
-    const callRoute = url.pathname.match(/^\/api\/calls\/(start|poll|signal|action)$/);
+    const callRoute = url.pathname.match(/^\/api\/calls\/(start|poll|history|signal|action)$/);
     if (callRoute) {
       const action = callRoute[1];
-      const methodAllowed = action === "poll" ? request.method === "GET" : request.method === "POST";
+      const methodAllowed = ["poll", "history"].includes(action) ? request.method === "GET" : request.method === "POST";
       if (!methodAllowed) return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
@@ -1358,7 +1358,7 @@ export default {
         const connection = env.MONGODB_CONNECTION.get(id);
         let payload = null;
         let internalPath = "/internal/calls/" + action;
-        if (action === "poll") {
+        if (action === "poll" || action === "history") {
           const roomId = url.searchParams.get("roomId") || "";
           const response = await connection.fetch("https://internal.invalid" + internalPath, {
             method: "POST", headers: { "content-type": "application/json" },
@@ -1382,10 +1382,11 @@ export default {
       }
     }
 
-    const chatRoute = url.pathname.match(/^\/api\/chat\/(history\/([^/]+)|conversations|send)$/);
+    const chatRoute = url.pathname.match(/^\/api\/chat\/(history\/([^/]+)|conversations|send|delivered|typing)$/);
     if (chatRoute) {
       const methodAllowed = chatRoute[1] === "history/" + chatRoute[2] ? request.method === "GET"
-        : chatRoute[1] === "conversations" ? request.method === "GET" : request.method === "POST";
+        : chatRoute[1] === "conversations" || chatRoute[1] === "typing" && request.method === "GET"
+          ? request.method === "GET" : request.method === "POST";
       if (!methodAllowed) return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
@@ -1415,7 +1416,25 @@ export default {
           const result = await response.json().catch(() => ({ error: "Chat history unavailable" }));
           return json(result, response.status);
         }
+        if (chatRoute[1] === "typing" && request.method === "GET") {
+          const roomId = url.searchParams.get("roomId") || "";
+          const response = await connection.fetch("https://internal.invalid/internal/chat/typing-read", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, roomId })
+          });
+          const result = await response.json().catch(() => ({ error: "Typing status unavailable" }));
+          return json(result, response.status);
+        }
         const payload = await request.json().catch(() => null);
+        if (chatRoute[1] === "typing" || chatRoute[1] === "delivered") {
+          const internalPath = chatRoute[1] === "typing" ? "/internal/chat/typing-write" : "/internal/chat/delivered";
+          const response = await connection.fetch("https://internal.invalid" + internalPath, {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, payload })
+          });
+          const result = await response.json().catch(() => ({ error: "Chat status update unavailable" }));
+          return json(result, response.status);
+        }
         const response = await connection.fetch("https://internal.invalid/internal/chat/send", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ claims, payload })
