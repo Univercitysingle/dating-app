@@ -25,6 +25,16 @@ test("superadmin login issues a Firebase custom token with root-level role claim
       client_email: "firebase-adminsdk@test-project.iam.gserviceaccount.com",
       private_key: privateKey
     }),
+    RATE_LIMITER: {
+      idFromName() { return "test-rate-limit"; },
+      get() {
+        return {
+          async fetch() {
+            return new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 900000 }), { status: 200 });
+          }
+        };
+      }
+    },
     MONGODB_CONNECTION: {
       idFromName: name => name,
       get: () => ({
@@ -1469,7 +1479,7 @@ test("password-based superadmin login signs a Firebase custom token only for the
   };
   const login = async password => worker.fetch(new Request("https://dating-app.test/api/auth/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "CF-Connecting-IP": "203.0.113.42" },
     body: JSON.stringify({ email: "admin@example.com", password })
   }), env);
   const denied = await login("wrong password");
