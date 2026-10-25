@@ -435,29 +435,65 @@ function Profile() {
               );
           case 'settings':
               return (
-                  <SectionCard title="Settings">
-                      {isPremium && (
-                          <button
-                              onClick={() => navigate('/manage-subscription')}
-                              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                          >
-                              Manage Subscription
+                  <section className="profile-settings" aria-labelledby="profile-settings-title">
+                      <div className="profile-settings-heading">
+                          <div>
+                              <p className="profile-settings-eyebrow">YOUR ACCOUNT</p>
+                              <h2 id="profile-settings-title">Settings</h2>
+                              <p>Manage your membership, preferences, and account.</p>
+                          </div>
+                          <span className="profile-settings-heading-icon" aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="3"/><path strokeLinecap="round" strokeLinejoin="round" d="m19.4 15 .1.1 1.1.9-1.2 2.1-1.4-.5a7.8 7.8 0 0 1-1.7 1l-.2 1.5h-2.4l-.3-1.5a7.8 7.8 0 0 1-1.7-1l-1.4.5-1.2-2.1 1.2-1a7.5 7.5 0 0 1 0-2l-1.2-1 1.2-2.1 1.4.5a7.8 7.8 0 0 1 1.7-1l.3-1.5h2.4l.2 1.5a7.8 7.8 0 0 1 1.7 1l1.4-.5 1.2 2.1-1.1 1a7.5 7.5 0 0 1 0 2Z" transform="translate(-1 -1)"/></svg>
+                          </span>
+                      </div>
+
+                      <div className="profile-settings-group">
+                          <h3>Membership</h3>
+                          <div className="profile-settings-row">
+                              <span className="profile-settings-icon profile-settings-icon-membership" aria-hidden="true">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8.5 12 3l9 5.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5z"/><path d="M8 21v-7h8v7M7 9h.01M12 9h.01M17 9h.01"/></svg>
+                              </span>
+                              <div className="profile-settings-row-copy">
+                                  <strong>{isPremium ? 'Premium membership' : 'Basic membership'}</strong>
+                                  <span>{isPremium ? 'Review your subscription and billing options.' : 'Unlock more ways to connect with Premium.'}</span>
+                              </div>
+                              <button type="button" className="profile-settings-row-action" onClick={() => navigate(isPremium ? '/manage-subscription' : '/premium')}>
+                                  {isPremium ? 'Manage' : 'Explore Premium'}
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="profile-settings-group">
+                          <h3>Preferences &amp; help</h3>
+                          <button type="button" className="profile-settings-row profile-settings-row-button" onClick={toggleTheme}>
+                              <span className="profile-settings-icon" aria-hidden="true">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
+                              </span>
+                              <span className="profile-settings-row-copy"><strong>Appearance</strong><span>Choose how the app looks on your device.</span></span>
+                              <span className="profile-settings-value">{theme === 'dark' ? 'Dark' : 'Light'} mode</span>
+                              <svg className="profile-settings-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
                           </button>
-                      )}
-                      {!isPremium && (
-                          <button
-                              onClick={() => navigate('/premium')}
-                              className="mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-                          >
-                              Go Premium
+                          <button type="button" className="profile-settings-row profile-settings-row-button" onClick={() => navigate('/support')}>
+                              <span className="profile-settings-icon" aria-hidden="true">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><path d="M4 13h3v6H6a2 2 0 0 1-2-2zM20 13h-3v6h1a2 2 0 0 0 2-2zM17 19a5 5 0 0 1-5 2"/></svg>
+                              </span>
+                              <span className="profile-settings-row-copy"><strong>Help &amp; support</strong><span>Get help with your account or report an issue.</span></span>
+                              <svg className="profile-settings-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
                           </button>
-                      )}
-                      <button onClick={() => navigate('/support')} className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">Support</button>
-                      <button onClick={toggleTheme} className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">
-                        Toggle Theme (Current: {theme})
-                      </button>
-                      <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Logout</button>
-                  </SectionCard>
+                      </div>
+
+                      <div className="profile-settings-group profile-settings-account">
+                          <h3>Account</h3>
+                          <div className="profile-settings-row">
+                              <span className="profile-settings-icon profile-settings-icon-logout" aria-hidden="true">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>
+                              </span>
+                              <span className="profile-settings-row-copy"><strong>Sign out</strong><span>Sign out of this device when you’re finished.</span></span>
+                              <button type="button" className="profile-settings-logout" onClick={handleLogout}>Log out</button>
+                          </div>
+                      </div>
+                  </section>
               );
           default: return null;
       }
