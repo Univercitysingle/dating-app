@@ -66,7 +66,6 @@ function Profile() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const logger = console; // Using console for component-level logs for now
 
     const fetchProfile = async () => {
         try {
