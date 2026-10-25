@@ -1329,6 +1329,62 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/dark-fantasy/catalog") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      // Public product listings only. Fetch from fixed, public Shopify collection endpoints;
+      // never proxy arbitrary URLs or accept caller-supplied hostnames.
+      const collections = [
+        { handle: "costumes", label: "Costumes" },
+        { handle: "lingerie", label: "Lingerie" },
+        { handle: "essentials", label: "Toys & essentials" }
+      ];
+      try {
+        const responses = await Promise.all(collections.map(async collection => {
+          const upstream = await fetch(`https://midnightdivas.com/collections/${collection.handle}/products.json?limit=12`, {
+            headers: { "accept": "application/json", "user-agent": "DatingAppPublicCatalog/1.0 (+https://dating-app-staging.pages.dev)" },
+            cf: { cacheTtl: 900, cacheEverything: true }
+          });
+          if (!upstream.ok) return [];
+          const data = await upstream.json().catch(() => null);
+          if (!Array.isArray(data?.products)) return [];
+          return data.products.map(product => {
+            const handle = String(product?.handle || "").trim();
+            const title = String(product?.title || "").replace(/<[^>]*>/g, "").trim().slice(0, 180);
+            if (!handle || !title || !/^[a-z0-9-]+$/i.test(handle)) return null;
+            const imageCandidate = product?.images?.[0]?.src || product?.image?.src || "";
+            let image = "";
+            try {
+              const parsedImage = new URL(imageCandidate);
+              if (parsedImage.protocol === "https:" && /(^|\.)shopifycdn\.com$|(^|\.)midnightdivas\.com$/i.test(parsedImage.hostname)) image = parsedImage.href;
+            } catch {}
+            const variant = Array.isArray(product?.variants) ? product.variants.find(item => item?.available) || product.variants[0] : null;
+            const priceValue = variant?.price;
+            const price = priceValue !== undefined && priceValue !== null && /^\d+(\.\d{1,2})?$/.test(String(priceValue)) ? String(priceValue) : "";
+            return {
+              id: String(product.id || handle),
+              title,
+              category: collection.label,
+              url: `https://midnightdivas.com/products/${handle}`,
+              image,
+              price
+            };
+          }).filter(Boolean);
+        }));
+        const seen = new Set();
+        const products = responses.flat().filter(product => {
+          if (seen.has(product.id)) return false;
+          seen.add(product.id);
+          return true;
+        }).slice(0, 36);
+        return new Response(JSON.stringify({ products, source: "Midnight Divas", fetchedAt: new Date().toISOString() }), {
+          status: 200,
+          headers: { ...JSON_HEADERS, "cache-control": "public, max-age=300, s-maxage=900", "access-control-allow-origin": "https://dating-app-staging.pages.dev" }
+        });
+      } catch {
+        return json({ error: "Public product catalogue is temporarily unavailable", products: [] }, 502);
+      }
+    }
+
     if (url.pathname === "/api/dark-fantasy" || url.pathname.startsWith("/api/dark-fantasy/")) {
       // This feature is intentionally fail-closed until jurisdiction, age-assurance,
       // moderation, and payment-provider approvals are recorded by the operator.
