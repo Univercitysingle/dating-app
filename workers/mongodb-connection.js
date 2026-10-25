@@ -1223,7 +1223,9 @@ export class MongoDBConnection {
       }
       const accessUntil = user.darkFantasyAccessUntil ? new Date(user.darkFantasyAccessUntil) : null;
       const entitled = Boolean(accessUntil && !Number.isNaN(accessUntil.getTime()) && accessUntil > new Date());
-      return { status: 200, body: { enabled: true, ageEligible: age !== null && age >= 18, hasAccess: entitled && age !== null && age >= 18 && !["temporarily_suspended", "permanently_banned"].includes(user.accountStatus), accessUntil: entitled ? accessUntil.toISOString() : null } };
+      const accountEligible = !["temporarily_suspended", "permanently_banned"].includes(user.accountStatus);
+      const ageEligible = age !== null && age >= 18;
+      return { status: 200, body: { enabled: true, ageEligible, accountEligible, hasAccess: entitled && ageEligible && accountEligible, accessUntil: entitled ? accessUntil.toISOString() : null } };
     } catch {
       return { status: 503, body: { error: "Dark Fantasy access status unavailable" } };
     }
