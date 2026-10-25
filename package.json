@@ -9,12 +9,13 @@
     "dev:frontend": "react-scripts start",
     "dev": "node scripts/dev.js",
     "build": "react-scripts build",
-    "test": "npm run test:frontend && npm run test:backend",
+    "test": "npm run test:frontend && npm run test:backend && npm run test:worker",
     "test:frontend": "jest --config=jest.config.js --roots src",
     "test:backend": "jest --config=jest.backend.config.js --verbose",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "depcheck": "depcheck"
+    "depcheck": "depcheck",
+    "test:worker": "node --test workers/mongodb-connection.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.574.0",
