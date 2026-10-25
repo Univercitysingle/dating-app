@@ -1332,6 +1332,103 @@ export class MongoDBConnection {
     }
   }
 
+  getSecretCommunityCatalog() {
+    return [
+      { slug: "gay-men", title: "Secret Gay Men", description: "A private space for gay men to connect and share experiences." },
+      { slug: "lesbian-women", title: "Secret Lesbian Women", description: "A private space for lesbian women, friendship and dating connections." },
+      { slug: "bisexual", title: "Secret Bi & Bi-curious", description: "For bisexual and bi-curious adults to explore identity and connect without judgement." },
+      { slug: "lgbtq-plus", title: "Secret LGBTQ+ Community", description: "A welcoming social space for LGBTQ+ adults." },
+      { slug: "trans-nonbinary", title: "Secret Trans & Non-binary", description: "Peer connection for transgender and non-binary adults." },
+      { slug: "swingers-swap", title: "Secret Swingers & Swap", description: "For consenting adults interested in ethical swinging and partner-swapping." },
+      { slug: "open-relationships", title: "Secret Open Relationships", description: "Discuss consensual non-monogamy, communication and boundaries." },
+      { slug: "polyamory", title: "Secret Polyamory & Throuples", description: "Connect around polyamory, triads and consensual relationship structures." },
+      { slug: "couples", title: "Secret Couples Connection", description: "A private space for couples seeking shared social connections." },
+      { slug: "kink-consent", title: "Secret Kink & Boundaries", description: "Discuss kink-related interests, safety, negotiation and consent." },
+      { slug: "friends-social", title: "Secret Friends & Social", description: "Meet people for friendship, community events and supportive conversations." },
+      { slug: "regional", title: "Secret Local Groups", description: "Find local interest groups where location-based discovery is available." }
+    ];
+  }
+
+  getSecretCommunityRules() {
+    return [
+      "Respect privacy. Never share identifying details or another member content outside the community without permission.",
+      "Consent is mandatory. No harassment, coercion, unwanted sexual content, or repeated unwanted contact.",
+      "Do not out, threaten, stalk, dox, or discriminate against members.",
+      "Only eligible adults may participate. Never post illegal content or content involving minors.",
+      "Report harmful content and respect moderator decisions. Repeated violations may result in removal or suspension."
+    ];
+  }
+
+  async secretCommunityAction(uid, action, input = {}) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const status = await this.getDarkFantasyStatus(uid);
+      if (status.status !== 200) return status;
+      if (!status.body.ageEligible || !status.body.accountEligible) return { status: 403, body: { error: "Eligible adult accounts only" } };
+      if (!status.body.hasAccess) return { status: 402, body: { error: "An active Dark Fantasy add-on is required" } };
+      const db = this.getDatabase(await this.getClient());
+      const catalog = this.getSecretCommunityCatalog();
+      if (action === "list") {
+        const memberships = await db.collection("secretcommunitymemberships").find({ uid }).toArray();
+        return { status: 200, body: catalog.map(c => ({ ...c, membershipStatus: memberships.find(m => m.communitySlug === c.slug)?.status || "none", rules: this.getSecretCommunityRules() })) };
+      }
+      const slug = input.slug;
+      const community = catalog.find(c => c.slug === slug);
+      if (!community) return { status: 404, body: { error: "Community not found" } };
+      const membership = await db.collection("secretcommunitymemberships").findOne({ communitySlug: slug, uid });
+      const user = await db.collection("users").findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is restricted" } };
+      if (action === "detail") {
+        const memberCount = await db.collection("secretcommunitymemberships").countDocuments({ communitySlug: slug, status: "active" });
+        const postCount = await db.collection("secretcommunityposts").countDocuments({ communitySlug: slug, status: "published" });
+        return { status: 200, body: { ...community, memberCount, postCount, membershipStatus: membership?.status || "none", rules: this.getSecretCommunityRules() } };
+      }
+      if (action === "join") {
+        const now = new Date();
+        await db.collection("secretcommunitymemberships").updateOne({ communitySlug: slug, uid }, { $set: { communitySlug: slug, uid, status: "requested", role: "member", requestedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true });
+        return { status: 201, body: { status: "requested", message: "Your membership request has been submitted for review." } };
+      }
+      if (action === "decision") {
+        if (input.claimsRole !== "superadmin" && !["owner", "moderator"].includes(membership?.role)) return { status: 403, body: { error: "Only community moderators can review membership requests" } };
+        if (!["approve", "reject"].includes(input.input?.decision) || typeof input.targetUid !== "string" || input.targetUid.length > 128) return { status: 400, body: { error: "Invalid membership decision" } };
+        const result = await db.collection("secretcommunitymemberships").updateOne({ communitySlug: slug, uid: input.targetUid, status: "requested" }, { $set: { status: input.input.decision === "approve" ? "active" : "rejected", reviewedAt: new Date(), reviewedBy: uid } });
+        return result.matchedCount ? { status: 200, body: { status: input.input.decision === "approve" ? "active" : "rejected" } } : { status: 404, body: { error: "Membership request not found" } };
+      }
+      if (["posts", "create-post", "comment", "reaction"].includes(action) && membership?.status !== "active") return { status: 403, body: { error: "Active community membership is required" } };
+      const posts = db.collection("secretcommunityposts");
+      if (action === "posts") {
+        const items = await posts.find({ communitySlug: slug, status: "published" }).sort({ createdAt: -1 }).limit(50).toArray();
+        return { status: 200, body: items.map(p => ({ id: String(p._id), text: p.text, author: "Member", createdAt: p.createdAt, comments: (p.comments || []).map(c => ({ id: c.id, text: c.text, author: "Member", createdAt: c.createdAt })), reactions: (p.reactions || []).map(r => ({ type: r.type })) })) };
+      }
+      if (action === "create-post") {
+        const text = typeof input.input?.text === "string" ? input.input.text.trim() : "";
+        if (!text || text.length > 3000) return { status: 400, body: { error: "Post text must be between 1 and 3000 characters" } };
+        const now = new Date();
+        const result = await posts.insertOne({ communitySlug: slug, authorUid: uid, text, status: "published", comments: [], reactions: [], createdAt: now, updatedAt: now });
+        return { status: 201, body: { id: String(result.insertedId), text, author: "Member", createdAt: now, comments: [], reactions: [] } };
+      }
+      if (!["comment", "reaction"].includes(action) || typeof input.postId !== "string" || !/^[a-fA-F0-9]{24}$/.test(input.postId)) return { status: 400, body: { error: "Invalid post or action" } };
+      const { ObjectId } = await import("mongodb");
+      const post = await posts.findOne({ _id: new ObjectId(input.postId), communitySlug: slug, status: "published" });
+      if (!post) return { status: 404, body: { error: "Post not found" } };
+      if (action === "comment") {
+        const text = typeof input.input?.text === "string" ? input.input.text.trim() : "";
+        if (!text || text.length > 1000) return { status: 400, body: { error: "Comment text must be between 1 and 1000 characters" } };
+        const comment = { id: crypto.randomUUID(), uid, text, createdAt: new Date() };
+        await posts.updateOne({ _id: post._id }, { $push: { comments: comment }, $set: { updatedAt: new Date() } });
+        return { status: 201, body: { id: comment.id, text, author: "Member", createdAt: comment.createdAt } };
+      }
+      const reaction = input.input?.reaction;
+      if (!["like", "heart", "support"].includes(reaction)) return { status: 400, body: { error: "Unsupported reaction" } };
+      const current = post.reactions || [];
+      const next = current.some(r => r.uid === uid && r.type === reaction) ? current.filter(r => r.uid !== uid) : [...current.filter(r => r.uid !== uid), { uid, type: reaction }];
+      await posts.updateOne({ _id: post._id }, { $set: { reactions: next, updatedAt: new Date() } });
+      return { status: 200, body: { reactions: next.map(r => ({ type: r.type })) } };
+    } catch (error) {
+      console.error("Secret community operation failed", { action, name: error?.name || "Error" });
+      return { status: 503, body: { error: "Community service unavailable" } };
+    }
+  }
   async createPendingPurchase(uid, itemId) {
     const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100, "dark-fantasy-monthly": 1200, "dark-fantasy-creator-monthly": 800, "dark-fantasy-unlimited-pass": 3500 };
     const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost", "dark-fantasy-monthly": "Dark Fantasy Add-on (30 days)", "dark-fantasy-creator-monthly": "Dark Fantasy Creator Gallery (30 days)", "dark-fantasy-unlimited-pass": "Dark Fantasy Unlimited Pass (30 days)" };
