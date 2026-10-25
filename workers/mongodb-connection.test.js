@@ -95,6 +95,13 @@ test("public profile responses remove all contact aliases and nested contact fie
     whatsappNumber: "+971500000003",
     contactDetails: { email: "nested@example.com", mobile: "+971500000004", label: "private" },
     metadata: { account: { email_address: "deep@example.com", visibleLabel: "kept" } },
+    birthday: new Date("1990-04-15T00:00:00.000Z"),
+    role: "user",
+    blocked: ["another-user"],
+    password: "must-not-leak",
+    lastLoginIp: "203.0.113.10",
+    location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45] },
+    lifestyle: { drinking: "never", privateNote: "must-not-leak" },
     bio: "Public biography"
   };
   const users = {
@@ -115,11 +122,13 @@ test("public profile responses remove all contact aliases and nested contact fie
   for (const field of ["email", "email_address", "mobileNumber", "phone_number", "whatsappNumber"]) {
     assert.equal(Object.hasOwn(ordinary.body, field), false, field + " must not be exposed");
   }
-  assert.equal(Object.hasOwn(ordinary.body.contactDetails, "email"), false);
-  assert.equal(Object.hasOwn(ordinary.body.contactDetails, "mobile"), false);
-  assert.equal(ordinary.body.contactDetails.label, "private");
-  assert.equal(Object.hasOwn(ordinary.body.metadata.account, "email_address"), false);
-  assert.equal(ordinary.body.metadata.account.visibleLabel, "kept");
+  assert.equal(Object.hasOwn(ordinary.body, "contactDetails"), false, "nested contact container must not be exposed");
+  assert.equal(Object.hasOwn(ordinary.body, "metadata"), false, "arbitrary metadata must not be exposed");
+  for (const field of ["birthday", "role", "blocked", "password", "lastLoginIp"]) {
+    assert.equal(Object.hasOwn(ordinary.body, field), false, field + " must not be exposed");
+  }
+  assert.deepEqual(ordinary.body.location, { city: "Abu Dhabi", country: "UAE" }, "exact coordinates must not be exposed");
+  assert.deepEqual(ordinary.body.lifestyle, { drinking: "never" }, "unknown nested fields must not be exposed");
   assert.equal(ordinary.body.bio, "Public biography");
 
   const owner = await connection.getUserProfile("target-user", "target-user");
