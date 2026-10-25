@@ -2856,15 +2856,16 @@ export class MongoDBConnection {
         const found = await rooms.find({ $or: [{ hostUid: uid }, { "participants.uid": uid }, { visibility: "listed", status: "active" }] }).sort({ updatedAt: -1 }).limit(50).toArray();
         const listedRooms = await Promise.all(found.map(async room => {
           const isHost = room.hostUid === uid;
-          const ticket = !isHost && Number(room.ticketPriceLkr) > 0
+          const ticketPriceLkr = Number(room.ticketPriceLkr) || 0;
+          const ticket = !isHost && ticketPriceLkr > 0
             ? await db.collection("videoRoomTickets").findOne({ roomId: room.roomId, viewerUid: uid, status: "paid" }, { projection: { _id: 1 } })
             : null;
           return {
             roomId: room.roomId, hostUid: room.hostUid, hostDisplayName: room.hostDisplayName,
-            title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity, ticketPriceLkr: Number(room.ticketPriceLkr) || 0,
+            title: room.title, mode: room.mode, visibility: room.visibility, capacity: room.capacity, ticketPriceLkr,
             status: room.status, participantCount: (room.participants || []).length,
             createdAt: room.createdAt, expiresAt: room.expiresAt,
-            isHost, hasTicket: isHost || Number(room.ticketPriceLkr) <= 0 || Boolean(ticket),
+            isHost, hasTicket: isHost || ticketPriceLkr <= 0 || Boolean(ticket),
             isParticipant: (room.participants || []).some(p => p.uid === uid),
             mediaReady: room.mediaStatus === "ready", bandwidthProfile: room.bandwidthProfile
           };
