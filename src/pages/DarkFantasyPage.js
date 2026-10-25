@@ -41,6 +41,7 @@ const DarkFantasyPage = () => {
   const [communityPostText, setCommunityPostText] = useState('');
   const [communityCommentDrafts, setCommunityCommentDrafts] = useState({});
   const [communityBusy, setCommunityBusy] = useState(false);
+  const [communityRequests, setCommunityRequests] = useState([]);
 
   const load = useCallback(async () => {
     setChecking(true);
@@ -175,6 +176,24 @@ const DarkFantasyPage = () => {
     finally { setCommunityBusy(false); }
   };
 
+  const loadCommunityRequests = async () => {
+    if (!selectedCommunity) return;
+    setCommunityBusy(true); setError('');
+    try { setCommunityRequests(await apiClient.get('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/requests')); }
+    catch (e) { setError(e.data?.error || e.message || 'Could not load membership requests.'); }
+    finally { setCommunityBusy(false); }
+  };
+
+  const decideCommunityRequest = async (targetUid, decision) => {
+    if (!selectedCommunity) return;
+    setCommunityBusy(true); setError('');
+    try {
+      await apiClient.post('/dark-fantasy/communities/' + encodeURIComponent(selectedCommunity.slug) + '/requests/' + encodeURIComponent(targetUid) + '/decision', { decision });
+      setCommunityRequests(current => current.filter(item => item.uid !== targetUid));
+      setNotice('Membership request ' + (decision === 'approve' ? 'approved.' : 'rejected.'));
+    } catch (e) { setError(e.data?.error || e.message || 'Could not update membership request.'); }
+    finally { setCommunityBusy(false); }
+  };
   const createCommunityPost = async () => {
     if (!selectedCommunity || !communityPostText.trim()) return;
     setCommunityBusy(true); setError('');
@@ -241,6 +260,7 @@ const DarkFantasyPage = () => {
             <div className="flex items-start justify-between gap-3"><div><h3 className="text-xl font-bold">{selectedCommunity.title}</h3><p className="mt-2 text-sm text-slate-200">{selectedCommunity.description}</p></div><span className="rounded-full bg-white/10 px-3 py-1 text-xs">{selectedCommunity.memberCount || 0} members</span></div>
             <p className="mt-3 text-xs text-slate-300">Membership: {selectedCommunity.membershipStatus || "none"}</p>
           </div>
+          {selectedCommunity.canModerate && <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><h4 className="font-semibold text-violet-950">Membership requests</h4><button type="button" onClick={loadCommunityRequests} disabled={communityBusy} className="rounded-full border border-violet-300 px-3 py-1.5 text-sm font-semibold text-violet-950">Load requests</button></div>{communityRequests.length > 0 ? <div className="mt-3 space-y-2">{communityRequests.map(item => <div key={item.uid} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white p-3"><span className="text-xs text-gray-600">Member ID: {item.uid}</span><div className="flex gap-2"><button type="button" disabled={communityBusy} onClick={() => decideCommunityRequest(item.uid, "approve")} className="rounded-full bg-violet-800 px-3 py-1.5 text-xs font-semibold text-white">Approve</button><button type="button" disabled={communityBusy} onClick={() => decideCommunityRequest(item.uid, "reject")} className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold">Reject</button></div></div>)}</div> : <p className="mt-2 text-sm text-violet-900">Load the queue to review pending requests.</p>}</div>}
           <div className="mt-4 rounded-xl border border-slate-200 p-4"><h4 className="font-semibold text-gray-900">Community rules</h4><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-gray-600">{(selectedCommunity.rules || []).map((rule, index) => <li key={index}>{rule}</li>)}</ul></div>
           {selectedCommunity.membershipStatus !== "active" ? <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4"><p className="text-sm text-violet-950">{selectedCommunity.membershipStatus === "requested" ? "Your request is awaiting moderator review." : selectedCommunity.membershipStatus === "rejected" ? "Your previous request was not approved. You may submit a new request." : "Request membership to participate in this private community."}</p><button type="button" onClick={requestCommunityMembership} disabled={communityBusy || selectedCommunity.membershipStatus === "requested"} className="mt-3 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{communityBusy ? "Please wait…" : selectedCommunity.membershipStatus === "requested" ? "Request pending" : "Request to join"}</button></div> : <div className="mt-5">
             <label className="block text-sm font-semibold text-gray-900" htmlFor="community-post">Start a discussion</label><textarea id="community-post" value={communityPostText} onChange={e => setCommunityPostText(e.target.value)} maxLength={3000} rows={3} placeholder="Share a question or thought with members…" className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm" />
