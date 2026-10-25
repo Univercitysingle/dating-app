@@ -174,7 +174,6 @@ const DarkFantasyPage = () => {
           const url = new URL(window.location.href);
           url.searchParams.delete('purchaseId');
           window.history.replaceState({}, '', url);
-          await load();
         } else if (result?.status === 'failed' || result?.status === 'rejected') {
           clearInterval(timer);
           setError('Payment was not completed. No add-on access was granted.');
