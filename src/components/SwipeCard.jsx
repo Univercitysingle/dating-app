@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import SuperLikeNotification from './SuperLikeNotification';
 import ProfileDetailView from './profile/ProfileDetailView';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl } from '../utils/media';
@@ -63,6 +63,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   };
 
   return (
+    <>
     <motion.div
       drag="x"
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
@@ -224,6 +225,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
       </div>,
       document.body
     )}
+    </>
   );
 };
 
