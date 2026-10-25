@@ -1335,6 +1335,14 @@ export default {
       if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") {
         return json({ error: "Dark Fantasy is not currently available." }, 404);
       }
+      // Fail closed unless an operator configures an approved ISO country allowlist.
+      // Cloudflare's country signal is a coarse access control, not proof of residence.
+      const allowedCountries = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "")
+        .split(",").map(country => country.trim().toUpperCase()).filter(country => /^[A-Z]{2}$/.test(country));
+      const requestCountry = String(request.cf?.country || "").toUpperCase();
+      if (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry)) {
+        return json({ error: "Dark Fantasy is not available in this region." }, 404);
+      }
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       const route = url.pathname.replace(/\/+$/, "");
       const method = request.method;
