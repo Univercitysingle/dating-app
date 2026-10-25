@@ -2987,6 +2987,7 @@ export class MongoDBConnection {
       if (url.pathname === "/internal/dark-fantasy/status") result = await this.getDarkFantasyStatus(body.claims.sub);
       else if (url.pathname === "/internal/dark-fantasy/discover") result = await this.discoverDarkFantasy(body.claims.sub);
       else if (body.action === "save") result = await this.saveDarkFantasyProfile(body.claims.sub, body.payload || {});
+      else if (body.action === "delete") result = await this.deleteDarkFantasyProfile(body.claims.sub);
       else result = await this.getDarkFantasyProfile(body.claims.sub);
       return json(result.body, result.status);
     }
