@@ -2319,3 +2319,327 @@ nav.fixed.bottom-0.left-0.right-0 {
   .chat-header-call-actions .call-icon-button { width: 34px; height: 34px; min-width: 34px; }
   .chat-header-call-actions .call-icon-button svg { width: 16px; height: 16px; }
 }
+
+
+/* Responsive layout refinements: adapt to narrow phones, landscape, tablets and desktop. */
+html, body, #root {
+  width: 100%;
+  min-width: 0;
+}
+body {
+  overflow-x: clip;
+}
+img, video, canvas, svg {
+  max-width: 100%;
+}
+.app-shell, .app-main, .page-container, .inbox-page, .inbox-workspace,
+.inbox-sidebar, .chat-whatsapp-shell, .chat-messages, .chat-message-stack {
+  min-width: 0;
+}
+.inbox-page {
+  padding-left: clamp(10px, 2.5vw, 24px);
+  padding-right: clamp(10px, 2.5vw, 24px);
+}
+.inbox-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.4fr);
+  min-height: min(70dvh, 720px);
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(37, 31, 62, .06);
+}
+.inbox-sidebar {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--app-border);
+}
+.inbox-conversation-list {
+  min-height: 0;
+  max-height: min(64dvh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.inbox-welcome {
+  min-width: 0;
+}
+.chat-whatsapp-shell {
+  display: flex;
+  height: min(calc(100dvh - var(--bottom-nav-height) - 32px - env(safe-area-inset-bottom)), 900px);
+  min-height: 0;
+}
+.chat-whatsapp-header {
+  gap: clamp(6px, 1.5vw, 14px);
+}
+.chat-whatsapp-header .chat-participant-link {
+  min-width: 0;
+  overflow: hidden;
+}
+.chat-header-actions {
+  min-width: 0;
+}
+.chat-header-call-actions {
+  flex-shrink: 0;
+}
+.chat-messages {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+.chat-message-stack .chat-bubble {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.chat-whatsapp-composer {
+  flex-shrink: 0;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+.chat-composer-form {
+  min-width: 0;
+}
+.chat-composer-form .chat-message-input {
+  width: 100%;
+  min-width: 0;
+}
+button, a, input, textarea, select {
+  touch-action: manipulation;
+}
+input, textarea, select {
+  max-width: 100%;
+}
+@media (max-width: 767px) {
+  .inbox-page {
+    padding: 12px 0 max(18px, env(safe-area-inset-bottom));
+  }
+  .inbox-heading {
+    padding: 0 14px;
+    gap: 10px;
+  }
+  .inbox-heading h1 {
+    font-size: clamp(26px, 7vw, 34px);
+    line-height: 1.1;
+  }
+  .inbox-heading p:not(.page-eyebrow) {
+    max-width: 34ch;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .inbox-workspace {
+    display: block;
+    min-height: 0;
+    margin-top: 14px;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .inbox-sidebar {
+    min-height: 0;
+    border-right: 0;
+  }
+  .inbox-conversation-list {
+    max-height: none;
+    overflow: visible;
+  }
+  .inbox-sidebar-header {
+    padding: 14px 14px 12px;
+  }
+  .inbox-search {
+    min-width: 0;
+  }
+  .inbox-search input {
+    width: 100%;
+    min-width: 0;
+    font-size: 16px; /* Avoids iOS input zoom. */
+  }
+  .conversation-row {
+    min-width: 0;
+  }
+  .chat-whatsapp-shell {
+    width: 100%;
+    height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom));
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .chat-whatsapp-header {
+    min-height: 60px;
+    padding: 7px max(9px, env(safe-area-inset-left)) 7px 8px;
+    gap: 5px;
+  }
+  .chat-whatsapp-header .chat-back-link {
+    width: 32px;
+    min-width: 32px;
+    height: 38px;
+    flex: 0 0 32px;
+    padding: 0;
+  }
+  .chat-whatsapp-header .chat-participant-link {
+    flex: 1 1 auto;
+    gap: 8px;
+  }
+  .chat-whatsapp-header .chat-participant-link > div:first-child {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+  }
+  .chat-whatsapp-header .chat-participant-link h2 {
+    max-width: 42vw;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+  .chat-participant-status {
+    max-width: 42vw;
+    overflow: hidden;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chat-header-actions {
+    gap: 4px;
+  }
+  .chat-header-call-actions {
+    gap: 4px;
+  }
+  .chat-header-call-actions .call-icon-button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+  }
+  .chat-header-call-actions .call-icon-button svg {
+    width: 15px;
+    height: 15px;
+  }
+  .chat-messages {
+    flex: 1 1 auto;
+    padding: 12px 10px;
+  }
+  .chat-message-stack {
+    gap: 9px;
+  }
+  .chat-message-stack .chat-bubble {
+    max-width: min(88%, 520px);
+    padding: 9px 10px 7px;
+    font-size: 13px;
+  }
+  .chat-whatsapp-composer {
+    padding: 8px max(9px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left));
+  }
+  .chat-composer-form {
+    gap: 7px;
+  }
+  .chat-composer-mark {
+    display: none;
+  }
+  .chat-whatsapp-composer .chat-message-input {
+    min-height: 42px;
+    padding: 10px 14px;
+    font-size: 16px; /* Prevents mobile browser zoom on focus. */
+  }
+  .chat-whatsapp-composer .chat-send-button {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    flex: 0 0 42px;
+  }
+  .chat-call-panel {
+    max-height: 32dvh;
+    overflow-y: auto;
+    padding: 8px 10px;
+  }
+  .chat-call-panel video {
+    max-height: 30dvh;
+  }
+  .page-container {
+    padding: 16px 12px max(20px, env(safe-area-inset-bottom));
+  }
+  .auth-card {
+    width: 100%;
+    max-width: 100%;
+    padding: clamp(18px, 5vw, 26px);
+  }
+  .state-panel {
+    margin: 12px;
+    padding: 18px;
+  }
+}
+@media (max-width: 380px) {
+  .chat-whatsapp-header {
+    gap: 3px;
+    padding-right: 6px;
+  }
+  .chat-whatsapp-header .chat-participant-link {
+    gap: 6px;
+  }
+  .chat-whatsapp-header .chat-participant-link > div:first-child {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+  .chat-whatsapp-header .chat-participant-link h2 {
+    max-width: 34vw;
+    font-size: 12px;
+  }
+  .chat-participant-status {
+    max-width: 34vw;
+    font-size: 9px;
+  }
+  .chat-header-call-actions .call-icon-button {
+    width: 29px;
+    height: 29px;
+    min-width: 29px;
+  }
+  .chat-header-call-actions .call-icon-button svg {
+    width: 14px;
+    height: 14px;
+  }
+  .chat-back-link span {
+    font-size: 17px;
+  }
+  .inbox-heading .page-eyebrow {
+    font-size: 9px;
+  }
+}
+@media (max-height: 520px) and (max-width: 900px) {
+  .chat-whatsapp-shell {
+    height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom));
+  }
+  .chat-whatsapp-header {
+    min-height: 50px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .chat-whatsapp-header .chat-participant-link > div:first-child {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+  .chat-whatsapp-composer {
+    padding-top: 5px;
+    padding-bottom: max(5px, env(safe-area-inset-bottom));
+  }
+  .chat-whatsapp-composer .chat-message-input,
+  .chat-whatsapp-composer .chat-send-button {
+    min-height: 38px;
+    height: 38px;
+  }
+  .chat-whatsapp-composer .chat-send-button {
+    width: 38px;
+    min-width: 38px;
+  }
+}
+@media (min-width: 768px) {
+  .inbox-workspace {
+    min-height: min(72dvh, 760px);
+  }
+  .inbox-conversation-list {
+    max-height: min(62dvh, 650px);
+  }
+}
