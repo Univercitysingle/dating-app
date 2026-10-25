@@ -503,3 +503,52 @@ test("moderation uses explicit temporary and permanent account states and suppor
   assert.equal(restored.userUpdate.$set.isProfileVisible, true);
   assert.equal(restored.reportUpdate.$set.status, "resolved_user_restored");
 });
+
+
+test("Dark Fantasy add-on is a separate fixed-price purchase", async () => {
+  let inserted;
+  const users = { async findOne({ uid }) { return uid === "adult-user" ? { _id: "user-id", uid, name: "Adult User", email: "adult@example.com" } : null; } };
+  const purchases = { async insertOne(doc) { inserted = doc; return { insertedId: "0123456789abcdef01234567" }; } };
+  const db = { collection(name) { if (name === "users") return users; if (name === "purchases") return purchases; assert.fail("Unexpected collection " + name); } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.createPendingPurchase("adult-user", "dark-fantasy-monthly");
+  assert.equal(result.status, 201);
+  assert.equal(result.body.price, 1200);
+  assert.equal(inserted.itemId, "dark-fantasy-monthly");
+  assert.equal(inserted.itemName, "Dark Fantasy Add-on (30 days)");
+  assert.equal(inserted.status, "pending");
+});
+
+test("Dark Fantasy access requires an eligible adult and an unexpired paid add-on", async () => {
+  const future = new Date(Date.now() + 86400000);
+  const db = { collection(name) {
+    assert.equal(name, "users");
+    return { async findOne({ uid }) {
+      if (uid === "adult") return { uid, birthday: new Date("1990-01-01"), darkFantasyAccessUntil: future, accountStatus: "active" };
+      if (uid === "minor") return { uid, birthday: new Date("2015-01-01"), darkFantasyAccessUntil: future, accountStatus: "active" };
+      if (uid === "expired") return { uid, birthday: new Date("1990-01-01"), darkFantasyAccessUntil: new Date(Date.now() - 1000), accountStatus: "active" };
+      return null;
+    } };
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const adult = await connection.getDarkFantasyStatus("adult");
+  assert.equal(adult.status, 200);
+  assert.equal(adult.body.ageEligible, true);
+  assert.equal(adult.body.hasAccess, true);
+  const minor = await connection.getDarkFantasyStatus("minor");
+  assert.equal(minor.body.ageEligible, false);
+  assert.equal(minor.body.hasAccess, false);
+  const expired = await connection.getDarkFantasyStatus("expired");
+  assert.equal(expired.body.hasAccess, false);
+});
+
+test("Dark Fantasy preferences cannot be saved without explicit consent", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const result = await connection.saveDarkFantasyProfile("adult-user", { consent: false, interests: [], boundaries: [], visibility: "private" });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /consent/i);
+});
