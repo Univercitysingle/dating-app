@@ -1473,7 +1473,7 @@ export class MongoDBConnection {
       if (!admin || !["admin", "superadmin"].includes(admin.role)) {
         return { status: 403, body: { message: "Forbidden: You do not have the required permissions." } };
       }
-      const allowedStatuses = ["pending_review", "under_investigation", "resolved_no_action", "resolved_warning_issued_to_reported_user", "resolved_reporter_notified", "resolved_content_removed", "resolved_user_suspended", "resolved_user_banned"];
+      const allowedStatuses = ["pending_review", "under_investigation", "resolved_no_action", "resolved_warning_issued_to_reported_user", "resolved_reporter_notified", "resolved_content_removed", "resolved_user_suspended", "resolved_user_banned", "resolved_user_restored"];
       const query = {};
       if (typeof params.status === "string" && params.status) {
         if (!allowedStatuses.includes(params.status)) return { status: 400, body: { message: "Invalid report status." } };
@@ -1483,9 +1483,12 @@ export class MongoDBConnection {
       const limit = Number.isInteger(params.limit) && params.limit > 0 ? Math.min(params.limit, 100) : 10;
       if (typeof params.search === "string" && params.search.trim()) {
         const term = params.search.trim().slice(0, 128);
-        const matchingUsers = await db.collection("users").find({
-          $or: [{ uid: term }, { email: term }]
-        }, { projection: { uid: 1 } }).toArray();
+        const searchQuery = admin.role === "superadmin"
+          ? { $or: [{ uid: term }, { email: term }] }
+          : { uid: term };
+        const matchingUsers = await db.collection("users").find(
+          searchQuery, { projection: { uid: 1 } }
+        ).toArray();
         const matchingUids = matchingUsers.map(user => user.uid).filter(Boolean);
         if (!matchingUids.length) return { status: 200, body: { reports: [], totalPages: 0, currentPage: page } };
         query.reportedUserUid = { $in: matchingUids };
@@ -1493,7 +1496,13 @@ export class MongoDBConnection {
       const reports = await db.collection("reports").find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray();
       const total = await db.collection("reports").countDocuments(query);
       const uids = [...new Set(reports.flatMap(report => [report.reporterUid, report.reportedUserUid]).filter(Boolean))];
-      const users = uids.length ? await db.collection("users").find({ uid: { $in: uids } }, { projection: { uid: 1, name: 1, email: 1, isProfileVisible: 1, role: 1 } }).toArray() : [];
+      const userProjection = {
+        uid: 1, name: 1, isProfileVisible: 1, role: 1,
+        ...(admin.role === "superadmin" ? { email: 1, mobileNumber: 1 } : {})
+      };
+      const users = uids.length ? await db.collection("users").find(
+        { uid: { $in: uids } }, { projection: userProjection }
+      ).toArray() : [];
       const byUid = new Map(users.map(user => [user.uid, user]));
       return { status: 200, body: { reports: reports.map(report => ({ ...report, reporter: byUid.get(report.reporterUid) || null, reportedUser: byUid.get(report.reportedUserUid) || null })), totalPages: Math.ceil(total / limit), currentPage: page } };
     } catch {
@@ -1510,9 +1519,13 @@ export class MongoDBConnection {
       if (!admin || !["admin", "superadmin"].includes(admin.role)) return { status: 403, body: { message: "Forbidden: You do not have the required permissions." } };
       const report = await db.collection("reports").findOne({ _id: new ObjectId(reportId) });
       if (!report) return { status: 404, body: { message: "Report not found" } };
+      const privateContactProjection = admin.role === "superadmin" ? { email: 1, mobileNumber: 1 } : {};
       const [reporter, reportedUser] = await Promise.all([
-        db.collection("users").findOne({ uid: report.reporterUid }, { projection: { uid: 1, name: 1, email: 1 } }),
-        db.collection("users").findOne({ uid: report.reportedUserUid }, { projection: { uid: 1, name: 1, email: 1, isProfileVisible: 1, role: 1, suspendedUntil: 1 } })
+        db.collection("users").findOne({ uid: report.reporterUid }, { projection: { uid: 1, name: 1, ...privateContactProjection } }),
+        db.collection("users").findOne({ uid: report.reportedUserUid }, { projection: {
+          uid: 1, name: 1, isProfileVisible: 1, role: 1, suspendedUntil: 1, accountStatus: 1,
+          ...privateContactProjection
+        } })
       ]);
       return { status: 200, body: { ...report, reporter, reportedUser } };
     } catch {
@@ -2490,13 +2503,12 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const [caller, receiver] = await Promise.all([
-        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } }),
-        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } })
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } }),
+        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } })
       ]);
       if (!caller || !receiver) return { status: 404, body: { error: "Call participant not found" } };
       const now = new Date();
-      if ((caller.suspendedUntil && new Date(caller.suspendedUntil) > now) ||
-          (receiver.suspendedUntil && new Date(receiver.suspendedUntil) > now) ||
+      if (isAccountRestricted(caller, now) || isAccountRestricted(receiver, now) ||
           (Array.isArray(caller.blocked) && caller.blocked.includes(receiverUid)) ||
           (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid))) {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
@@ -2793,13 +2805,12 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const [sender, receiver] = await Promise.all([
-        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } }),
-        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1 } })
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } }),
+        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } })
       ]);
       if (!sender || !receiver) return { status: 404, body: { error: "Chat participant not found" } };
       const now = new Date();
-      if ((sender.suspendedUntil && new Date(sender.suspendedUntil) > now) ||
-          (receiver.suspendedUntil && new Date(receiver.suspendedUntil) > now)) {
+      if (isAccountRestricted(sender, now) || isAccountRestricted(receiver, now)) {
         return { status: 403, body: { error: "Messaging is unavailable for this account" } };
       }
       if ((Array.isArray(sender.blocked) && sender.blocked.includes(receiverUid)) ||
