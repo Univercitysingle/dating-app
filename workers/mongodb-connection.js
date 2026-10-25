@@ -1691,10 +1691,17 @@ export class MongoDBConnection {
       const user = await db.collection("users").findOne({ uid: targetUid });
       if (!user) return { status: 404, body: { error: "User not found" } };
       const viewer = targetUid === viewerUid ? user : await db.collection("users").findOne(
-        { uid: viewerUid }, { projection: { role: 1 } }
+        { uid: viewerUid }, { projection: { role: 1, blocked: 1 } }
       );
       const isOwner = targetUid === viewerUid;
       const isSuperAdmin = viewer?.role === "superadmin";
+      const viewerBlockedTarget = Array.isArray(viewer?.blocked) && viewer.blocked.includes(targetUid);
+      const targetBlockedViewer = Array.isArray(user.blocked) && user.blocked.includes(viewerUid);
+      if (!isOwner && !isSuperAdmin &&
+          (user.isProfileVisible === false || viewerBlockedTarget || targetBlockedViewer)) {
+        // Do not reveal whether a hidden or blocked profile exists.
+        return { status: 404, body: { error: "User not found" } };
+      }
       const profile = { ...user };
       // Never expose credentials or operational IP metadata in profile responses.
       delete profile.password;
