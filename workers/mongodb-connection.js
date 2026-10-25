@@ -1473,7 +1473,12 @@ export class MongoDBConnection {
           const userUpdate = {};
           if (purchase.itemId === "super-like-5") userUpdate.$inc = { purchasedSuperLikes: 5 };
           else if (purchase.itemId === "undo-swipes-5") userUpdate.$inc = { purchasedUndoSwipes: 5 };
-          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };\n          else if (purchase.itemId === "dark-fantasy-monthly") {\n            const existingUser = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { darkFantasyAccessUntil: 1 }, session });\n            const currentExpiry = existingUser?.darkFantasyAccessUntil ? new Date(existingUser.darkFantasyAccessUntil).getTime() : 0;\n            userUpdate.$set = { darkFantasyAccessUntil: new Date(Math.max(now.getTime(), Number.isFinite(currentExpiry) ? currentExpiry : 0) + 30 * 86400000) };\n          }
+          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };
+          else if (purchase.itemId === "dark-fantasy-monthly") {
+            const existingUser = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { darkFantasyAccessUntil: 1 }, session });
+            const currentExpiry = existingUser?.darkFantasyAccessUntil ? new Date(existingUser.darkFantasyAccessUntil).getTime() : 0;
+            userUpdate.$set = { darkFantasyAccessUntil: new Date(Math.max(now.getTime(), Number.isFinite(currentExpiry) ? currentExpiry : 0) + 30 * 86400000) };
+          }
           if (Object.keys(userUpdate).length) {
             userUpdate.$set = { ...(userUpdate.$set || {}), updatedAt: now };
             const changedUser = await db.collection("users").updateOne({ _id: purchase.userId }, userUpdate, { session });
