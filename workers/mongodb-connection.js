@@ -1244,7 +1244,17 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
       if (!user) return { status: 404, body: { error: "User not found" } };
-      const subscriptions = await db.collection("subscriptions")
+      const subscriptionCollection = db.collection("subscriptions");
+      // WebXPay checkout can be abandoned before the gateway sends a verified
+      // callback. Expire those attempts so they do not remain "pending" forever.
+      // Keep the records in history as cancelled rather than deleting audit data.
+      const now = new Date();
+      const pendingCutoff = new Date(now.getTime() - 30 * 60 * 1000);
+      await subscriptionCollection.updateMany(
+        { userId: user._id, status: "pending", createdAt: { $lt: pendingCutoff } },
+        { $set: { status: "cancelled", cancellationReason: "payment_timeout", updatedAt: now } }
+      );
+      const subscriptions = await subscriptionCollection
         .find({ userId: user._id })
         .sort({ createdAt: -1 })
         .limit(10)
