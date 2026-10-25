@@ -2468,7 +2468,8 @@ export class MongoDBConnection {
   }
 
   async getTypingStatus(uid, roomId) {
-    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) || !roomId.includes(uid)) {
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
+        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid))) {
       return { status: 400, body: { error: "Invalid chat room" } };
     }
     try {
@@ -2485,7 +2486,7 @@ export class MongoDBConnection {
   async markChatDelivered(uid, payload) {
     const { roomId, messageIds } = payload || {};
     if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
-        !roomId.includes(uid) || !Array.isArray(messageIds) || messageIds.length > 100) {
+        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid)) || !Array.isArray(messageIds) || messageIds.length > 100) {
       return { status: 400, body: { error: "Invalid delivery receipt" } };
     }
     try {
