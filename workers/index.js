@@ -1685,7 +1685,7 @@ export default {
         });
         const order = await response.json().catch(() => ({ error: "Video room ticket checkout unavailable." }));
         if (!response.ok) return json(order, response.status);
-        try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy", order.itemName || "Live video room ticket"); }
+        try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy?section=videorooms", order.itemName || "Live video room ticket"); }
         catch { return json({ error: "WebXPay payment gateway is not configured." }, 503); }
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
