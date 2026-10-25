@@ -1218,3 +1218,117 @@ nav.fixed.bottom-0.left-0.right-0 {
     padding-left: 3px;
   }
 }
+
+
+/* Compact, accessible call controls and in-thread call receipts. */
+.chat-call-panel .call-icon-button {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+}
+
+.chat-call-panel .call-icon-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.chat-call-panel .call-utility-button {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--app-border);
+  border-radius: 50%;
+  background: #fff;
+  color: #4f4650;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.chat-call-panel .call-utility-button:hover {
+  border-color: #d5a5b2;
+  background: #fff7fa;
+}
+
+.chat-call-panel .call-utility-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.call-live-status {
+  min-height: 44px;
+}
+
+.call-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16865b;
+  box-shadow: 0 0 0 4px rgba(22, 134, 91, 0.1);
+}
+
+.call-signal-meter {
+  display: flex;
+  height: 20px;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.call-signal-meter span {
+  display: block;
+  width: 4px;
+  border-radius: 3px;
+  background: #ded9dd;
+  transition: background-color 100ms linear;
+}
+
+.call-signal-meter span:nth-child(1) { height: 5px; }
+.call-signal-meter span:nth-child(2) { height: 8px; }
+.call-signal-meter span:nth-child(3) { height: 11px; }
+.call-signal-meter span:nth-child(4) { height: 14px; }
+.call-signal-meter span:nth-child(5) { height: 17px; }
+.call-signal-meter span:nth-child(6) { height: 20px; }
+.call-signal-meter span.is-active { background: #16865b; }
+
+.call-history-chip {
+  border-color: #e9e1dd;
+  background: rgba(255, 253, 251, 0.94);
+  color: #514650;
+  box-shadow: 0 2px 8px rgba(42, 31, 37, 0.025);
+}
+
+.call-history-icon {
+  background: #f1e9ed;
+  color: #87364d;
+}
+
+.call-history-missed {
+  border-color: #f0c8d0;
+  background: #fff7f8;
+}
+
+.call-history-missed .call-history-icon {
+  background: #fbe3e7;
+  color: #b4234a;
+}
+
+@media (max-width: 420px) {
+  .chat-call-panel .call-icon-button,
+  .chat-call-panel .call-utility-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .call-history-chip {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+}
