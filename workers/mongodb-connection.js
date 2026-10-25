@@ -2812,15 +2812,20 @@ export class MongoDBConnection {
       const rooms = db.collection("videoRooms");
       const now = new Date();
       if (action === "earnings") {
-        const earnings = await db.collection("creatorEarnings").find({ creatorUid: uid }).sort({ createdAt: -1 }).limit(100).toArray();
-        const totals = earnings.reduce((acc, item) => {
-          const amount = Number(item.creatorAmount) || 0;
-          acc.grossLkr += Number(item.grossAmount) || 0;
-          if (item.status === "pending_review") acc.pendingReviewLkr += amount;
-          else if (item.status === "approved") acc.approvedLkr += amount;
-          if (item.payoutStatus === "paid") acc.paidLkr += amount;
-          return acc;
-        }, { grossLkr: 0, pendingReviewLkr: 0, approvedLkr: 0, paidLkr: 0 });
+        const [aggregateRows, earnings] = await Promise.all([
+          db.collection("creatorEarnings").aggregate([
+            { $match: { creatorUid: uid } },
+            { $group: {
+              _id: null,
+              grossLkr: { $sum: "$grossAmount" },
+              pendingReviewLkr: { $sum: { $cond: [{ $eq: ["$status", "pending_review"] }, "$creatorAmount", 0] } },
+              approvedLkr: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, "$creatorAmount", 0] } },
+              paidLkr: { $sum: { $cond: [{ $eq: ["$payoutStatus", "paid"] }, "$creatorAmount", 0] } }
+            } }
+          ]).toArray(),
+          db.collection("creatorEarnings").find({ creatorUid: uid }).sort({ createdAt: -1 }).limit(100).toArray()
+        ]);
+        const totals = aggregateRows[0] || { grossLkr: 0, pendingReviewLkr: 0, approvedLkr: 0, paidLkr: 0 };
         return { status: 200, body: { currency: "LKR", totals, earnings: earnings.map(item => ({
           roomId: item.roomId, grossAmount: item.grossAmount, creatorAmount: item.creatorAmount,
           platformAmount: item.platformAmount, status: item.status, payoutStatus: item.payoutStatus, createdAt: item.createdAt
