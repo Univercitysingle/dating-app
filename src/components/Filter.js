@@ -6,8 +6,6 @@ const DEFAULTS = {
   maxDistance: 100,
   relationshipType: '',
   sexualOrientation: '',
-  familyStatus: '',
-  lifestyle: { pets: '', workout: '', drinking: '', smoking: '' },
 };
 
 const SelectField = ({ id, label, value, onChange, options, hint }) => (
@@ -26,24 +24,15 @@ const Filter = ({ onApply, onClose = () => {} }) => {
   const [minAge, setMinAge] = useState(DEFAULTS.minAge);
   const [maxAge, setMaxAge] = useState(DEFAULTS.maxAge);
   const [maxDistance, setMaxDistance] = useState(DEFAULTS.maxDistance);
-  const [lifestyle, setLifestyle] = useState({ ...DEFAULTS.lifestyle });
   const [relationshipType, setRelationshipType] = useState(DEFAULTS.relationshipType);
   const [sexualOrientation, setSexualOrientation] = useState(DEFAULTS.sexualOrientation);
-  const [familyStatus, setFamilyStatus] = useState(DEFAULTS.familyStatus);
-
-  const handleLifestyleChange = (event) => {
-    const { name, value } = event.target;
-    setLifestyle((current) => ({ ...current, [name]: value }));
-  };
 
   const resetFilters = () => {
     setMinAge(DEFAULTS.minAge);
     setMaxAge(DEFAULTS.maxAge);
     setMaxDistance(DEFAULTS.maxDistance);
-    setLifestyle({ ...DEFAULTS.lifestyle });
     setRelationshipType(DEFAULTS.relationshipType);
     setSexualOrientation(DEFAULTS.sexualOrientation);
-    setFamilyStatus(DEFAULTS.familyStatus);
   };
 
   const handleApply = (event) => {
@@ -53,14 +42,10 @@ const Filter = ({ onApply, onClose = () => {} }) => {
       maxAge,
       maxDistance: Number(maxDistance),
       relationshipType,
-      familyStatus,
     };
     if (relationshipType === 'Casual (FWB)' && sexualOrientation) {
       filters.sexualOrientation = sexualOrientation;
     }
-    Object.entries(lifestyle).forEach(([key, value]) => {
-      if (value) filters[key] = value;
-    });
     onApply(filters);
   };
 
@@ -78,9 +63,7 @@ const Filter = ({ onApply, onClose = () => {} }) => {
     minAge !== DEFAULTS.minAge || maxAge !== DEFAULTS.maxAge,
     maxDistance !== DEFAULTS.maxDistance,
     Boolean(relationshipType),
-    Boolean(familyStatus),
     Boolean(sexualOrientation),
-    ...Object.values(lifestyle).map(Boolean),
   ].filter(Boolean).length;
 
   return (
@@ -164,42 +147,8 @@ const Filter = ({ onApply, onClose = () => {} }) => {
                 ]}
               />
             )}
-            <SelectField
-              id="familyStatus"
-              label="Family background"
-              value={familyStatus}
-              onChange={(event) => setFamilyStatus(event.target.value)}
-              options={[
-                ['', 'No preference'],
-                ['Lower Class Family', 'Lower income background'],
-                ['Lower-Middle Class Family', 'Lower-middle income background'],
-                ['Middle Class Family', 'Middle income background'],
-                ['Upper-Middle Class Family', 'Upper-middle income background'],
-                ['Upper Class / Elite Family', 'Higher income background'],
-              ]}
-            />
           </section>
 
-          <section className="filter-section" aria-labelledby="lifestyle-title">
-            <div className="filter-section-heading">
-              <h3 id="lifestyle-title">Everyday life</h3>
-              <span>Lifestyle</span>
-            </div>
-            <div className="filter-lifestyle-grid">
-              <SelectField id="pets" label="Pets" value={lifestyle.pets} onChange={handleLifestyleChange} options={[
-                ['', 'No preference'], ['Dog person', 'Dogs'], ['Cat person', 'Cats'], ['No pets', 'No pets'], ['All the pets', 'All pets'],
-              ]} />
-              <SelectField id="workout" label="Exercise" value={lifestyle.workout} onChange={handleLifestyleChange} options={[
-                ['', 'No preference'], ['Every day', 'Every day'], ['Often', 'Often'], ['Sometimes', 'Sometimes'], ['Never', 'Rarely / never'],
-              ]} />
-              <SelectField id="drinking" label="Drinking" value={lifestyle.drinking} onChange={handleLifestyleChange} options={[
-                ['', 'No preference'], ['Frequently', 'Often'], ['Socially', 'Socially'], ['Rarely', 'Rarely'], ['Never', 'Never'],
-              ]} />
-              <SelectField id="smoking" label="Smoking" value={lifestyle.smoking} onChange={handleLifestyleChange} options={[
-                ['', 'No preference'], ['Socially', 'Socially'], ['Sometimes', 'Sometimes'], ['Never', 'Never'],
-              ]} />
-            </div>
-          </section>
         </div>
 
         <footer className="discover-filter-footer">
