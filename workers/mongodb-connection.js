@@ -1,8 +1,8 @@
-const PRIVATE_CONTACT_FIELDS = [
-  "email", "emailAddress", "email_address", "mobile", "mobileNumber", "mobile_number",
-  "phone", "phoneNumber", "phone_number", "contactNumber", "contact_number",
-  "telephone", "telephoneNumber", "whatsapp", "whatsApp", "whatsappNumber"
-];
+const PRIVATE_CONTACT_FIELDS = new Set([
+  "email", "emailaddress", "email_address", "emailid", "mail", "mobile", "mobilenumber",
+  "mobile_number", "phone", "phonenumber", "phone_number", "contactnumber", "contact_number",
+  "telephone", "telephonenumber", "whatsapp", "whatsappnumber", "contactemail", "contactphone"
+]);
 
 function stripPrivateContactFields(value) {
   if (!value || typeof value !== "object") return value;
@@ -11,13 +11,80 @@ function stripPrivateContactFields(value) {
     return value;
   }
   for (const key of Object.keys(value)) {
-    if (PRIVATE_CONTACT_FIELDS.includes(key)) {
+    const normalizedKey = key.replace(/[^a-z0-9_]/gi, "").toLowerCase();
+    if (PRIVATE_CONTACT_FIELDS.has(normalizedKey)) {
       delete value[key];
     } else if (value[key] && typeof value[key] === "object") {
       stripPrivateContactFields(value[key]);
     }
   }
   return value;
+}
+
+// Public profile responses use an allowlist, not a denylist. This prevents new
+// account, authentication, billing, moderation, or contact fields from leaking
+// when the user document schema grows. Exact GPS coordinates and full birthday
+// are never returned to other users.
+function sanitizePublicProfile(profile) {
+  const allowed = [
+    "uid", "id", "name", "age", "gender", "sexualOrientation", "bio", "photos",
+    "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education",
+    "relationshipGoals", "familyStatus", "siblings", "religion", "politicalLeaning",
+    "lookingFor", "pets", "lifestyle", "badges", "isVerified", "isOnboardingComplete",
+    "superLikedByCurrentUser"
+  ];
+  const safe = {};
+  for (const key of allowed) {
+    if (profile[key] !== undefined) safe[key] = profile[key];
+  }
+  if (profile.plan === "premium" || profile.plan === "basic") safe.plan = profile.plan;
+  if (profile.lastActiveAt instanceof Date || typeof profile.lastActiveAt === "string") {
+    safe.lastActiveAt = profile.lastActiveAt;
+  }
+  if (profile.location && typeof profile.location === "object" && !Array.isArray(profile.location)) {
+    const location = {};
+    for (const key of ["city", "region", "state", "country", "countryCode", "cityName"]) {
+      if (typeof profile.location[key] === "string" && profile.location[key].length <= 100) {
+        location[key] = profile.location[key];
+      }
+    }
+    if (Object.keys(location).length) safe.location = location;
+  } else if (typeof profile.location === "string" && profile.location.length <= 100) {
+    safe.location = profile.location;
+  }
+  if (profile.lifestyle && typeof profile.lifestyle === "object" && !Array.isArray(profile.lifestyle)) {
+    const lifestyle = {};
+    for (const key of ["drinking", "smoking", "exercise", "diet", "lookingFor", "pets", "religion", "politicalLeaning"]) {
+      if (profile.lifestyle[key] !== undefined) lifestyle[key] = profile.lifestyle[key];
+    }
+    if (Object.keys(lifestyle).length) safe.lifestyle = lifestyle;
+  }
+  if (profile.badges && typeof profile.badges === "object" && !Array.isArray(profile.badges)) {
+    const badges = {};
+    for (const key of ["verified", "premium", "early_adopter"]) {
+      if (profile.badges[key] !== undefined) badges[key] = profile.badges[key];
+    }
+    if (Object.keys(badges).length) safe.badges = badges;
+  }
+  if (Array.isArray(profile.photos)) {
+    safe.photos = profile.photos.map((photo) => {
+      if (typeof photo === "string") return photo;
+      if (!photo || typeof photo !== "object") return null;
+      const safePhoto = {};
+      for (const key of ["url", "isPrimary", "isMain", "order", "alt"]) {
+        if (photo[key] !== undefined) safePhoto[key] = photo[key];
+      }
+      return safePhoto;
+    }).filter(Boolean);
+  }
+  if (profile.socialMediaLinks && typeof profile.socialMediaLinks === "object" && !Array.isArray(profile.socialMediaLinks)) {
+    const links = {};
+    for (const key of ["instagram", "spotify", "tiktok"]) {
+      if (typeof profile.socialMediaLinks[key] === "string") links[key] = profile.socialMediaLinks[key];
+    }
+    if (Object.keys(links).length) safe.socialMediaLinks = links;
+  }
+  return safe;
 }
 
 const JSON_HEADERS = {
@@ -1017,7 +1084,6 @@ export class MongoDBConnection {
         const user = usersByUid.get(candidateUid);
         if (!user) continue;
         const profile = { ...user };
-        stripPrivateContactFields(profile);
         delete profile.password;
         delete profile.lastLoginIp;
         if (profile._id !== undefined) profile.id = String(profile._id);
@@ -1039,7 +1105,7 @@ export class MongoDBConnection {
           });
         }
         profile.superLikedByCurrentUser = superLikedBy.has(candidateUid);
-        result.push(profile);
+        result.push(sanitizePublicProfile(profile));
       }
       return { status: 200, body: result };
     } catch (error) {
@@ -1625,7 +1691,7 @@ export class MongoDBConnection {
       // Never expose credentials or operational IP metadata in profile responses.
       delete profile.password;
       delete profile.lastLoginIp;
-      if (!isOwner && !isSuperAdmin) stripPrivateContactFields(profile);
+      if (isOwner || isSuperAdmin) stripPrivateContactFields(profile);
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (profile.isOnboardingComplete === undefined) profile.isOnboardingComplete = true;
       if (profile.birthday) {
@@ -1644,7 +1710,7 @@ export class MongoDBConnection {
           return { ...photo, url: this.getMediaUrl(photo.url) };
         });
       }
-      return { status: 200, body: profile };
+      return { status: 200, body: (isOwner || isSuperAdmin) ? profile : sanitizePublicProfile(profile) };
     } catch {
       return { status: 503, body: { error: "Profile service unavailable" } };
     }
