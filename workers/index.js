@@ -1340,7 +1340,7 @@ export default {
       const method = request.method;
       const allowed =
         (route === "/api/dark-fantasy/status" && method === "GET") ||
-        (route === "/api/dark-fantasy/profile" && ["GET", "PUT"].includes(method)) ||
+        (route === "/api/dark-fantasy/profile" && ["GET", "PUT", "DELETE"].includes(method)) ||
         (route === "/api/dark-fantasy/discover" && method === "GET") ||
         (route === "/api/dark-fantasy/purchase" && method === "POST");
       if (!allowed) return json({ error: "Not found" }, 404);
@@ -1376,7 +1376,7 @@ export default {
         }
         const response = await connection.fetch("https://internal.invalid" + internalPath, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims, ...(method === "PUT" ? { action: "save", payload } : {}) })
+          body: JSON.stringify({ claims, ...(method === "PUT" ? { action: "save", payload } : method === "DELETE" ? { action: "delete" } : {}) })
         });
         const body = await response.json().catch(() => ({ error: "Dark Fantasy service unavailable" }));
         return json(body, response.status);
