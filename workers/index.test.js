@@ -652,6 +652,7 @@ test("subscription history returns the ten newest records for the current user",
   let subscriptionQuery, sortSpec, limitValue;
   const user = { _id: "mongo-user-id" };
   const subscriptions = {
+    updateMany: async () => ({ modifiedCount: 0 }),
     find: (query) => {
       subscriptionQuery = query;
       return {
