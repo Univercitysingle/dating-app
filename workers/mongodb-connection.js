@@ -1756,11 +1756,10 @@ export class MongoDBConnection {
       if (!current) return { status: 404, body: { error: "User not found" } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
       const allowedFields = onboardingComplete
-        ? ["sexualOrientation", "bio", "photos", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "badges", "lastActiveAt"]
-        : ["name", "birthday", "gender", "sexualOrientation", "bio", "photos", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "badges", "mobileNumber", "lastActiveAt", "isOnboardingComplete"];
+        ? ["sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "lastActiveAt"]
+        : ["name", "birthday", "gender", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "mobileNumber", "lastActiveAt", "isOnboardingComplete"];
       const nestedAllowed = {
         lifestyle: ["drinking", "smoking", "exercise", "diet", "lookingFor"],
-        badges: ["verified", "premium", "early_adopter"],
         socialMediaLinks: ["instagram", "spotify", "tiktok"],
         education: ["school", "degree"]
       };
