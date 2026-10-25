@@ -35,6 +35,7 @@ import SubscriptionPage from './pages/SubscriptionPage';
 import SupportPage from './pages/SupportPage';
 import SupportTicketDetailPage from './pages/SupportTicketDetailPage';
 import StorePage from './pages/StorePage';
+import DarkFantasyPage from './pages/DarkFantasyPage';
 import MainLayout from './components/MainLayout';
 import FAQPage from './pages/legal/FAQPage';
 import SafetyTipsPage from './pages/legal/SafetyTipsPage';
@@ -157,6 +158,7 @@ function App() {
               <Route path="/support" element={<SupportPage />} />
               <Route path="/support/tickets/:ticketId" element={<SupportTicketDetailPage />} />
               <Route path="/store" element={<StorePage />} />
+              <Route path="/dark-fantasy" element={<DarkFantasyPage />} />
             </Route>
 
             {/* Admin Routes */}
