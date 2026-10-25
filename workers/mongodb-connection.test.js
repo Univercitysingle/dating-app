@@ -102,6 +102,8 @@ test("public profile responses remove all contact aliases and nested contact fie
     lastLoginIp: "203.0.113.10",
     location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45] },
     lifestyle: { drinking: "never", privateNote: "must-not-leak" },
+    profilePrompts: [{ question: "About me", answer: "I enjoy hiking", email: "nested-prompt@example.com", mobileNumber: "+971500000005" }],
+    education: { school: "Example University", contact: { email_address: "nested-education@example.com", phone_number: "+971500000006" }, coordinates: [54.37, 24.45] },
     bio: "Public biography"
   };
   const users = {
@@ -129,6 +131,8 @@ test("public profile responses remove all contact aliases and nested contact fie
   }
   assert.deepEqual(ordinary.body.location, { city: "Abu Dhabi", country: "UAE" }, "exact coordinates must not be exposed");
   assert.deepEqual(ordinary.body.lifestyle, { drinking: "never" }, "unknown nested fields must not be exposed");
+  assert.deepEqual(ordinary.body.profilePrompts, [{ question: "About me", answer: "I enjoy hiking" }], "nested contact fields in public profile prompts must not be exposed");
+  assert.deepEqual(ordinary.body.education, { school: "Example University", contact: {} }, "nested contact fields and exact coordinates in public fields must not be exposed");
   assert.equal(ordinary.body.bio, "Public biography");
 
   const owner = await connection.getUserProfile("target-user", "target-user");
