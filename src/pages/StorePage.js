@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import StoreCheckoutModal from '../components/StoreCheckoutModal';
 import apiClient from '../api/apiClient';
 
 const storeItems = [
@@ -19,7 +18,6 @@ const subscriptionPlans = [
 const StorePage = () => {
   const { user } = useAuth();
   const location = useLocation();
-  const [checkout, setCheckout] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -90,41 +88,6 @@ const StorePage = () => {
     return () => { clearInterval(timer); };
   }, [location.search]);
 
-  useEffect(() => {
-    if (!checkout?.purchaseId || !checkout?.kind) return undefined;
-    let attempts = 0;
-    let stopped = false;
-    const check = async () => {
-      try {
-        const endpoint = checkout.kind === 'subscription'
-          ? `/subscription/status/${encodeURIComponent(checkout.purchaseId)}`
-          : `/purchase/status/${encodeURIComponent(checkout.purchaseId)}`;
-        const result = await apiClient.get(endpoint);
-        const successful = checkout.kind === 'subscription'
-          ? result?.status === 'active'
-          : result?.status === 'completed';
-        if (successful) {
-          if (stopped) return;
-          if (checkout.kind === 'subscription') setCurrentSubscription(result);
-          setNotification({ show: true, message: checkout.kind === 'subscription' ? 'Your subscription is now active!' : 'Your purchase was successful!', type: 'success' });
-          setCheckout(null);
-          return;
-        }
-        if (result?.status === 'failed') {
-          setNotification({ show: true, message: 'Payment was not completed. You can try again from The store.', type: 'error' });
-          setCheckout(null);
-        }
-      } catch (error) {
-        // Ignore temporary status errors while the payment provider is processing.
-      }
-      attempts += 1;
-      if (attempts >= 40 && !stopped) {
-        setNotification({ show: true, message: 'Payment is still processing. You can close checkout and check your status again shortly.', type: 'info' });
-      }
-    };
-    const timer = setInterval(check, 3000);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [checkout?.purchaseId, checkout?.kind]);
 
   const startCheckout = async ({ kind, item, plan }) => {
     if (isProcessing) return;
@@ -138,15 +101,30 @@ const StorePage = () => {
         throw new Error('The payment gateway did not return a checkout form. Please try again.');
       }
 
-      // The server-generated form contains the return URL with the server-created order ID.
-      const match = response.match(/purchaseId=([^&"'\s<]+)/i);
-      const purchaseId = match ? decodeURIComponent(match[1].replace(/&amp;$/, '')) : null;
-      setCheckout({
-        kind,
-        title: kind === 'subscription' ? `${plan.name} subscription checkout` : `${item.name} checkout`,
-        html: response,
-        purchaseId,
+      // WebXPay blocks iframe embedding, so submit its server-generated form
+      // as a top-level POST in the current tab.
+      const parsed = new DOMParser().parseFromString(response, 'text/html');
+      const gatewayForm = parsed.querySelector('form');
+      if (!gatewayForm || !gatewayForm.action) throw new Error('Invalid payment gateway form returned.');
+      const gatewayUrl = new URL(gatewayForm.action);
+      if (gatewayUrl.protocol !== 'https:' || !['stagingxpay.info', 'govpay.webxpay.com'].includes(gatewayUrl.hostname)) {
+        throw new Error('Unapproved payment gateway URL.');
+      }
+      const form = document.createElement('form');
+      form.method = (gatewayForm.method || 'POST').toUpperCase();
+      form.action = gatewayUrl.href;
+      form.target = '_self';
+      form.hidden = true;
+      gatewayForm.querySelectorAll('input[name]').forEach((source) => {
+        const field = document.createElement('input');
+        field.type = 'hidden';
+        field.name = source.name;
+        field.value = source.value;
+        form.appendChild(field);
       });
+      if (!form.querySelector('input[name="payment"]')) throw new Error('Payment payload is missing.');
+      document.body.appendChild(form);
+      form.requestSubmit();
     } catch (error) {
       setNotification({ show: true, message: error.data?.error || error.data?.message || error.message || 'Could not start checkout. Please try again.', type: 'error' });
     } finally {
@@ -173,7 +151,7 @@ const StorePage = () => {
       <section aria-labelledby="subscription-plans-heading" className="mb-12">
         <div className="mb-5">
           <h2 id="subscription-plans-heading" className="text-2xl font-bold text-gray-900">Premium subscriptions</h2>
-          <p className="mt-1 text-sm text-gray-500">Choose weekly, monthly, or annual access. All plans use the same in-page IPG checkout.</p>
+          <p className="mt-1 text-sm text-gray-500">Choose weekly, monthly, or annual access. All plans use the same secure IPG checkout in this browser tab.</p>
         </div>
         {currentSubscription?.status === 'active' && (
           <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
@@ -208,7 +186,7 @@ const StorePage = () => {
       <section aria-labelledby="store-items-heading">
         <div className="mb-5">
           <h2 id="store-items-heading" className="text-2xl font-bold text-gray-900">Store items</h2>
-          <p className="mt-1 text-sm text-gray-500">Purchase extras through the same secure in-page checkout.</p>
+          <p className="mt-1 text-sm text-gray-500">Purchase extras through the same secure IPG checkout in this browser tab.</p>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {storeItems.map((item) => (
@@ -231,14 +209,7 @@ const StorePage = () => {
         </div>
       </section>
 
-      {checkout && (
-        <StoreCheckoutModal
-          title={checkout.title}
-          checkoutHtml={checkout.html}
-          onClose={() => setCheckout(null)}
-        />
-      )}
-    </div>
+   </div>
   );
 };
 
