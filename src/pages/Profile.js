@@ -372,7 +372,7 @@ function Profile() {
                                 <div className="space-y-2 text-neutral-600 dark:text-neutral-300">
                                     <p><strong>Name:</strong> {profile.name}</p>
                                     <p><strong>Age:</strong> {profile.age}</p>
-                                    <p><strong>Email:</strong> {profile.email}</p>
+                                    {canViewSensitiveContact && <p><strong>Email:</strong> {profile.email || 'N/A'}</p>}
                                     <p><strong>Gender:</strong> {profile.gender}</p>
                                     <p><strong>Education:</strong> {profile.education || 'N/A'}</p>
                                     <p><strong>Relationship Goals:</strong> {profile.relationshipGoals || 'N/A'}</p>
@@ -382,7 +382,7 @@ function Profile() {
                                             <p><strong>Siblings:</strong> {profile.siblings || 'N/A'}</p>
                                         </>
                                     )}
-                                    <p><strong>Mobile Number:</strong> {profile.mobileNumber || 'N/A'}</p>
+                                    {canViewSensitiveContact && <p><strong>Mobile Number:</strong> {profile.mobileNumber || 'N/A'}</p>}
                                 </div>
                             )}
                         </SectionCard>
