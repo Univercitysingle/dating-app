@@ -47,7 +47,7 @@ test("superadmin login issues a Firebase custom token with root-level role claim
   };
   const response = await worker.fetch(new Request("https://dating-app.test/api/auth/login", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "CF-Connecting-IP": "203.0.113.41" },
     body: JSON.stringify({ email: "sadmin", password: "correct-test-password" })
   }), env);
   assert.equal(response.status, 200);
