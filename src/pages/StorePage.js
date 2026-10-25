@@ -49,7 +49,6 @@ const StorePage = () => {
     const purchaseId = query.get('purchaseId');
     if (!purchaseId) return undefined;
 
-    let cancelled = false;
     let attempts = 0;
     const verify = async () => {
       try {
@@ -88,7 +87,7 @@ const StorePage = () => {
       attempts += 1;
       if (await verify() || attempts >= 20) clearInterval(timer);
     }, 3000);
-    return () => { cancelled = true; clearInterval(timer); };
+    return () => { clearInterval(timer); };
   }, [location.search]);
 
   useEffect(() => {
