@@ -32,7 +32,7 @@ const DarkFantasyPage = () => {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const [section, setSection] = useState('galleries');
+  const [section, setSection] = useState(() => new URLSearchParams(window.location.search).get('section') === 'videorooms' ? 'videorooms' : 'galleries');
   const [catalog, setCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState('');
