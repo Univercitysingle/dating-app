@@ -343,14 +343,22 @@ export class MongoDBConnection {
     // automatically lifted by the scheduled job.
     if (scope === "all" || scope === "moderation") {
       const expiredSuspensions = await users.find({
-        accountStatus: "temporarily_suspended",
-        suspendedUntil: { $lte: now }
+        suspendedUntil: { $lte: now },
+        $or: [
+          { accountStatus: "temporarily_suspended" },
+          { accountStatus: { $exists: false } }
+        ]
       }).sort({ suspendedUntil: 1 }).limit(500).toArray();
       for (const user of expiredSuspensions) {
-        if (user.accountStatus !== "temporarily_suspended" || !user.suspendedUntil ||
-            new Date(user.suspendedUntil) > now) continue;
+        // Support legacy temporary suspensions created before accountStatus
+        // existed, while never lifting an explicitly permanent ban.
+        if ((user.accountStatus !== "temporarily_suspended" && user.accountStatus !== undefined) ||
+            !user.suspendedUntil || new Date(user.suspendedUntil) > now) continue;
+        const accountFilter = user.accountStatus === "temporarily_suspended"
+          ? { accountStatus: "temporarily_suspended" }
+          : { accountStatus: { $exists: false } };
         await users.updateOne(
-          { _id: user._id, accountStatus: "temporarily_suspended", suspendedUntil: { $lte: now } },
+          { _id: user._id, ...accountFilter, suspendedUntil: { $lte: now } },
           {
             $set: {
               accountStatus: "active",
