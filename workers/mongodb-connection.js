@@ -541,6 +541,8 @@ export class MongoDBConnection {
       if (profile.uid !== uid) {
         delete profile.email;
         delete profile.mobileNumber;
+        delete profile.phoneNumber;
+        delete profile.contactNumber;
       }
       if (profile._id !== undefined) profile.id = String(profile._id);
       if (Array.isArray(profile.photos)) {
