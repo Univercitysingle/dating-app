@@ -168,6 +168,7 @@ const DarkFantasyPage = () => {
           <p className="mt-2 text-gray-600">LKR 1,200 for 30 days. Access is granted only after the server verifies a successful payment. Renewals are not automatic.</p>
           <ul className="mt-5 space-y-2 text-sm text-gray-700"><li>• Private interests and personal boundaries</li><li>• Opt-in compatibility discovery</li><li>• Independent visibility controls</li><li>• Block and report controls remain available</li></ul>
           <button type="button" onClick={startPurchase} disabled={busy || status?.ageEligible === false} className="mt-6 rounded-full bg-slate-950 px-6 py-3 font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Preparing checkout…' : 'Buy Dark Fantasy add-on'}</button>
+          <button type="button" onClick={deletePreferences} disabled={busy} className="mt-3 rounded-full border border-red-200 px-5 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Delete previously saved preferences</button>
           <p className="mt-3 text-xs text-gray-500">Checkout availability depends on the deployment's legal and payment approval settings.</p>
         </section>
       ) : status?.hasAccess ? (
