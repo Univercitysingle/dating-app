@@ -1588,6 +1588,51 @@ export default {
     }
 
 
+
+    if (url.pathname === "/api/video-rooms/ice-config") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const connection = env.MONGODB_CONNECTION?.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        if (!connection) return json({ error: "Video Rooms service unavailable" }, 503);
+        const accessResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
+        });
+        const access = await accessResponse.json().catch(() => ({}));
+        if (!accessResponse.ok) return json(access, accessResponse.status);
+        if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
+        if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
+
+        const iceServers = [
+          { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+          { urls: ["stun:global.stun.twilio.com:3478"] }
+        ];
+        const turnUrls = String(env.TURN_URLS || "").split(",").map(value => value.trim()).filter(value => /^turns?:[^\s]+$/i.test(value));
+        const sharedSecret = env.TURN_SHARED_SECRET;
+        if (turnUrls.length && sharedSecret) {
+          const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+          const username = expiresAt + ":" + String(claims.sub).slice(0, 96);
+          const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(sharedSecret), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+          const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(username)));
+          let binary = "";
+          for (const byte of signature) binary += String.fromCharCode(byte);
+          const credential = btoa(binary);
+          iceServers.push({ urls: turnUrls, username, credential });
+        }
+        return json({
+          iceServers,
+          iceTransportPolicy: "all",
+          turnConfigured: turnUrls.length > 0 && Boolean(sharedSecret),
+          credentialExpiresAt: turnUrls.length && sharedSecret ? Math.floor(Date.now() / 1000) + 3600 : null
+        }, 200, { "cache-control": "no-store" });
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "ICE configuration unavailable" }, 503);
+      }
+    }
+
     const videoRoomMatch = url.pathname.match(/^\/api\/video-rooms(?:\/([^/]+)\/(join|leave|end))?$/);
     if (videoRoomMatch) {
       const action = videoRoomMatch[2] || (request.method === "GET" ? "list" : "create");
