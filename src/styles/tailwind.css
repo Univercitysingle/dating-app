@@ -338,7 +338,7 @@ nav.fixed.bottom-0.left-0.right-0 a svg {
   isolation: isolate;
   background-image:
     linear-gradient(135deg, rgba(31, 20, 42, 0.7), rgba(53, 24, 52, 0.45)),
-    var(--login-background, url('/bg.webp'));
+    var(--login-background, url('../../public/bg.webp'));
 }
 
 .login-card {
