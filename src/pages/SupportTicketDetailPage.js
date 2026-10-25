@@ -9,6 +9,7 @@ const SupportTicketDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newMessage, setNewMessage] = useState('');
+  const [attachments, setAttachments] = useState([]);
 
   const fetchTicketDetails = async () => {
     setIsLoading(true);
@@ -34,12 +35,24 @@ const SupportTicketDetailPage = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() && !attachments.length) return;
 
     try {
-      const response = await apiClient.post(`/support-tickets/${ticketId}/messages`, { message: newMessage });
+      const uploaded = [];
+      for (const file of attachments) {
+        const form = new FormData();
+        form.append('ticketId', ticketId);
+        form.append('file', file);
+        const result = await apiClient.post('/support-attachments', form);
+        uploaded.push(result.attachment);
+      }
+      const response = await apiClient.post('/support-tickets/' + ticketId + '/messages', {
+        message: newMessage || 'Attachments added.',
+        attachments: uploaded
+      });
       setMessages([...messages, response]);
       setNewMessage('');
+      setAttachments([]);
     } catch (err) {
       setError(err.response?.data?.message || 'An error occurred while sending the message.');
     }
@@ -80,6 +93,11 @@ const SupportTicketDetailPage = () => {
               <div className={`p-4 rounded-lg max-w-lg ${msg.isFromAdmin ? 'bg-gray-200' : 'bg-primary text-white'}`}>
                 <p className="font-bold">{msg.isFromAdmin ? 'Admin' : 'You'}</p>
                 <p>{msg.message}</p>
+                {Array.isArray(msg.attachments) && msg.attachments.length > 0 && <div className="mt-3 space-y-2">
+                  {msg.attachments.map((file) => <a key={file.key} href={file.url} target="_blank" rel="noreferrer" className="block underline break-all text-sm">
+                    {file.type && file.type.startsWith('image/') ? 'Image: ' : 'File: '}{file.name}
+                  </a>)}
+                </div>}
                 <p className="text-xs mt-2 opacity-75">{new Date(msg.createdAt).toLocaleString()}</p>
               </div>
             </div>
@@ -94,8 +112,10 @@ const SupportTicketDetailPage = () => {
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type your message..."
               className="w-full p-2 border border-gray-300 rounded-md"
-              required
             ></textarea>
+            <label htmlFor="ticket-reply-attachments" className="block mt-3 text-sm font-medium text-gray-700">Attach images or PDF (up to 5 files, 10 MB each)</label>
+            <input id="ticket-reply-attachments" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" onChange={(e) => setAttachments(Array.from(e.target.files || []).slice(0, 5))} className="mt-1 block w-full text-sm" />
+            {attachments.length > 0 && <p className="text-sm text-gray-500 mt-1">{attachments.map(file => file.name).join(', ')}</p>}
             <button
               type="submit"
               className="mt-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
