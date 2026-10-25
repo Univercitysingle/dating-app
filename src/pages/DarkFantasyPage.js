@@ -108,6 +108,10 @@ const DarkFantasyPage = () => {
     finally { setVideoRoomBusy(false); }
   };
 
+  useEffect(() => {
+    if (section === 'videorooms' && status?.hasAccess) loadVideoRooms();
+  }, [section, status?.hasAccess]);
+
   return () => { active = false; };
   }, []);
 
