@@ -97,6 +97,11 @@ function Chat() {
     return () => { cancelled = true; };
   }, [chatId, user?.uid]);
 
+  useEffect(() => () => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (chatId) apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
+  }, [chatId]);
+
   useEffect(() => {
     let cancelled = false;
     const refreshTyping = async () => {
@@ -196,6 +201,12 @@ function Chat() {
       timestamp: new Date().toISOString(),
     };
 
+    // Stop the live typing signal as the message is submitted.
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = null;
+    if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid });
+    apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
+
     // Optimistically update UI
     addMessage(message);
     setInput('');
@@ -236,10 +247,13 @@ function Chat() {
     setInput(value);
     if (!otherUser?.uid) return;
 
+    const wasTyping = Boolean(typingTimeoutRef.current);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (value.trim()) {
-      if (socket?.connected) socket.emit('typing', { roomId: chatId, receiverUid: otherUser.uid });
-      apiClient.post('/chat/typing', { roomId: chatId, isTyping: true }).catch(() => {});
+      if (!wasTyping) {
+        if (socket?.connected) socket.emit('typing', { roomId: chatId, receiverUid: otherUser.uid });
+        apiClient.post('/chat/typing', { roomId: chatId, isTyping: true }).catch(() => {});
+      }
       typingTimeoutRef.current = setTimeout(() => {
         if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
         apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
