@@ -531,6 +531,18 @@ export default {
       }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (env.RATE_LIMITER) {
+          const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName("swipe-user:" + claims.sub));
+          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "swipe", limit: 100, windowMs: 60 * 60 * 1000 })
+          });
+          if (!rateResponse.ok) return json({ error: "Swipe rate limit service unavailable" }, 503);
+          const rate = await rateResponse.json();
+          if (!rate.allowed) return new Response(JSON.stringify({ error: "Swipe limit reached. Please retry later." }), {
+            status: 429, headers: { ...JSON_HEADERS, "retry-after": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))) }
+          });
+        }
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/swipe", {
@@ -744,6 +756,18 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (env.RATE_LIMITER) {
+          const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName("photo-upload-user:" + claims.sub));
+          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "photo-upload", limit: 10, windowMs: 60 * 60 * 1000 })
+          });
+          if (!rateResponse.ok) return json({ message: "Photo upload rate limit service unavailable" }, 503);
+          const rate = await rateResponse.json();
+          if (!rate.allowed) return new Response(JSON.stringify({ message: "Photo upload limit reached. Please retry later." }), {
+            status: 429, headers: { ...JSON_HEADERS, "retry-after": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))) }
+          });
+        }
         // Upload bytes through the CDN proxy configured by CDN_HOSTNAME; keep this
         // API route for Firebase authentication and profile metadata updates.
         if (!isCdnConfigured(env)) {
