@@ -1537,7 +1537,13 @@ export class MongoDBConnection {
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
       if (ticket.status === "Closed") return { status: 403, body: { message: "This ticket is closed and cannot be updated." } };
       const now = new Date();
-      const message = { ticketId: ticket._id, senderId: user._id, message: payload.message.trim(), createdAt: now, updatedAt: now };
+      const attachments = Array.isArray(payload.attachments) ? payload.attachments.slice(0, 5).filter(item =>
+        item && typeof item.key === "string" && item.key.startsWith("support-" + ticketId + "-") &&
+        typeof item.url === "string" && typeof item.name === "string" &&
+        ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"].includes(item.type) &&
+        Number.isFinite(Number(item.size)) && Number(item.size) > 0 && Number(item.size) <= 10 * 1024 * 1024
+      ).map(item => ({ key: item.key, url: item.url, name: item.name.slice(0, 180), type: item.type, size: Number(item.size) })) : [];
+      const message = { ticketId: ticket._id, senderId: user._id, message: payload.message.trim(), ...(attachments.length ? { attachments } : {}), createdAt: now, updatedAt: now };
       const result = await db.collection("ticketmessages").insertOne(message);
       message._id = result.insertedId;
       await db.collection("supporttickets").updateOne({ _id: ticket._id, userId: user._id }, { $set: { status: "In Progress", updatedAt: now } });
@@ -2166,8 +2172,15 @@ export class MongoDBConnection {
       const ticket = await db.collection("supporttickets").findOne({ _id: ticketObjectId });
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
       const now = new Date();
+      const attachments = Array.isArray(payload.attachments) ? payload.attachments.slice(0, 5).filter(item =>
+        item && typeof item.key === "string" && item.key.startsWith("support-" + ticketId + "-") &&
+        typeof item.url === "string" && typeof item.name === "string" &&
+        ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"].includes(item.type) &&
+        Number.isFinite(Number(item.size)) && Number(item.size) > 0 && Number(item.size) <= 10 * 1024 * 1024
+      ).map(item => ({ key: item.key, url: item.url, name: item.name.slice(0, 180), type: item.type, size: Number(item.size) })) : [];
       const message = {
         ticketId: ticketObjectId, senderId: adminUser._id, message: payload.message.trim(),
+        ...(attachments.length ? { attachments } : {}),
         isFromAdmin: true, createdAt: now, updatedAt: now
       };
       const inserted = await db.collection("ticketmessages").insertOne(message);
