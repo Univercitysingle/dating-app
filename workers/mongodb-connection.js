@@ -1208,9 +1208,114 @@ export class MongoDBConnection {
     }
   }
 
+  async getDarkFantasyStatus(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { birthday: 1, darkFantasyAccessUntil: 1, accountStatus: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const birthday = user.birthday ? new Date(user.birthday) : null;
+      let age = null;
+      if (birthday && !Number.isNaN(birthday.getTime())) {
+        const now = new Date();
+        age = now.getFullYear() - birthday.getFullYear();
+        if (now.getMonth() < birthday.getMonth() || (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+      }
+      const accessUntil = user.darkFantasyAccessUntil ? new Date(user.darkFantasyAccessUntil) : null;
+      const entitled = Boolean(accessUntil && !Number.isNaN(accessUntil.getTime()) && accessUntil > new Date());
+      return { status: 200, body: { enabled: true, ageEligible: age !== null && age >= 18, hasAccess: entitled && age !== null && age >= 18 && !["temporarily_suspended", "permanently_banned"].includes(user.accountStatus), accessUntil: entitled ? accessUntil.toISOString() : null } };
+    } catch {
+      return { status: 503, body: { error: "Dark Fantasy access status unavailable" } };
+    }
+  }
+
+  async saveDarkFantasyProfile(uid, payload = {}) {
+    const allowedInterests = new Set(["cam-shows", "couples", "threesome", "ffm", "group-play", "femdom", "cuckold", "roleplay", "sensory-play", "lingerie", "intimacy-products"]);
+    const allowedBoundaries = new Set(["no-explicit-media", "no-unmatched-messages", "verified-adults-only", "couples-only", "private-profile"]);
+    if (typeof uid !== "string" || !uid || uid.length > 128 || !payload || typeof payload !== "object" || Array.isArray(payload)) return { status: 400, body: { error: "Invalid profile payload" } };
+    if (payload.consent !== true) return { status: 400, body: { error: "Explicit opt-in consent is required" } };
+    if (!Array.isArray(payload.interests) || payload.interests.length > 20 || payload.interests.some(x => typeof x !== "string" || !allowedInterests.has(x)) ||
+        !Array.isArray(payload.boundaries) || payload.boundaries.length > 10 || payload.boundaries.some(x => typeof x !== "string" || !allowedBoundaries.has(x))) {
+      return { status: 400, body: { error: "Invalid interests or boundaries" } };
+    }
+    if (!["private", "discoverable"].includes(payload.visibility)) return { status: 400, body: { error: "Invalid visibility setting" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const status = await this.getDarkFantasyStatus(uid);
+      if (status.status !== 200) return status;
+      if (!status.body.ageEligible) return { status: 403, body: { error: "Dark Fantasy is available only to eligible adults" } };
+      if (!status.body.hasAccess) return { status: 402, body: { error: "A valid Dark Fantasy add-on is required" } };
+      const now = new Date();
+      const profile = {
+        uid,
+        consent: true,
+        consentAt: now,
+        interests: [...new Set(payload.interests)],
+        boundaries: [...new Set(payload.boundaries)],
+        visibility: payload.visibility,
+        updatedAt: now
+      };
+      await db.collection("darkfantasyprofiles").createIndex({ uid: 1 }, { unique: true, name: "dark_fantasy_uid_unique" });
+      await db.collection("darkfantasyprofiles").updateOne({ uid }, { $set: profile, $setOnInsert: { createdAt: now } }, { upsert: true });
+      return { status: 200, body: { consent: profile.consent, interests: profile.interests, boundaries: profile.boundaries, visibility: profile.visibility, updatedAt: now.toISOString() } };
+    } catch {
+      return { status: 503, body: { error: "Dark Fantasy profile could not be saved" } };
+    }
+  }
+
+  async getDarkFantasyProfile(uid) {
+    const status = await this.getDarkFantasyStatus(uid);
+    if (status.status !== 200) return status;
+    if (!status.body.ageEligible) return { status: 403, body: { error: "Dark Fantasy is available only to eligible adults" } };
+    if (!status.body.hasAccess) return { status: 402, body: { error: "A valid Dark Fantasy add-on is required" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const profile = await db.collection("darkfantasyprofiles").findOne({ uid }, { projection: { _id: 0, uid: 0, consentAt: 0, createdAt: 0 } });
+      return { status: 200, body: profile || { consent: false, interests: [], boundaries: ["private-profile"], visibility: "private" } };
+    } catch {
+      return { status: 503, body: { error: "Dark Fantasy profile unavailable" } };
+    }
+  }
+
+  async discoverDarkFantasy(uid) {
+    const status = await this.getDarkFantasyStatus(uid);
+    if (status.status !== 200) return status;
+    if (!status.body.ageEligible) return { status: 403, body: { error: "Dark Fantasy is available only to eligible adults" } };
+    if (!status.body.hasAccess) return { status: 402, body: { error: "A valid Dark Fantasy add-on is required" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const [me, myProfile, profiles] = await Promise.all([
+        db.collection("users").findOne({ uid }, { projection: { blocked: 1, accountStatus: 1 } }),
+        db.collection("darkfantasyprofiles").findOne({ uid, consent: true }),
+        db.collection("darkfantasyprofiles").find({ uid: { $ne: uid }, consent: true, visibility: "discoverable" }).limit(100).toArray()
+      ]);
+      if (!myProfile || myProfile.visibility !== "discoverable") return { status: 200, body: [] };
+      const blocked = new Set(Array.isArray(me?.blocked) ? me.blocked.map(String) : []);
+      const candidateUids = profiles.map(p => p.uid).filter(candidateUid => !blocked.has(candidateUid));
+      if (!candidateUids.length) return { status: 200, body: [] };
+      const users = await db.collection("users").find({
+        uid: { $in: candidateUids },
+        accountStatus: { $nin: ["temporarily_suspended", "permanently_banned"] },
+        darkFantasyAccessUntil: { $gt: new Date() }
+      }).limit(100).toArray();
+      const results = [];
+      for (const candidate of users) {
+        const candidateProfile = profiles.find(p => p.uid === candidate.uid);
+        if (!candidateProfile || (Array.isArray(candidate.blocked) && candidate.blocked.map(String).includes(uid))) continue;
+        const sharedInterestCount = myProfile.interests.filter(x => candidateProfile.interests.includes(x)).length;
+        if (!sharedInterestCount) continue;
+        const safe = sanitizePublicProfile(candidate);
+        results.push({ ...safe, sharedInterestCount });
+      }
+      return { status: 200, body: results };
+    } catch {
+      return { status: 503, body: { error: "Dark Fantasy discovery unavailable" } };
+    }
+  }
+
   async createPendingPurchase(uid, itemId) {
-    const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100 };
-    const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost" };
+    const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100, "dark-fantasy-monthly": 1200 };
+    const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost", "dark-fantasy-monthly": "Dark Fantasy Add-on (30 days)" };
     if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, itemId)) {
       return { status: 400, body: { error: "Invalid item ID." } };
     }
@@ -1357,7 +1462,7 @@ export class MongoDBConnection {
           const userUpdate = {};
           if (purchase.itemId === "super-like-5") userUpdate.$inc = { purchasedSuperLikes: 5 };
           else if (purchase.itemId === "undo-swipes-5") userUpdate.$inc = { purchasedUndoSwipes: 5 };
-          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };
+          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };\n          else if (purchase.itemId === "dark-fantasy-monthly") {\n            const existingUser = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { darkFantasyAccessUntil: 1 }, session });\n            const currentExpiry = existingUser?.darkFantasyAccessUntil ? new Date(existingUser.darkFantasyAccessUntil).getTime() : 0;\n            userUpdate.$set = { darkFantasyAccessUntil: new Date(Math.max(now.getTime(), Number.isFinite(currentExpiry) ? currentExpiry : 0) + 30 * 86400000) };\n          }
           if (Object.keys(userUpdate).length) {
             userUpdate.$set = { ...(userUpdate.$set || {}), updatedAt: now };
             const changedUser = await db.collection("users").updateOne({ _id: purchase.userId }, userUpdate, { session });
@@ -2859,6 +2964,20 @@ export class MongoDBConnection {
       if (!["all", "trials", "subscriptions"].includes(scope)) return json({ error: "Invalid expiration scope" }, 400);
       const result = await this.runScheduledExpirations(new Date(), scope);
       return json(result);
+    }
+
+    if (url.pathname === "/internal/dark-fantasy/status" ||
+        url.pathname === "/internal/dark-fantasy/profile" ||
+        url.pathname === "/internal/dark-fantasy/discover") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Unauthorized" }, 401);
+      let result;
+      if (url.pathname === "/internal/dark-fantasy/status") result = await this.getDarkFantasyStatus(body.claims.sub);
+      else if (url.pathname === "/internal/dark-fantasy/discover") result = await this.discoverDarkFantasy(body.claims.sub);
+      else if (body.action === "save") result = await this.saveDarkFantasyProfile(body.claims.sub, body.payload || {});
+      else result = await this.getDarkFantasyProfile(body.claims.sub);
+      return json(result.body, result.status);
     }
 
     if (url.pathname === "/internal/create-purchase" || url.pathname === "/internal/create-subscription") {
