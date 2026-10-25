@@ -121,6 +121,18 @@ const DarkFantasyPage = () => {
     finally { setBusy(false); }
   };
 
+  const deletePreferences = async () => {
+    if (!window.confirm('Delete your Dark Fantasy preferences and remove you from discovery?')) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await apiClient.delete('/dark-fantasy/profile');
+      setProfile({ consent: false, interests: [], boundaries: ['private-profile'], visibility: 'private' });
+      setMatches([]);
+      setNotice('Your Dark Fantasy preferences were deleted.');
+    } catch (e) { setError(e.data?.error || e.message || 'Could not delete preferences.'); }
+    finally { setBusy(false); }
+  };
+
   const discover = async () => {
     setBusy(true); setError(''); setNotice('');
     try { setMatches(await apiClient.get('/dark-fantasy/discover')); }
@@ -163,7 +175,7 @@ const DarkFantasyPage = () => {
             <fieldset className="mt-6"><legend className="font-semibold text-gray-800">Boundaries and preferences</legend><div className="mt-3 grid gap-3 sm:grid-cols-2">{boundaryOptions.map(([value,label]) => <label key={value} className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 text-sm"><input type="checkbox" checked={profile.boundaries.includes(value)} onChange={() => toggle('boundaries', value)} />{label}</label>)}</div></fieldset>
             <fieldset className="mt-6"><legend className="font-semibold text-gray-800">Visibility</legend><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4"><input type="radio" name="visibility" checked={profile.visibility === 'private'} onChange={() => setProfile(current => ({ ...current, visibility: 'private' }))} /><span><span className="block font-semibold">Private</span><span className="text-sm text-gray-500">Not shown in Dark Fantasy discovery.</span></span></label><label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4"><input type="radio" name="visibility" checked={profile.visibility === 'discoverable'} onChange={() => setProfile(current => ({ ...current, visibility: 'discoverable' }))} /><span><span className="block font-semibold">Opt in to discovery</span><span className="text-sm text-gray-500">Only eligible, opted-in add-on members can see your ordinary public profile card.</span></span></label></div></fieldset>
             <label className="mt-6 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-950"><input type="checkbox" checked={profile.consent} onChange={e => setProfile(current => ({ ...current, consent: e.target.checked }))} /><span><span className="font-semibold">I explicitly opt in.</span> I confirm I am an adult, understand that these preferences are sensitive, and consent to their use only for this feature. I can turn off discovery or delete my preferences by contacting support.</span></label>
-            <div className="mt-6 flex flex-wrap gap-3"><button type="button" onClick={save} disabled={busy || !profile.consent} className="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save private preferences'}</button><button type="button" onClick={discover} disabled={busy || !profile.consent || profile.visibility !== 'discoverable'} className="rounded-full border border-slate-300 px-5 py-3 font-semibold text-slate-800 disabled:opacity-50">Find compatible profiles</button></div>
+            <div className="mt-6 flex flex-wrap gap-3"><button type="button" onClick={save} disabled={busy || !profile.consent} className="rounded-full bg-slate-950 px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? 'Saving…' : 'Save private preferences'}</button><button type="button" onClick={discover} disabled={busy || !profile.consent || profile.visibility !== 'discoverable'} className="rounded-full border border-slate-300 px-5 py-3 font-semibold text-slate-800 disabled:opacity-50">Find compatible profiles</button><button type="button" onClick={deletePreferences} disabled={busy} className="rounded-full border border-red-200 px-5 py-3 font-semibold text-red-700 disabled:opacity-50">Delete preferences</button></div>
           </section>
           <section className="mt-6"><h2 className="mb-3 text-xl font-bold text-gray-900">Compatible profiles</h2>{matches.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{matches.map(match => <article key={match.uid || match.id} className="rounded-2xl border border-gray-200 bg-white p-5"><h3 className="font-semibold text-gray-900">{match.name || 'Member'}</h3><p className="mt-1 text-sm text-gray-600">{match.age ? `${match.age} years old · ` : ''}${match.sharedInterestCount} shared interest(s)</p><p className="mt-3 text-xs text-gray-500">Interests remain private. Connect through the app's existing consent and matching features.</p></article>)}</div> : <p className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600">No compatible profiles found yet. Keep discovery off until you are ready to be visible.</p>}</section>
         </>
