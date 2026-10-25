@@ -79,21 +79,21 @@ const DarkFantasyPage = () => {
     return () => { active = false; };
   }, []);
 
-  const loadVideoRooms = async () => {
+  const loadVideoRooms = useCallback(async () => {
     setVideoRoomsLoading(true);
     try {
       const result = await apiClient.get('/video-rooms');
       setVideoRooms(Array.isArray(result?.rooms) ? result.rooms : []);
     } catch (e) { setError(e.data?.error || e.message || 'Could not load Video Rooms.'); }
     finally { setVideoRoomsLoading(false); }
-  };
+  }, []);
 
-  const loadCreatorEarnings = async () => {
+  const loadCreatorEarnings = useCallback(async () => {
     try {
       const result = await apiClient.get('/video-rooms/earnings');
       setCreatorEarnings(result || null);
     } catch (e) { setError(e.data?.error || e.message || 'Could not load creator earnings.'); }
-  };
+  }, []);
 
   const createVideoRoom = async () => {
     setVideoRoomBusy(true); setError(''); setNotice('');
@@ -156,7 +156,7 @@ const DarkFantasyPage = () => {
       loadVideoRooms();
       loadCreatorEarnings();
     }
-  }, [section, status?.hasAccess]);
+  }, [section, status?.hasAccess, loadVideoRooms, loadCreatorEarnings]);
 
   useEffect(() => {
     const purchaseId = new URLSearchParams(location.search).get('purchaseId');
@@ -169,7 +169,8 @@ const DarkFantasyPage = () => {
         if (result?.status === 'completed') {
           clearInterval(timer);
           setNotice('Payment confirmed. Your purchase is being applied.');
-          await Promise.all([load(), loadVideoRooms(), loadCreatorEarnings()]);
+          await load();
+          if (section === 'videorooms') await Promise.all([loadVideoRooms(), loadCreatorEarnings()]);
           const url = new URL(window.location.href);
           url.searchParams.delete('purchaseId');
           window.history.replaceState({}, '', url);
@@ -184,7 +185,7 @@ const DarkFantasyPage = () => {
       if (attempts >= 20) clearInterval(timer);
     }, 3000);
     return () => clearInterval(timer);
-  }, [location.search, load]);
+  }, [location.search, load, section, loadVideoRooms, loadCreatorEarnings]);
 
   const toggle = (key, value) => setProfile(current => ({
     ...current,
