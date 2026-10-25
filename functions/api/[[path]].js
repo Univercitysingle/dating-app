@@ -6,15 +6,16 @@ function copyHeaders(source) { const headers = new Headers(); for (const [name, 
 function stripPrivateContactFields(profile) {
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) return profile;
   const sanitized = { ...profile };
-  for (const key of ["email", "emailAddress", "mobileNumber", "mobile_number", "mobile", "phoneNumber", "phone_number", "phone", "contactNumber", "contact_number"]) {
-    delete sanitized[key];
-  }
-  for (const key of ["contact", "contactDetails"]) {
+  const privateFields = [
+    "email", "emailAddress", "email_address", "mobile", "mobileNumber", "mobile_number",
+    "phone", "phoneNumber", "phone_number", "contactNumber", "contact_number",
+    "telephone", "telephoneNumber", "whatsapp", "whatsApp", "whatsappNumber"
+  ];
+  for (const key of privateFields) delete sanitized[key];
+  for (const key of ["contact", "contactDetails", "personalContact", "contactInfo"]) {
     if (sanitized[key] && typeof sanitized[key] === "object" && !Array.isArray(sanitized[key])) {
       const nested = { ...sanitized[key] };
-      for (const field of ["email", "emailAddress", "mobile", "mobileNumber", "mobile_number", "phone", "phoneNumber", "phone_number", "contactNumber", "contact_number"]) {
-        delete nested[field];
-      }
+      for (const field of privateFields) delete nested[field];
       if (Object.keys(nested).length) sanitized[key] = nested;
       else delete sanitized[key];
     }
