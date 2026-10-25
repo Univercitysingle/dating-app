@@ -103,7 +103,7 @@ const Filter = ({ onApply, onClose = () => {} }) => {
             <div className="filter-field filter-distance-field">
               <div className="filter-range-heading">
                 <label htmlFor="max-distance" className="filter-label">Maximum distance</label>
-                <output>{maxDistance} km</output>
+                <output>Up to {maxDistance} km</output>
               </div>
               <input id="max-distance" aria-label="Maximum distance" type="range" min="1" max="100" value={maxDistance} onChange={(event) => setMaxDistance(Number(event.target.value))} />
               <div className="filter-range-scale"><span>1 km</span><span>100 km</span></div>
