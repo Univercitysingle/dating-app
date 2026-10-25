@@ -100,8 +100,12 @@ export class MongoDBConnection {
 
     clean = clean.replace(/^\/+/, "");
     clean = clean.replace(/^(?:api\/media|media)\//i, "");
+    // The legacy CDN stored generated photo keys at the bucket root even when
+    // application URLs included /photos/ or /media/ prefixes.
+    const basename = clean.split("/").pop() || "";
+    const isGeneratedPhotoKey = /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(basename);
+    if (isGeneratedPhotoKey) clean = basename;
     const encoded = clean.split("/").map(part => encodeURIComponent(part)).join("/");
-    const isGeneratedPhotoKey = /^photos-[A-Za-z0-9_-]{1,128}-(?:[0-9a-f-]{36}|[0-9]{10,16})\.(?:jpg|jpeg|png|gif|webp)$/i.test(clean);
     if (configured) {
       try {
         const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
