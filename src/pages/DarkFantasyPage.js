@@ -32,6 +32,7 @@ const DarkFantasyPage = () => {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [section, setSection] = useState('discover');
 
   const load = useCallback(async () => {
     if (!featureEnabled) return;
@@ -84,10 +85,10 @@ const DarkFantasyPage = () => {
     [key]: current[key].includes(value) ? current[key].filter(item => item !== value) : [...current[key], value],
   }));
 
-  const startPurchase = async () => {
+  const startPurchase = async (itemId = 'dark-fantasy-monthly') => {
     setBusy(true); setError(''); setNotice('');
     try {
-      const response = await apiClient.post('/dark-fantasy/purchase', {});
+      const response = await apiClient.post('/dark-fantasy/purchase', { itemId });
       if (typeof response !== 'string' || !response.trim()) throw new Error('Checkout form was not returned.');
       const parsed = new DOMParser().parseFromString(response, 'text/html');
       const gatewayForm = parsed.querySelector('form');
@@ -155,14 +156,20 @@ const DarkFantasyPage = () => {
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Private, opt-in adult-interest matching for eligible adults. Your interests are never included in ordinary dating profiles or shown to other users by default.</p>
       </header>
 
+      <nav aria-label="Dark Fantasy sections" className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">{[["discover","Discover"],["galleries","Galleries"],["store","Dark Fantasy Store"]].map(([key,label]) => <button key={key} type="button" onClick={() => setSection(key)} aria-current={section === key ? "page" : undefined} className={`rounded-full px-4 py-2 text-sm font-semibold ${section === key ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100"}`}>{label}</button>)}</nav>
+
       {(notice || error) && <div role="status" className={`mb-5 rounded-xl border p-4 text-sm ${error ? 'border-red-200 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-800'}`}>{error || notice}</div>}
 
-      {checking && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">Checking regional availability and add-on access…</section>}
-      {!checking && !status && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">{error || 'This feature is unavailable in your region or for this deployment.'}</section>}
-      {!checking && status && status.accountEligible === false && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">This account is not eligible</h2><p className="mt-1 text-sm">Dark Fantasy access and purchases are unavailable for suspended or banned accounts.</p></section>}
-      {!checking && status && !status.ageEligible && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">Adult eligibility could not be confirmed</h2><p className="mt-1 text-sm">This feature requires an eligible adult account. Update your account verification through the supported process if your age is incorrect or unavailable.</p></section>}
+      {section === "store" && <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-violet-700">In-app purchases</p><h2 className="mt-2 text-2xl font-bold text-gray-900">Dark Fantasy Store</h2><p className="mt-2 text-sm text-gray-600">Browse the store without a Dark Fantasy subscription. Store items are purchased separately; gallery access and the Unlimited Pass are not required to browse or buy ordinary store items.</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><article className="rounded-xl border border-slate-200 p-4"><h3 className="font-semibold">Creator Gallery — 30 days</h3><p className="mt-1 text-sm text-gray-600">Enable your own Dark Fantasy gallery for 30 days.</p><p className="mt-3 font-bold">LKR 800</p><button onClick={() => startPurchase("dark-fantasy-creator-monthly")} disabled={busy || status?.ageEligible === false || status?.accountEligible === false} className="mt-3 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Enable my gallery</button></article><article className="rounded-xl border border-violet-200 bg-violet-50 p-4"><h3 className="font-semibold">Unlimited Pass — 30 days</h3><p className="mt-1 text-sm text-gray-600">Access all eligible creator galleries while the pass is active.</p><p className="mt-3 font-bold">LKR 3,500</p><button onClick={() => startPurchase("dark-fantasy-unlimited-pass")} disabled={busy || status?.ageEligible === false || status?.accountEligible === false} className="mt-3 rounded-full bg-violet-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Get Unlimited Pass</button></article><article className="rounded-xl border border-slate-200 p-4"><h3 className="font-semibold">Individual Gallery — 30 days</h3><p className="mt-1 text-sm text-gray-600">Unlock a specific creator gallery from the Galleries tab.</p><p className="mt-3 font-bold">LKR 500 per gallery</p><p className="mt-2 text-xs text-gray-500">You only pay for the gallery you choose.</p></article></div><p className="mt-4 text-xs text-gray-500">Prices are pilot placeholders and checkout remains subject to server-side payment approval. Store browsing does not require an active add-on.</p></section>}
 
-      {status && !checking && !status.hasAccess ? (
+      {section === "galleries" && <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-violet-700">Creator galleries</p><h2 className="mt-2 text-2xl font-bold text-gray-900">Browse galleries</h2><p className="mt-2 text-sm text-gray-600">Creators need an active Creator Gallery pass to publish. Visitors can unlock a single gallery for 30 days or use an Unlimited Pass. The access model is now defined; creator media upload, gallery moderation, and gated media delivery must be completed before live gallery content is enabled.</p><button onClick={() => setSection("store")} className="mt-4 rounded-full bg-slate-950 px-5 py-3 font-semibold text-white">View passes in Store</button></section>}
+
+      {section === "discover" && checking && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">Checking regional availability and add-on access…</section>}
+      {section === "discover" && !checking && !status && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">{error || 'This feature is unavailable in your region or for this deployment.'}</section>}
+      {section === "discover" && !checking && status && status.accountEligible === false && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">This account is not eligible</h2><p className="mt-1 text-sm">Dark Fantasy access and purchases are unavailable for suspended or banned accounts.</p></section>}
+      {section === "discover" && !checking && status && !status.ageEligible && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">Adult eligibility could not be confirmed</h2><p className="mt-1 text-sm">This feature requires an eligible adult account. Update your account verification through the supported process if your age is incorrect or unavailable.</p></section>}
+
+      {section === "discover" && status && !checking && !status.hasAccess ? (
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-wide text-violet-700">Separate purchase · not included with Premium</p>
           <h2 className="mt-2 text-2xl font-bold text-gray-900">Dark Fantasy access — 30 days</h2>
@@ -172,7 +179,7 @@ const DarkFantasyPage = () => {
           <button type="button" onClick={deletePreferences} disabled={busy} className="mt-3 rounded-full border border-red-200 px-5 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Delete previously saved preferences</button>
           <p className="mt-3 text-xs text-gray-500">Checkout availability depends on the deployment's legal and payment approval settings.</p>
         </section>
-      ) : status?.hasAccess ? (
+      ) : section === "discover" && status?.hasAccess ? (
         <>
           <section className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-900"><p className="font-semibold">Add-on active</p><p className="mt-1 text-sm">Access until {status.accessUntil ? new Date(status.accessUntil).toLocaleDateString() : 'the expiry date shown by your account'}.</p></section>
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
