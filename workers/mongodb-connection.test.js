@@ -209,3 +209,41 @@ test("subscription history expires abandoned pending WebXPay checkouts after 30 
   assert.equal(expiryUpdate.$set.cancellationReason, "payment_timeout");
   assert.ok(expiryUpdate.$set.updatedAt instanceof Date);
 });
+
+test("profile updates cannot bypass photo upload controls or self-assign verification badges", async () => {
+  let capturedUpdate;
+  const storedUser = {
+    uid: "user-1",
+    name: "Test User",
+    isOnboardingComplete: true,
+    photos: [{ url: "photos-user-1-1234567890123.jpg", order: 0 }],
+    badges: { verified: false, premium: false }
+  };
+  const users = {
+    async findOne(query) {
+      assert.equal(query.uid, "user-1");
+      return { ...storedUser };
+    },
+    async updateOne(query, update) {
+      assert.deepEqual(query, { uid: "user-1" });
+      capturedUpdate = update;
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) { assert.equal(name, "users"); return users; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.updateCurrentUserProfile("user-1", {
+    bio: "Updated bio",
+    photos: [{ url: "https://attacker.example/impersonation.jpg", order: 0 }],
+    badges: { verified: true, premium: true }
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(capturedUpdate.$set.bio, "Updated bio");
+  assert.equal(Object.hasOwn(capturedUpdate.$set, "photos"), false, "photos must only change through the validated photo endpoints");
+  assert.equal(Object.hasOwn(capturedUpdate.$set, "badges"), false, "users must not grant themselves verification or premium badges");
+});
+
