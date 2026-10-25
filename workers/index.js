@@ -1459,6 +1459,40 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/dark-fantasy/communities" || url.pathname.startsWith("/api/dark-fantasy/communities/")) {
+      if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") return json({ error: "Dark Fantasy is not currently available." }, 404);
+      const allowedCountries = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").split(",").map(country => country.trim().toUpperCase()).filter(country => /^[A-Z]{2}$/.test(country));
+      const requestCountry = String(request.cf?.country || "").toUpperCase();
+      if (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry)) return json({ error: "Dark Fantasy is not available in this region." }, 404);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Community service unavailable" }, 503);
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const route = url.pathname.replace(/\/+$/, "");
+        const segments = route.replace("/api/dark-fantasy/communities", "").split("/").filter(Boolean);
+        const method = request.method;
+        let internalPath = "/internal/dark-fantasy/communities/";
+        const payload = {};
+        if (segments.length === 0 && method === "GET") internalPath += "list";
+        else if (segments.length === 1 && method === "GET") { internalPath += "detail"; payload.slug = segments[0]; }
+        else if (segments.length === 2 && segments[1] === "join" && method === "POST") { internalPath += "join"; payload.slug = segments[0]; }
+        else if (segments.length === 2 && segments[1] === "posts" && method === "GET") { internalPath += "posts"; payload.slug = segments[0]; }
+        else if (segments.length === 2 && segments[1] === "posts" && method === "POST") { internalPath += "create-post"; payload.slug = segments[0]; payload.input = await request.json().catch(() => null); }
+        else if (segments.length === 4 && segments[1] === "posts" && segments[3] === "comments" && method === "POST") { internalPath += "comment"; payload.slug = segments[0]; payload.postId = segments[2]; payload.input = await request.json().catch(() => null); }
+        else if (segments.length === 4 && segments[1] === "posts" && segments[3] === "reaction" && method === "POST") { internalPath += "reaction"; payload.slug = segments[0]; payload.postId = segments[2]; payload.input = await request.json().catch(() => null); }
+        else if (segments.length === 4 && segments[1] === "requests" && segments[3] === "decision" && method === "POST") { internalPath += "decision"; payload.slug = segments[0]; payload.targetUid = segments[2]; payload.input = await request.json().catch(() => null); }
+        else return json({ error: "Not found" }, 404);
+        const response = await connection.fetch("https://internal.invalid" + internalPath, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, ...payload }) });
+        const body = await response.json().catch(() => ({ error: "Community service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Community service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/purchase/store-item") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
