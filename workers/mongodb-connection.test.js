@@ -94,6 +94,7 @@ test("public profile responses remove all contact aliases and nested contact fie
     phone_number: "+971500000002",
     whatsappNumber: "+971500000003",
     contactDetails: { email: "nested@example.com", mobile: "+971500000004", label: "private" },
+    metadata: { account: { email_address: "deep@example.com", visibleLabel: "kept" } },
     bio: "Public biography"
   };
   const users = {
@@ -117,6 +118,8 @@ test("public profile responses remove all contact aliases and nested contact fie
   assert.equal(Object.hasOwn(ordinary.body.contactDetails, "email"), false);
   assert.equal(Object.hasOwn(ordinary.body.contactDetails, "mobile"), false);
   assert.equal(ordinary.body.contactDetails.label, "private");
+  assert.equal(Object.hasOwn(ordinary.body.metadata.account, "email_address"), false);
+  assert.equal(ordinary.body.metadata.account.visibleLabel, "kept");
   assert.equal(ordinary.body.bio, "Public biography");
 
   const owner = await connection.getUserProfile("target-user", "target-user");
