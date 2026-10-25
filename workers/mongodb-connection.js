@@ -1761,7 +1761,17 @@ export class MongoDBConnection {
           .sort({ [sortField]: sortDirection, _id: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
         users.countDocuments(query)
       ]);
-      return { status: 200, body: { users: items, totalPages: Math.ceil(totalUsers / limit), currentPage: page, totalUsers } };
+      const safeItems = items.map(item => {
+        const safeUser = { ...item };
+        if (access.role !== "superadmin") {
+          delete safeUser.email;
+          delete safeUser.mobileNumber;
+          delete safeUser.phoneNumber;
+          delete safeUser.contactNumber;
+        }
+        return safeUser;
+      });
+      return { status: 200, body: { users: safeItems, totalPages: Math.ceil(totalUsers / limit), currentPage: page, totalUsers } };
     } catch {
       return { status: 503, body: { message: "Unable to list users" } };
     }
@@ -1777,6 +1787,12 @@ export class MongoDBConnection {
         { _id: new ObjectId(userId) }, { projection: { password: 0, lastLoginIp: 0 } }
       );
       if (!user) return { status: 404, body: { message: "User not found" } };
+      if (access.role !== "superadmin") {
+        delete user.email;
+        delete user.mobileNumber;
+        delete user.phoneNumber;
+        delete user.contactNumber;
+      }
       return { status: 200, body: user };
     } catch {
       return { status: 503, body: { message: "Administration service unavailable" } };
