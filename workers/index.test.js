@@ -81,6 +81,15 @@ test("legacy /api/media reads fail closed when CDN_HOSTNAME is missing", async (
   assert.deepEqual(await response.json(), { error: "Media storage unavailable" });
 });
 
+test("media object writes cannot bypass the dedicated CDN proxy", async () => {
+  const key = "photos-user-1757226432186.jpg";
+  const response = await worker.fetch(request("/api/media/" + key, "PUT"), {
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/"
+  });
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), { error: "Method not allowed" });
+});
+
 test("GET /health returns a non-sensitive liveness response", async () => {
   const response = await worker.fetch(request("/health"), { MIGRATION_STAGE: "test" });
   assert.equal(response.status, 200);
