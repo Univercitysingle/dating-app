@@ -779,7 +779,11 @@ export default {
         const result = await response.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!response.ok) return json(result, response.status);
         const proxyUrl = getCdnObjectUrl(env, key, "root");
-        const proxyResponse = await fetch(proxyUrl, { method: "DELETE" });
+        const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
+        const proxyResponse = await fetch(proxyUrl, {
+          method: "DELETE",
+          headers: { "Origin": frontendOrigin }
+        });
         if (!proxyResponse.ok) {
           console.error("Photo CDN proxy delete failed", { status: proxyResponse.status });
           return json({ message: "Photo metadata was deleted but storage cleanup failed" }, 502);
