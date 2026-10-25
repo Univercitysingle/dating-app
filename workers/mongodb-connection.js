@@ -1504,6 +1504,8 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found." } };
       const existing = await db.collection("videoRoomTickets").findOne({ roomId, viewerUid: uid, status: "paid" });
       if (existing) return { status: 409, body: { error: "You already have access to this live show." } };
+      const pending = await db.collection("purchases").findOne({ videoRoomId: roomId, viewerUid: uid, status: "pending" });
+      if (pending) return { status: 409, body: { error: "A checkout for this live show is already pending. Complete it before starting another." } };
       const now = new Date();
       const itemId = "video-room-ticket:" + roomId;
       const purchase = {
