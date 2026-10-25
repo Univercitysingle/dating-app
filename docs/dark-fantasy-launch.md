@@ -43,3 +43,12 @@ All endpoints require Firebase authentication and the Worker feature gate. Profi
 ## Rollback
 
 Set Worker DARK_FANTASY_ENABLED=false (or remove it), set Pages REACT_APP_DARK_FANTASY_ENABLED=false, and leave DARK_FANTASY_PAYMENTS_APPROVED unset/false. This disables entry and API access without deleting entitlement or preference records. Handle data deletion requests through the authenticated deletion endpoint while the feature is enabled, or an approved administrative privacy workflow.
+
+
+## Creator galleries, gallery access, and store
+
+- `dark-fantasy-creator-monthly`: LKR 800 pilot price; server settlement grants `creatorGalleryAccessUntil` for 30 days.
+- `dark-fantasy-gallery:<creatorUid>`: LKR 500 pilot price; settlement grants the buyer access to that creator's gallery for 30 days. Purchases are rejected for one's own gallery and if the creator's gallery entitlement is inactive.
+- `dark-fantasy-unlimited-pass`: LKR 3,500 pilot price; server settlement grants `darkFantasyUnlimitedUntil` for 30 days.
+- These are separate from the existing Dark Fantasy matching add-on and ordinary Premium. Browsing the Dark Fantasy Store does not require a subscription.
+- Important: this commit establishes purchase SKUs and settlement entitlements and adds the UI entry points. It does **not** yet implement private gallery media upload, media-delivery authorization, creator gallery management, or an actual gallery catalogue. Do not launch paid gallery content until those are implemented and tested; do not store sensitive media in public URLs.
