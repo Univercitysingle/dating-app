@@ -20,6 +20,7 @@ function Chat() {
   const { socket, allMessages, addMessage, removeMessage } = useSocket();
   const { chatId } = useParams();
   const typingTimeoutRef = useRef(null);
+  const typingLastSentAtRef = useRef(0);
   const messagesEndRef = useRef(null);
   const historyPollRef = useRef(null);
   const addMessageRef = useRef(addMessage);
@@ -204,6 +205,7 @@ function Chat() {
     // Stop the live typing signal as the message is submitted.
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = null;
+    typingLastSentAtRef.current = 0;
     if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid });
     apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
 
@@ -250,18 +252,22 @@ function Chat() {
     const wasTyping = Boolean(typingTimeoutRef.current);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (value.trim()) {
-      if (!wasTyping) {
+      const now = Date.now();
+      if (!wasTyping || now - typingLastSentAtRef.current > 2500) {
         if (socket?.connected) socket.emit('typing', { roomId: chatId, receiverUid: otherUser.uid });
         apiClient.post('/chat/typing', { roomId: chatId, isTyping: true }).catch(() => {});
+        typingLastSentAtRef.current = now;
       }
       typingTimeoutRef.current = setTimeout(() => {
         if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
         apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
+        typingLastSentAtRef.current = 0;
         typingTimeoutRef.current = null;
       }, 1800);
     } else {
       if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
       apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
+      typingLastSentAtRef.current = 0;
       typingTimeoutRef.current = null;
     }
   };
