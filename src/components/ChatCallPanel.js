@@ -7,6 +7,7 @@ const messageFor = (error, fallback) => error?.data?.error || error?.data?.messa
 
 export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [call, setCall] = useState(null);
+  const [headerTarget, setHeaderTarget] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [localStream, setLocalStream] = useState(null);
@@ -29,6 +30,9 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const remoteAudioRef = useRef(null);
 
   useEffect(() => { callRef.current = call; }, [call]);
+  useEffect(() => {
+    setHeaderTarget(typeof document !== 'undefined' ? document.getElementById(`chat-call-actions-${roomId}`) : null);
+  }, [roomId]);
   useEffect(() => { if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream; }, [localStream]);
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
@@ -323,7 +327,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const videoCall = call?.type === 'video';
 
   return <section className="chat-call-panel" aria-label="Voice and video calls">
-    {typeof document !== 'undefined' && document.getElementById(`chat-call-actions-${roomId}`) && createPortal(
+    {headerTarget && createPortal(
           <div className="chat-header-call-actions flex items-center gap-2">
             {!active && <>
               <button type="button" onClick={() => startCall('audio')} className="call-action call-action-voice call-icon-button" aria-label="Start voice call" title="Start voice call">
@@ -345,7 +349,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 14.5c4.5-4 11.5-4 16 0l-2.5 4-4-2-1-2h-3l-1 2-4 2z"/></svg>
             </button>}
           </div>,
-      document.getElementById(`chat-call-actions-${roomId}`)
+      headerTarget
     )}
 
     {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
