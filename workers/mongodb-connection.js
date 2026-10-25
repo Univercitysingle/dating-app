@@ -113,6 +113,17 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+function isAccountRestricted(user, now = new Date()) {
+  if (!user) return true;
+  if (user.accountStatus === "permanently_banned") return true;
+  if (user.accountStatus === "temporarily_suspended") {
+    if (!user.suspendedUntil) return true;
+    return new Date(user.suspendedUntil) > now;
+  }
+  // Backward compatibility for accounts suspended before accountStatus existed.
+  return Boolean(user.suspendedUntil && new Date(user.suspendedUntil) > now);
+}
+
 function withTimeout(promise, timeoutMs, operation) {
   let timer;
   return Promise.race([
@@ -484,6 +495,9 @@ export class MongoDBConnection {
     }
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
+      const account = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
+      if (!account) return { status: 404, body: { message: "User not found" } };
+      if (isAccountRestricted(account)) return { status: 403, body: { message: "Account is suspended or banned." } };
       const result = await users.findOneAndUpdate({
         uid,
         $expr: {
@@ -520,8 +534,9 @@ export class MongoDBConnection {
     }
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
-      const user = await users.findOne({ uid }, { projection: { photos: 1 } });
+      const user = await users.findOne({ uid }, { projection: { photos: 1, accountStatus: 1, suspendedUntil: 1 } });
       if (!user) return { status: 404, body: { message: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { message: "Account is suspended or banned." } };
       const photo = (user.photos || []).find(item => item.url === key);
       if (!photo) return { status: 404, body: { message: "Photo not found in profile" } };
       if ((user.photos || []).length <= 1) return { status: 400, body: { message: "You must have at least one photo." } };
@@ -555,6 +570,9 @@ export class MongoDBConnection {
     }
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
+      const account = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
+      if (!account) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(account)) return { status: 403, body: { error: "Account is suspended or banned." } };
       const result = await users.updateOne({ uid }, { $set: { photos: normalized } });
       if (!result.matchedCount) return { status: 404, body: { error: "User not found" } };
       return await this.getCurrentUserProfile(uid);
@@ -710,11 +728,13 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const [currentUser, targetUser] = await Promise.all([
-        users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1 } }),
-        users.findOne({ uid: targetUid }, { projection: { blocked: 1 } })
+        users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1, accountStatus: 1, suspendedUntil: 1 } }),
+        users.findOne({ uid: targetUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1 } })
       ]);
       if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
       if (!targetUser) return { status: 404, body: { error: "Target user not found." } };
+      if (isAccountRestricted(currentUser)) return { status: 403, body: { error: "Account is suspended or banned." } };
+      if (isAccountRestricted(targetUser)) return { status: 403, body: { error: "Target account is unavailable." } };
       if (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(targetUid)) {
         return { status: 403, body: { error: "You have blocked this user. Unblock them to swipe." } };
       }
@@ -979,6 +999,7 @@ export class MongoDBConnection {
       phase = "load-current-user";
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(currentUser)) return { status: 403, body: { error: "Account is suspended or banned." } };
 
       const minAge = filters.minAge === undefined ? null : Number.parseInt(filters.minAge, 10);
       const maxAge = filters.maxAge === undefined ? null : Number.parseInt(filters.maxAge, 10);
@@ -1840,8 +1861,9 @@ export class MongoDBConnection {
     if (!update || typeof update !== "object" || Array.isArray(update)) return { status: 400, body: { error: "A JSON profile object is required" } };
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
-      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1 } });
+      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1, accountStatus: 1, suspendedUntil: 1 } });
       if (!current) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(current)) return { status: 403, body: { error: "Account is suspended or banned." } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
       const allowedFields = onboardingComplete
         ? ["sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "lastActiveAt"]
