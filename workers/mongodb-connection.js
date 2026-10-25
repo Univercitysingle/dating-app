@@ -1263,6 +1263,17 @@ export class MongoDBConnection {
     }
   }
 
+  async deleteDarkFantasyProfile(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      await db.collection("darkfantasyprofiles").deleteOne({ uid });
+      return { status: 200, body: { deleted: true } };
+    } catch {
+      return { status: 503, body: { error: "Dark Fantasy preferences could not be deleted" } };
+    }
+  }
+
   async getDarkFantasyProfile(uid) {
     const status = await this.getDarkFantasyStatus(uid);
     if (status.status !== 200) return status;
