@@ -44,7 +44,11 @@ const DarkFantasyPage = () => {
   const [communityRequests, setCommunityRequests] = useState([]);
   const [videoRoomMode, setVideoRoomMode] = useState('private');
   const [videoRoomVisibility, setVideoRoomVisibility] = useState('invite');
-  const [videoRoomCapacity, setVideoRoomCapacity] = useState('4');
+  const [videoRoomCapacity, setVideoRoomCapacity] = useState('2');
+  const [videoRoomTitle, setVideoRoomTitle] = useState('');
+  const [videoRooms, setVideoRooms] = useState([]);
+  const [videoRoomsLoading, setVideoRoomsLoading] = useState(false);
+  const [videoRoomBusy, setVideoRoomBusy] = useState(false);
 
   const load = useCallback(async () => {
     setChecking(true);
@@ -70,7 +74,41 @@ const DarkFantasyPage = () => {
       .then(result => { if (active) setCatalog(Array.isArray(result?.products) ? result.products : []); })
       .catch(() => { if (active) setCatalogError('Live product data is temporarily unavailable. You can still browse the official collections below.'); })
       .finally(() => { if (active) setCatalogLoading(false); });
-    return () => { active = false; };
+  
+  const loadVideoRooms = async () => {
+    setVideoRoomsLoading(true);
+    try {
+      const result = await apiClient.get('/video-rooms');
+      setVideoRooms(Array.isArray(result?.rooms) ? result.rooms : []);
+    } catch (e) { setError(e.data?.error || e.message || 'Could not load Video Rooms.'); }
+    finally { setVideoRoomsLoading(false); }
+  };
+
+  const createVideoRoom = async () => {
+    setVideoRoomBusy(true); setError(''); setNotice('');
+    try {
+      const result = await apiClient.post('/video-rooms', {
+        mode: videoRoomMode, visibility: videoRoomMode === 'private' ? 'invite' : videoRoomVisibility,
+        capacity: Number(videoRoomCapacity), title: videoRoomTitle.trim()
+      });
+      if (result?.room) setVideoRooms(current => [result.room, ...current.filter(room => room.roomId !== result.room.roomId)]);
+      setNotice(result?.message || 'Room created.');
+      await loadVideoRooms();
+    } catch (e) { setError(e.data?.error || e.message || 'Could not create Video Room.'); }
+    finally { setVideoRoomBusy(false); }
+  };
+
+  const updateVideoRoom = async (roomId, action) => {
+    setVideoRoomBusy(true); setError(''); setNotice('');
+    try {
+      await apiClient.post('/video-rooms/' + encodeURIComponent(roomId) + '/' + action, {});
+      setNotice(action === 'end' ? 'Room ended.' : action === 'leave' ? 'You left the room.' : 'You joined the room. Live media is not connected yet.');
+      await loadVideoRooms();
+    } catch (e) { setError(e.data?.error || e.message || 'Could not update Video Room.'); }
+    finally { setVideoRoomBusy(false); }
+  };
+
+  return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -364,10 +402,25 @@ const DarkFantasyPage = () => {
             </article>
           </div>
 
-          <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-            <p className="font-bold text-amber-950">Room setup preview only</p>
-            <p className="mt-1 text-sm leading-6 text-amber-900">Your choices above preview the intended room setup; they do not create a live room yet. The current API does not implement multi-participant room membership, audience permissions, or SFU-backed broadcasting. Keep live creation disabled until those server-side controls and WebRTC signaling are implemented and tested.</p>
-            {!status?.hasAccess && <button type="button" onClick={() => setSection("store")} className="mt-3 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white">View Dark Fantasy add-on</button>}
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <p className="font-bold text-violet-950">Bandwidth-saving defaults</p>
+            <p className="mt-1 text-sm leading-6 text-violet-900">Private rooms are configured for adaptive peer-to-peer video; group and broadcast rooms are tagged for low-bitrate SFU delivery. Room records and access controls are active, but camera/audio transport is not connected, so creating a room does not start a live show.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-white p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Individual</p><p className="mt-1 text-sm font-semibold text-slate-900">Adaptive 360p, up to 720p</p><p className="mt-1 text-xs text-slate-600">Peer-to-peer where possible; TURN only when needed.</p></div>
+              <div className="rounded-xl bg-white p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Group</p><p className="mt-1 text-sm font-semibold text-slate-900">180p–360p tiles</p><p className="mt-1 text-xs text-slate-600">Limit simultaneous camera publishing.</p></div>
+              <div className="rounded-xl bg-white p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Broadcast</p><p className="mt-1 text-sm font-semibold text-slate-900">Adaptive 360p–720p</p><p className="mt-1 text-xs text-slate-600">One host stream distributed by an SFU.</p></div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-950">Create a room</h3><p className="mt-1 text-sm text-slate-600">Room metadata is stored server-side. Cameras never start automatically.</p></div><button type="button" onClick={loadVideoRooms} disabled={videoRoomsLoading || videoRoomBusy} className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">{videoRoomsLoading ? 'Refreshing…' : 'Refresh rooms'}</button></div>
+            <label htmlFor="video-room-title" className="mt-4 block text-sm font-semibold text-slate-800">Room title (optional)</label>
+            <input id="video-room-title" value={videoRoomTitle} onChange={event => setVideoRoomTitle(event.target.value.slice(0, 80))} maxLength={80} placeholder="e.g. Evening chat" className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            <button type="button" onClick={createVideoRoom} disabled={videoRoomBusy || checking || !status?.hasAccess} className="mt-4 min-h-11 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{videoRoomBusy ? 'Working…' : 'Create room'}</button>
+            {!status?.hasAccess && <button type="button" onClick={() => setSection('store')} className="ml-2 mt-4 min-h-11 rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold">View add-on options</button>}
+            <div className="mt-5 space-y-3">
+              {videoRooms.map(room => <article key={room.roomId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h4 className="font-bold text-slate-950">{room.title}</h4><span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{room.mode}</span><span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">{room.status}</span></div><p className="mt-1 text-xs text-slate-600">{room.hostDisplayName || (room.isHost ? 'You are hosting' : 'Host')} · {room.participantCount}/{room.capacity} people · {room.visibility === 'listed' ? 'Listed' : 'Invite only'}</p><p className="mt-1 text-xs text-amber-800">{room.mediaReady ? 'Media ready' : 'Room saved; live video not connected'}</p></div><div className="flex gap-2">{room.status === 'active' && room.isHost && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'end')} disabled={videoRoomBusy} className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">End room</button>}{room.status === 'active' && !room.isHost && !room.isParticipant && room.visibility === 'listed' && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'join')} disabled={videoRoomBusy} className="rounded-full bg-violet-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Join room</button>}{room.status === 'active' && room.isParticipant && !room.isHost && <button type="button" onClick={() => updateVideoRoom(room.roomId, 'leave')} disabled={videoRoomBusy} className="rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-50">Leave</button>}</div></article>)}
+              {!videoRoomsLoading && videoRooms.length === 0 && <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">No rooms to display yet. Create one when your account has access.</p>}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
             <span className="rounded-full border border-slate-200 px-3 py-2">Private by default</span>
