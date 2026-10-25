@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import PhotoUploader from './PhotoUploader';
+import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const PhotoEditor = ({ photos, onSave, onCancel }) => {
   const [localPhotos, setLocalPhotos] = useState(photos);
@@ -57,9 +58,18 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
         {localPhotos.map((photo, index) => (
           <div key={index} className="relative">
             <img
-              src={photo.url}
+              src={resolvePhotoUrl(photo.url)}
               alt={`User photo ${index + 1}`}
               className="object-cover w-full h-32 rounded-lg"
+              onError={(event) => {
+                const image = event.currentTarget;
+                const fallback = resolveWorkerPhotoUrl(photo.url);
+                if (fallback && image.src !== fallback) {
+                  image.src = fallback;
+                  return;
+                }
+                if (image.src !== PLACEHOLDER_IMAGE) image.src = PLACEHOLDER_IMAGE;
+              }}
             />
             <button
               onClick={() => handleDelete(photo.url)}
