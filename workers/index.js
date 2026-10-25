@@ -1664,6 +1664,7 @@ export default {
     if (videoRoomTicketMatch) {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
+      if (String(env.DARK_FANTASY_PAYMENTS_APPROVED || "").toLowerCase() !== "true") return json({ error: "Video Room payments are not approved for this deployment." }, 503);
       if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) return json({ error: "WebXPay payment gateway is not configured." }, 503);
       try {
         createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
