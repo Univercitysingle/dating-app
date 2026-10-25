@@ -21,6 +21,23 @@ function stripPrivateContactFields(value) {
   return value;
 }
 
+const PRIVATE_NESTED_PROFILE_FIELDS = new Set([
+  "password", "passwordhash", "lastloginip", "role", "blocked", "birthday",
+  "coordinates", "latitude", "longitude", "lat", "lng", "exactlocation", "location"
+]);
+
+function copyPublicValue(value) {
+  if (Array.isArray(value)) return value.map(copyPublicValue);
+  if (!value || typeof value !== "object") return value;
+  const safe = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    const normalizedKey = key.replace(/[^a-z0-9_]/gi, "").toLowerCase();
+    if (PRIVATE_CONTACT_FIELDS.has(normalizedKey) || PRIVATE_NESTED_PROFILE_FIELDS.has(normalizedKey)) continue;
+    safe[key] = copyPublicValue(nestedValue);
+  }
+  return safe;
+}
+
 // Public profile responses use an allowlist, not a denylist. This prevents new
 // account, authentication, billing, moderation, or contact fields from leaking
 // when the user document schema grows. Exact GPS coordinates and full birthday
@@ -35,7 +52,7 @@ function sanitizePublicProfile(profile) {
   ];
   const safe = {};
   for (const key of allowed) {
-    if (profile[key] !== undefined) safe[key] = profile[key];
+    if (profile[key] !== undefined) safe[key] = copyPublicValue(profile[key]);
   }
   if (profile.plan === "premium" || profile.plan === "basic") safe.plan = profile.plan;
   if (profile.lastActiveAt instanceof Date || typeof profile.lastActiveAt === "string") {
