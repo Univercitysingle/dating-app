@@ -4,18 +4,20 @@ const PRIVATE_CONTACT_FIELDS = [
   "telephone", "telephoneNumber", "whatsapp", "whatsApp", "whatsappNumber"
 ];
 
-function stripPrivateContactFields(profile) {
-  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return profile;
-  for (const key of PRIVATE_CONTACT_FIELDS) delete profile[key];
-  for (const key of ["contact", "contactDetails", "personalContact", "contactInfo"]) {
-    if (profile[key] && typeof profile[key] === "object" && !Array.isArray(profile[key])) {
-      const nested = { ...profile[key] };
-      for (const field of PRIVATE_CONTACT_FIELDS) delete nested[field];
-      if (Object.keys(nested).length) profile[key] = nested;
-      else delete profile[key];
+function stripPrivateContactFields(value) {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    for (const item of value) stripPrivateContactFields(item);
+    return value;
+  }
+  for (const key of Object.keys(value)) {
+    if (PRIVATE_CONTACT_FIELDS.includes(key)) {
+      delete value[key];
+    } else if (value[key] && typeof value[key] === "object") {
+      stripPrivateContactFields(value[key]);
     }
   }
-  return profile;
+  return value;
 }
 
 const JSON_HEADERS = {
