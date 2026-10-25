@@ -1,7 +1,11 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
-import { isB2Configured, isCdnConfigured, putPrivateObject, getPrivateObject, deletePrivateObject } from "./backblaze-storage.js";
+
+
+function isCdnConfigured(env) {
+  return Boolean(String(env.CDN_HOSTNAME || "").trim());
+}
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -9,7 +13,7 @@ const JSON_HEADERS = {
 };
 
 function getCdnObjectUrl(env, key, route = "root") {
-  const configured = String(env.CDN_HOSTNAME || env.CDN_HOSTURL || env.CDN_HOST_URL || env.CDN_HOST || "").trim();
+  const configured = String(env.CDN_HOSTNAME || "").trim();
   if (!configured) throw new Error("CDN_HOSTNAME is not configured");
   const base = new URL(/^https?:\/\//i.test(configured) ? configured : "https://" + configured);
   if (base.protocol !== "https:" || base.username || base.password || base.search || base.hash) {
@@ -246,83 +250,26 @@ export default {
       return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400" } });
     }
 
-    // Serve private B2 profile images through the existing CDN hostname.
-    // Accept both the legacy /<object-key> URL and the explicit /media/<key> form.
+    // Serve profile photos only through the dedicated CDN/private-storage proxy.
+    // The dating-app API Worker never accesses Backblaze credentials or object bytes.
     const mediaMatch = url.pathname.match(/^\/(?:api\/media|media)\/([^/]+)$/) ||
       url.pathname.match(/^\/(photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|gif|webp))$/i);
     if (mediaMatch) {
-      if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
       let key;
-      try { key = decodeURIComponent(mediaMatch[1]); } catch { return json({ error: "Invalid media key" }, 400); }
-      // Support current UUID-based keys and older timestamp-based keys, including WebP.
-      if (!/^photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|gif|webp)$/i.test(key)) return json({ error: "Media not found" }, 404);
-      if (!isCdnConfigured(env)) return json({ error: "Media storage unavailable" }, 503);
-      // Route every profile-image read (legacy root, /media, and /api/media)
-      // to the configured CDN host. The API Worker never serves image bytes.
-      if (request.method === "GET" || request.method === "HEAD") {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            location: getAppMediaUrl(env, key),
-            "cache-control": "public, max-age=300"
-          }
-        });
-      }
-      if (request.method === "PUT") {
-        if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-        try {
-          const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-          if (typeof claims.sub !== "string" || !key.startsWith("photos-" + claims.sub + "-")) {
-            return json({ error: "Photo does not belong to the current user" }, 403);
-          }
-          const contentType = request.headers.get("content-type") || "";
-          const extensionByType = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" };
-          const extension = extensionByType[contentType];
-          if (!extension || !key.toLowerCase().endsWith("." + extension)) return json({ error: "Unsupported image type" }, 400);
-          const declaredLength = Number(request.headers.get("content-length") || 0);
-          if (declaredLength > 5 * 1024 * 1024) return json({ error: "Photo must be 5 MB or smaller" }, 413);
-          const bytes = new Uint8Array(await request.arrayBuffer());
-          if (bytes.length < 1 || bytes.length > 5 * 1024 * 1024) return json({ error: "Photo must be 5 MB or smaller" }, 400);
-          const jpeg = contentType === "image/jpeg" && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-          const png = contentType === "image/png" && bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
-          const gifSignature = bytes.length >= 6 ? String.fromCharCode(...bytes.slice(0, 6)) : "";
-          const gif = contentType === "image/gif" && (gifSignature === "GIF89a" || gifSignature === "GIF87a");
-          const webp = contentType === "image/webp" && bytes.length >= 12 &&
-            String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
-            String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-          if (!jpeg && !png && !gif && !webp) return json({ error: "File content does not match its image type" }, 400);
-          await putPrivateObject(env, key, bytes, contentType, claims.sub);
-          return json({ uploaded: true }, 201);
-        } catch (error) {
-          if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
-          if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
-          console.error("Private media proxy upload failed", {
-            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Upload failed"
-          });
-          return json({ error: "Media upload failed" }, 503);
-        }
-      }
-      try {
-        const object = await getPrivateObject(env, key);
-        const headers = new Headers({ "content-type": object.ContentType || "application/octet-stream", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" });
-        if (object.ContentLength !== undefined) headers.set("content-length", String(object.ContentLength));
-        if (request.method === "HEAD") return new Response(null, { status: 200, headers });
-        const body = object.Body && typeof object.Body.transformToWebStream === "function" ? object.Body.transformToWebStream() : object.Body;
-        return new Response(body, { status: 200, headers });
-      } catch (error) {
-        const status = error && (error.$metadata?.httpStatusCode || error.statusCode);
-        const missing = status === 404 || error?.name === "NoSuchKey" || error?.name === "NotFound";
-        if (!missing) {
-          console.error("Private media proxy read failed", {
-            name: error && typeof error.name === "string" ? error.name.slice(0, 80) : "StorageError",
-            code: error && typeof error.Code === "string" ? error.Code.slice(0, 80) : undefined,
-            status: typeof status === "number" ? status : undefined,
-            message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Storage read failed"
-          });
-          return json({ error: "Media storage unavailable" }, 503);
-        }
+      try { key = decodeURIComponent(mediaMatch[1]); }
+      catch { return json({ error: "Invalid media key" }, 400); }
+      if (!/^photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|gif|webp)$/i.test(key)) {
         return json({ error: "Media not found" }, 404);
       }
+      if (!isCdnConfigured(env)) return json({ error: "Media storage unavailable" }, 503);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: getAppMediaUrl(env, key),
+          "cache-control": "public, max-age=300"
+        }
+      });
     }
 
     if (request.method === "GET" && url.pathname === "/health") {
