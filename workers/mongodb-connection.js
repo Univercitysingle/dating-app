@@ -2795,10 +2795,16 @@ export class MongoDBConnection {
         if (room.visibility !== "listed" && room.hostUid !== uid && !isMember) return { status: 403, body: { error: "This room is invite-only." } };
         if (!isMember && members.length >= room.capacity) return { status: 409, body: { error: "This room is full." } };
         if (room.mode === "private" && room.hostUid !== uid && !isMember) return { status: 403, body: { error: "Private shows require a direct invitation." } };
-        if (!isMember) await rooms.updateOne({ roomId, status: "active", "participants.uid": { $ne: uid } }, {
-          $push: { participants: { uid, role: room.mode === "broadcast" ? "viewer" : "participant", joinedAt: now, mediaPublishingAllowed: false } },
-          $set: { updatedAt: now }
-        });
+        if (!isMember) {
+          const joined = await rooms.updateOne({
+            roomId, status: "active", "participants.uid": { $ne: uid },
+            $expr: { $lt: [{ $size: { $ifNull: ["$participants", []] } }, "$capacity"] }
+          }, {
+            $push: { participants: { uid, role: room.mode === "broadcast" ? "viewer" : "participant", joinedAt: now, mediaPublishingAllowed: false } },
+            $set: { updatedAt: now }
+          });
+          if (!joined.modifiedCount) return { status: 409, body: { error: "This room is full or no longer accepting participants." } };
+        }
       } else if (action === "leave") {
         if (!isMember) return { status: 403, body: { error: "You are not a member of this room." } };
         if (room.hostUid === uid) await rooms.updateOne({ roomId, status: "active" }, { $set: { status: "ended", endedAt: now, updatedAt: now } });
