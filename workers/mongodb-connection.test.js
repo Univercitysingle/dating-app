@@ -601,7 +601,7 @@ test("Secrets Communities fail closed without an active Dark Fantasy entitlement
   connection.getDarkFantasyStatus = async () => ({ status: 200, body: { ageEligible: true, accountEligible: true, hasAccess: false } });
   connection.getClient = async () => ({});
   connection.getDatabase = () => { assert.fail("Database must not be accessed without entitlement"); };
-  const result = await connection.secretCommunityAction("member-1", "detail", { slug: "gay-men" });
+  const result = await connection.secretCommunityAction("member-1", "join", { slug: "gay-men" });
   assert.equal(result.status, 402);
   assert.match(result.body.error, /active Dark Fantasy add-on/i);
 });
