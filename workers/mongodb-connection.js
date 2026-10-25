@@ -1388,6 +1388,11 @@ export class MongoDBConnection {
         await db.collection("secretcommunitymemberships").updateOne({ communitySlug: slug, uid }, { $set: { communitySlug: slug, uid, status: "requested", role: "member", requestedAt: now, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true });
         return { status: 201, body: { status: "requested", message: "Your membership request has been submitted for review." } };
       }
+      if (action === "requests") {
+        if (input.claimsRole !== "superadmin" && !["owner", "moderator"].includes(membership?.role)) return { status: 403, body: { error: "Only community moderators can view membership requests" } };
+        const requests = await db.collection("secretcommunitymemberships").find({ communitySlug: slug, status: "requested" }, { projection: { _id: 0, uid: 1, requestedAt: 1 } }).sort({ requestedAt: 1 }).limit(100).toArray();
+        return { status: 200, body: requests.map(item => ({ uid: item.uid, requestedAt: item.requestedAt })) };
+      }
       if (action === "decision") {
         if (input.claimsRole !== "superadmin" && !["owner", "moderator"].includes(membership?.role)) return { status: 403, body: { error: "Only community moderators can review membership requests" } };
         if (!["approve", "reject"].includes(input.input?.decision) || typeof input.targetUid !== "string" || input.targetUid.length > 128) return { status: 400, body: { error: "Invalid membership decision" } };
@@ -3110,7 +3115,7 @@ export class MongoDBConnection {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Unauthorized" }, 401);
       const action = url.pathname.split("/").pop();
-      if (!["list", "detail", "join", "posts", "create-post", "comment", "reaction", "decision"].includes(action)) return json({ error: "Not found" }, 404);
+      if (!["list", "detail", "join", "posts", "create-post", "comment", "reaction", "decision", "requests"].includes(action)) return json({ error: "Not found" }, 404);
       const result = await this.secretCommunityAction(body.claims.sub, action, { ...body, claimsRole: body.claims.role });
       return json(result.body, result.status);
     }
