@@ -31,7 +31,7 @@ function copyPublicValue(value) {
   if (!value || typeof value !== "object") return value;
   const safe = {};
   for (const [key, nestedValue] of Object.entries(value)) {
-    const normalizedKey = key.replace(/[^a-z0-9_]/gi, "").toLowerCase();
+    const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
     if (PRIVATE_CONTACT_FIELDS.has(normalizedKey) || PRIVATE_NESTED_PROFILE_FIELDS.has(normalizedKey)) continue;
     safe[key] = copyPublicValue(nestedValue);
   }
