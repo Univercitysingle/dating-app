@@ -122,8 +122,17 @@ export const SocketProvider = ({ children }) => {
   const addMessage = useCallback((newMessage) => {
     setAllMessages(prevMessages => {
       const roomMessages = prevMessages[newMessage.roomId] || [];
-      if (roomMessages.some(m => String(m._id) === String(newMessage._id))) {
-        return prevMessages;
+      const existingIndex = roomMessages.findIndex(m => String(m._id) === String(newMessage._id));
+      if (existingIndex !== -1) {
+        const existing = roomMessages[existingIndex];
+        const statusRank = { sent: 1, delivered: 2, read: 3 };
+        const nextStatus = (statusRank[newMessage.status] || 0) > (statusRank[existing.status] || 0)
+          ? newMessage.status : existing.status;
+        const merged = { ...existing, ...newMessage, status: nextStatus };
+        if (Object.keys(merged).every(key => merged[key] === existing[key])) return prevMessages;
+        const updated = [...roomMessages];
+        updated[existingIndex] = merged;
+        return { ...prevMessages, [newMessage.roomId]: updated };
       }
       const optimisticIndex = roomMessages.findIndex(m =>
         m.senderUid === newMessage.senderUid &&
