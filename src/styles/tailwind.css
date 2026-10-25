@@ -1171,3 +1171,50 @@ nav.fixed.bottom-0.left-0.right-0 {
     animation: none;
   }
 }
+
+
+/* Chat participant navigation: the whole identity area opens the public profile. */
+.chat-header {
+  gap: 12px;
+}
+
+.chat-participant-link {
+  min-width: 0;
+  padding: 5px 8px;
+  text-decoration: none;
+  transition: background-color 150ms ease;
+}
+
+.chat-participant-link:hover {
+  background: #fbf0f3;
+}
+
+.chat-participant-link:focus-visible,
+.chat-back-link:focus-visible,
+.chat-profile-action:focus-visible {
+  outline: 3px solid rgba(163, 71, 93, 0.3);
+  outline-offset: 2px;
+}
+
+.chat-profile-action {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .chat-header {
+    gap: 7px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .chat-profile-action {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .chat-participant-link {
+    gap: 8px;
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+}
