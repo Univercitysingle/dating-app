@@ -15,6 +15,7 @@ function Chat() {
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const [otherUser, setOtherUser] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [callHistory, setCallHistory] = useState([]);
   const { user } = useAuth();
   const { socket, allMessages, addMessage, removeMessage } = useSocket();
   const { chatId } = useParams();
@@ -45,6 +46,23 @@ function Chat() {
         const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
         if (!cancelled && Array.isArray(result?.messages)) {
           result.messages.forEach(message => addMessageRef.current(message));
+          const undelivered = result.messages.filter(message =>
+            message.receiverUid === user.uid && message.status === 'sent' &&
+            message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
+          );
+          if (undelivered.length) {
+            try {
+              await apiClient.post('/chat/delivered', {
+                roomId: chatId,
+                messageIds: undelivered.map(message => String(message._id)),
+              });
+              if (!cancelled) undelivered.forEach(message =>
+                addMessageRef.current({ ...message, status: 'delivered' })
+              );
+            } catch (deliveryError) {
+              logger.debug('Message delivery receipt deferred:', deliveryError?.status || 'network error');
+            }
+          }
         }
       } catch (historyError) {
         if (!cancelled) logger.debug('Chat history refresh unavailable:', historyError?.status || 'network error');
@@ -59,6 +77,42 @@ function Chat() {
       if (historyPollRef.current) clearInterval(historyPollRef.current);
       historyPollRef.current = null;
     };
+  }, [chatId, user?.uid]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshCallHistory = async () => {
+      try {
+        const result = await apiClient.get('/calls/history', { params: { roomId: chatId } });
+        if (!cancelled && Array.isArray(result?.calls)) setCallHistory(result.calls);
+      } catch (historyError) {
+        if (!cancelled) logger.debug('Call history refresh unavailable:', historyError?.status || 'network error');
+      }
+    };
+    if (user?.uid && chatId) {
+      refreshCallHistory();
+      const interval = window.setInterval(refreshCallHistory, 4000);
+      return () => { cancelled = true; window.clearInterval(interval); };
+    }
+    return () => { cancelled = true; };
+  }, [chatId, user?.uid]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshTyping = async () => {
+      try {
+        const result = await apiClient.get('/chat/typing', { params: { roomId: chatId } });
+        if (!cancelled) setIsTyping(Boolean(result?.isTyping));
+      } catch (_) {
+        if (!cancelled) setIsTyping(false);
+      }
+    };
+    if (user?.uid && chatId) {
+      refreshTyping();
+      const interval = window.setInterval(refreshTyping, 1200);
+      return () => { cancelled = true; window.clearInterval(interval); };
+    }
+    return () => { cancelled = true; };
   }, [chatId, user?.uid]);
 
   useEffect(() => {
@@ -178,20 +232,24 @@ function Chat() {
   };
 
   const handleInputChange = (e) => {
-    setInput(e.target.value);
+    const value = e.target.value;
+    setInput(value);
+    if (!otherUser?.uid) return;
 
-    if (!socket || !otherUser?.uid) return;
-
-    if (!typingTimeoutRef.current) {
-      socket.emit('typing', { roomId: chatId, receiverUid: otherUser.uid });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (value.trim()) {
+      if (socket?.connected) socket.emit('typing', { roomId: chatId, receiverUid: otherUser.uid });
+      apiClient.post('/chat/typing', { roomId: chatId, isTyping: true }).catch(() => {});
+      typingTimeoutRef.current = setTimeout(() => {
+        if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
+        apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
+        typingTimeoutRef.current = null;
+      }, 1800);
     } else {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
+      if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
+      apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
       typingTimeoutRef.current = null;
-    }, 2000);
+    }
   };
 
   if (!user) {
@@ -221,7 +279,14 @@ function Chat() {
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
       <main className="chat-messages flex-grow overflow-y-auto p-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
-          {messages.map((msg) => (
+          {[...messages, ...callHistory.map(call => ({
+            _id: `call-${call._id}`,
+            messageType: 'call',
+            call,
+            senderUid: call.callerUid,
+            receiverUid: call.receiverUid,
+            timestamp: call.createdAt || call.updatedAt,
+          }))].sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()).map((msg) => (
             <ChatMessage
               key={msg._id}
               message={msg}
