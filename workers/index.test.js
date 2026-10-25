@@ -774,7 +774,7 @@ test("public profile endpoint rejects anonymous requests", async () => {
 });
 
 test("public profile sanitization hides email and mobile from other users", async () => {
-  const target = { _id: "target-id", uid: "target", email: "private@example.com", mobileNumber: "+971501234567", name: "Target", photos: [{ url: "photo.jpg" }] };
+  const target = { _id: "target-id", uid: "target", email: "private@example.com", mobileNumber: "private-mobile", phoneNumber: "private-phone", contactNumber: "private-contact", name: "Target", photos: [{ url: "photo.jpg" }] };
   const viewer = { uid: "viewer", role: "user" };
   const users = { findOne: async (query) => query.uid === "target" ? target : viewer };
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
@@ -784,6 +784,8 @@ test("public profile sanitization hides email and mobile from other users", asyn
   assert.equal(result.body.id, "target-id");
   assert.equal(result.body.email, undefined);
   assert.equal(result.body.mobileNumber, undefined);
+  assert.equal(result.body.phoneNumber, undefined);
+  assert.equal(result.body.contactNumber, undefined);
   assert.equal(result.body.photos[0].url, "https://cdn.example.com/photo.jpg");
 });
 
@@ -797,6 +799,20 @@ test("profile owner and superadmin retain the legacy full-profile view", async (
   const superadmin = await connection.getUserProfile("target", "admin");
   assert.equal(owner.body.email, "private@example.com");
   assert.equal(superadmin.body.mobileNumber, "+971501234567");
+});
+
+test("ordinary admins cannot view another user's private contact fields", async () => {
+  const target = { _id: "target-id", uid: "target", email: "private@example.com", mobileNumber: "private-mobile", phoneNumber: "private-phone", contactNumber: "private-contact" };
+  const admin = { uid: "admin", role: "admin" };
+  const users = { findOne: async (query) => query.uid === "target" ? target : admin };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+  const result = await connection.getUserProfile("target", "admin");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.email, undefined);
+  assert.equal(result.body.mobileNumber, undefined);
+  assert.equal(result.body.phoneNumber, undefined);
+  assert.equal(result.body.contactNumber, undefined);
 });
 
 test("public profile returns 404 for unknown users", async () => {
