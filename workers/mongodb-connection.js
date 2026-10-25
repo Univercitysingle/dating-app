@@ -1365,7 +1365,7 @@ export class MongoDBConnection {
       const status = await this.getDarkFantasyStatus(uid);
       if (status.status !== 200) return status;
       if (!status.body.ageEligible || !status.body.accountEligible) return { status: 403, body: { error: "Eligible adult accounts only" } };
-      if (!status.body.hasAccess) return { status: 402, body: { error: "An active Dark Fantasy add-on is required" } };
+      if (!status.body.hasAccess && !["list", "detail"].includes(action)) return { status: 402, body: { error: "An active Dark Fantasy add-on is required" } };
       const db = this.getDatabase(await this.getClient());
       const catalog = this.getSecretCommunityCatalog();
       if (action === "list") {
@@ -1381,7 +1381,7 @@ export class MongoDBConnection {
       if (action === "detail") {
         const memberCount = await db.collection("secretcommunitymemberships").countDocuments({ communitySlug: slug, status: "active" });
         const postCount = await db.collection("secretcommunityposts").countDocuments({ communitySlug: slug, status: "published" });
-        return { status: 200, body: { ...community, memberCount, postCount, membershipStatus: membership?.status || "none", canModerate: input.claimsRole === "superadmin" || ["owner", "moderator"].includes(membership?.role), rules: this.getSecretCommunityRules() } };
+        return { status: 200, body: { ...community, memberCount, postCount, membershipStatus: membership?.status || "none", hasAccess: status.body.hasAccess, canModerate: input.claimsRole === "superadmin" || ["owner", "moderator"].includes(membership?.role), rules: this.getSecretCommunityRules() } };
       }
       if (action === "join") {
         if (membership?.status === "active") return { status: 200, body: { status: "active", message: "You are already a member." } };
