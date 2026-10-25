@@ -367,3 +367,39 @@ test("scheduled moderation expiry restores expired temporary suspensions but nev
   assert.equal(updates[0].update.$set.isProfileVisible, false);
   assert.equal(Object.hasOwn(updates[0].update.$unset, "suspendedUntil"), true);
 });
+
+
+test("permanently banned users cannot swipe even when legacy data has no expiry date", async () => {
+  const users = {
+    async findOne(query) {
+      return query.uid === "banned"
+        ? { uid: "banned", accountStatus: "permanently_banned", blocked: [] }
+        : { uid: query.uid, accountStatus: "active", blocked: [] };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { assert.equal(name, "users"); return users; } });
+  const result = await connection.recordSwipe("banned", "target", "like");
+  assert.equal(result.status, 403);
+  assert.match(result.body.error, /suspended or banned/i);
+});
+
+test("temporarily suspended users cannot change profile fields", async () => {
+  let writes = 0;
+  const users = {
+    async findOne() {
+      return {
+        uid: "suspended", accountStatus: "temporarily_suspended",
+        suspendedUntil: new Date(Date.now() + 60_000), isOnboardingComplete: true
+      };
+    },
+    async updateOne() { writes++; return { matchedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { assert.equal(name, "users"); return users; } });
+  const result = await connection.updateCurrentUserProfile("suspended", { bio: "Changed while suspended" });
+  assert.equal(result.status, 403);
+  assert.equal(writes, 0);
+});
