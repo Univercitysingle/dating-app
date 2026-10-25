@@ -103,7 +103,7 @@ test("public profile responses remove all contact aliases and nested contact fie
     location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45] },
     lifestyle: { drinking: "never", privateNote: "must-not-leak" },
     profilePrompts: [{ question: "About me", answer: "I enjoy hiking", email: "nested-prompt@example.com", mobileNumber: "+971500000005" }],
-    education: { school: "Example University", contact: { email_address: "nested-education@example.com", phone_number: "+971500000006" }, coordinates: [54.37, 24.45] },
+    education: { school: "Example University", contact: { email_address: "nested-education@example.com", phone_number: "+971500000006", password_hash: "must-not-leak", last_login_ip: "203.0.113.11" }, coordinates: [54.37, 24.45] },
     bio: "Public biography"
   };
   const users = {
