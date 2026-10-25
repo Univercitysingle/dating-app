@@ -26,6 +26,7 @@ const DarkFantasyPage = () => {
   const location = useLocation();
   const featureEnabled = String(process.env.REACT_APP_DARK_FANTASY_ENABLED || '').toLowerCase() === 'true';
   const [status, setStatus] = useState(null);
+  const [checking, setChecking] = useState(true);
   const [profile, setProfile] = useState({ consent: false, interests: [], boundaries: [], visibility: 'private' });
   const [matches, setMatches] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -34,6 +35,7 @@ const DarkFantasyPage = () => {
 
   const load = useCallback(async () => {
     if (!featureEnabled) return;
+    setChecking(true);
     try {
       const nextStatus = await apiClient.get('/dark-fantasy/status');
       setStatus(nextStatus);
@@ -43,6 +45,8 @@ const DarkFantasyPage = () => {
       }
     } catch (e) {
       setError(e.data?.error || e.message || 'Dark Fantasy is unavailable right now.');
+    } finally {
+      setChecking(false);
     }
   }, [featureEnabled]);
 
@@ -153,9 +157,11 @@ const DarkFantasyPage = () => {
 
       {(notice || error) && <div role="status" className={`mb-5 rounded-xl border p-4 text-sm ${error ? 'border-red-200 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-800'}`}>{error || notice}</div>}
 
-      {status && !status.ageEligible && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">Adult eligibility could not be confirmed</h2><p className="mt-1 text-sm">This feature requires an eligible adult account. Update your account verification through the supported process if your age is incorrect or unavailable.</p></section>}
+      {checking && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">Checking regional availability and add-on access…</section>}
+      {!checking && !status && <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">{error || 'This feature is unavailable in your region or for this deployment.'}</section>}
+      {!checking && status && !status.ageEligible && <section className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"><h2 className="font-semibold">Adult eligibility could not be confirmed</h2><p className="mt-1 text-sm">This feature requires an eligible adult account. Update your account verification through the supported process if your age is incorrect or unavailable.</p></section>}
 
-      {!status?.hasAccess ? (
+      {status && !status.hasAccess ? (
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-wide text-violet-700">Separate purchase · not included with Premium</p>
           <h2 className="mt-2 text-2xl font-bold text-gray-900">Dark Fantasy access — 30 days</h2>
