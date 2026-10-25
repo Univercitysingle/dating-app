@@ -14,6 +14,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [cameraOff, setCameraOff] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [connectionQuality, setConnectionQuality] = useState(0);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callRef = useRef(null);
@@ -46,6 +47,47 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     const interval = window.setInterval(updateDuration, 1000);
     return () => window.clearInterval(interval);
   }, [call?.status, call?.connectedAt]);
+
+  useEffect(() => {
+    if (call?.status !== 'accepted' || !peerRef.current) {
+      setConnectionQuality(0);
+      return undefined;
+    }
+    let cancelled = false;
+    const readConnectionQuality = async () => {
+      const peer = peerRef.current;
+      if (!peer || peer.connectionState !== 'connected') return;
+      try {
+        const stats = await peer.getStats();
+        let packetsReceived = 0;
+        let packetsLost = 0;
+        let roundTripTime = null;
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && !report.isRemote) {
+            packetsReceived += report.packetsReceived || 0;
+            packetsLost += Math.max(0, report.packetsLost || 0);
+          }
+          if (report.type === 'candidate-pair' && report.state === 'succeeded' &&
+              (report.nominated || report.selected)) {
+            if (typeof report.currentRoundTripTime === 'number') roundTripTime = report.currentRoundTripTime;
+          }
+        });
+        const totalPackets = packetsReceived + packetsLost;
+        const lossRate = totalPackets ? packetsLost / totalPackets : 0;
+        let quality = 3;
+        if (roundTripTime !== null && roundTripTime < 0.15 && lossRate < 0.02) quality = 5;
+        else if ((roundTripTime === null || roundTripTime < 0.25) && lossRate < 0.04) quality = 4;
+        else if ((roundTripTime !== null && roundTripTime > 0.5) || lossRate > 0.1) quality = 1;
+        else if ((roundTripTime !== null && roundTripTime > 0.3) || lossRate > 0.05) quality = 2;
+        if (!cancelled) setConnectionQuality(quality);
+      } catch (_) {
+        if (!cancelled) setConnectionQuality(0);
+      }
+    };
+    readConnectionQuality();
+    const interval = window.setInterval(readConnectionQuality, 2000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [call?.status, call?._id]);
 
   useEffect(() => {
     if (!localStream) {
@@ -309,6 +351,12 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         <span className="call-live-dot" aria-hidden="true" />
         <span className="text-sm font-semibold text-gray-800">{formatDuration(callDuration)}</span>
         <span className="text-xs text-gray-500">{videoCall ? 'Video connected' : 'Voice connected'}</span>
+        <div className="flex items-center gap-2" aria-label={connectionQuality ? `Network signal quality ${connectionQuality} of 5` : 'Network signal quality unavailable'}>
+          <span className="text-xs text-gray-500">Signal</span>
+          <div className="call-signal-meter" aria-hidden="true">
+            {Array.from({ length: 5 }, (_, index) => <span key={index} className={connectionQuality >= index + 1 ? 'is-active' : ''} />)}
+          </div>
+        </div>
         {localStream && <div className="ml-auto flex items-center gap-2" aria-label={`Microphone audio level ${Math.round(audioLevel * 100)} percent`}>
           <span className="text-xs text-gray-500">Mic</span>
           <div className="call-signal-meter" aria-hidden="true">
