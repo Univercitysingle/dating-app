@@ -1685,3 +1685,312 @@ nav.fixed.bottom-0.left-0.right-0 {
 .profile-page .profile-hero > div:first-child > div.absolute.top-2 {
   height: 4px;
 }
+
+
+/* Settings panel: a compact, accessible account-preferences layout. */
+.profile-settings {
+  display: grid;
+  gap: 24px;
+  padding: clamp(18px, 4vw, 30px);
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  background: var(--app-surface);
+  box-shadow: 0 8px 28px rgba(42, 31, 37, 0.055);
+  color: var(--app-ink);
+}
+
+.profile-settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.profile-settings-heading h2 {
+  margin: 2px 0 5px;
+  color: var(--app-ink);
+  font-size: clamp(24px, 4vw, 30px);
+  font-weight: 760;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+}
+
+.profile-settings-heading p:last-child {
+  margin: 0;
+  color: var(--app-muted, #82747d);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.profile-settings-eyebrow {
+  margin: 0;
+  color: #9a5267;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.profile-settings-heading-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  place-items: center;
+  border: 1px solid rgba(163, 71, 93, 0.14);
+  border-radius: 16px;
+  background: rgba(163, 71, 93, 0.08);
+  color: #87364d;
+}
+
+.profile-settings-heading-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.profile-settings-group {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-settings-group > h3 {
+  margin: 0 0 2px;
+  color: var(--app-ink);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.profile-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface);
+  text-align: left;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.profile-settings-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(110, 89, 104, 0.08);
+  color: var(--app-ink);
+}
+
+.profile-settings-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.profile-settings-icon-membership {
+  background: rgba(163, 71, 93, 0.1);
+  color: #87364d;
+}
+
+.profile-settings-icon-logout {
+  background: rgba(183, 54, 66, 0.08);
+  color: #b73642;
+}
+
+.profile-settings-row-copy {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-settings-row-copy strong {
+  color: var(--app-ink);
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.profile-settings-row-copy span {
+  color: var(--app-muted, #82747d);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.profile-settings-row-action,
+.profile-settings-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(135, 54, 77, 0.2);
+  border-radius: 9px;
+  background: rgba(163, 71, 93, 0.07);
+  color: #87364d;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.profile-settings-row-action svg {
+  width: 15px;
+  height: 15px;
+}
+
+.profile-settings-row-button {
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+}
+
+.profile-settings-row-button:hover {
+  border-color: rgba(163, 71, 93, 0.32);
+  background: rgba(163, 71, 93, 0.035);
+}
+
+.profile-settings-row-button:active,
+.profile-settings-row-action:active,
+.profile-settings-logout:active {
+  transform: translateY(1px);
+}
+
+.profile-settings-row-button:focus-visible,
+.profile-settings-row-action:focus-visible,
+.profile-settings-logout:focus-visible {
+  outline: 3px solid rgba(163, 71, 93, 0.25);
+  outline-offset: 3px;
+}
+
+.profile-settings-row-action:hover {
+  border-color: rgba(135, 54, 77, 0.38);
+  background: rgba(163, 71, 93, 0.13);
+}
+
+.profile-settings-value {
+  flex: 0 0 auto;
+  color: var(--app-muted, #82747d);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.profile-settings-chevron {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  color: var(--app-muted, #82747d);
+}
+
+.profile-settings-account {
+  padding-top: 20px;
+  border-top: 1px solid var(--app-border);
+}
+
+.profile-settings-logout {
+  border-color: rgba(183, 54, 66, 0.22);
+  background: rgba(183, 54, 66, 0.055);
+  color: #b73642;
+}
+
+.profile-settings-logout:hover {
+  border-color: rgba(183, 54, 66, 0.4);
+  background: rgba(183, 54, 66, 0.1);
+}
+
+@media (max-width: 560px) {
+  .profile-settings {
+    gap: 20px;
+    padding: 17px;
+    border-radius: 13px;
+  }
+
+  .profile-settings-heading {
+    padding-bottom: 18px;
+  }
+
+  .profile-settings-heading-icon {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    border-radius: 13px;
+  }
+
+  .profile-settings-row {
+    align-items: flex-start;
+    gap: 11px;
+    padding: 13px 11px;
+  }
+
+  .profile-settings-icon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 10px;
+  }
+
+  .profile-settings-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .profile-settings-row-action {
+    gap: 5px;
+    min-height: 34px;
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+
+  .profile-settings-row-action svg {
+    display: none;
+  }
+
+  .profile-settings-value {
+    max-width: 66px;
+    text-align: right;
+    line-height: 1.35;
+  }
+
+  .profile-settings-row-button {
+    align-items: center;
+  }
+
+  .profile-settings-row-copy strong {
+    font-size: 12px;
+  }
+
+  .profile-settings-row-copy span {
+    font-size: 11px;
+  }
+
+  .profile-settings-logout {
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 360px) {
+  .profile-settings-row {
+    flex-wrap: wrap;
+  }
+
+  .profile-settings-row-copy {
+    flex-basis: calc(100% - 52px);
+  }
+
+  .profile-settings-row-action,
+  .profile-settings-logout {
+    margin-left: 47px;
+  }
+
+  .profile-settings-row-button .profile-settings-value {
+    margin-left: auto;
+  }
+}
