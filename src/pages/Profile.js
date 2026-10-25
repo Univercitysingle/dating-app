@@ -250,48 +250,6 @@ function Profile() {
                           )}
                       </SectionCard>
 
-                      {isOwnProfile && (
-                        <SectionCard title="Subscription">
-                          <div>
-                            <p className="text-neutral-600 dark:text-neutral-300 mb-4">
-                              Current Plan: <span className="font-bold">{isPremium ? 'Premium' : 'Basic'}</span>
-                            </p>
-                            <div className="mt-4">
-                              <h3 className="text-lg font-semibold mb-2">History</h3>
-                              {subscriptions.length > 0 ? (
-                                <ul className="space-y-2">
-                                  {subscriptions.map(sub => (
-                                    <li key={sub._id} className="p-2 bg-neutral-200 dark:bg-neutral-700 rounded-md">
-                                      <p className="font-semibold capitalize">{sub.plan} Plan</p>
-                                      <p className="text-sm">Status: <span className="font-medium capitalize">{sub.status === 'cancelled' && sub.cancellationReason === 'payment_timeout' ? 'Cancelled — payment not completed' : sub.status}</span></p>
-                                      {sub.cancellationReason === 'payment_timeout' && (
-                                        <p className="text-sm text-neutral-500">This checkout was automatically cancelled because payment was not completed within 30 minutes. You can start a new subscription if you still want Premium.</p>
-                                      )}
-                                      {sub.endDate && (
-                                        <p className="text-sm">Expires on: {new Date(sub.endDate).toLocaleDateString()}</p>
-                                      )}
-                                      {sub.status === 'rejected' && sub.rejectionReason && (
-                                        <p className="text-sm text-red-600">Reason: {sub.rejectionReason}</p>
-                                      )}
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="text-sm text-neutral-500">No subscription history found.</p>
-                              )}
-                            </div>
-                            {!isPremium && (
-                                <button
-                                    onClick={() => navigate('/premium')}
-                                    className="mt-4 px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-                                >
-                                    Get Premium
-                                </button>
-                            )}
-                          </div>
-                        </SectionCard>
-                      )}
-
                       <SectionCard title="Profile Prompts">
                           {isEditing ? (
                               <ProfilePromptsEditor initialPrompts={editableFields.profilePrompts} onChange={(profilePrompts) => setEditableFields(prev => ({...prev, profilePrompts}))} />
@@ -468,6 +426,42 @@ function Profile() {
                               </button>
                           </div>
                       </div>
+
+                      {isOwnProfile && (
+                          <div className="profile-settings-group profile-settings-subscription-history">
+                              <h3>Subscription history</h3>
+                              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+                                  Current plan: <strong>{isPremium ? 'Premium' : 'Basic'}</strong>. Past and incomplete checkout attempts are shown below.
+                              </p>
+                              {subscriptions.length > 0 ? (
+                                  <ul className="space-y-3">
+                                      {subscriptions.map((sub, index) => (
+                                          <li key={sub._id || `${sub.plan || 'subscription'}-${sub.createdAt || index}`} className="profile-settings-row">
+                                              <div className="profile-settings-row-copy">
+                                                  <strong className="capitalize">{sub.plan || 'Subscription'} plan</strong>
+                                                  <span>
+                                                      Status: {sub.status === 'cancelled' && sub.cancellationReason === 'payment_timeout'
+                                                          ? 'Cancelled — payment not completed'
+                                                          : (sub.status || 'Unknown')}
+                                                  </span>
+                                                  {sub.cancellationReason === 'payment_timeout' && (
+                                                      <span>This checkout was automatically cancelled because payment was not completed within 30 minutes. You can start a new subscription if you still want Premium.</span>
+                                                  )}
+                                                  {sub.endDate && (
+                                                      <span>Expires on: {new Date(sub.endDate).toLocaleDateString()}</span>
+                                                  )}
+                                                  {sub.status === 'rejected' && sub.rejectionReason && (
+                                                      <span className="text-red-600">Reason: {sub.rejectionReason}</span>
+                                                  )}
+                                              </div>
+                                          </li>
+                                      ))}
+                                  </ul>
+                              ) : (
+                                  <p className="text-sm text-neutral-500 dark:text-neutral-400">No subscription history found.</p>
+                              )}
+                          </div>
+                      )}
 
                       <div className="profile-settings-group">
                           <h3>Preferences &amp; help</h3>
