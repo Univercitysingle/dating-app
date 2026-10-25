@@ -1374,11 +1374,11 @@ export default {
           if (!eligibility.accountEligible) return json({ error: "This account is not eligible to purchase this add-on." }, 403);
           const response = await connection.fetch("https://internal.invalid/internal/create-purchase", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, itemId: "dark-fantasy-monthly" })
+            body: JSON.stringify({ claims, itemId: (await request.clone().json().catch(() => ({}))).itemId || "dark-fantasy-monthly" })
           });
           const order = await response.json().catch(() => ({ error: "Purchase service unavailable" }));
           if (!response.ok) return json(order, response.status);
-          try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy", "Dark Fantasy Add-on (30 days)"); }
+          try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy", order.itemName || "Dark Fantasy purchase"); }
           catch { return json({ error: "Payment gateway is not configured." }, 503); }
         }
         if (!env.MONGODB_CONNECTION) return json({ error: "Dark Fantasy service unavailable" }, 503);
