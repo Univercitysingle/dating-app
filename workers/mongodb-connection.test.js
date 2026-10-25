@@ -143,3 +143,56 @@ test("generated photo URLs from legacy hosts are normalized to CDN_HOSTNAME", ()
     "https://dateme.enadoctemp.workers.dev/" + key
   );
 });
+
+
+test("subscription history expires abandoned pending WebXPay checkouts after 30 minutes", async () => {
+  let expiryFilter;
+  let expiryUpdate;
+  const now = new Date();
+  const history = [{ _id: "old-pending", plan: "weekly", status: "cancelled" }];
+  const subscriptions = {
+    async updateMany(filter, update) {
+      expiryFilter = filter;
+      expiryUpdate = update;
+      return { modifiedCount: 1 };
+    },
+    find(filter) {
+      assert.deepEqual(filter, { userId: "user-object-id" });
+      return {
+        sort(sortBy) {
+          assert.deepEqual(sortBy, { createdAt: -1 });
+          return {
+            limit(limit) {
+              assert.equal(limit, 10);
+              return { toArray: async () => history };
+            }
+          };
+        }
+      };
+    }
+  };
+  const users = { async findOne(filter) {
+    assert.deepEqual(filter, { uid: "user-1" });
+    return { _id: "user-object-id" };
+  } };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "subscriptions") return subscriptions;
+    assert.fail(`Unexpected collection: ${name}`);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getSubscriptionHistory("user-1");
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, history);
+  assert.equal(expiryFilter.userId, "user-object-id");
+  assert.equal(expiryFilter.status, "pending");
+  assert.ok(expiryFilter.createdAt.$lt instanceof Date);
+  assert.ok(Math.abs((now.getTime() - expiryFilter.createdAt.$lt.getTime()) - 30 * 60 * 1000) < 1000);
+  assert.deepEqual(expiryUpdate.$set.status, "cancelled");
+  assert.equal(expiryUpdate.$set.cancellationReason, "payment_timeout");
+  assert.ok(expiryUpdate.$set.updatedAt instanceof Date);
+});
