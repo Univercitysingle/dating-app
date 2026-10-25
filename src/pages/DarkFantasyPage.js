@@ -42,6 +42,9 @@ const DarkFantasyPage = () => {
   const [communityCommentDrafts, setCommunityCommentDrafts] = useState({});
   const [communityBusy, setCommunityBusy] = useState(false);
   const [communityRequests, setCommunityRequests] = useState([]);
+  const [videoRoomMode, setVideoRoomMode] = useState('private');
+  const [videoRoomVisibility, setVideoRoomVisibility] = useState('invite');
+  const [videoRoomCapacity, setVideoRoomCapacity] = useState('4');
 
   const load = useCallback(async () => {
     setChecking(true);
@@ -282,30 +285,95 @@ const DarkFantasyPage = () => {
 
       {section === "videorooms" && <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-violet-100 bg-gradient-to-r from-slate-950 via-violet-950 to-fuchsia-950 p-6 text-white sm:p-8">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-200">Private live spaces</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-200">Live video experiences</p>
           <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Video Rooms</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">Join private, consent-led video conversations with clear room rules and participant controls. Your camera and microphone should only be enabled when you choose.</p>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">Choose how you want to appear before creating a room. A private one-to-one show, an interactive group room, and a host-led broadcast are different experiences with different audience and privacy controls.</p>
         </div>
-        <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8">
-          <article className="rounded-2xl border border-slate-200 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-xl" aria-hidden="true">▣</div>
-            <h3 className="mt-4 text-lg font-bold text-slate-950">Private rooms</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Rooms should be invite-only or explicitly discoverable, with a defined participant limit and host controls.</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-fuchsia-100 text-xl" aria-hidden="true">◉</div>
-            <h3 className="mt-4 text-lg font-bold text-slate-950">Camera and microphone consent</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Preview devices before joining, mute at any time, and leave instantly. Devices must not activate automatically.</p>
-          </article>
-          <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            <p className="font-bold">Video room service is not connected yet</p>
-            <p className="mt-1">Live rooms require authenticated room APIs, real-time WebRTC signaling, and server-enforced access and moderation. This staging build does not yet expose those endpoints, so no fake rooms or simulated participants are shown.</p>
-            {!status?.hasAccess && <button onClick={() => setSection("store")} className="mt-3 rounded-full bg-slate-950 px-5 py-2.5 font-semibold text-white">View Dark Fantasy add-on</button>}
+
+        <div className="space-y-6 p-5 sm:p-8">
+          <div>
+            <h3 className="text-lg font-bold text-slate-950">1. Choose your room format</h3>
+            <p className="mt-1 text-sm text-slate-600">This choice determines who can publish video, who can watch, and how people join.</p>
+            <div className="mt-4 grid gap-3 lg:grid-cols-3">
+              <button type="button" onClick={() => { setVideoRoomMode('private'); setVideoRoomCapacity('2'); }} aria-pressed={videoRoomMode === 'private'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'private' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
+                <span className="text-xs font-bold uppercase tracking-wider text-violet-700">Private · 1:1</span>
+                <span className="mt-2 block text-base font-bold text-slate-950">Individual show</span>
+                <span className="mt-2 block text-sm leading-5 text-slate-600">Only the host and one specifically invited person can join. No public listing; the host approves the guest.</span>
+                <span className="mt-3 block text-xs font-semibold text-slate-700">2 people · Two-way video</span>
+              </button>
+              <button type="button" onClick={() => { setVideoRoomMode('group'); setVideoRoomCapacity('4'); }} aria-pressed={videoRoomMode === 'group'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'group' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
+                <span className="text-xs font-bold uppercase tracking-wider text-violet-700">Interactive · Group</span>
+                <span className="mt-2 block text-base font-bold text-slate-950">Multi-person room</span>
+                <span className="mt-2 block text-sm leading-5 text-slate-600">A host invites several participants. Each admitted person can publish their own camera and microphone when they choose.</span>
+                <span className="mt-3 block text-xs font-semibold text-slate-700">Up to 6 people · Everyone can speak</span>
+              </button>
+              <button type="button" onClick={() => { setVideoRoomMode('broadcast'); setVideoRoomCapacity('25'); setVideoRoomVisibility('listed'); }} aria-pressed={videoRoomMode === 'broadcast'} className={`rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${videoRoomMode === 'broadcast' ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-600' : 'border-slate-200 hover:border-violet-300'}`}>
+                <span className="text-xs font-bold uppercase tracking-wider text-fuchsia-700">Host-led · Audience</span>
+                <span className="mt-2 block text-base font-bold text-slate-950">Broadcast room</span>
+                <span className="mt-2 block text-sm leading-5 text-slate-600">The host appears on camera; viewers watch and interact with text or request-to-join controls. Viewers do not go on camera automatically.</span>
+                <span className="mt-3 block text-xs font-semibold text-slate-700">Host video + audience · Larger scale</span>
+              </button>
+            </div>
           </div>
-          <div className="sm:col-span-2 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
-            <span className="rounded-full border border-slate-200 px-3 py-2">🔒 Private by default</span>
-            <span className="rounded-full border border-slate-200 px-3 py-2">✓ Consent first</span>
-            <span className="rounded-full border border-slate-200 px-3 py-2">🛡️ Report and block controls required</span>
+
+          <div className="rounded-2xl border border-slate-200 p-5">
+            <h3 className="text-lg font-bold text-slate-950">2. Set audience and room rules</h3>
+            <div className="mt-4 grid gap-5 sm:grid-cols-2">
+              <div>
+                <label htmlFor="video-room-visibility" className="block text-sm font-semibold text-slate-800">Who can find this room?</label>
+                <select id="video-room-visibility" value={videoRoomVisibility} onChange={event => setVideoRoomVisibility(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <option value="invite">Invite only (recommended)</option>
+                  <option value="listed">Listed in the room lobby</option>
+                </select>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Listed rooms show only the room title, host display name, audience format and current occupancy. Never expose email, phone number, or private profile fields.</p>
+              </div>
+              <div>
+                <label htmlFor="video-room-capacity" className="block text-sm font-semibold text-slate-800">Maximum audience / participants</label>
+                <select id="video-room-capacity" value={videoRoomCapacity} onChange={event => setVideoRoomCapacity(event.target.value)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  {(videoRoomMode === 'private' ? [['2','2 people']] : videoRoomMode === 'group' ? [['3','3 people'],['4','4 people'],['5','5 people'],['6','6 people']] : [['25','25 viewers'],['50','50 viewers'],['100','100 viewers']]).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <p className="mt-2 text-xs leading-5 text-slate-500">{videoRoomMode === 'broadcast' ? 'Broadcasts at this scale should use a WebRTC SFU/media service, not a peer-to-peer mesh.' : videoRoomMode === 'group' ? 'Small group rooms can use a mesh only at low participant counts; an SFU is preferable as the group grows.' : 'The invited guest must be approved before joining. Both people can end the call immediately.'}</p>
+              </div>
+            </div>
+            <div className="mt-5 rounded-xl bg-slate-50 p-4">
+              <p className="text-sm font-bold text-slate-900">Your selected setup</p>
+              <p className="mt-1 text-sm text-slate-600">{videoRoomMode === 'private' ? 'Individual show: host + one approved guest, two-way video.' : videoRoomMode === 'group' ? 'Group room: multiple admitted participants with individual mic/camera controls.' : 'Broadcast: host publishes video to an audience; viewers need explicit approval before being promoted to on-camera participants.'}</p>
+              <p className="mt-2 text-xs font-medium text-slate-500">Visibility: {videoRoomVisibility === 'invite' ? 'Invite only' : 'Listed in lobby'} · Capacity: {videoRoomCapacity}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 p-5">
+              <h3 className="font-bold text-slate-950">3. How joining works</h3>
+              <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-600">
+                <li>Host creates a room and shares a time-limited invite link, or publishes a listing if selected.</li>
+                <li>Guests see the host's public display name, room format and rules before requesting entry.</li>
+                <li>Host admits or rejects each request. Joining never enables a camera or microphone by itself.</li>
+                <li>Participants choose their devices and can mute, disable video, report, block or leave at any time.</li>
+              </ol>
+            </article>
+            <article className="rounded-2xl border border-slate-200 p-5">
+              <h3 className="font-bold text-slate-950">4. Safety and privacy rules</h3>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                <li>• Room access and capacity are enforced by the server, not just the UI.</li>
+                <li>• Invite tokens expire and cannot grant host privileges to guests.</li>
+                <li>• Only the host can remove participants or end a room for everyone.</li>
+                <li>• No recording by default; any recording feature would need clear consent and separate safeguards.</li>
+                <li>• Report/block controls and rate limits apply to room invitations and chat.</li>
+              </ul>
+            </article>
+          </div>
+
+          <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+            <p className="font-bold text-amber-950">Room setup preview only</p>
+            <p className="mt-1 text-sm leading-6 text-amber-900">Your choices above preview the intended room setup; they do not create a live room yet. The current API does not implement multi-participant room membership, audience permissions, or SFU-backed broadcasting. Keep live creation disabled until those server-side controls and WebRTC signaling are implemented and tested.</p>
+            {!status?.hasAccess && <button type="button" onClick={() => setSection("store")} className="mt-3 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white">View Dark Fantasy add-on</button>}
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+            <span className="rounded-full border border-slate-200 px-3 py-2">Private by default</span>
+            <span className="rounded-full border border-slate-200 px-3 py-2">Explicit consent</span>
+            <span className="rounded-full border border-slate-200 px-3 py-2">Host moderation</span>
+            <span className="rounded-full border border-slate-200 px-3 py-2">No automatic camera access</span>
           </div>
         </div>
       </section>}
