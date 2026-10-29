@@ -1625,20 +1625,39 @@ export class MongoDBConnection {
           return;
         }
         const success = statusCode === "0" || statusCode === "00";
-        const terminalStates = purchase ? ["completed", "rejected", "expired"] : ["active", "cancelled", "inactive"];
+        const now = new Date();
+        const lateExpiredTicket = Boolean(purchase && record.status === "expired" &&
+          typeof purchase.itemId === "string" && purchase.itemId.startsWith("video-room-ticket:"));
+        const terminalStates = purchase ? ["completed", "rejected", "refund_required"] : ["active", "cancelled", "inactive"];
         if (terminalStates.includes(record.status)) {
           outcome = { status: 200, body: { success: true, message: "Payment already processed." } };
           return;
         }
-        if (record.status !== "pending") {
+        if (record.status !== "pending" && !lateExpiredTicket) {
           outcome = { status: 409, body: { error: "Transaction is no longer pending." } };
           return;
         }
-        const now = new Date();
+        if (lateExpiredTicket && success) {
+          const roomId = String(purchase.videoRoomId || purchase.itemId.slice("video-room-ticket:".length));
+          const room = await db.collection("videoRooms").findOne({ roomId, status: "active" }, { session });
+          if (!room || room.mediaStatus !== "ready" || (room.expiresAt && new Date(room.expiresAt) <= now)) {
+            await purchases.updateOne(
+              { _id: record._id, status: "expired" },
+              { $set: {
+                status: "refund_required", paymentReference: String(reference).slice(0, 128),
+                refundReviewRequired: true, refundReason: "late_payment_after_room_expiry",
+                paidLateAt: now, updatedAt: now
+              } },
+              { session }
+            );
+            outcome = { status: 409, body: { error: "Payment arrived after this room expired. The transaction has been flagged for refund review.", refundReviewRequired: true } };
+            return;
+          }
+        }
         const collection = purchase ? purchases : subscriptions;
         const nextStatus = success ? (purchase ? "completed" : "active") : (purchase ? "rejected" : "cancelled");
         const changed = await collection.updateOne(
-          { _id: record._id, status: "pending" },
+          { _id: record._id, status: record.status },
           { $set: { status: nextStatus, paymentReference: String(reference).slice(0, 128), updatedAt: now } },
           { session }
         );
