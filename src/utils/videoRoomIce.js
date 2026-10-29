@@ -63,3 +63,23 @@ export async function connectWithIceFailover({ config, negotiate, timeoutMs = 12
 }
 
 export default { getVideoRoomIceConfig, connectWithIceFailover };
+
+
+/**
+ * General voice/video calls use the same short-lived TURN credentials as Video
+ * Rooms, but do not require the optional Video Rooms subscription.
+ */
+export async function getCallIceConfig() {
+  try {
+    const config = await apiClient.get('/calls/ice-config');
+    if (Array.isArray(config?.iceServers) && config.iceServers.length) return config;
+  } catch (_) {
+    // Preserve basic calling when the TURN credential endpoint is unavailable.
+  }
+  return {
+    iceServers: DEFAULT_STUN_SERVERS,
+    iceTransportPolicy: 'all',
+    turnConfigured: false,
+    degraded: true,
+  };
+}
