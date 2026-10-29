@@ -675,6 +675,69 @@ test("paid live-show ticket checkout uses the room's server-side price and recor
   assert.equal(insertedPurchase.status, "pending");
 });
 
+test("paid live-show ticket checkout expires an abandoned pending order after 15 minutes", async () => {
+  const staleId = "stale-order";
+  const insertedId = "new-order";
+  let expiredUpdate;
+  let insertedPurchase;
+  const room = {
+    roomId: "room-1", hostUid: "creator-1", title: "Evening Live",
+    mode: "broadcast", visibility: "listed", ticketPriceLkr: 500, status: "active", mediaStatus: "ready"
+  };
+  const db = { collection(name) {
+    if (name === "videoRooms") return { async findOne() { return room; } };
+    if (name === "users") return { async findOne() { return { _id: "viewer-object-id", uid: "viewer-1" }; } };
+    if (name === "videoRoomTickets") return { async findOne() { return null; } };
+    if (name === "purchases") return {
+      async findOne() { return { _id: staleId, status: "pending", createdAt: new Date(Date.now() - 16 * 60 * 1000) }; },
+      async updateOne(filter, update) { expiredUpdate = { filter, update }; return { modifiedCount: 1 }; },
+      async insertOne(document) { insertedPurchase = document; return { insertedId }; }
+    };
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createPendingVideoRoomTicket("viewer-1", "room-1");
+
+  assert.equal(result.status, 201);
+  assert.equal(result.body.orderId, insertedId);
+  assert.equal(expiredUpdate.filter._id, staleId);
+  assert.equal(expiredUpdate.update.$set.status, "expired");
+  assert.equal(expiredUpdate.update.$set.expirationReason, "checkout_timeout");
+  assert.ok(insertedPurchase.checkoutExpiresAt instanceof Date);
+});
+
+test("paid live-show ticket checkout refuses rooms past their expiry", async () => {
+  let roomUpdate;
+  let inserted = false;
+  const room = {
+    roomId: "room-1", hostUid: "creator-1", mode: "broadcast", visibility: "listed",
+    ticketPriceLkr: 500, status: "active", mediaStatus: "ready", expiresAt: new Date(Date.now() - 1000)
+  };
+  const db = { collection(name) {
+    if (name === "videoRooms") return {
+      async findOne() { return room; },
+      async updateOne(filter, update) { roomUpdate = { filter, update }; return { modifiedCount: 1 }; }
+    };
+    if (name === "users") return { async findOne() { return { _id: "viewer-object-id", uid: "viewer-1" }; } };
+    if (name === "videoRoomTickets") return { async findOne() { return null; } };
+    if (name === "purchases") return { async findOne() { return null; }, async insertOne() { inserted = true; return { insertedId: "new-order" }; } };
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createPendingVideoRoomTicket("viewer-1", "room-1");
+
+  assert.equal(result.status, 404);
+  assert.match(result.body.error, /expired/i);
+  assert.equal(roomUpdate.update.$set.status, "ended");
+  assert.equal(inserted, false);
+});
+
 test("paid live-show ticket checkout rejects duplicate pending orders", async () => {
   const room = {
     roomId: "room-1", hostUid: "creator-1", title: "Evening Live",
