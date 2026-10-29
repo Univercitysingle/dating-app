@@ -1589,6 +1589,40 @@ export default {
 
 
 
+    if (url.pathname === "/api/calls/ice-config") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const stunServers = [
+          { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+          { urls: ["stun:global.stun.twilio.com:3478"] }
+        ];
+        const turnUrls = String(env.TURN_URLS || "").split(",").map(value => value.trim()).filter(value => /^turns?:[^\\s]+$/i.test(value));
+        const sharedSecret = env.TURN_SHARED_SECRET;
+        let turnServer = null;
+        let credentialExpiresAt = null;
+        if (turnUrls.length && sharedSecret) {
+          credentialExpiresAt = Math.floor(Date.now() / 1000) + 3600;
+          const username = credentialExpiresAt + ":" + String(claims.sub).slice(0, 96);
+          const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(sharedSecret), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+          const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(username)));
+          let binary = "";
+          for (const byte of signature) binary += String.fromCharCode(byte);
+          turnServer = { username, credential: btoa(binary) };
+        }
+        const iceServers = [...stunServers, ...(turnServer ? [{ urls: turnUrls, ...turnServer }] : [])];
+        return new Response(JSON.stringify({
+          iceServers, iceTransportPolicy: "all",
+          turnConfigured: Boolean(turnServer && turnUrls.length), credentialExpiresAt
+        }), { status: 200, headers: { ...JSON_HEADERS, "cache-control": "no-store", "pragma": "no-cache" } });
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Call ICE configuration unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/video-rooms/ice-config") {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
