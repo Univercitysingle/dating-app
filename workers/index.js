@@ -1598,7 +1598,7 @@ export default {
           { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
           { urls: ["stun:global.stun.twilio.com:3478"] }
         ];
-        const turnUrls = String(env.TURN_URLS || "").split(",").map(value => value.trim()).filter(value => /^turns?:[^\\s]+$/i.test(value));
+        const turnUrls = String(env.TURN_URLS || "").split(",").map(value => value.trim()).filter(value => /^turns?:[^\s]+$/i.test(value));
         const sharedSecret = env.TURN_SHARED_SECRET;
         let turnServer = null;
         let credentialExpiresAt = null;
