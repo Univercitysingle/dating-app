@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import apiClient from '../api/apiClient';
+import { getCallIceConfig } from '../utils/videoRoomIce';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
@@ -165,7 +166,12 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
     localStreamRef.current = stream;
     setLocalStream(stream);
-    const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const iceConfig = await getCallIceConfig();
+    const peer = new RTCPeerConnection({
+      iceServers: Array.isArray(iceConfig?.iceServers) && iceConfig.iceServers.length ? iceConfig.iceServers : ICE_SERVERS,
+      iceTransportPolicy: 'all',
+      iceCandidatePoolSize: 2,
+    });
     peerRef.current = peer;
     stream.getTracks().forEach(track => peer.addTrack(track, stream));
     peer.ontrack = event => { if (event.streams?.[0]) setRemoteStream(event.streams[0]); };
