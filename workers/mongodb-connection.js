@@ -1495,6 +1495,10 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const room = await db.collection("videoRooms").findOne({ roomId, status: "active" });
+      if (room?.expiresAt && new Date(room.expiresAt) <= new Date()) {
+        await db.collection("videoRooms").updateOne({ roomId, status: "active" }, { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date() } });
+        return { status: 404, body: { error: "This live show has expired." } };
+      }
       if (!room || room.mode !== "broadcast" || room.visibility !== "listed" ||
           !Number.isInteger(room.ticketPriceLkr) || room.ticketPriceLkr < 1) {
         return { status: 404, body: { error: "This room is not offering paid tickets." } };
@@ -1507,14 +1511,26 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found." } };
       const existing = await db.collection("videoRoomTickets").findOne({ roomId, viewerUid: uid, status: "paid" });
       if (existing) return { status: 409, body: { error: "You already have access to this live show." } };
-      const pending = await db.collection("purchases").findOne({ videoRoomId: roomId, viewerUid: uid, status: "pending" });
-      if (pending) return { status: 409, body: { error: "A checkout for this live show is already pending. Complete it before starting another." } };
+      const purchases = db.collection("purchases");
+      const pending = await purchases.findOne({ videoRoomId: roomId, viewerUid: uid, status: "pending" });
       const now = new Date();
+      if (pending) {
+        const pendingSince = pending.updatedAt || pending.createdAt;
+        const pendingAge = pendingSince ? now.getTime() - new Date(pendingSince).getTime() : 0;
+        // Recover abandoned checkout attempts after 15 minutes. Records without a
+        // timestamp are kept pending for backward compatibility rather than guessed stale.
+        if (Number.isFinite(pendingAge) && pendingAge >= 15 * 60 * 1000) {
+          await purchases.updateOne({ _id: pending._id, status: "pending" }, { $set: { status: "expired", updatedAt: now, expirationReason: "checkout_timeout" } });
+        } else {
+          return { status: 409, body: { error: "A checkout for this live show is already pending. Complete it before starting another." } };
+        }
+      }
       const itemId = "video-room-ticket:" + roomId;
       const purchase = {
         userId: user._id, viewerUid: uid, itemId, itemName: "Live show ticket: " + String(room.title || "Video Room").slice(0, 80),
         itemPrice: String(room.ticketPriceLkr), videoRoomId: roomId, creatorUid: room.hostUid,
-        creatorSharePercent: 70, status: "pending", createdAt: now, updatedAt: now
+        creatorSharePercent: 70, status: "pending", createdAt: now, updatedAt: now,
+        checkoutExpiresAt: new Date(now.getTime() + 15 * 60 * 1000)
       };
       const inserted = await db.collection("purchases").insertOne(purchase);
       return { status: 201, body: {
@@ -1609,7 +1625,7 @@ export class MongoDBConnection {
           return;
         }
         const success = statusCode === "0" || statusCode === "00";
-        const terminalStates = purchase ? ["completed", "rejected"] : ["active", "cancelled", "inactive"];
+        const terminalStates = purchase ? ["completed", "rejected", "expired"] : ["active", "cancelled", "inactive"];
         if (terminalStates.includes(record.status)) {
           outcome = { status: 200, body: { success: true, message: "Payment already processed." } };
           return;
@@ -2848,6 +2864,8 @@ export class MongoDBConnection {
             (mode === "broadcast" && ![25, 50, 100].includes(capacity))) return { status: 400, body: { error: "Invalid room mode, visibility, or capacity." } };
         const user = await db.collection("users").findOne({ uid }, { projection: { name: 1, displayName: 1, accountStatus: 1 } });
         if (!user || isAccountRestricted(user, now)) return { status: 403, body: { error: "This account cannot host a Video Room." } };
+        // Lazily end expired rooms so they do not consume the host active-room quota.
+        await rooms.updateMany({ status: "active", expiresAt: { $lte: now } }, { $set: { status: "ended", endedAt: now, updatedAt: now } });
         if (await rooms.countDocuments({ hostUid: uid, status: "active" }) >= 2) return { status: 429, body: { error: "You already have the maximum number of active rooms." } };
         const room = {
           roomId: crypto.randomUUID(), hostUid: uid,
@@ -2863,6 +2881,9 @@ export class MongoDBConnection {
         return { status: 201, body: { room: { roomId: room.roomId, title: room.title, mode, visibility, capacity, ticketPriceLkr, status: room.status, participantCount: 1, isHost: true, mediaReady: false, bandwidthProfile: room.bandwidthProfile, createdAt: now, expiresAt: room.expiresAt }, mediaReady: false, message: "Room created. Live media is not connected until a media transport is configured." } };
       }
       if (action === "list") {
+        // Expire stale active rooms before listing. This also prevents expired rooms
+        // from remaining visible just because a scheduled cleanup has not run.
+        await rooms.updateMany({ status: "active", expiresAt: { $lte: now } }, { $set: { status: "ended", endedAt: now, updatedAt: now } });
         const found = await rooms.find({ $or: [{ hostUid: uid }, { "participants.uid": uid }, { visibility: "listed", status: "active" }] }).sort({ updatedAt: -1 }).limit(50).toArray();
         const listedRooms = await Promise.all(found.map(async room => {
           const isHost = room.hostUid === uid;
