@@ -1626,8 +1626,9 @@ export class MongoDBConnection {
         }
         const success = statusCode === "0" || statusCode === "00";
         const now = new Date();
-        const lateExpiredTicket = Boolean(purchase && record.status === "expired" &&
-          typeof purchase.itemId === "string" && purchase.itemId.startsWith("video-room-ticket:"));
+        const isVideoTicketPurchase = Boolean(purchase && typeof purchase.itemId === "string" &&
+          purchase.itemId.startsWith("video-room-ticket:"));
+        const lateExpiredTicket = Boolean(isVideoTicketPurchase && record.status === "expired");
         const terminalStates = purchase ? ["completed", "rejected", "refund_required"] : ["active", "cancelled", "inactive"];
         if (terminalStates.includes(record.status)) {
           outcome = { status: 200, body: { success: true, message: "Payment already processed." } };
@@ -1637,20 +1638,20 @@ export class MongoDBConnection {
           outcome = { status: 409, body: { error: "Transaction is no longer pending." } };
           return;
         }
-        if (lateExpiredTicket && success) {
+        if (isVideoTicketPurchase && success) {
           const roomId = String(purchase.videoRoomId || purchase.itemId.slice("video-room-ticket:".length));
           const room = await db.collection("videoRooms").findOne({ roomId, status: "active" }, { session });
           if (!room || room.mediaStatus !== "ready" || (room.expiresAt && new Date(room.expiresAt) <= now)) {
             await purchases.updateOne(
-              { _id: record._id, status: "expired" },
+              { _id: record._id, status: record.status },
               { $set: {
                 status: "refund_required", paymentReference: String(reference).slice(0, 128),
-                refundReviewRequired: true, refundReason: "late_payment_after_room_expiry",
+                refundReviewRequired: true, refundReason: "room_unavailable_at_settlement",
                 paidLateAt: now, updatedAt: now
               } },
               { session }
             );
-            outcome = { status: 409, body: { error: "Payment arrived after this room expired. The transaction has been flagged for refund review.", refundReviewRequired: true } };
+            outcome = { status: 409, body: { error: "Payment was received but the live room is no longer available. The transaction has been flagged for refund review.", refundReviewRequired: true } };
             return;
           }
         }
