@@ -30,6 +30,9 @@ jobs:
       CDN_HOSTNAME: ${{ secrets.CDN_HOSTNAME }}
       WEBXPAY_PUBLIC_KEY: ${{ secrets.WEBXPAY_PUBLIC_KEY }}
       WEBXPAY_SECRET_KEY: ${{ secrets.WEBXPAY_SECRET_KEY }}
+      DARK_FANTASY_PAYMENTS_APPROVED: ${{ secrets.DARK_FANTASY_PAYMENTS_APPROVED || 'false' }}
+      TURN_URLS: ${{ secrets.TURN_URLS }}
+      TURN_SHARED_SECRET: ${{ secrets.TURN_SHARED_SECRET }}
       FRONTEND_URL: ${{ secrets.STAGING_FRONTEND_URL || 'https://dating-app-staging.pages.dev' }}
       FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL || secrets.REACT_APP_FIREBASE_REALTIME_DATABASE || secrets.REACT_APP_FIREBASE_DATABASE_URL }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
@@ -102,6 +105,31 @@ jobs:
           set -euo pipefail
           printf '%s' "$WEBXPAY_PUBLIC_KEY" | npx --yes wrangler@4 secret put WEBXPAY_PUBLIC_KEY --config wrangler.jsonc --env staging
           printf '%s' "$WEBXPAY_SECRET_KEY" | npx --yes wrangler@4 secret put WEBXPAY_SECRET_KEY --config wrangler.jsonc --env staging
+
+      - name: Configure Video Rooms payment approval gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${DARK_FANTASY_PAYMENTS_APPROVED,,}" in
+            true|false) ;;
+            *) echo "::error::DARK_FANTASY_PAYMENTS_APPROVED must be true or false."; exit 1 ;;
+          esac
+          printf '%s' "$DARK_FANTASY_PAYMENTS_APPROVED" | npx --yes wrangler@4 secret put DARK_FANTASY_PAYMENTS_APPROVED --config wrangler.jsonc --env staging
+
+      - name: Configure optional TURN credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$TURN_URLS" && -n "$TURN_SHARED_SECRET" ]]; then
+            printf '%s' "$TURN_URLS" | npx --yes wrangler@4 secret put TURN_URLS --config wrangler.jsonc --env staging
+            printf '%s' "$TURN_SHARED_SECRET" | npx --yes wrangler@4 secret put TURN_SHARED_SECRET --config wrangler.jsonc --env staging
+            echo "TURN credentials configured for the staging Worker."
+          elif [[ -n "$TURN_URLS" || -n "$TURN_SHARED_SECRET" ]]; then
+            echo "::error::Set both TURN_URLS and TURN_SHARED_SECRET GitHub secrets, or leave both empty to preserve existing Worker configuration."
+            exit 1
+          else
+            echo "TURN secrets were not supplied by GitHub Actions; preserving existing staging Worker configuration."
+          fi
 
       - name: Configure Firebase Realtime Database secret when available
         shell: bash
