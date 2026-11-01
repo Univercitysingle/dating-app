@@ -57,8 +57,20 @@ async function createCdnAuthorizationToken(env, claims, key, method) {
   if (secret.length < 32) {
     throw new Error("CDN JWT_SECRET is missing or shorter than 32 characters");
   }
-  if (!claims || typeof claims.sub !== "string" || !claims.sub) {
+  if (!claims || typeof claims.sub !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(claims.sub)) {
+    throw new Error("A valid authenticated Firebase user ID is required for CDN authorization");
+  }
+  if (method !== "PUT" && method !== "DELETE") {
+    throw new Error("CDN authorization only permits PUT and DELETE");
+  }
+  const photoKey = new RegExp("^photos-" + claims.sub.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\  if (!claims || typeof claims.sub !== "string" || !claims.sub) {
     throw new Error("Authenticated Firebase user ID is missing for CDN authorization");
+  }
+
+  const now = Math.floor(Date.now() / 1000);") + "-[0-9]{10,16}\\\\.(?:jpg|jpeg|png|gif|webp)$", "i");
+  const supportKey = /^support-[a-fA-F0-9]{24}-[0-9]{10,16}-[a-f0-9-]{36}\\.(?:jpg|jpeg|png|gif|webp|pdf)$/i;
+  if (!(photoKey.test(key) || (typeof key === "string" && supportKey.test(key)))) {
+    throw new Error("CDN object key is not an allowed application upload key");
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -903,7 +915,7 @@ export default {
         }
         const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
         if (!id) {
-          await fetch(getCdnObjectUrl(env, key, "root"), { method: "DELETE" }).catch(() => {});
+          await requestCdnObject(env, key, "DELETE", { "Origin": env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin }, undefined, claims).catch(() => {});
           return json({ message: "Photo metadata service unavailable" }, 503);
         }
         const connection = env.MONGODB_CONNECTION.get(id);
@@ -944,7 +956,9 @@ export default {
         } catch {
           return json({ error: "Invalid photo URL" }, 400);
         }
-        if (!key.startsWith("photos-" + claims.sub + "-")) return json({ error: "Photo does not belong to the current user" }, 403);
+        const ownedPhotoKey = new RegExp("^photos-" + claims.sub.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\        if (!key.startsWith("photos-" + claims.sub + "-")) return json({ error: "Photo does not belong to the current user" }, 403);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);") + "-[0-9]{10,16}\\\\.(?:jpg|jpeg|png|gif|webp)$", "i");
+        if (!ownedPhotoKey.test(key)) return json({ error: "Photo does not belong to the current user or has an invalid key" }, 403);
         if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
