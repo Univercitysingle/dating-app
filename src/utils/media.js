@@ -1,12 +1,10 @@
-const MEDIA_API_ORIGIN =
-  process.env.REACT_APP_MEDIA_API_ORIGIN ||
-  'https://dating-app-api-staging.enadoctemp.workers.dev';
+const DEFAULT_CDN_HOSTNAME = 'https://dateme.enadoctemp.workers.dev';
 const PLACEHOLDER_IMAGE = 'https://placehold.co/100x100';
 
 const PHOTO_KEY_PATTERN =
   /^photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(?:jpg|jpeg|png|gif|webp)$/i;
 
-const configuredCdn = String(process.env.REACT_APP_CDN_HOSTNAME || '').trim();
+const configuredCdn = String(process.env.REACT_APP_CDN_HOSTNAME || DEFAULT_CDN_HOSTNAME).trim();
 let CDN_BASE = '';
 if (configuredCdn) {
   try {
@@ -43,14 +41,15 @@ export function resolvePhotoUrl(value) {
   // Canonicalize legacy and relative photo URLs to the configured private-storage
   // proxy so every screen uses the same CDN host.
   if (key && CDN_BASE) return `${CDN_BASE}/${encodeURIComponent(key)}`;
-  if (key) return `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(key)}`;
+  // Never fall back to the API Worker for image delivery. The CDN proxy owns
+  // object reads and writes, including legacy profile-photo URLs.
 
   return value;
 }
 
 export function resolveWorkerPhotoUrl(value) {
   const key = extractPhotoKey(value);
-  return key ? `${MEDIA_API_ORIGIN}/api/media/${encodeURIComponent(key)}` : '';
+  return key ? `${CDN_BASE}/${encodeURIComponent(key)}` : '';
 }
 
 export { PLACEHOLDER_IMAGE };
