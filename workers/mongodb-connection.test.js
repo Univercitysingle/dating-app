@@ -799,3 +799,117 @@ test("paid live-show ticket checkout rejects duplicate pending orders", async ()
   assert.equal(result.status, 409);
   assert.match(result.body.error, /already pending/i);
 });
+
+
+test("moderation writes a durable audit entry before changing account state", async () => {
+  const { ObjectId } = await import("mongodb");
+  const reportId = "64b000000000000000000001";
+  const reportObjectId = new ObjectId(reportId);
+  const auditId = new ObjectId("64b000000000000000000002");
+  const order = [];
+  const report = { _id: reportObjectId, reportedUserUid: "target-user", status: "open" };
+  const target = { _id: "target-object-id", uid: "target-user", accountStatus: "active", isProfileVisible: true };
+  let insertedAudit;
+  let finalizedAudit;
+  const users = {
+    async findOne(query) {
+      if (query.uid === "admin-user") return { uid: "admin-user", role: "admin" };
+      if (query.uid === "target-user") return target;
+      return null;
+    },
+    async updateOne(query, update) {
+      order.push("user-update");
+      assert.equal(query._id, target._id);
+      assert.equal(update.$set.accountStatus, "temporarily_suspended");
+      return { modifiedCount: 1 };
+    }
+  };
+  const reports = {
+    async findOne(query) {
+      assert.equal(String(query._id), reportId);
+      return report;
+    },
+    async updateOne(query, update) {
+      order.push("report-update");
+      assert.equal(query._id, reportObjectId);
+      assert.equal(update.$set.status, "resolved_user_suspended");
+      return { modifiedCount: 1 };
+    }
+  };
+  const auditlogs = {
+    async insertOne(doc) {
+      order.push("audit-insert");
+      insertedAudit = doc;
+      return { insertedId: auditId };
+    },
+    async updateOne(query, update) {
+      order.push("audit-finalize");
+      finalizedAudit = { query, update };
+      return { modifiedCount: 1 };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "reports") return reports;
+      if (name === "auditlogs") return auditlogs;
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.moderateReport("admin-user", reportId, {
+    action: "suspend_user",
+    durationDays: 7,
+    adminNotes: "Policy violation"
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(order, ["audit-insert", "user-update", "report-update", "audit-finalize"]);
+  assert.equal(insertedAudit.eventType, "moderation_action");
+  assert.equal(insertedAudit.actorUid, "admin-user");
+  assert.equal(insertedAudit.targetUid, "target-user");
+  assert.equal(insertedAudit.action, "suspend_user");
+  assert.equal(insertedAudit.previousAccountStatus, "active");
+  assert.equal(insertedAudit.previousProfileVisibility, true);
+  assert.equal(insertedAudit.durationDays, 7);
+  assert.equal(insertedAudit.outcome, "started");
+  assert.equal(finalizedAudit.query._id, auditId);
+  assert.equal(finalizedAudit.update.$set.outcome, "completed");
+  assert.equal(finalizedAudit.update.$set.reportStatus, "resolved_user_suspended");
+});
+
+test("moderation fails closed when the audit entry cannot be persisted", async () => {
+  const { ObjectId } = await import("mongodb");
+  const reportId = "64b000000000000000000003";
+  const order = [];
+  const report = { _id: new ObjectId(reportId), reportedUserUid: "target-user", status: "open" };
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne(query) {
+          if (query.uid === "admin-user") return { uid: "admin-user", role: "admin" };
+          if (query.uid === "target-user") return { _id: "target-object-id", uid: "target-user", accountStatus: "active" };
+          return null;
+        },
+        async updateOne() { order.push("user-update"); return { modifiedCount: 1 }; }
+      };
+      if (name === "reports") return { async findOne() { return report; } };
+      if (name === "auditlogs") return {
+        async insertOne() { order.push("audit-insert"); throw new Error("audit storage unavailable"); },
+        async updateOne() { return { modifiedCount: 0 }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.moderateReport("admin-user", reportId, { action: "dismiss" });
+
+  assert.equal(result.status, 503);
+  assert.deepEqual(order, ["audit-insert"]);
+});
