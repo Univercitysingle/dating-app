@@ -525,6 +525,14 @@ test("moderation uses explicit temporary and permanent account states and suppor
 });
 
 
+test("private gallery purchases fail closed until secure media delivery is available", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => { assert.fail("Gallery checkout must not access the database while disabled"); };
+  const result = await connection.createPendingPurchase("adult-buyer", "dark-fantasy-gallery:creator-123");
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /private gallery purchases are temporarily unavailable/i);
+});
+
 test("Dark Fantasy add-on is a separate fixed-price purchase", async () => {
   let inserted;
   const users = { async findOne({ uid }) { return uid === "adult-user" ? { _id: "user-id", uid, name: "Adult User", email: "adult@example.com", birthday: new Date("1990-01-01"), accountStatus: "active" } : null; } };
