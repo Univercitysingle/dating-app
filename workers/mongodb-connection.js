@@ -1268,8 +1268,9 @@ export class MongoDBConnection {
   async deleteDarkFantasyProfile(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
-      const db = this.getDatabase(await this.getClient());
-      const session = this.getClient().startSession();
+      const client = await this.getClient();
+      const db = this.getDatabase(client);
+      const session = client.startSession();
       try {
         await session.withTransaction(async () => {
           await db.collection("darkfantasyprofiles").deleteOne({ uid }, { session });
