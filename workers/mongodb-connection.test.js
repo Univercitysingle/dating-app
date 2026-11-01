@@ -477,9 +477,18 @@ test("moderation uses explicit temporary and permanent account states and suppor
       async findOne(query) { assert.equal(String(query._id), String(report._id)); return report; },
       async updateOne(query, update) { reportUpdate = update; return { matchedCount: 1 }; }
     };
+    const auditlogs = {
+      async insertOne(entry) { assert.equal(entry.eventType, "moderation_action"); return { insertedId: new ObjectId("0123456789abcdef01234568") }; },
+      async updateOne(query, update) { assert.equal(update.$set.outcome, "completed"); return { matchedCount: 1 }; }
+    };
     const connection = new MongoDBConnection({}, {});
     connection.getClient = async () => ({});
-    connection.getDatabase = () => ({ collection(name) { return name === "users" ? users : reports; } });
+    connection.getDatabase = () => ({ collection(name) {
+      if (name === "users") return users;
+      if (name === "reports") return reports;
+      if (name === "auditlogs") return auditlogs;
+      assert.fail("Unexpected collection: " + name);
+    } });
     const result = await connection.moderateReport("admin", String(report._id), { action, ...extraPayload });
     assert.equal(result.status, 200);
     assert.ok(userUpdate);
