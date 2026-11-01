@@ -554,6 +554,48 @@ test("Dark Fantasy preferences cannot be saved without explicit consent", async 
   assert.match(result.body.error, /consent/i);
 });
 
+test("withdrawing Dark Fantasy consent deletes the profile and revokes all related entitlements", async () => {
+  let deletedProfile = false;
+  let revoked;
+  let transactionEnded = false;
+  const profiles = { async deleteOne(query, options) {
+    assert.deepEqual(query, { uid: "adult-user" });
+    assert.ok(options.session);
+    deletedProfile = true;
+    return { deletedCount: 1 };
+  } };
+  const users = { async updateOne(query, update, options) {
+    assert.deepEqual(query, { uid: "adult-user" });
+    assert.ok(options.session);
+    revoked = update.$unset;
+    return { modifiedCount: 1 };
+  } };
+  const db = { collection(name) {
+    if (name === "darkfantasyprofiles") return profiles;
+    if (name === "users") return users;
+    assert.fail("Unexpected collection " + name);
+  } };
+  const session = {
+    async withTransaction(callback) { return callback(); },
+    async endSession() { transactionEnded = true; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+
+  const result = await connection.deleteDarkFantasyProfile("adult-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.accessRevoked, true);
+  assert.equal(deletedProfile, true);
+  assert.deepEqual(Object.keys(revoked).sort(), [
+    "creatorGalleryAccessUntil",
+    "darkFantasyAccessUntil",
+    "darkFantasyGalleryAccess",
+    "darkFantasyUnlimitedUntil"
+  ]);
+  assert.equal(transactionEnded, true);
+});
+
 
 test("Dark Fantasy API remains unavailable by default without feature approval flags", async () => {
   const response = await Worker.fetch(new Request("https://api.example.test/api/dark-fantasy/status"), {});
