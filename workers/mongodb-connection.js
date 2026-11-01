@@ -1269,8 +1269,27 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
       const db = this.getDatabase(await this.getClient());
-      await db.collection("darkfantasyprofiles").deleteOne({ uid });
-      return { status: 200, body: { deleted: true } };
+      const session = this.getClient().startSession();
+      try {
+        await session.withTransaction(async () => {
+          await db.collection("darkfantasyprofiles").deleteOne({ uid }, { session });
+          // DELETE is the user's explicit consent withdrawal. Revoke every Dark Fantasy
+          // entitlement at the same time so existing gallery and room access cannot persist.
+          await db.collection("users").updateOne(
+            { uid },
+            { $unset: {
+              darkFantasyAccessUntil: "",
+              creatorGalleryAccessUntil: "",
+              darkFantasyUnlimitedUntil: "",
+              darkFantasyGalleryAccess: ""
+            } },
+            { session }
+          );
+        });
+      } finally {
+        await session.endSession();
+      }
+      return { status: 200, body: { deleted: true, accessRevoked: true } };
     } catch {
       return { status: 503, body: { error: "Dark Fantasy preferences could not be deleted" } };
     }
