@@ -1637,18 +1637,31 @@ export default {
         const decoded = verifyWebXPayCallback(callback.payment, callback.signature, env.WEBXPAY_PUBLIC_KEY);
         if (!decoded) return json({ error: "Signature verification failed." }, 400);
         const fields = decoded.split("|").map(value => value.trim());
-        if (fields.length < 5 || !/^[a-fA-F0-9]{24}$/.test(fields[0])) {
+        // WebXPay's documented redirect response is:
+        // order_id|order_reference|transaction_datetime|status_code|comment|gateway_id
+        // Do not search other fields for a status-like value: doing so can turn a
+        // malformed response into an approval.
+        if (fields.length !== 6 || !/^[a-fA-F0-9]{24}$/.test(fields[0]) ||
+            !fields[1] || fields[1].length > 128 ||
+            !fields[2] || !Number.isFinite(Date.parse(fields[2])) ||
+            !["0", "00", "15"].includes(fields[3]) ||
+            !fields[5] || fields[5].length > 32) {
           return json({ error: "Invalid payment response." }, 400);
         }
-        // WEBXPAY's published examples differ on whether gateway ID or status is field 4.
-        const statusCode = [fields[3], fields[4]].find(value => ["0", "00", "15"].includes(value));
-        if (!statusCode) return json({ error: "Unsupported payment status." }, 400);
+        const statusCode = fields[3];
         if (!env.MONGODB_CONNECTION) return json({ error: "Payment settlement unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/webxpay-settle", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ orderId: fields[0], statusCode, reference: fields[1] || "" })
+          body: JSON.stringify({
+            orderId: fields[0],
+            statusCode,
+            reference: fields[1],
+            transactionDate: fields[2],
+            gatewayComment: fields[4].slice(0, 256),
+            gatewayId: fields[5]
+          })
         });
         const body = await response.json().catch(() => ({ error: "Payment settlement unavailable" }));
         return json(body, response.status);
