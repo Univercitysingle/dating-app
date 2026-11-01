@@ -63,11 +63,7 @@ async function createCdnAuthorizationToken(env, claims, key, method) {
   if (method !== "PUT" && method !== "DELETE") {
     throw new Error("CDN authorization only permits PUT and DELETE");
   }
-  const photoKey = new RegExp("^photos-" + claims.sub.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\  if (!claims || typeof claims.sub !== "string" || !claims.sub) {
-    throw new Error("Authenticated Firebase user ID is missing for CDN authorization");
-  }
-
-  const now = Math.floor(Date.now() / 1000);") + "-[0-9]{10,16}\\\\.(?:jpg|jpeg|png|gif|webp)$", "i");
+  const photoKey = new RegExp("^photos-" + claims.sub + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i");
   const supportKey = /^support-[a-fA-F0-9]{24}-[0-9]{10,16}-[a-f0-9-]{36}\\.(?:jpg|jpeg|png|gif|webp|pdf)$/i;
   if (!(photoKey.test(key) || (typeof key === "string" && supportKey.test(key)))) {
     throw new Error("CDN object key is not an allowed application upload key");
