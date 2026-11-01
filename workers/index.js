@@ -35,7 +35,11 @@ async function requestCdnObject(env, key, method, headers, body) {
   // CDN deployments may expose the object route either at /<key> or
   // /api/media/<key>. Retry the alternate supported route only when the
   // first route is absent or does not allow this method.
-  const routes = ["root", "api"];
+  // Upload and delete operations must use the CDN's dedicated media route.
+  // Keep root-first routing for reads because existing profile image URLs use /<key>.
+  const routes = method === "GET" || method === "HEAD"
+    ? ["root", "api"]
+    : ["api", "root"];
   let response;
   for (const route of routes) {
     response = await fetch(getCdnObjectUrl(env, key, route), {
