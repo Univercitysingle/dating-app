@@ -1912,6 +1912,8 @@ export class MongoDBConnection {
   }
 
   async moderateReport(uid, reportId, payload = {}) {
+    let auditId = null;
+    let auditCollection = null;
     if (typeof reportId !== "string" || !/^[a-fA-F0-9]{24}$/.test(reportId)) return { status: 400, body: { message: "Invalid report ID" } };
     const actions = ["dismiss", "suspend_user", "ban_user", "restore_user"];
     if (!payload || !actions.includes(payload.action)) return { status: 400, body: { message: "Invalid action specified." } };
@@ -1935,6 +1937,25 @@ export class MongoDBConnection {
       const target = await db.collection("users").findOne({ uid: report.reportedUserUid });
       if (!target) return { status: 404, body: { message: "Reported user not found." } };
       const now = new Date();
+      auditCollection = db.collection("auditlogs");
+      const auditEntry = {
+        eventType: "moderation_action",
+        actorUid: uid,
+        targetUid: report.reportedUserUid,
+        reportId: report._id,
+        action: payload.action,
+        previousAccountStatus: target.accountStatus || "active",
+        previousProfileVisibility: target.isProfileVisible !== false,
+        ...(payload.action === "suspend_user" ? { durationDays } : {}),
+        outcome: "started",
+        createdAt: now,
+        updatedAt: now
+      };
+      // Fail closed: do not mutate an account unless the moderation audit entry
+      // has been durably written first. An interrupted action remains visible as
+      // outcome="started" for administrative investigation.
+      const auditResult = await auditCollection.insertOne(auditEntry);
+      auditId = auditResult.insertedId;
       let status;
       if (payload.action === "dismiss") {
         status = "resolved_no_action";
@@ -1979,8 +2000,29 @@ export class MongoDBConnection {
       const update = { status, updatedAt: now };
       if (typeof payload.adminNotes === "string") update.adminNotes = payload.adminNotes.trim();
       await db.collection("reports").updateOne({ _id: report._id }, { $set: update });
+      await auditCollection.updateOne(
+        { _id: auditId, outcome: "started" },
+        { $set: { outcome: "completed", reportStatus: status, updatedAt: new Date() } }
+      );
       return { status: 200, body: { message: "Action '" + payload.action + "' performed successfully.", report: { ...report, ...update } } };
-    } catch {
+    } catch (error) {
+      if (auditCollection && auditId) {
+        try {
+          await auditCollection.updateOne(
+            { _id: auditId, outcome: "started" },
+            { $set: { outcome: "failed_or_interrupted", updatedAt: new Date() } }
+          );
+        } catch (auditError) {
+          console.error("Moderation audit finalization failed", {
+            phase: "moderation-audit-finalize",
+            message: auditError && typeof auditError.message === "string" ? auditError.message.slice(0, 160) : "Unknown error"
+          });
+        }
+      }
+      console.error("Moderation action failed", {
+        phase: "moderation-action",
+        message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Unknown error"
+      });
       return { status: 503, body: { message: "Report moderation service is temporarily unavailable." } };
     }
   }
