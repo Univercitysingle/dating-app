@@ -1643,7 +1643,7 @@ export default {
         // malformed response into an approval.
         if (fields.length !== 6 || !/^[a-fA-F0-9]{24}$/.test(fields[0]) ||
             !fields[1] || fields[1].length > 128 ||
-            !fields[2] || !Number.isFinite(Date.parse(fields[2])) ||
+            !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fields[2]) || !Number.isFinite(Date.parse(fields[2])) ||
             !["0", "00", "15"].includes(fields[3]) ||
             !fields[5] || fields[5].length > 32) {
           return json({ error: "Invalid payment response." }, 400);
