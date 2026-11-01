@@ -35,7 +35,7 @@ function base64UrlEncodeJson(value) {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 async function createCdnAuthorizationToken(env, claims, key, method) {
@@ -74,7 +74,7 @@ async function createCdnAuthorizationToken(env, claims, key, method) {
   );
   let binary = "";
   for (const byte of new Uint8Array(signature)) binary += String.fromCharCode(byte);
-  const signatureB64 = btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  const signatureB64 = btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   return unsigned + "." + signatureB64;
 }
 
