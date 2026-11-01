@@ -1637,9 +1637,13 @@ export class MongoDBConnection {
     }
   }
 
-  async settleWebXPay(orderId, statusCode, reference = "") {
+  async settleWebXPay(orderId, statusCode, reference = "", gatewayMetadata = {}) {
     if (typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId) ||
-        !["0", "00", "15"].includes(String(statusCode))) {
+        !["0", "00", "15"].includes(String(statusCode)) ||
+        (reference && (typeof reference !== "string" || reference.length > 128)) ||
+        (gatewayMetadata.transactionDate && !Number.isFinite(Date.parse(gatewayMetadata.transactionDate))) ||
+        (gatewayMetadata.gatewayId && (typeof gatewayMetadata.gatewayId !== "string" || gatewayMetadata.gatewayId.length > 32)) ||
+        (gatewayMetadata.gatewayComment && (typeof gatewayMetadata.gatewayComment !== "string" || gatewayMetadata.gatewayComment.length > 256))) {
       return { status: 400, body: { error: "Invalid payment response" } };
     }
     let outcome = { status: 503, body: { error: "Payment settlement unavailable" } };
@@ -1694,7 +1698,14 @@ export class MongoDBConnection {
         const nextStatus = success ? (purchase ? "completed" : "active") : (purchase ? "rejected" : "cancelled");
         const changed = await collection.updateOne(
           { _id: record._id, status: record.status },
-          { $set: { status: nextStatus, paymentReference: String(reference).slice(0, 128), updatedAt: now } },
+          { $set: {
+            status: nextStatus,
+            paymentReference: String(reference).slice(0, 128),
+            ...(gatewayMetadata.transactionDate ? { gatewayTransactionAt: new Date(gatewayMetadata.transactionDate) } : {}),
+            ...(gatewayMetadata.gatewayId ? { paymentGatewayId: gatewayMetadata.gatewayId } : {}),
+            ...(gatewayMetadata.gatewayComment ? { paymentGatewayComment: gatewayMetadata.gatewayComment } : {}),
+            updatedAt: now
+          } },
           { session }
         );
         if (!changed.modifiedCount) {
@@ -3450,7 +3461,17 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/webxpay-settle") {
       const body = await request.json().catch(() => null);
       if (!body || typeof body.orderId !== "string" || typeof body.statusCode !== "string") return json({ error: "Invalid request" }, 400);
-      const result = await this.settleWebXPay(body.orderId, body.statusCode, body.reference || "");
+      if (typeof body.reference !== "string" || !body.reference || body.reference.length > 128 ||
+          typeof body.transactionDate !== "string" || !Number.isFinite(Date.parse(body.transactionDate)) ||
+          typeof body.gatewayId !== "string" || !body.gatewayId || body.gatewayId.length > 32 ||
+          typeof body.gatewayComment !== "string" || body.gatewayComment.length > 256) {
+        return json({ error: "Invalid gateway transaction metadata" }, 400);
+      }
+      const result = await this.settleWebXPay(body.orderId, body.statusCode, body.reference, {
+        transactionDate: body.transactionDate,
+        gatewayId: body.gatewayId,
+        gatewayComment: body.gatewayComment
+      });
       return json(result.body, result.status);
     }
 
