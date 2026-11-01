@@ -1460,23 +1460,26 @@ export class MongoDBConnection {
     const prices = { "super-like-5": 500, "undo-swipes-5": 500, "profile-boost-1": 100, "dark-fantasy-monthly": 1200, "dark-fantasy-creator-monthly": 800, "dark-fantasy-unlimited-pass": 3500 };
     const names = { "super-like-5": "5 Super Likes", "undo-swipes-5": "5 Undo Swipes", "profile-boost-1": "1 Profile Boost", "dark-fantasy-monthly": "Dark Fantasy Add-on (30 days)", "dark-fantasy-creator-monthly": "Dark Fantasy Creator Gallery (30 days)", "dark-fantasy-unlimited-pass": "Dark Fantasy Unlimited Pass (30 days)" };
     const galleryMatch = typeof itemId === "string" ? itemId.match(/^dark-fantasy-gallery:([A-Za-z0-9_-]{1,128})$/) : null;
-    if (galleryMatch) { prices[itemId] = 500; names[itemId] = "Individual Dark Fantasy Gallery Access (30 days)"; }
-    if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, itemId)) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid purchase request." } };
+    }
+    // Gallery checkout stays disabled until private media delivery is implemented
+    // and verified by the CDN proxy. Never charge for gallery access that cannot
+    // yet be securely delivered.
+    if (galleryMatch) {
+      return { status: 503, body: { error: "Private gallery purchases are temporarily unavailable." } };
+    }
+    if (!Object.hasOwn(prices, itemId)) {
       return { status: 400, body: { error: "Invalid item ID." } };
     }
     try {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
-      if (["dark-fantasy-creator-monthly", "dark-fantasy-unlimited-pass", "dark-fantasy-monthly"].includes(itemId) || galleryMatch) {
+      if (["dark-fantasy-creator-monthly", "dark-fantasy-unlimited-pass", "dark-fantasy-monthly"].includes(itemId)) {
         const status = await this.getDarkFantasyStatus(uid);
         if (status.status !== 200) return status;
         if (!status.body.ageEligible || !status.body.accountEligible) return { status: 403, body: { error: "An eligible adult account is required." } };
-        if (galleryMatch) {
-          if (galleryMatch[1] === uid) return { status: 400, body: { error: "You cannot purchase access to your own gallery." } };
-          const creator = await db.collection("users").findOne({ uid: galleryMatch[1], creatorGalleryAccessUntil: { $gt: new Date() } }, { projection: { uid: 1 } });
-          if (!creator) return { status: 404, body: { error: "That gallery is not currently available." } };
-        }
       }
       const now = new Date();
       const purchase = {
