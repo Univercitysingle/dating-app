@@ -31,13 +31,63 @@ function getCdnObjectUrl(env, key, route = "root") {
 
 
 
-async function requestCdnObject(env, key, method, headers, body) {
-  // The deployed dateme proxy contract is root-level only:
-  // PUT/GET/HEAD/DELETE https://dateme.enadoctemp.workers.dev/<object-key>
-  // Do not probe /api/media because that route is not implemented by the proxy.
+function base64UrlEncodeJson(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+}
+
+async function createCdnAuthorizationToken(env, claims, key, method) {
+  const secret = String(env.JWT_SECRET || "");
+  if (secret.length < 32) {
+    throw new Error("CDN JWT_SECRET is missing or shorter than 32 characters");
+  }
+  if (!claims || typeof claims.sub !== "string" || !claims.sub) {
+    throw new Error("Authenticated Firebase user ID is missing for CDN authorization");
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncodeJson({ alg: "HS256", typ: "JWT" });
+  const payload = base64UrlEncodeJson({
+    sub: claims.sub,
+    iss: "dating-app-api",
+    aud: "dateme-cdn",
+    key,
+    method,
+    iat: now,
+    nbf: now - 5,
+    exp: now + 60
+  });
+  const unsigned = header + "." + payload;
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(unsigned)
+  );
+  let binary = "";
+  for (const byte of new Uint8Array(signature)) binary += String.fromCharCode(byte);
+  const signatureB64 = btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return unsigned + "." + signatureB64;
+}
+
+async function requestCdnObject(env, key, method, headers, body, claims) {
+  // The dateme proxy accepts root-level object routes only.
+  // Firebase identity is verified by this API Worker first. A short-lived
+  // HS256 token then authorizes the server-to-server CDN operation.
+  const token = await createCdnAuthorizationToken(env, claims, key, method);
+  const requestHeaders = new Headers(headers || {});
+  requestHeaders.set("Authorization", "Bearer " + token);
   return fetch(getCdnObjectUrl(env, key, "root"), {
     method,
-    headers,
+    headers: requestHeaders,
     ...(body === undefined ? {} : { body })
   });
 }
@@ -748,7 +798,7 @@ export default {
         const key = "support-" + ticketId + "-" + Date.now() + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         const proxyUrl = getCdnObjectUrl(env, key, "root");
         const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
-        const upload = await requestCdnObject(env, key, "PUT", { "Content-Type": file.type, "Origin": frontendOrigin }, bytes);
+        const upload = await requestCdnObject(env, key, "PUT", { "Content-Type": file.type, "Origin": frontendOrigin }, bytes, claims);
         if (!upload.ok) {
           const detail = await upload.text().catch(() => "");
           console.error("Support attachment upload failed", { status: upload.status, detail: detail.slice(0, 120) });
@@ -818,7 +868,7 @@ export default {
             "Content-Type": file.type,
             // The proxy allowlists the staging frontend and API Worker origins.
             "Origin": frontendOrigin
-          }, fileBytes);
+          }, fileBytes, claims);
           proxyStatus = proxyResponse.status;
           if (!proxyResponse.ok) {
             const proxyError = await proxyResponse.text().catch(() => "");
@@ -891,7 +941,7 @@ export default {
         if (!response.ok) return json(result, response.status);
         const proxyUrl = getCdnObjectUrl(env, key, "root");
         const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
-        const proxyResponse = await requestCdnObject(env, key, "DELETE", { "Origin": frontendOrigin });
+        const proxyResponse = await requestCdnObject(env, key, "DELETE", { "Origin": frontendOrigin }, undefined, claims);
         if (!proxyResponse.ok) {
           console.error("Photo CDN proxy delete failed", { status: proxyResponse.status });
           return json({ message: "Photo metadata was deleted but storage cleanup failed" }, 502);
