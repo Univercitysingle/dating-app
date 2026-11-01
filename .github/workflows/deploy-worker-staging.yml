@@ -28,6 +28,7 @@ jobs:
       FIREBASE_PROJECT_ID: it-services-1841e
       MONGODB_DATABASE: test
       CDN_HOSTNAME: ${{ secrets.CDN_HOSTNAME }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBXPAY_PUBLIC_KEY: ${{ secrets.WEBXPAY_PUBLIC_KEY }}
       WEBXPAY_SECRET_KEY: ${{ secrets.WEBXPAY_SECRET_KEY }}
       DARK_FANTASY_PAYMENTS_APPROVED: ${{ secrets.DARK_FANTASY_PAYMENTS_APPROVED || 'false' }}
@@ -69,6 +70,8 @@ jobs:
           # Do not block deployment or overwrite that known-good runtime secret when this
           # GitHub Actions context cannot read the optional value (for example, an environment secret).
           test -n "$CDN_HOSTNAME" || { echo "Missing GitHub secret CDN_HOSTNAME (legacy CDN hostname)"; exit 1; }
+          test -n "$JWT_SECRET" || { echo "::error::Missing GitHub secret JWT_SECRET. It must match the dateme CDN Worker's JWT_SECRET."; exit 1; }
+          test "${#JWT_SECRET}" -ge 32 || { echo "::error::JWT_SECRET must be at least 32 characters."; exit 1; }
           test -n "$WEBXPAY_PUBLIC_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_PUBLIC_KEY"; exit 1; }
           test -n "$WEBXPAY_SECRET_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_SECRET_KEY"; exit 1; }
 
@@ -94,6 +97,10 @@ jobs:
             exit 1
           fi
           echo "worker_url=$WORKER_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Configure API-to-CDN authentication secret
+        shell: bash
+        run: printf '%s' "$JWT_SECRET" | npx --yes wrangler@4 secret put JWT_SECRET --config wrangler.jsonc --env staging
 
       - name: Configure staging MongoDB secret
         shell: bash
