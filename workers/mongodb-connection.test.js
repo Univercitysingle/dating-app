@@ -533,6 +533,20 @@ test("private gallery purchases fail closed until secure media delivery is avail
   assert.match(result.body.error, /private gallery purchases are temporarily unavailable/i);
 });
 
+test("all private gallery purchase SKUs fail closed until secure media delivery is available", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => { assert.fail("Disabled gallery checkout must not access the database"); };
+  for (const itemId of [
+    "dark-fantasy-gallery:creator-123",
+    "dark-fantasy-creator-monthly",
+    "dark-fantasy-unlimited-pass"
+  ]) {
+    const result = await connection.createPendingPurchase("adult-buyer", itemId);
+    assert.equal(result.status, 503, itemId);
+    assert.match(result.body.error, /private gallery purchases are temporarily unavailable/i);
+  }
+});
+
 test("Dark Fantasy add-on is a separate fixed-price purchase", async () => {
   let inserted;
   const users = { async findOne({ uid }) { return uid === "adult-user" ? { _id: "user-id", uid, name: "Adult User", email: "adult@example.com", birthday: new Date("1990-01-01"), accountStatus: "active" } : null; } };
