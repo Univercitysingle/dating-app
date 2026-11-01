@@ -44,7 +44,17 @@ test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and
   const user = { _id: "user-object-id", uid: "user-1", name: "Test User" };
   let insertedSubscription;
   const subscriptions = {
-    async findOne() { order.push("check-active"); return null; },
+    async updateMany(filter, update) {
+      order.push("expire-stale");
+      assert.equal(filter.status, "pending");
+      assert.equal(update.$set.cancellationReason, "payment_timeout");
+      return { modifiedCount: 0 };
+    },
+    async findOne(filter) {
+      if (filter.status === "active") order.push("check-active");
+      else if (filter.status === "pending") order.push("check-pending");
+      return null;
+    },
     async insertOne(doc) {
       order.push("insert");
       insertedSubscription = doc;
@@ -60,7 +70,7 @@ test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and
   connection.ensureSubscriptionIndexes = async () => { assert.fail("Request-time subscription creation must not require index permissions"); };
   const result = await connection.createPendingSubscription("user-1", "monthly");
   assert.equal(result.status, 201);
-  assert.deepEqual(order, ["find-user", "check-active", "insert"]);
+  assert.deepEqual(order, ["find-user", "expire-stale", "check-active", "check-pending", "insert"]);
   assert.match(insertedSubscription.stripeSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
   assert.match(insertedSubscription.payhereSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
   assert.notEqual(insertedSubscription.stripeSubscriptionId, insertedSubscription.payhereSubscriptionId);
@@ -921,4 +931,39 @@ test("moderation fails closed when the audit entry cannot be persisted", async (
 
   assert.equal(result.status, 503);
   assert.deepEqual(order, ["audit-insert"]);
+});
+
+
+test("pending WebXPay subscription checkout blocks a second checkout and expires stale attempts", async () => {
+  const user = { _id: "user-object-id", uid: "user-1" };
+  const pending = { _id: "pending-order" };
+  let expiredFilter;
+  let expiredUpdate;
+  let inserted = false;
+  const subscriptions = {
+    async updateMany(filter, update) { expiredFilter = filter; expiredUpdate = update; return { modifiedCount: 1 }; },
+    async findOne(filter) {
+      if (filter.status === "active") return null;
+      if (filter.status === "pending") return pending;
+      return null;
+    },
+    async insertOne() { inserted = true; return { insertedId: "new-order" }; }
+  };
+  const db = { collection(name) {
+    if (name === "users") return { async findOne() { return user; } };
+    if (name === "subscriptions") return subscriptions;
+    assert.fail("Unexpected collection " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createPendingSubscription("user-1", "monthly");
+
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /already pending/i);
+  assert.equal(inserted, false);
+  assert.equal(expiredFilter.userId, user._id);
+  assert.equal(expiredFilter.status, "pending");
+  assert.equal(expiredUpdate.$set.cancellationReason, "payment_timeout");
 });
