@@ -7,6 +7,20 @@ function isCdnConfigured(env) {
   return Boolean(String(env.CDN_HOSTNAME || "").trim());
 }
 
+function darkFantasyRegionGate(request, env) {
+  if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") {
+    return json({ error: "Dark Fantasy is not currently available." }, 404);
+  }
+  const setting = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").trim().toUpperCase();
+  if (setting === "*") return null;
+  const allowed = setting.split(",").map(value => value.trim()).filter(value => /^[A-Z]{2}$/.test(value));
+  const country = String(request.cf?.country || "").toUpperCase();
+  if (!allowed.length || !country || !allowed.includes(country)) {
+    return json({ error: "Dark Fantasy is not available in this region." }, 404);
+  }
+  return null;
+}
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -1384,6 +1398,8 @@ export default {
     }
 
     if (url.pathname === "/api/dark-fantasy/catalog") {
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       // Public product listings only. Fetch from fixed, public Shopify collection endpoints;
       // never proxy arbitrary URLs or accept caller-supplied hostnames.
@@ -1678,6 +1694,8 @@ export default {
     }
 
     if (url.pathname === "/api/video-rooms/ice-config") {
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
@@ -1731,6 +1749,8 @@ export default {
     }
 
     if (url.pathname === "/api/video-rooms/earnings") {
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
       try {
@@ -1750,6 +1770,8 @@ export default {
 
     const videoRoomTicketMatch = url.pathname.match(/^\/api\/video-rooms\/([^/]+)\/ticket$/);
     if (videoRoomTicketMatch) {
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
       if (String(env.DARK_FANTASY_PAYMENTS_APPROVED || "").toLowerCase() !== "true") return json({ error: "Video Room payments are not approved for this deployment." }, 503);
@@ -1784,6 +1806,8 @@ export default {
 
     const videoRoomMatch = url.pathname.match(/^\/api\/video-rooms(?:\/([^/]+)\/(join|leave|end))?$/);
     if (videoRoomMatch) {
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       const action = videoRoomMatch[2] || (request.method === "GET" ? "list" : "create");
       if (request.method !== (action === "list" ? "GET" : "POST")) return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
