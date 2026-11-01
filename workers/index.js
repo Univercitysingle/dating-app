@@ -954,8 +954,6 @@ export default {
         }
         const ownedPhotoKey = new RegExp("^photos-" + claims.sub + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i");
         if (!ownedPhotoKey.test(key)) return json({ error: "Photo does not belong to the current user or has an invalid key" }, 403);
-        if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);") + "-[0-9]{10,16}\\\\.(?:jpg|jpeg|png|gif|webp)$", "i");
-        if (!ownedPhotoKey.test(key)) return json({ error: "Photo does not belong to the current user or has an invalid key" }, 403);
         if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
