@@ -1578,13 +1578,28 @@ export class MongoDBConnection {
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
-      const active = await db.collection("subscriptions").findOne({
+      const subscriptions = db.collection("subscriptions");
+      const now = new Date();
+      const pendingCutoff = new Date(now.getTime() - 30 * 60 * 1000);
+      // Expire abandoned checkouts before checking for another pending order.
+      // This prevents multiple live checkout sessions from being paid for the
+      // same account and creating overlapping subscription records.
+      await subscriptions.updateMany(
+        { userId: user._id, status: "pending", createdAt: { $lt: pendingCutoff } },
+        { $set: { status: "cancelled", cancellationReason: "payment_timeout", updatedAt: now } }
+      );
+      const active = await subscriptions.findOne({
         userId: user._id,
         status: "active",
-        endDate: { $gt: new Date() }
+        endDate: { $gt: now }
       }, { projection: { _id: 1 } });
       if (active) return { status: 409, body: { error: "You already have an active subscription." } };
-      const now = new Date();
+      const pending = await subscriptions.findOne({
+        userId: user._id,
+        status: "pending",
+        createdAt: { $gte: pendingCutoff }
+      }, { projection: { _id: 1 } });
+      if (pending) return { status: 409, body: { error: "A subscription checkout is already pending. Complete it before starting another." } };
       const subscription = {
         userId: user._id,
         plan,
@@ -1596,7 +1611,7 @@ export class MongoDBConnection {
         createdAt: now,
         updatedAt: now
       };
-      const inserted = await db.collection("subscriptions").insertOne(subscription);
+      const inserted = await subscriptions.insertOne(subscription);
       return {
         status: 201,
         body: {
