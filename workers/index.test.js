@@ -1237,7 +1237,7 @@ test("WebXPay callback verifies the signed response before asking MongoDB to set
     privateKeyEncoding: { type: "pkcs8", format: "pem" }
   });
   const orderId = "0123456789abcdef01234567";
-  const signedPayload = orderId + "|T123456|2026-10-21 12:00:00|1|00|Approved";
+  const signedPayload = orderId + "|T123456|2026-10-21 12:00:00|00|Approved|1";
   const payment = Buffer.from(signedPayload, "utf8").toString("base64");
   const signature = privateEncrypt({
     key: privateKey,
@@ -1264,7 +1264,7 @@ test("WebXPay callback verifies the signed response before asking MongoDB to set
     body
   }), env);
   assert.equal(response.status, 200);
-  assert.deepEqual(settled, { orderId, statusCode: "00", reference: "T123456" });
+  assert.deepEqual(settled, { orderId, statusCode: "00", reference: "T123456", transactionDate: "2026-10-21 12:00:00", gatewayComment: "Approved", gatewayId: "1" });
 });
 
 test("WebXPay callback rejects invalid signatures and does not settle an order", async () => {
@@ -1699,3 +1699,29 @@ test("chat message remains saved when Firebase Realtime Database rejects the syn
   }
 });
 
+
+
+test("WebXPay callback rejects a status code in the wrong field", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const payload = "0123456789abcdef01234567|T123|2026-10-21 12:00:00|1|00|Approved";
+  const payment = Buffer.from(payload, "utf8").toString("base64");
+  const signature = privateEncrypt({ key: privateKey, padding: constants.RSA_PKCS1_PADDING }, Buffer.from(payload, "utf8")).toString("base64");
+  let settled = false;
+  const response = await worker.fetch(new Request("https://dating-app.test/api/webxpay/response", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ payment, signature })
+  }), {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-id"; },
+      get() { return { async fetch() { settled = true; return new Response("{}", { status: 200 }); } }; }
+    }
+  });
+  assert.equal(response.status, 400);
+  assert.equal(settled, false);
+});
