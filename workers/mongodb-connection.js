@@ -1466,7 +1466,7 @@ export class MongoDBConnection {
     // Gallery checkout stays disabled until private media delivery is implemented
     // and verified by the CDN proxy. Never charge for gallery access that cannot
     // yet be securely delivered.
-    if (galleryMatch) {
+    if (galleryMatch || ["dark-fantasy-creator-monthly", "dark-fantasy-unlimited-pass"].includes(itemId)) {
       return { status: 503, body: { error: "Private gallery purchases are temporarily unavailable." } };
     }
     if (!Object.hasOwn(prices, itemId)) {
