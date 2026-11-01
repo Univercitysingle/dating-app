@@ -32,27 +32,14 @@ function getCdnObjectUrl(env, key, route = "root") {
 
 
 async function requestCdnObject(env, key, method, headers, body) {
-  // CDN deployments may expose the object route either at /<key> or
-  // /api/media/<key>. Retry the alternate supported route only when the
-  // first route is absent or does not allow this method.
-  // Upload and delete operations must use the CDN's dedicated media route.
-  // Keep root-first routing for reads because existing profile image URLs use /<key>.
-  const routes = method === "GET" || method === "HEAD"
-    ? ["root", "api"]
-    : ["api", "root"];
-  let response;
-  for (const route of routes) {
-    response = await fetch(getCdnObjectUrl(env, key, route), {
-      method,
-      headers,
-      ...(body === undefined ? {} : { body })
-    });
-    if (response.status !== 404 && response.status !== 405) return response;
-    if (route === "root") {
-      await response.text().catch(() => "");
-    }
-  }
-  return response;
+  // The deployed dateme proxy contract is root-level only:
+  // PUT/GET/HEAD/DELETE https://dateme.enadoctemp.workers.dev/<object-key>
+  // Do not probe /api/media because that route is not implemented by the proxy.
+  return fetch(getCdnObjectUrl(env, key, "root"), {
+    method,
+    headers,
+    ...(body === undefined ? {} : { body })
+  });
 }
 
 function getAppMediaUrl(env, key) {
