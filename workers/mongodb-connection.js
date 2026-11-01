@@ -1641,7 +1641,7 @@ export class MongoDBConnection {
     if (typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId) ||
         !["0", "00", "15"].includes(String(statusCode)) ||
         (reference && (typeof reference !== "string" || reference.length > 128)) ||
-        (gatewayMetadata.transactionDate && (typeof gatewayMetadata.transactionDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(gatewayMetadata.transactionDate) || !Number.isFinite(Date.parse(gatewayMetadata.transactionDate)))) ||
+        (gatewayMetadata.transactionDate && (typeof gatewayMetadata.transactionDate !== "string" || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(gatewayMetadata.transactionDate) || !Number.isFinite(Date.parse(gatewayMetadata.transactionDate)))) ||
         (gatewayMetadata.gatewayId && (typeof gatewayMetadata.gatewayId !== "string" || gatewayMetadata.gatewayId.length > 32)) ||
         (gatewayMetadata.gatewayComment && (typeof gatewayMetadata.gatewayComment !== "string" || gatewayMetadata.gatewayComment.length > 256))) {
       return { status: 400, body: { error: "Invalid payment response" } };
@@ -3462,7 +3462,7 @@ export class MongoDBConnection {
       const body = await request.json().catch(() => null);
       if (!body || typeof body.orderId !== "string" || typeof body.statusCode !== "string") return json({ error: "Invalid request" }, 400);
       if (typeof body.reference !== "string" || !body.reference || body.reference.length > 128 ||
-          typeof body.transactionDate !== "string" || !/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(body.transactionDate) || !Number.isFinite(Date.parse(body.transactionDate)) ||
+          typeof body.transactionDate !== "string" || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(body.transactionDate) || !Number.isFinite(Date.parse(body.transactionDate)) ||
           typeof body.gatewayId !== "string" || !body.gatewayId || body.gatewayId.length > 32 ||
           typeof body.gatewayComment !== "string" || body.gatewayComment.length > 256) {
         return json({ error: "Invalid gateway transaction metadata" }, 400);
