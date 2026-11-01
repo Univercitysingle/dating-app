@@ -649,9 +649,17 @@ test("successful Dark Fantasy payment settlement grants a separate 30-day entitl
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({ startSession: () => session });
   connection.getDatabase = () => db;
-  const result = await connection.settleWebXPay(orderId, "00", "provider-reference");
+  const result = await connection.settleWebXPay(orderId, "00", "provider-reference", {
+    transactionDate: "2026-10-21 12:00:00",
+    gatewayId: "1",
+    gatewayComment: "Approved"
+  });
   assert.equal(result.status, 200);
   assert.equal(purchase.status, "completed");
+  assert.equal(purchase.paymentReference, "provider-reference");
+  assert.equal(purchase.paymentGatewayId, "1");
+  assert.equal(purchase.paymentGatewayComment, "Approved");
+  assert.ok(purchase.gatewayTransactionAt instanceof Date);
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil instanceof Date);
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() >= existingExpiry.getTime() + 29 * 86400000);
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() <= existingExpiry.getTime() + 31 * 86400000);
