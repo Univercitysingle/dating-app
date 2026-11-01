@@ -632,7 +632,7 @@ test("successful Dark Fantasy payment settlement grants a separate 30-day entitl
   const purchase = { _id: new ObjectId(orderId), userId, itemId: "dark-fantasy-monthly", status: "pending" };
   const purchases = {
     async findOne() { return purchase; },
-    async updateOne(query, update) { purchase.status = update.$set.status; return { modifiedCount: 1 }; }
+    async updateOne(query, update) { Object.assign(purchase, update.$set || {}); return { modifiedCount: 1 }; }
   };
   const subscriptions = { async findOne() { assert.fail("A purchase must not be treated as a subscription"); } };
   const users = {
