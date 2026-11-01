@@ -659,7 +659,7 @@ test("successful Dark Fantasy payment settlement grants a separate 30-day entitl
   assert.equal(purchase.paymentReference, "provider-reference");
   assert.equal(purchase.paymentGatewayId, "1");
   assert.equal(purchase.paymentGatewayComment, "Approved");
-  assert.ok(purchase.gatewayTransactionAt instanceof Date);
+  assert.equal(purchase.gatewayTransactionDate, "2026-10-21 12:00:00");
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil instanceof Date);
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() >= existingExpiry.getTime() + 29 * 86400000);
   assert.ok(entitlementUpdate.$set.darkFantasyAccessUntil.getTime() <= existingExpiry.getTime() + 31 * 86400000);
