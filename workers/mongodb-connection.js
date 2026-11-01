@@ -1232,7 +1232,7 @@ export class MongoDBConnection {
   }
 
   async saveDarkFantasyProfile(uid, payload = {}) {
-    const allowedInterests = new Set(["cam-shows", "couples", "threesome", "ffm", "group-play", "femdom", "cuckold", "roleplay", "sensory-play", "lingerie", "intimacy-products"]);
+    const allowedInterests = new Set(["video-rooms", "cam-shows", "couples", "threesome", "ffm", "group-play", "femdom", "cuckold", "roleplay", "sensory-play", "lingerie", "intimacy-products"]);
     const allowedBoundaries = new Set(["no-explicit-media", "no-unmatched-messages", "verified-adults-only", "couples-only", "private-profile"]);
     if (typeof uid !== "string" || !uid || uid.length > 128 || !payload || typeof payload !== "object" || Array.isArray(payload)) return { status: 400, body: { error: "Invalid profile payload" } };
     if (payload.consent !== true) return { status: 400, body: { error: "Explicit opt-in consent is required" } };
