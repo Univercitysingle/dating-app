@@ -31,6 +31,26 @@ function getCdnObjectUrl(env, key, route = "root") {
 
 
 
+async function requestCdnObject(env, key, method, headers, body) {
+  // CDN deployments may expose the object route either at /<key> or
+  // /api/media/<key>. Retry the alternate supported route only when the
+  // first route is absent or does not allow this method.
+  const routes = ["root", "api"];
+  let response;
+  for (const route of routes) {
+    response = await fetch(getCdnObjectUrl(env, key, route), {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body })
+    });
+    if (response.status !== 404 && response.status !== 405) return response;
+    if (route === "root") {
+      await response.text().catch(() => "");
+    }
+  }
+  return response;
+}
+
 function getAppMediaUrl(env, key) {
   // Profile URLs must point directly at the configured CDN proxy, never Pages/API.
   return getCdnObjectUrl(env, key, "root");
@@ -737,7 +757,7 @@ export default {
         const key = "support-" + ticketId + "-" + Date.now() + "-" + crypto.randomUUID() + "." + allowedTypes[file.type];
         const proxyUrl = getCdnObjectUrl(env, key, "root");
         const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
-        const upload = await fetch(proxyUrl, { method: "PUT", headers: { "Content-Type": file.type, "Origin": frontendOrigin }, body: bytes });
+        const upload = await requestCdnObject(env, key, "PUT", { "Content-Type": file.type, "Origin": frontendOrigin }, bytes);
         if (!upload.ok) {
           const detail = await upload.text().catch(() => "");
           console.error("Support attachment upload failed", { status: upload.status, detail: detail.slice(0, 120) });
@@ -803,15 +823,11 @@ export default {
           // request itself. Keep B2 credentials out of this API Worker.
           const proxyUrl = getCdnObjectUrl(env, key, "root");
           const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
-          const proxyResponse = await fetch(proxyUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": file.type,
-              // The proxy allowlists the staging frontend and API Worker origins.
-              "Origin": frontendOrigin
-            },
-            body: fileBytes
-          });
+          const proxyResponse = await requestCdnObject(env, key, "PUT", {
+            "Content-Type": file.type,
+            // The proxy allowlists the staging frontend and API Worker origins.
+            "Origin": frontendOrigin
+          }, fileBytes);
           proxyStatus = proxyResponse.status;
           if (!proxyResponse.ok) {
             const proxyError = await proxyResponse.text().catch(() => "");
@@ -884,10 +900,7 @@ export default {
         if (!response.ok) return json(result, response.status);
         const proxyUrl = getCdnObjectUrl(env, key, "root");
         const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
-        const proxyResponse = await fetch(proxyUrl, {
-          method: "DELETE",
-          headers: { "Origin": frontendOrigin }
-        });
+        const proxyResponse = await requestCdnObject(env, key, "DELETE", { "Origin": frontendOrigin });
         if (!proxyResponse.ok) {
           console.error("Photo CDN proxy delete failed", { status: proxyResponse.status });
           return json({ message: "Photo metadata was deleted but storage cleanup failed" }, 502);
