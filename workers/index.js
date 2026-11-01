@@ -921,7 +921,7 @@ export default {
         });
         const result = await metadataResponse.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!metadataResponse.ok) {
-          await fetch(getCdnObjectUrl(env, key, "root"), { method: "DELETE" }).catch(() => {});
+          await requestCdnObject(env, key, "DELETE", { "Origin": env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin }, undefined, claims).catch(() => {});
           return json(result, metadataResponse.status);
         }
         return json({
@@ -952,7 +952,8 @@ export default {
         } catch {
           return json({ error: "Invalid photo URL" }, 400);
         }
-        const ownedPhotoKey = new RegExp("^photos-" + claims.sub.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\        if (!key.startsWith("photos-" + claims.sub + "-")) return json({ error: "Photo does not belong to the current user" }, 403);
+        const ownedPhotoKey = new RegExp("^photos-" + claims.sub + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i");
+        if (!ownedPhotoKey.test(key)) return json({ error: "Photo does not belong to the current user or has an invalid key" }, 403);
         if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);") + "-[0-9]{10,16}\\\\.(?:jpg|jpeg|png|gif|webp)$", "i");
         if (!ownedPhotoKey.test(key)) return json({ error: "Photo does not belong to the current user or has an invalid key" }, 403);
         if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);
