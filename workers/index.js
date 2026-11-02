@@ -1858,10 +1858,10 @@ export default {
       }
     }
 
-    const callRoute = url.pathname.match(/^\/api\/calls\/(start|poll|history|signal|action)$/);
+    const callRoute = url.pathname.match(/^\/api\/calls\/(start|poll|history|incoming|signal|action)$/);
     if (callRoute) {
       const action = callRoute[1];
-      const methodAllowed = ["poll", "history"].includes(action) ? request.method === "GET" : request.method === "POST";
+      const methodAllowed = ["poll", "history", "incoming"].includes(action) ? request.method === "GET" : request.method === "POST";
       if (!methodAllowed) return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
@@ -1871,7 +1871,7 @@ export default {
         const connection = env.MONGODB_CONNECTION.get(id);
         let payload = null;
         let internalPath = "/internal/calls/" + action;
-        if (action === "poll" || action === "history") {
+        if (action === "poll" || action === "history" || action === "incoming") {
           const roomId = url.searchParams.get("roomId") || "";
           const response = await connection.fetch("https://internal.invalid" + internalPath, {
             method: "POST", headers: { "content-type": "application/json" },
