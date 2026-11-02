@@ -16,7 +16,6 @@ import PhotoEditor from '../components/PhotoEditor';
 import LifestyleEditor from '../components/LifestyleEditor';
 import BadgesDisplay from '../components/BadgesDisplay';
 import { API_URL } from '../utils/constants';
-import { validateMobileNumber } from '../utils/helpers';
 import SectionCard from '../components/profile/SectionCard';
 
 const countryCallingCodes = [
