@@ -99,10 +99,44 @@ export default function IncomingCallMonitor() {
       const prefs = preferencesRef.current;
       if (!prefs.events[category]) return;
       if (prefs.channels.inApp && document.visibilityState === 'visible') {
-        toast.info(`${title}: ${body}`, {
-          autoClose: 7000,
-          onClick: url ? () => window.location.assign(url) : undefined
-        });
+        toast.info(
+          <div className="min-w-0">
+            <div className="font-semibold">{title}</div>
+            <div className="mt-1 text-sm">{body}</div>
+            {category === 'voiceCalls' || category === 'videoCalls' ? (
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                  onClick={event => {
+                    event.stopPropagation();
+                    if (url) window.location.assign(url);
+                  }}
+                >Answer</button>
+                <button
+                  type="button"
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                  onClick={async event => {
+                    event.stopPropagation();
+                    try {
+                      const incoming = await apiClient.get('/calls/incoming');
+                      if (incoming?.call?._id) {
+                        await apiClient.post('/calls/action', {
+                          callId: String(incoming.call._id),
+                          action: 'decline'
+                        });
+                      }
+                      closeToast();
+                    } catch (_) {
+                      toast.error('Could not reject the call. Open the chat and try again.');
+                    }
+                  }}
+                >Reject</button>
+              </div>
+            ) : null}
+          </div>,
+          { autoClose: category === 'voiceCalls' || category === 'videoCalls' ? false : 7000, closeOnClick: false }
+        );
       }
       if (prefs.channels.sounds) playTone(getAudioContext(), 740);
       if (prefs.channels.desktop && document.visibilityState !== 'visible' &&
@@ -171,8 +205,14 @@ export default function IncomingCallMonitor() {
         const category = call.type === 'video' ? 'videoCalls' : 'voiceCalls';
         const isTargetChatOpen = window.location.pathname === `/chat/${encodeURIComponent(call.roomId)}`;
         if (isTargetChatOpen) {
-          stopRingtone();
+          // ChatCallPanel owns the visible in-chat controls, but the global monitor
+          // must keep ringing until the recipient accepts or rejects the call.
           activeCallIdRef.current = callId;
+          if (preferencesRef.current.events[category] && preferencesRef.current.channels.callRingtone) {
+            startRingtone();
+          } else {
+            stopRingtone();
+          }
           return;
         }
         if (activeCallIdRef.current !== callId) {
