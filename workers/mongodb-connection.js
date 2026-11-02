@@ -3093,8 +3093,10 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
       }
       const calls = db.collection("callSessions");
+      // A user can participate in only one live call at a time, even if
+      // another conversation attempts to call them concurrently.
       const active = await calls.findOne({
-        roomId, status: { $in: ["ringing", "accepted"] },
+        status: { $in: ["ringing", "accepted"] },
         $or: [{ callerUid: uid }, { receiverUid: uid }]
       }, { projection: { _id: 1 } });
       if (active) return { status: 409, body: { error: "There is already an active call in this conversation" } };
