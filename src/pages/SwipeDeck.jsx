@@ -147,7 +147,7 @@ const SwipeDeck = () => {
     };
     window.addEventListener('keydown', handleSwipeKeys);
     return () => window.removeEventListener('keydown', handleSwipeKeys);
-  }, [users, isVoting, newMatchInfo, showFilters]);
+  }, [users, isVoting, newMatchInfo, showFilters, handleVote]);
 
   const handleSwipe = () => {
     // This function is called when the card animation is complete
