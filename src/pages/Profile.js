@@ -17,6 +17,7 @@ import LifestyleEditor from '../components/LifestyleEditor';
 import BadgesDisplay from '../components/BadgesDisplay';
 import { API_URL } from '../utils/constants';
 import SectionCard from '../components/profile/SectionCard';
+import NotificationPreferencesPanel from '../components/NotificationPreferencesPanel';
 
 const countryCallingCodes = [
   { country: 'United Arab Emirates', flag: '🇦🇪', code: '+971' },
@@ -498,6 +499,8 @@ function Profile() {
                               )}
                           </div>
                       )}
+
+                      {isOwnProfile && <NotificationPreferencesPanel />}
 
                       <div className="profile-settings-group">
                           <h3>Preferences &amp; help</h3>
