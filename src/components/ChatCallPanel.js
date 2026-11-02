@@ -59,11 +59,11 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   useEffect(() => {
     setHeaderTarget(typeof document !== 'undefined' ? document.getElementById(`chat-call-actions-${roomId}`) : null);
   }, [roomId]);
-  useEffect(() => { if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream; }, [localStream]);
+  useEffect(() => { if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream; }, [localStream, call?.status]);
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
     if (remoteAudioRef.current && remoteStream) remoteAudioRef.current.srcObject = remoteStream;
-  }, [remoteStream]);
+  }, [remoteStream, call?.status]);
 
   useEffect(() => {
     if (call?.status !== 'accepted' || !call.connectedAt) {
