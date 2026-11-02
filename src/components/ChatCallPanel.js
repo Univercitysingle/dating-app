@@ -18,6 +18,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [callDuration, setCallDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState(0);
+  const [callAlertsEnabled, setCallAlertsEnabled] = useState(() => {
+    try { return window.localStorage.getItem('dating-app-call-alerts') === 'enabled'; }
+    catch (_) { return false; }
+  });
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callRef = useRef(null);
@@ -30,6 +34,9 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
+  const ringtoneTimerRef = useRef(null);
+  const ringtoneContextRef = useRef(null);
+  const notifiedCallIdRef = useRef(null);
 
   useEffect(() => { callRef.current = call; }, [call]);
   useEffect(() => {
@@ -139,6 +146,76 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, [localStream]);
 
   const formatDuration = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+  const stopRingtone = useCallback(() => {
+    if (ringtoneTimerRef.current) {
+      window.clearInterval(ringtoneTimerRef.current);
+      ringtoneTimerRef.current = null;
+    }
+  }, []);
+
+  const playRingtone = useCallback(() => {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      const context = ringtoneContextRef.current || new AudioContextClass();
+      ringtoneContextRef.current = context;
+      if (context.state === 'suspended') context.resume().catch(() => {});
+      const playPair = () => {
+        if (context.state !== 'running') return;
+        const now = context.currentTime;
+        [0, 0.28].forEach(offset => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(880, now + offset);
+          oscillator.frequency.setValueAtTime(660, now + offset + 0.18);
+          gain.gain.setValueAtTime(0.0001, now + offset);
+          gain.gain.exponentialRampToValueAtTime(0.16, now + offset + 0.025);
+          gain.gain.setValueAtTime(0.16, now + offset + 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.2);
+          oscillator.connect(gain);
+          gain.connect(context.destination);
+          oscillator.start(now + offset);
+          oscillator.stop(now + offset + 0.21);
+          oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+        });
+      };
+      stopRingtone();
+      playPair();
+      ringtoneTimerRef.current = window.setInterval(playPair, 1800);
+    } catch (_) {
+      // Browser audio policy or unavailable audio hardware can block the ringtone.
+    }
+  }, [stopRingtone]);
+
+  const enableCallAlerts = async () => {
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        const context = ringtoneContextRef.current || new AudioContextClass();
+        ringtoneContextRef.current = context;
+        await context.resume();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        gain.gain.value = 0.0001;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.03);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      }
+      window.localStorage.setItem('dating-app-call-alerts', 'enabled');
+      setCallAlertsEnabled(true);
+      setStatus('Call alerts enabled on this device');
+      setError('');
+    } catch (_) {
+      setError('Could not enable sound alerts. Check your browser permissions.');
+    }
+  };
 
   const cleanupMedia = useCallback(() => {
     if (peerRef.current) {
@@ -370,7 +447,55 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const active = call && ['ringing', 'accepted'].includes(call.status);
   const videoCall = call?.type === 'video';
 
+  useEffect(() => {
+    if (!incoming || !call?._id) {
+      stopRingtone();
+      return undefined;
+    }
+    if (callAlertsEnabled) playRingtone();
+
+    const callId = String(call._id);
+    if (notifiedCallIdRef.current !== callId) {
+      notifiedCallIdRef.current = callId;
+      if ('Notification' in window && Notification.permission === 'granted' &&
+          document.visibilityState !== 'visible') {
+        try {
+          const notification = new Notification(
+            call.type === 'video' ? 'Incoming video call' : 'Incoming voice call',
+            {
+              body: `${otherUser?.name || 'Someone'} is calling you`,
+              tag: `incoming-call-${callId}`,
+              requireInteraction: true
+            }
+          );
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+        } catch (_) {
+          // Native notifications may be unavailable in some browser contexts.
+        }
+      }
+    }
+    return undefined;
+  }, [incoming, call?._id, call?.type, callAlertsEnabled, otherUser?.name, playRingtone, stopRingtone]);
+
+  useEffect(() => {
+    if (!incoming) stopRingtone();
+  }, [incoming, stopRingtone]);
+
+  useEffect(() => () => {
+    stopRingtone();
+    const context = ringtoneContextRef.current;
+    if (context && context.state !== 'closed') context.close().catch(() => {});
+    ringtoneContextRef.current = null;
+  }, [stopRingtone]);
+
   return <section className="chat-call-panel" aria-label="Voice and video calls">
+    {!callAlertsEnabled && <div className="mx-3 mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+      <span className="text-xs text-gray-600">Enable sound and browser alerts for incoming calls on this device.</span>
+      <button type="button" onClick={enableCallAlerts} className="call-utility-button">Enable call alerts</button>
+    </div>}
     {headerTarget && createPortal(
           <div className="chat-header-call-actions flex items-center gap-2">
             {!active && <>
