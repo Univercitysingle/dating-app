@@ -43,6 +43,7 @@ import TermsPage from './pages/legal/TermsPage';
 import CookiePolicyPage from './pages/legal/CookiePolicyPage';
 import PrivacySettingsPage from './pages/legal/PrivacySettingsPage';
 import DebugSwipeCardPage from './pages/DebugSwipeCardPage';
+import IncomingCallMonitor from './components/IncomingCallMonitor';
 
 function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -110,6 +111,7 @@ function App() {
       <AuthProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <SocketProvider>
+            <IncomingCallMonitor />
             <ToastContainer
               position="top-right"
             autoClose={5000}
