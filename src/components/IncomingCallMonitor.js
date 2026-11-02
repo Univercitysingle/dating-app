@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
@@ -38,6 +38,32 @@ export default function IncomingCallMonitor() {
   const seenMessagesRef = useRef(new Set());
   const initializedRef = useRef({ notifications: false, messages: false });
   const activeCallIdRef = useRef(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [callActionBusy, setCallActionBusy] = useState(false);
+  const [callActionError, setCallActionError] = useState('');
+
+  const answerIncomingCall = () => {
+    if (!incomingCall?.roomId) return;
+    window.location.assign(`/chat/${encodeURIComponent(incomingCall.roomId)}`);
+  };
+
+  const rejectIncomingCall = async () => {
+    if (!incomingCall?._id || callActionBusy) return;
+    setCallActionBusy(true);
+    setCallActionError('');
+    try {
+      await apiClient.post('/calls/action', {
+        callId: String(incomingCall._id),
+        action: 'decline'
+      });
+      setIncomingCall(null);
+      activeCallIdRef.current = null;
+    } catch (error) {
+      setCallActionError(error?.data?.error || error?.data?.message || 'Could not reject the call. Please try again.');
+    } finally {
+      setCallActionBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!user?.uid) return undefined;
