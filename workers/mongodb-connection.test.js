@@ -1027,3 +1027,56 @@ test("profile updates accept education text from onboarding and structured legac
   assert.deepEqual(saved.education, { school: "Example University", degree: "BSc" });
 });
 
+
+
+test("call signaling keeps a rolling candidate buffer without a lifetime 429 cap", async () => {
+  const callId = "0123456789abcdef01234567";
+  let capturedUpdate;
+  let capturedFilter;
+  const activeCall = {
+    _id: { toString: () => callId },
+    callerUid: "caller-uid",
+    receiverUid: "receiver-uid",
+    status: "accepted",
+    signals: Array.from({ length: 300 }, (_, index) => ({ signalId: String(index) }))
+  };
+  const calls = {
+    async findOne() { return activeCall; },
+    async updateOne(filter, update) {
+      capturedFilter = filter;
+      capturedUpdate = update;
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => calls }) });
+  const result = await connection.sendCallSignal("caller-uid", {
+    callId,
+    candidate: { candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 5000 typ host", sdpMid: "0", sdpMLineIndex: 0 }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.success, true);
+  assert.equal(capturedFilter._id, activeCall._id);
+  assert.deepEqual(capturedFilter.$or, [{ callerUid: "caller-uid" }, { receiverUid: "caller-uid" }]);
+  assert.equal(capturedUpdate.$push.signals.$slice, -300);
+  assert.equal(capturedUpdate.$push.signals.$each.length, 1);
+  assert.equal(capturedUpdate.$push.signals.$each[0].toUid, "receiver-uid");
+});
+
+test("call signaling rejects non-participants before writing candidates", async () => {
+  const callId = "0123456789abcdef01234567";
+  let writeAttempted = false;
+  const calls = {
+    async findOne() {
+      return { _id: {}, callerUid: "caller-uid", receiverUid: "receiver-uid", status: "accepted" };
+    },
+    async updateOne() { writeAttempted = true; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => calls }) });
+  const result = await connection.sendCallSignal("attacker-uid", {
+    callId, candidate: { candidate: "candidate:1", sdpMid: "0", sdpMLineIndex: 0 }
+  });
+  assert.equal(result.status, 403);
+  assert.equal(writeAttempted, false);
+});
