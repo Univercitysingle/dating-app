@@ -103,7 +103,7 @@ export default function IncomingCallMonitor() {
           <div className="min-w-0">
             <div className="font-semibold">{title}</div>
             <div className="mt-1 text-sm">{body}</div>
-            {category === 'voiceCalls' || category === 'videoCalls' ? (
+            {title.startsWith('Incoming ') ? (
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -135,7 +135,7 @@ export default function IncomingCallMonitor() {
               </div>
             ) : null}
           </div>,
-          { autoClose: category === 'voiceCalls' || category === 'videoCalls' ? false : 7000, closeOnClick: false }
+          { autoClose: title.startsWith('Incoming ') ? false : 7000, closeOnClick: false }
         );
       }
       if (prefs.channels.sounds) playTone(getAudioContext(), 740);
