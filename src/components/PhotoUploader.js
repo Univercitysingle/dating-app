@@ -3,42 +3,6 @@ import apiClient from '../api/apiClient';
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
-const MAX_IMAGE_WIDTH = 600;
-const WEBP_QUALITY = 0.8;
-
-async function normalizePhotoForUpload(file) {
-  if (typeof createImageBitmap !== 'function') {
-    throw new Error('This browser cannot optimize photos. Please try a current version of Chrome, Edge, Firefox, or Safari.');
-  }
-
-  const bitmap = await createImageBitmap(file);
-  try {
-    const scale = Math.min(1, MAX_IMAGE_WIDTH / bitmap.width);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Photo optimization is not available in this browser.');
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob((result) => {
-        if (!result) reject(new Error('Could not optimize this photo.'));
-        else resolve(result);
-      }, 'image/webp', WEBP_QUALITY);
-    });
-    if (blob.type !== 'image/webp') {
-      throw new Error('This browser could not convert the photo to WebP.');
-    }
-    if (blob.size < 1 || blob.size > MAX_PHOTO_SIZE) {
-      throw new Error('Optimized photo must be smaller than 5 MB.');
-    }
-    const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
-    return new File([blob], baseName + '.webp', { type: 'image/webp', lastModified: Date.now() });
-  } finally {
-    bitmap.close?.();
-  }
-}
 
 const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -56,18 +20,17 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       return;
     }
     if (file.size < 1 || file.size > MAX_PHOTO_SIZE) {
-      setError('Photo must be smaller than 5 MB.');
+      setError('Photo must be 5 MB or smaller.');
       input.value = '';
       return;
     }
 
     setIsUploading(true);
     try {
-      // Match the legacy Sharp pipeline: max width 600px, no enlargement,
-      // WebP output, and quality 80 before the API writes the object to B2.
-      const optimizedPhoto = await normalizePhotoForUpload(file);
+      // Upload the original file unchanged. Do not resize, recompress, or
+      // convert it, so its original dimensions and image quality are preserved.
       const formData = new FormData();
-      formData.append('photo', optimizedPhoto);
+      formData.append('photo', file, file.name);
 
       const response = await apiClient.post('/users/photos', formData);
       onUploadComplete(response);
