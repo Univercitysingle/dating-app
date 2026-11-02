@@ -997,3 +997,33 @@ test("pending WebXPay subscription checkout blocks a second checkout and expires
   assert.equal(expiredFilter.status, "pending");
   assert.equal(expiredUpdate.$set.cancellationReason, "payment_timeout");
 });
+
+test("profile updates accept education text from onboarding and structured legacy education", async () => {
+  const storedUser = { uid: "user-education", isOnboardingComplete: false };
+  let saved;
+  const users = {
+    async findOne(query) {
+      assert.equal(query.uid, "user-education");
+      return { ...storedUser };
+    },
+    async updateOne(query, update) {
+      saved = update.$set;
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection() { return users; } });
+  connection.getCurrentUserProfile = async () => ({ status: 200, body: { education: saved.education } });
+
+  const textResult = await connection.updateCurrentUserProfile("user-education", { education: "Bachelor's Degree" });
+  assert.equal(textResult.status, 200);
+  assert.equal(saved.education, "Bachelor's Degree");
+
+  const structuredResult = await connection.updateCurrentUserProfile("user-education", {
+    education: { school: "Example University", degree: "BSc" }
+  });
+  assert.equal(structuredResult.status, 200);
+  assert.deepEqual(saved.education, { school: "Example University", degree: "BSc" });
+});
+
