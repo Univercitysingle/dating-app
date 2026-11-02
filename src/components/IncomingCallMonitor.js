@@ -14,9 +14,10 @@ const DEFAULT_PREFERENCES = {
   }
 };
 
-function categoryForNotification(type) {
+function categoryForNotification(type, notification = {}) {
   if (type === 'match') return 'newMatches';
   if (type === 'like' || type === 'superlike') return 'newLikes';
+  if (type === 'missed_call') return notification.callType === 'video' ? 'videoCalls' : 'voiceCalls';
   if (type === 'message' || type === 'new_message') return 'newMessages';
   if (type === 'profile_view') return 'profileViews';
   if (type === 'room_invitation') return 'roomInvitations';
@@ -212,12 +213,18 @@ export default function IncomingCallMonitor() {
             currentIds.add(id);
             if (!initializedRef.current.notifications) return;
             if (seenNotificationsRef.current.has(id)) return;
-            const category = categoryForNotification(item.type);
+            const category = categoryForNotification(item.type, item);
             if (category) {
               const label = item.type === 'match' ? 'New match'
                 : item.type === 'superlike' ? 'New Super Like'
-                  : item.type === 'like' ? 'New like' : 'New activity';
-              notify(label, 'You have a new update.', category, item.type === 'match' ? '/matches' : '/likes');
+                  : item.type === 'like' ? 'New like'
+                    : item.type === 'missed_call' ? (item.callType === 'video' ? 'Missed video call' : 'Missed voice call')
+                      : 'New activity';
+              const destination = item.roomId
+                ? `/chat/${encodeURIComponent(item.roomId)}`
+                : item.type === 'match' ? '/matches' : '/likes';
+              const message = item.type === 'missed_call' ? 'You missed a call.' : 'You have a new update.';
+              notify(label, message, category, destination);
             }
           });
           currentIds.forEach(id => seenNotificationsRef.current.add(id));
