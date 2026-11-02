@@ -18,10 +18,27 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [callDuration, setCallDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const [connectionQuality, setConnectionQuality] = useState(0);
-  const [callAlertsEnabled, setCallAlertsEnabled] = useState(() => {
-    try { return window.localStorage.getItem('dating-app-call-alerts') === 'enabled'; }
-    catch (_) { return false; }
-  });
+  const [callAlertsEnabled, setCallAlertsEnabled] = useState(true);
+  const [callAlertEventEnabled, setCallAlertEventEnabled] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const apply = preferences => {
+      const channels = preferences?.channels || {};
+      const events = preferences?.events || {};
+      setCallAlertsEnabled(channels.callRingtone !== false);
+      setCallAlertEventEnabled(call?.type === 'video' ? events.videoCalls !== false : events.voiceCalls !== false);
+    };
+    apiClient.get('/notification-preferences').then(value => {
+      if (active) apply(value);
+    }).catch(() => {});
+    const onUpdate = event => { if (active) apply(event.detail); };
+    window.addEventListener('dating-app-notification-preferences-updated', onUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener('dating-app-notification-preferences-updated', onUpdate);
+    };
+  }, [call?.type]);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
   const callRef = useRef(null);
@@ -188,34 +205,6 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       // Browser audio policy or unavailable audio hardware can block the ringtone.
     }
   }, [stopRingtone]);
-
-  const enableCallAlerts = async () => {
-    try {
-      if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        const context = ringtoneContextRef.current || new AudioContextClass();
-        ringtoneContextRef.current = context;
-        await context.resume();
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        gain.gain.value = 0.0001;
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start();
-        oscillator.stop(context.currentTime + 0.03);
-        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-      }
-      window.localStorage.setItem('dating-app-call-alerts', 'enabled');
-      setCallAlertsEnabled(true);
-      setStatus('Call alerts enabled on this device');
-      setError('');
-    } catch (_) {
-      setError('Could not enable sound alerts. Check your browser permissions.');
-    }
-  };
 
   const cleanupMedia = useCallback(() => {
     if (peerRef.current) {
@@ -452,33 +441,11 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       stopRingtone();
       return undefined;
     }
-    if (callAlertsEnabled) playRingtone();
-
-    const callId = String(call._id);
-    if (notifiedCallIdRef.current !== callId) {
-      notifiedCallIdRef.current = callId;
-      if ('Notification' in window && Notification.permission === 'granted' &&
-          document.visibilityState !== 'visible') {
-        try {
-          const notification = new Notification(
-            call.type === 'video' ? 'Incoming video call' : 'Incoming voice call',
-            {
-              body: `${otherUser?.name || 'Someone'} is calling you`,
-              tag: `incoming-call-${callId}`,
-              requireInteraction: true
-            }
-          );
-          notification.onclick = () => {
-            window.focus();
-            notification.close();
-          };
-        } catch (_) {
-          // Native notifications may be unavailable in some browser contexts.
-        }
-      }
-    }
+    if (callAlertsEnabled && callAlertEventEnabled) playRingtone();
+    else stopRingtone();
+    notifiedCallIdRef.current = String(call._id);
     return undefined;
-  }, [incoming, call?._id, call?.type, callAlertsEnabled, otherUser?.name, playRingtone, stopRingtone]);
+  }, [incoming, call?._id, call?.type, callAlertsEnabled, callAlertEventEnabled, playRingtone, stopRingtone]);
 
   useEffect(() => {
     if (!incoming) stopRingtone();
@@ -492,10 +459,6 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, [stopRingtone]);
 
   return <section className="chat-call-panel" aria-label="Voice and video calls">
-    {!callAlertsEnabled && <div className="mx-3 mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
-      <span className="text-xs text-gray-600">Enable sound and browser alerts for incoming calls on this device.</span>
-      <button type="button" onClick={enableCallAlerts} className="call-utility-button">Enable call alerts</button>
-    </div>}
     {headerTarget && createPortal(
           <div className="chat-header-call-actions flex items-center gap-2">
             {!active && <>
