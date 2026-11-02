@@ -1141,3 +1141,36 @@ test("accepted calls stay active while both participants renew their heartbeats"
   assert.equal(result.body.call.receiverLastSeenAt instanceof Date, true);
   assert.equal(updates.length, 1);
 });
+
+
+test("a user cannot start or receive overlapping calls in different chat rooms", async () => {
+  let activeCallFilter;
+  let insertAttempted = false;
+  const users = {
+    async findOne({ uid }) { return { uid, blocked: [], accountStatus: "active" }; }
+  };
+  const calls = {
+    async findOne(filter) {
+      activeCallFilter = filter;
+      return { _id: "existing-active-call" };
+    },
+    async insertOne() { insertAttempted = true; throw new Error("Should not create a second call"); }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({ collection(name) { return name === "users" ? users : calls; } })
+  });
+  const result = await connection.createCall("caller-uid", {
+    roomId: "caller-uid-new-receiver",
+    receiverUid: "new-receiver",
+    type: "audio",
+    offer: { type: "offer", sdp: "v=0" }
+  });
+  assert.equal(result.status, 409);
+  assert.equal(activeCallFilter.roomId, undefined);
+  assert.deepEqual(activeCallFilter.$or, [
+    { callerUid: "caller-uid" },
+    { receiverUid: "caller-uid" }
+  ]);
+  assert.equal(insertAttempted, false);
+});
