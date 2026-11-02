@@ -449,6 +449,18 @@ function Login() {
           )}
         </div>
       </div>
+      <script type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": [
+            { "@type": "Question", "name": "What is Hart2Hart?", "acceptedAnswer": { "@type": "Answer", "text": "Hart2Hart is an online dating app where adults can discover profiles, show interest, match and communicate." } },
+            { "@type": "Question", "name": "How do I start using Hart2Hart?", "acceptedAnswer": { "@type": "Answer", "text": "Create an account, complete your profile and browse the Discover experience to find people you may want to connect with." } },
+            { "@type": "Question", "name": "Can I chat with people I connect with?", "acceptedAnswer": { "@type": "Answer", "text": "The app includes conversations for connecting with other members. Video calling is available where supported." } },
+            { "@type": "Question", "name": "Is Hart2Hart for adults?", "acceptedAnswer": { "@type": "Answer", "text": "Hart2Hart is intended for adults aged 18 and over." } }
+          ]
+        })}
+      </script>
       <section className="login-seo-content relative z-10 w-full max-w-5xl mt-10 mb-8 px-2 text-white" aria-labelledby="dating-intro-title">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-pink-200">Hart2Hart</p>
