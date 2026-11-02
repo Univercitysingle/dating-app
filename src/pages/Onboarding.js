@@ -33,7 +33,7 @@ const Onboarding = () => {
       setError('Please fill out all fields, upload a photo, and select a personality type.');
       return;
     }
-    if (!/^\\+[1-9]\\d{7,14}$/.test(mobileNumber)) {
+    if (!/^\+[1-9]\d{7,14}$/.test(mobileNumber.trim())) {
       setError('Enter your mobile number in international format, for example +971501234567.');
       return;
     }
@@ -50,7 +50,7 @@ const Onboarding = () => {
           photos: [{ url: photo, order: 0 }],
           location,
           personalityType,
-          mobileNumber,
+          mobileNumber: mobileNumber.trim(),
           education,
           relationshipGoals,
           lifestyle: { lookingFor },
