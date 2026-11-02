@@ -1230,3 +1230,64 @@ test("global incoming call lookup returns only the authenticated receiver's live
   assert.equal(updates[0].filter._id, call._id);
   assert.ok(updates[0].update.$set.receiverLastSeenAt instanceof Date);
 });
+
+
+test("notification preferences default every delivery channel and event category to enabled", async () => {
+  let projection;
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "users");
+    return { async findOne(query, options) {
+      assert.equal(query.uid, "user-defaults");
+      projection = options.projection;
+      return { uid: "user-defaults" };
+    } };
+  } });
+  const result = await connection.getNotificationPreferences("user-defaults");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.channels, {
+    inApp: true, desktop: true, sounds: true, callRingtone: true
+  });
+  assert.ok(Object.values(result.body.events).every(value => value === true));
+  assert.deepEqual(projection, { notificationPreferences: 1, _id: 0 });
+});
+
+test("notification preferences persist validated partial changes without resetting other choices", async () => {
+  let saved;
+  const user = { _id: "user-object-id", notificationPreferences: {
+    channels: { inApp: false, desktop: true, sounds: true, callRingtone: true },
+    events: { newMatches: false, newLikes: true, newMessages: true }
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "users");
+    return {
+      async findOne(query) { assert.equal(query.uid, "user-settings"); return user; },
+      async updateOne(query, update) { assert.equal(query._id, user._id); saved = update.$set.notificationPreferences; return { modifiedCount: 1 }; }
+    };
+  } });
+  const result = await connection.updateNotificationPreferences("user-settings", {
+    channels: { callRingtone: false },
+    events: { voiceCalls: false }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(saved.channels.inApp, false);
+  assert.equal(saved.channels.callRingtone, false);
+  assert.equal(saved.events.newMatches, false);
+  assert.equal(saved.events.voiceCalls, false);
+  assert.equal(saved.events.newMessages, true);
+});
+
+test("notification preferences reject unknown keys and non-boolean values", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const unknown = await connection.updateNotificationPreferences("user-settings", {
+    events: { administratorAlerts: true }
+  });
+  const invalid = await connection.updateNotificationPreferences("user-settings", {
+    channels: { desktop: "yes" }
+  });
+  assert.equal(unknown.status, 400);
+  assert.equal(invalid.status, 400);
+});
