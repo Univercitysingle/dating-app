@@ -1,17 +1,18 @@
 {
-  "short_name": "ReactApp",
-  "name": "My React App",
+  "short_name": "Hart2Hart",
+  "name": "Hart2Hart | Online Dating and Genuine Connections",
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff",
+  "theme_color": "#24172d",
+  "background_color": "#24172d",
   "orientation": "portrait",
   "scope": "/",
-  "description": "A React app with PWA support",
+  "description": "Discover profiles and build genuine connections on Hart2Hart, an online dating platform for adults aged 18 and over.",
   "icons": [
     {
       "src": "/logo.jpg",
       "type": "image/jpeg",
+      "sizes": "any",
       "purpose": "any"
     }
   ]
