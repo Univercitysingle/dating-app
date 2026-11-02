@@ -39,6 +39,30 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
   assert.deepEqual(project.$let.vars.boostedIds, { $map: { input: { $ifNull: ["$boostedUsers", []] }, as: "boostedUser", in: "$$boostedUser.uid" } });
 });
 
+test("chat history is denied when either participant has blocked the other", async () => {
+  for (const blockedBy of ["current-user", "other-user"]) {
+    const users = {
+      async findOne({ uid }) {
+        if (uid === "current-user") return { uid, role: "user", blocked: blockedBy === uid ? ["other-user"] : [] };
+        if (uid === "other-user") return { uid, blocked: blockedBy === uid ? ["current-user"] : [] };
+        return null;
+      }
+    };
+    const chatmessages = {
+      async findOne() { return { senderUid: "current-user", receiverUid: "other-user" }; },
+      find() { assert.fail("Blocked chat history must not be queried"); }
+    };
+    const db = { collection(name) { return name === "users" ? users : chatmessages; } };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    const result = await connection.getChatHistory("current-user", "current-user-other-user");
+    assert.equal(result.status, 403);
+    assert.match(result.body.error, /unavailable/i);
+  }
+});
+
+
 
 test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and PayHere unique indexes", async () => {
   const order = [];

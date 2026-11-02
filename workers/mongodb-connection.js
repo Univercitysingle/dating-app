@@ -3443,18 +3443,27 @@ export class MongoDBConnection {
     skip = Number.isInteger(skip) ? Math.max(0, Math.min(skip, 100000)) : 0;
     try {
       const db = this.getDatabase(await this.getClient());
-      const user = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      const user = await db.collection("users").findOne({ uid }, { projection: { role: 1, blocked: 1 } });
       if (!user) return { status: 404, body: { error: "User not found" } };
-      const access = user.role === "superadmin" ? {} : {
-        $or: [{ senderUid: uid }, { receiverUid: uid }]
-      };
-      const query = { roomId, ...access };
+      let query = { roomId };
+      if (user.role !== "superadmin") {
+        const participantQuery = { roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] };
+        const conversation = await db.collection("chatmessages").findOne(
+          participantQuery,
+          { projection: { senderUid: 1, receiverUid: 1 } }
+        );
+        if (!conversation) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
+        const otherUid = conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid;
+        const otherUser = await db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } });
+        if (!otherUser ||
+            (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
+            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) {
+          return { status: 403, body: { error: "Chat history is unavailable for this conversation." } };
+        }
+        query = participantQuery;
+      }
       const messages = await db.collection("chatmessages").find(query)
         .sort({ timestamp: 1 }).skip(skip).limit(limit).toArray();
-      if (user.role !== "superadmin" && messages.length === 0) {
-        const hasConversation = await db.collection("chatmessages").findOne({ roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] }, { projection: { _id: 1 } });
-        if (!hasConversation) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
-      }
       return { status: 200, body: { messages } };
     } catch {
       return { status: 503, body: { error: "Chat history unavailable" } };
