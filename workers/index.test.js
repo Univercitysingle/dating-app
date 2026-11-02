@@ -1725,3 +1725,20 @@ test("WebXPay callback rejects a status code in the wrong field", async () => {
   assert.equal(response.status, 400);
   assert.equal(settled, false);
 });
+
+
+test("call signaling endpoints bypass the generic per-IP API limiter", async () => {
+  let limiterCalls = 0;
+  const response = await worker.fetch(new Request("https://dating-app.test/api/calls/poll?roomId=user-other", {
+    headers: { "CF-Connecting-IP": "203.0.113.77" }
+  }), {
+    FIREBASE_PROJECT_ID: "",
+    RATE_LIMITER: {
+      idFromName() { return "call-test"; },
+      get() { return { async fetch() { limiterCalls += 1; return new Response(JSON.stringify({ allowed: false }), { status: 200 }); } }; }
+    }
+  });
+  assert.equal(limiterCalls, 0);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /Authentication is not configured/);
+});
