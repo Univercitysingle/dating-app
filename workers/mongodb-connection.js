@@ -2344,6 +2344,15 @@ export class MongoDBConnection {
       for (const key of allowedFields) {
         if (update[key] === undefined) continue;
         if (nestedAllowed[key]) {
+          // The onboarding and profile forms represent education as a plain text
+          // value. Preserve that established schema while continuing to accept
+          // the structured { school, degree } shape used by older clients.
+          if (key === "education" && typeof update[key] === "string") {
+            const education = update[key].trim();
+            if (education.length > 200) return { status: 400, body: { error: "Education must be 200 characters or fewer." } };
+            sanitizedUpdate[key] = education;
+            continue;
+          }
           if (!update[key] || typeof update[key] !== "object" || Array.isArray(update[key])) return { status: 400, body: { error: "Invalid nested profile field format" } };
           sanitizedUpdate[key] = {};
           for (const prop of nestedAllowed[key]) if (update[key][prop] !== undefined) sanitizedUpdate[key][prop] = update[key][prop];
