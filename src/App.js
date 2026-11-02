@@ -11,6 +11,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
+import LandingPage from './pages/LandingPage';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
 import Chat from './pages/Chat';
@@ -78,6 +79,20 @@ function PrivateRoute({ children }) {
 
   console.log('PrivateRoute Decision: User is authenticated and onboarded, rendering children.');
   return children;
+}
+
+function PublicHomeRoute() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-950 text-white">
+        <p>Loading Hart2Hart...</p>
+      </div>
+    );
+  }
+
+  return user ? <Navigate to="/discover" replace /> : <LandingPage />;
 }
 
 function AdminRoute({ children }) {
@@ -187,7 +202,7 @@ function App() {
             </Route>
 
             {/* Default route */}
-            <Route path="/" element={<Navigate to="/discover" />} />
+            <Route path="/" element={<PublicHomeRoute />} />
             <Route path="*" element={<Navigate to="/discover" />} />
 
             {/* --- JULES'S TEMPORARY DEBUG ROUTE --- */}
