@@ -66,7 +66,7 @@ const Onboarding = () => {
       if (lookingFor === 'Casual (FWB)' && !sexualOrientation) return 'Please select your sexual orientation.';
     }
     if (step === 4) {
-      if (!/^\\+[1-9]\\d{7,14}$/.test(mobileNumber.trim())) return 'Enter your mobile number in international format, for example +971501234567.';
+      if (!/^\+[1-9]\d{7,14}$/.test(mobileNumber.trim())) return 'Enter your mobile number in international format, for example +971501234567.';
       const feet = Number(heightFeet);
       const inches = Number(heightInches);
       if (!heightFeet || !heightInches || feet < 3 || feet > 8 || inches < 0 || inches > 11) return 'Enter a valid height in feet and inches.';
