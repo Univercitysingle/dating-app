@@ -169,19 +169,16 @@ export default function IncomingCallMonitor() {
         const callId = String(call._id);
         const category = call.type === 'video' ? 'videoCalls' : 'voiceCalls';
         const isTargetChatOpen = window.location.pathname === `/chat/${encodeURIComponent(call.roomId)}`;
-        if (isTargetChatOpen) {
-          stopRingtone();
-          activeCallIdRef.current = callId;
-          return;
-        }
         if (activeCallIdRef.current !== callId) {
           activeCallIdRef.current = callId;
-          notify(
-            call.type === 'video' ? 'Incoming video call' : 'Incoming voice call',
-            `${call.callerName || 'Someone'} is calling you`,
-            category,
-            `/chat/${encodeURIComponent(call.roomId)}`
-          );
+          if (!isTargetChatOpen) {
+            notify(
+              call.type === 'video' ? 'Incoming video call' : 'Incoming voice call',
+              `${call.callerName || 'Someone'} is calling you`,
+              category,
+              `/chat/${encodeURIComponent(call.roomId)}`
+            );
+          }
         }
         if (preferencesRef.current.events[category] && preferencesRef.current.channels.callRingtone) {
           startRingtone();
