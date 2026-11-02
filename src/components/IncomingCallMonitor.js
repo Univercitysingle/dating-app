@@ -1,175 +1,281 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 
+const DEFAULT_PREFERENCES = {
+  channels: { inApp: true, desktop: true, sounds: true, callRingtone: true },
+  events: {
+    newMatches: true, newLikes: true, newMessages: true,
+    voiceCalls: true, videoCalls: true, profileViews: true,
+    roomInvitations: true, roomBookings: true, subscriptionUpdates: true,
+    paymentUpdates: true, supportUpdates: true, securityAlerts: true,
+    productUpdates: true
+  }
+};
+
+function categoryForNotification(type) {
+  if (type === 'match') return 'newMatches';
+  if (type === 'like' || type === 'superlike') return 'newLikes';
+  if (type === 'message' || type === 'new_message') return 'newMessages';
+  if (type === 'profile_view') return 'profileViews';
+  if (type === 'room_invitation') return 'roomInvitations';
+  if (type === 'room_booking' || type === 'booking_update') return 'roomBookings';
+  if (type === 'subscription') return 'subscriptionUpdates';
+  if (type === 'payment') return 'paymentUpdates';
+  if (type === 'support') return 'supportUpdates';
+  if (type === 'security') return 'securityAlerts';
+  if (type === 'product_update') return 'productUpdates';
+  return null;
+}
+
 export default function IncomingCallMonitor() {
   const { user } = useAuth();
-  const [alertsEnabled, setAlertsEnabled] = useState(() => {
-    try { return window.localStorage.getItem('dating-app-call-alerts') === 'enabled'; }
-    catch (_) { return false; }
-  });
-  const lastCallIdRef = useRef(null);
-  const ringtoneRef = useRef({ context: null, timer: null });
+  const audioRef = useRef({ context: null, ringtoneTimer: null });
+  const preferencesRef = useRef(DEFAULT_PREFERENCES);
+  const seenNotificationsRef = useRef(new Set());
+  const seenMessagesRef = useRef(new Set());
+  const initializedRef = useRef({ notifications: false, messages: false });
+  const activeCallIdRef = useRef(null);
 
   useEffect(() => {
+    if (!user?.uid) return undefined;
     let mounted = true;
-    let timer = null;
-    let requestInFlight = false;
+    let callTimer = null;
+    let activityTimer = null;
+    let callInFlight = false;
+    let activityInFlight = false;
 
     const stopRingtone = () => {
-      if (ringtoneRef.current.timer) {
-        window.clearInterval(ringtoneRef.current.timer);
-        ringtoneRef.current.timer = null;
+      if (audioRef.current.ringtoneTimer) {
+        window.clearInterval(audioRef.current.ringtoneTimer);
+        audioRef.current.ringtoneTimer = null;
       }
+    };
+
+    const getAudioContext = () => {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      if (!audioRef.current.context || audioRef.current.context.state === 'closed') {
+        audioRef.current.context = new AudioContextClass();
+      }
+      return audioRef.current.context;
+    };
+
+    const playTone = (context, frequency = 740) => {
+      if (!context || context.state !== 'running') return;
+      try {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const now = context.currentTime;
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(now);
+        oscillator.stop(now + 0.21);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      } catch (_) {}
     };
 
     const startRingtone = () => {
-      if (ringtoneRef.current.timer || !alertsEnabled) return;
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) return;
-      try {
-        const context = ringtoneRef.current.context || new AudioContextClass();
-        ringtoneRef.current.context = context;
-        if (context.state === 'suspended') context.resume().catch(() => {});
-        const ring = () => {
-          if (context.state !== 'running') return;
-          const now = context.currentTime;
-          [0, 0.3].forEach(offset => {
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, now + offset);
-            oscillator.frequency.setValueAtTime(660, now + offset + 0.18);
-            gain.gain.setValueAtTime(0.0001, now + offset);
-            gain.gain.exponentialRampToValueAtTime(0.14, now + offset + 0.025);
-            gain.gain.setValueAtTime(0.14, now + offset + 0.14);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.2);
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-            oscillator.start(now + offset);
-            oscillator.stop(now + offset + 0.21);
-            oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-          });
-        };
-        ring();
-        ringtoneRef.current.timer = window.setInterval(ring, 1800);
-      } catch (_) {
-        // Audio can remain unavailable until the user enables it from a gesture.
+      if (audioRef.current.ringtoneTimer || !preferencesRef.current.channels.callRingtone) return;
+      const context = getAudioContext();
+      if (!context) return;
+      const ring = () => {
+        if (context.state !== 'running') return;
+        playTone(context, 880);
+        window.setTimeout(() => playTone(context, 660), 260);
+      };
+      ring();
+      audioRef.current.ringtoneTimer = window.setInterval(ring, 1800);
+    };
+
+    const notify = (title, body, category, url = null) => {
+      const prefs = preferencesRef.current;
+      if (!prefs.events[category]) return;
+      if (prefs.channels.inApp && document.visibilityState === 'visible') {
+        toast.info(`${title}: ${body}`, {
+          autoClose: 7000,
+          onClick: url ? () => window.location.assign(url) : undefined
+        });
+      }
+      if (prefs.channels.sounds) playTone(getAudioContext(), 740);
+      if (prefs.channels.desktop && document.visibilityState !== 'visible' &&
+          'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const notification = new Notification(title, { body, tag: `dating-app-${category}-${Date.now()}` });
+          if (url) notification.onclick = () => {
+            window.focus();
+            window.location.assign(url);
+            notification.close();
+          };
+        } catch (_) {}
       }
     };
 
-    const checkIncomingCall = async () => {
-      if (requestInFlight || !user?.uid) return;
-      requestInFlight = true;
+    const unlockOnFirstGesture = () => {
+      const context = getAudioContext();
+      if (context?.state === 'suspended') context.resume().catch(() => {});
+      if (preferencesRef.current.channels.desktop && 'Notification' in window &&
+          Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+      window.removeEventListener('pointerdown', unlockOnFirstGesture);
+      window.removeEventListener('keydown', unlockOnFirstGesture);
+    };
+    window.addEventListener('pointerdown', unlockOnFirstGesture, { passive: true });
+    window.addEventListener('keydown', unlockOnFirstGesture);
+
+    const loadPreferences = async () => {
+      try {
+        const saved = await apiClient.get('/notification-preferences');
+        if (mounted) {
+          preferencesRef.current = {
+            channels: { ...DEFAULT_PREFERENCES.channels, ...(saved?.channels || {}) },
+            events: { ...DEFAULT_PREFERENCES.events, ...(saved?.events || {}) }
+          };
+        }
+      } catch (_) {
+        // Keep all notification categories enabled by default if preferences are temporarily unavailable.
+      }
+    };
+
+    const onPreferencesUpdated = event => {
+      const value = event.detail || {};
+      preferencesRef.current = {
+        channels: { ...DEFAULT_PREFERENCES.channels, ...(value.channels || {}) },
+        events: { ...DEFAULT_PREFERENCES.events, ...(value.events || {}) }
+      };
+      if (!preferencesRef.current.channels.callRingtone) stopRingtone();
+    };
+    window.addEventListener('dating-app-notification-preferences-updated', onPreferencesUpdated);
+
+    const checkCall = async () => {
+      if (callInFlight) return;
+      callInFlight = true;
       try {
         const result = await apiClient.get('/calls/incoming');
         if (!mounted) return;
         const call = result?.call;
         if (!call || call.status !== 'ringing') {
-          lastCallIdRef.current = null;
+          activeCallIdRef.current = null;
           stopRingtone();
           return;
         }
-
         const callId = String(call._id);
-        const currentChatPath = `/chat/${encodeURIComponent(call.roomId)}`;
-        const chatIsOpen = window.location.pathname === currentChatPath;
-        if (chatIsOpen) {
+        const category = call.type === 'video' ? 'videoCalls' : 'voiceCalls';
+        const isTargetChatOpen = window.location.pathname === `/chat/${encodeURIComponent(call.roomId)}`;
+        if (isTargetChatOpen) {
           stopRingtone();
+          activeCallIdRef.current = callId;
           return;
         }
-
-        startRingtone();
-        if (lastCallIdRef.current !== callId) {
-          lastCallIdRef.current = callId;
-          const callerName = call.callerName || 'Someone';
-          const message = call.type === 'video' ? 'Incoming video call' : 'Incoming voice call';
-          const openChat = () => window.location.assign(currentChatPath);
-
-          if (document.visibilityState === 'visible') {
-            toast.info(`${message} from ${callerName}. Select to open the conversation.`, {
-              autoClose: false,
-              closeOnClick: true,
-              onClick: openChat
-            });
-          } else if ('Notification' in window && Notification.permission === 'granted') {
-            try {
-              const notification = new Notification(message, {
-                body: `${callerName} is calling you`,
-                tag: `incoming-call-${callId}`,
-                requireInteraction: true
-              });
-              notification.onclick = () => {
-                window.focus();
-                openChat();
-                notification.close();
-              };
-            } catch (_) {
-              // Notifications may be blocked by the browser or operating system.
-            }
-          }
+        if (activeCallIdRef.current !== callId) {
+          activeCallIdRef.current = callId;
+          notify(
+            call.type === 'video' ? 'Incoming video call' : 'Incoming voice call',
+            `${call.callerName || 'Someone'} is calling you`,
+            category,
+            `/chat/${encodeURIComponent(call.roomId)}`
+          );
+        }
+        if (preferencesRef.current.events[category] && preferencesRef.current.channels.callRingtone) {
+          startRingtone();
+        } else {
+          stopRingtone();
         }
       } catch (_) {
-        // Keep the monitor quiet during temporary API or connectivity failures.
+        // A transient network failure must not interrupt the rest of the app.
       } finally {
-        requestInFlight = false;
+        callInFlight = false;
       }
     };
 
-    if (!user?.uid) {
-      stopRingtone();
-      return undefined;
-    }
+    const checkActivity = async () => {
+      if (activityInFlight) return;
+      activityInFlight = true;
+      try {
+        const [notifications, conversations] = await Promise.all([
+          apiClient.get('/notifications').catch(() => []),
+          apiClient.get('/chat/conversations').catch(() => [])
+        ]);
+        if (!mounted) return;
 
-    checkIncomingCall();
-    const run = async () => {
-      await checkIncomingCall();
-      if (mounted) timer = window.setTimeout(run, 2500);
+        if (Array.isArray(notifications)) {
+          const currentIds = new Set();
+          notifications.forEach(item => {
+            const id = String(item._id || item.id || `${item.type}-${item.senderUid}-${item.createdAt}`);
+            currentIds.add(id);
+            if (!initializedRef.current.notifications) return;
+            if (seenNotificationsRef.current.has(id)) return;
+            const category = categoryForNotification(item.type);
+            if (category) {
+              const label = item.type === 'match' ? 'New match'
+                : item.type === 'superlike' ? 'New Super Like'
+                  : item.type === 'like' ? 'New like' : 'New activity';
+              notify(label, 'You have a new update.', category, item.type === 'match' ? '/matches' : '/likes');
+            }
+          });
+          currentIds.forEach(id => seenNotificationsRef.current.add(id));
+          if (seenNotificationsRef.current.size > 500) {
+            seenNotificationsRef.current = new Set([...seenNotificationsRef.current].slice(-250));
+          }
+          initializedRef.current.notifications = true;
+        }
+
+        if (Array.isArray(conversations)) {
+          const currentIds = new Set();
+          conversations.forEach(conversation => {
+            const message = conversation.lastMessage;
+            if (!message || message.senderUid === user.uid) return;
+            const id = String(message._id || message.id || `${conversation.roomId}-${message.timestamp}`);
+            currentIds.add(id);
+            if (!initializedRef.current.messages || seenMessagesRef.current.has(id)) return;
+            notify(
+              'New message',
+              `${conversation.otherUser?.name || 'Someone'} sent you a message.`,
+              'newMessages',
+              `/chat/${encodeURIComponent(conversation.roomId)}`
+            );
+          });
+          currentIds.forEach(id => seenMessagesRef.current.add(id));
+          if (seenMessagesRef.current.size > 500) {
+            seenMessagesRef.current = new Set([...seenMessagesRef.current].slice(-250));
+          }
+          initializedRef.current.messages = true;
+        }
+      } catch (_) {
+        // Continue polling after transient API errors.
+      } finally {
+        activityInFlight = false;
+      }
     };
-    timer = window.setTimeout(run, 2500);
+
+    loadPreferences().finally(() => {
+      if (!mounted) return;
+      checkCall();
+      checkActivity();
+    });
+    callTimer = window.setInterval(checkCall, 2500);
+    activityTimer = window.setInterval(checkActivity, 10000);
 
     return () => {
       mounted = false;
-      if (timer) window.clearTimeout(timer);
+      if (callTimer) window.clearInterval(callTimer);
+      if (activityTimer) window.clearInterval(activityTimer);
       stopRingtone();
+      window.removeEventListener('pointerdown', unlockOnFirstGesture);
+      window.removeEventListener('keydown', unlockOnFirstGesture);
+      window.removeEventListener('dating-app-notification-preferences-updated', onPreferencesUpdated);
+      const context = audioRef.current.context;
+      if (context && context.state !== 'closed') context.close().catch(() => {});
+      audioRef.current.context = null;
     };
-  }, [user?.uid, alertsEnabled]);
+  }, [user?.uid]);
 
-  const enableAlerts = async () => {
-    try {
-      if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        const context = ringtoneRef.current.context || new AudioContextClass();
-        ringtoneRef.current.context = context;
-        await context.resume();
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        gain.gain.value = 0.0001;
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start();
-        oscillator.stop(context.currentTime + 0.03);
-        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-      }
-      window.localStorage.setItem('dating-app-call-alerts', 'enabled');
-      setAlertsEnabled(true);
-    } catch (_) {
-      toast.error('Could not enable call alerts. Check browser permissions.');
-    }
-  };
-
-  return !alertsEnabled && user?.uid ? (
-    <button
-      type="button"
-      onClick={enableAlerts}
-      className="fixed bottom-4 right-4 z-[1000] rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-lg hover:bg-gray-50"
-      aria-label="Enable incoming call sound and browser notifications"
-    >
-      Enable call alerts
-    </button>
-  ) : null;
+  return null;
 }
