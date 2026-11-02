@@ -68,6 +68,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
       drag="x"
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       onDragEnd={handleDragEnd}
+      onTap={() => setIsExpanded(true)}
       onAnimationComplete={onSwipe}
       exit={{ x: exitX, opacity: 0 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -117,13 +118,13 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
                     type="button"
                     aria-label="Previous profile photo"
                     className="h-full w-1/2 bg-transparent"
-                    onClick={() => changeImage('prev')}
+                    onClick={(event) => { event.stopPropagation(); changeImage('prev'); }}
                     />
                     <button
                     type="button"
                     aria-label="Next profile photo"
                     className="h-full w-1/2 bg-transparent"
-                    onClick={() => changeImage('next')}
+                    onClick={(event) => { event.stopPropagation(); changeImage('next'); }}
                     />
                 </div>
 
