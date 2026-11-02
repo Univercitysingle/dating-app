@@ -33,6 +33,10 @@ const Onboarding = () => {
       setError('Please fill out all fields, upload a photo, and select a personality type.');
       return;
     }
+    if (!/^\\+[1-9]\\d{7,14}$/.test(mobileNumber)) {
+      setError('Enter your mobile number in international format, for example +971501234567.');
+      return;
+    }
 
     const heightInCm = Math.round((parseInt(heightFeet, 10) * 30.48) + (parseInt(heightInches, 10) * 2.54));
 
