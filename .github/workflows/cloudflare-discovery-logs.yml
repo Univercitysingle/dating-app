@@ -40,7 +40,7 @@ jobs:
             parameters: {
               datasets: ["cloudflare-workers"],
               needle: {
-                value: "Call creation failed|Call state lookup failed|Call signaling failed|Call update failed|Call signaling limit reached|Unable to start call|Unable to send call signal|Unable to retrieve call|Calling service unavailable|ICE configuration unavailable|Too many requests|MongoServerError|Location40081|\\$in requires an array|Photo storage upload failed|CDN storage proxy returned HTTP|Firebase Realtime Database chat write failed|Unauthorized",
+                value: "Call creation failed|Call state lookup failed|Call signaling failed|Call update failed|Call signaling limit reached|Unable to start call|Unable to send call signal|Unable to retrieve call|Calling service unavailable|ICE configuration unavailable|Too many requests|api/calls|MongoServerError|Location40081|\\$in requires an array|Photo storage upload failed|CDN storage proxy returned HTTP|Firebase Realtime Database chat write failed",
                 isRegex: true,
                 matchCase: false
               }
