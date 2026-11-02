@@ -470,11 +470,13 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
               </button>
             </>}
             {incoming && <>
-              <button type="button" onClick={acceptCall} className="call-action call-action-voice call-icon-button" aria-label="Accept incoming call" title="Accept call">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+              <button type="button" onClick={acceptCall} disabled={callActionInProgressRef.current} className="call-action call-action-voice inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 font-semibold disabled:cursor-wait disabled:opacity-60" aria-label="Answer incoming call" title="Answer call">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                <span>Answer</span>
               </button>
-              <button type="button" onClick={() => finishCall('decline')} className="call-action call-action-danger call-icon-button" aria-label="Decline incoming call" title="Decline call">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+              <button type="button" onClick={() => finishCall('decline')} disabled={callActionInProgressRef.current} className="call-action call-action-danger inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 font-semibold disabled:cursor-wait disabled:opacity-60" aria-label="Reject incoming call" title="Reject call">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                <span>Reject</span>
               </button>
             </>}
             {active && !incoming && <button type="button" onClick={() => finishCall('end')} className="call-action call-action-danger call-icon-button" aria-label="End call" title="End call">
