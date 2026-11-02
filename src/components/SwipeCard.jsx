@@ -156,11 +156,23 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
                 </div>
 
                 {/* Basic Info Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-neutral-900/80 to-transparent h-1/2 flex flex-col justify-end">
+                <div className="discover-card-caption absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-neutral-950/95 via-neutral-900/35 to-transparent h-1/2 flex flex-col justify-end">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      {user.verified && <span className="discover-profile-badge"><span aria-hidden="true">✓</span> Verified</span>}
+                      {user.relationshipGoals && <span className="discover-profile-badge">{user.relationshipGoals}</span>}
+                    </div>
                     <h3 className="text-3xl font-extrabold text-neutral-50">
-                    {name || 'Unknown User'}
+                      {name || 'Unknown User'}{age ? <span className="ml-2 font-semibold">{age}</span> : null}
                     </h3>
-                    {age && <p className="text-2xl text-neutral-100">{age}</p>}
+                    {(user.occupation || user.location) && (
+                      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-white/90">
+                        {user.occupation && <span>{user.occupation}</span>}
+                        {user.occupation && user.location && <span aria-hidden="true">·</span>}
+                        {user.location && <span>{typeof user.location === 'string' ? user.location : user.location?.city || user.location?.name || ''}</span>}
+                      </p>
+                    )}
+                    {user.bio && <p className="mt-2 line-clamp-2 max-w-[34ch] text-sm leading-relaxed text-white/85">{user.bio}</p>}
+                    <p className="mt-3 text-[11px] font-semibold tracking-wide text-white/75">TAP THE CARD FOR MORE DETAILS</p>
                 </div>
             </div>
 
