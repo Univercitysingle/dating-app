@@ -1,10 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 
 export default function IncomingCallMonitor() {
   const { user } = useAuth();
+  const [alertsEnabled, setAlertsEnabled] = useState(() => {
+    try { return window.localStorage.getItem('dating-app-call-alerts') === 'enabled'; }
+    catch (_) { return false; }
+  });
   const lastCallIdRef = useRef(null);
   const ringtoneRef = useRef({ context: null, timer: null });
 
@@ -21,7 +25,7 @@ export default function IncomingCallMonitor() {
     };
 
     const startRingtone = () => {
-      if (ringtoneRef.current.timer || window.localStorage.getItem('dating-app-call-alerts') !== 'enabled') return;
+      if (ringtoneRef.current.timer || !alertsEnabled) return;
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return;
       try {
@@ -130,7 +134,42 @@ export default function IncomingCallMonitor() {
       if (timer) window.clearTimeout(timer);
       stopRingtone();
     };
-  }, [user?.uid]);
+  }, [user?.uid, alertsEnabled]);
 
-  return null;
+  const enableAlerts = async () => {
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        const context = ringtoneRef.current.context || new AudioContextClass();
+        ringtoneRef.current.context = context;
+        await context.resume();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        gain.gain.value = 0.0001;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        oscillator.stop(context.currentTime + 0.03);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      }
+      window.localStorage.setItem('dating-app-call-alerts', 'enabled');
+      setAlertsEnabled(true);
+    } catch (_) {
+      toast.error('Could not enable call alerts. Check browser permissions.');
+    }
+  };
+
+  return !alertsEnabled && user?.uid ? (
+    <button
+      type="button"
+      onClick={enableAlerts}
+      className="fixed bottom-4 right-4 z-[1000] rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-lg hover:bg-gray-50"
+      aria-label="Enable incoming call sound and browser notifications"
+    >
+      Enable call alerts
+    </button>
+  ) : null;
 }
