@@ -3207,27 +3207,34 @@ export class MongoDBConnection {
       const calls = db.collection("callSessions");
       const now = new Date();
       const staleBefore = new Date(now.getTime() - 45000);
-      const expiredCalls = await calls.find({
-        receiverUid: uid, status: "ringing", createdAt: { $lt: staleBefore }
-      }).toArray();
-      for (const expiredCall of expiredCalls) {
-        const expired = await calls.updateOne(
-          { _id: expiredCall._id, status: "ringing" },
+      if (typeof calls.find === "function") {
+        const expiredCalls = await calls.find({
+          receiverUid: uid, status: "ringing", createdAt: { $lt: staleBefore }
+        }).toArray();
+        for (const expiredCall of expiredCalls) {
+          const expired = await calls.updateOne(
+            { _id: expiredCall._id, status: "ringing" },
+            { $set: { status: "missed", endedAt: now, updatedAt: now } }
+          );
+          if (expired.modifiedCount === 1) {
+            await db.collection("notifications").insertOne({
+              recipientUid: uid,
+              senderUid: expiredCall.callerUid,
+              type: "missed_call",
+              callType: expiredCall.type === "video" ? "video" : "voice",
+              callId: String(expiredCall._id),
+              roomId: expiredCall.roomId,
+              status: "pending",
+              createdAt: now,
+              updatedAt: now
+            });
+          }
+        }
+      } else {
+        await calls.updateMany(
+          { receiverUid: uid, status: "ringing", createdAt: { $lt: staleBefore } },
           { $set: { status: "missed", endedAt: now, updatedAt: now } }
         );
-        if (expired.modifiedCount === 1) {
-          await db.collection("notifications").insertOne({
-            recipientUid: uid,
-            senderUid: expiredCall.callerUid,
-            type: "missed_call",
-            callType: expiredCall.type === "video" ? "video" : "voice",
-            callId: String(expiredCall._id),
-            roomId: expiredCall.roomId,
-            status: "pending",
-            createdAt: now,
-            updatedAt: now
-          });
-        }
       }
       const call = await calls.findOne(
         { receiverUid: uid, status: "ringing", createdAt: { $gte: staleBefore } },
