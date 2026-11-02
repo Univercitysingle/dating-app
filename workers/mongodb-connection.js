@@ -813,6 +813,9 @@ export class MongoDBConnection {
         });
         if (finalStatus === "matched") {
           await db.collection("notifications").deleteOne({
+            recipientUid: targetUid, senderUid: uid, type: { $in: ["like", "superlike"] }
+          });
+          await db.collection("notifications").deleteOne({
             recipientUid: uid, senderUid: targetUid, type: { $in: ["like", "superlike"] }
           });
           await db.collection("notifications").insertOne({
