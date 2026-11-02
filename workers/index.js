@@ -297,7 +297,7 @@ export default {
 
     // Apply a per-client edge limit to API traffic. Cloudflare supplies
     // CF-Connecting-IP; do not trust caller-controlled X-Forwarded-For.
-    if (url.pathname.startsWith("/api/") && request.method !== "OPTIONS" && env.RATE_LIMITER) {
+    if (url.pathname.startsWith("/api/") && !url.pathname.startsWith("/api/calls/") && request.method !== "OPTIONS" && env.RATE_LIMITER) {
       const clientIp = request.headers.get("CF-Connecting-IP");
       if (clientIp) {
         try {
