@@ -22,6 +22,7 @@ const Onboarding = () => {
   const [education, setEducation] = useState('');
   const [relationshipGoals, setRelationshipGoals] = useState('');
   const [lookingFor, setLookingFor] = useState('');
+  const [sexualOrientation, setSexualOrientation] = useState('');
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
 
@@ -50,6 +51,7 @@ const Onboarding = () => {
           photos: [{ url: photo, order: 0 }],
           location,
           personalityType,
+          ...(sexualOrientation ? { sexualOrientation } : {}),
           mobileNumber: mobileNumber.trim(),
           education,
           relationshipGoals,
@@ -249,6 +251,29 @@ const Onboarding = () => {
               <option value="Figuring it out">Figuring it out</option>
             </select>
           </div>
+          {lookingFor === 'Casual (FWB)' && (
+            <div>
+              <label htmlFor="sexualOrientation">Sexual Orientation</label>
+              <select
+                id="sexualOrientation"
+                name="sexualOrientation"
+                required
+                value={sexualOrientation}
+                onChange={(e) => setSexualOrientation(e.target.value)}
+                className="form-control mt-1 block w-full rounded-xl px-3 py-3 sm:text-sm"
+              >
+                <option value="">Select Sexual Orientation</option>
+                <option value="Straight">Straight</option>
+                <option value="Gay">Gay</option>
+                <option value="Lesbian">Lesbian</option>
+                <option value="Bisexual">Bisexual</option>
+                <option value="Pansexual">Pansexual</option>
+                <option value="Asexual">Asexual</option>
+                <option value="Queer">Queer</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          )}
           <div>
             <label htmlFor="lookingFor">Looking For</label>
             <select
