@@ -149,6 +149,8 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     localStreamRef.current = null;
     setLocalStream(null);
     setRemoteStream(null);
+    setMuted(false);
+    setCameraOff(false);
     remoteReadyRef.current = false;
     queuedLocalRef.current = [];
     queuedRemoteRef.current = [];
@@ -259,8 +261,14 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const finishCall = async action => {
     const active = callRef.current;
     if (active?._id) {
-      try { await apiClient.post('/calls/action', { callId: String(active._id), action }); }
-      catch (err) { setError(messageFor(err, 'Could not update the call status.')); }
+      try {
+        await apiClient.post('/calls/action', { callId: String(active._id), action });
+      } catch (err) {
+        // Keep the call and media alive if the server did not confirm the end
+        // action. Clearing the UI here can leave a zombie active session in DB.
+        setError(messageFor(err, 'Could not update the call status. Please retry.'));
+        return;
+      }
     }
     cleanupMedia();
     callRef.current = null;
