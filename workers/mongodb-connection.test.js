@@ -1174,3 +1174,59 @@ test("a user cannot start or receive overlapping calls in different chat rooms",
   ]);
   assert.equal(insertAttempted, false);
 });
+
+
+test("global incoming call lookup returns only the authenticated receiver's live ringing call", async () => {
+  const now = new Date();
+  const call = {
+    _id: { toString: () => "0123456789abcdef01234567" },
+    roomId: "caller-uid-receiver-uid",
+    callerUid: "caller-uid",
+    receiverUid: "receiver-uid",
+    type: "video",
+    status: "ringing",
+    createdAt: new Date(now.getTime() - 5000),
+    offer: { type: "offer", sdp: "v=0" },
+    signals: [{ signalId: "private-signal" }]
+  };
+  const updates = [];
+  let staleFilter;
+  const calls = {
+    async updateMany(filter, update) { staleFilter = { filter, update }; return { modifiedCount: 0 }; },
+    async findOne(filter, options) {
+      assert.equal(filter.receiverUid, "receiver-uid");
+      assert.equal(filter.status, "ringing");
+      assert.ok(filter.createdAt.$gte instanceof Date);
+      assert.deepEqual(options.sort, { createdAt: -1 });
+      return call;
+    },
+    async updateOne(filter, update) { updates.push({ filter, update }); return { matchedCount: 1, modifiedCount: 1 }; }
+  };
+  const users = {
+    async findOne(filter, options) {
+      assert.equal(filter.uid, "caller-uid");
+      assert.deepEqual(options.projection, { _id: 0, name: 1 });
+      return { name: "Caller Name" };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "callSessions") return calls;
+    if (name === "users") return users;
+    assert.fail("Unexpected collection: " + name);
+  } });
+
+  const result = await connection.getIncomingCall("receiver-uid");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call.callerName, "Caller Name");
+  assert.equal(result.body.call.offer.sdp, "v=0");
+  assert.equal("signals" in result.body.call, false);
+  assert.equal(staleFilter.filter.receiverUid, "receiver-uid");
+  assert.equal(staleFilter.filter.status, "ringing");
+  assert.equal(staleFilter.update.$set.status, "missed");
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].filter._id, call._id);
+  assert.ok(updates[0].update.$set.receiverLastSeenAt instanceof Date);
+});
