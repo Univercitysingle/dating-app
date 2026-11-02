@@ -1193,7 +1193,7 @@ export class MongoDBConnection {
           $project: {
             combinedUsers: {
               $let: {
-                vars: { boostedIds: { $map: { input: { $ifNull: ["$boostedUsers", []] }, as: "boostedUser", in: "$boostedUser.uid" } } },
+                vars: { boostedIds: { $map: { input: { $ifNull: ["$boostedUsers", []] }, as: "boostedUser", in: "$$boostedUser.uid" } } },
                 in: {
                   $concatArrays: [
                     "$boostedUsers",
@@ -1203,7 +1203,7 @@ export class MongoDBConnection {
                           $filter: {
                             input: "$regularUsers",
                             as: "regularUser",
-                            cond: { $not: [{ $in: ["$regularUser.uid", { $ifNull: ["$boostedIds", []] }] }] }
+                            cond: { $not: [{ $in: ["$$regularUser.uid", { $ifNull: ["$$boostedIds", []] }] }] }
                           }
                         },
                         { $max: [0, { $subtract: [20, { $size: "$boostedUsers" }] }] }
