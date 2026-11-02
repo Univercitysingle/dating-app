@@ -3115,6 +3115,37 @@ export class MongoDBConnection {
     }
   }
 
+  async getIncomingCall(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const calls = db.collection("callSessions");
+      const now = new Date();
+      const staleBefore = new Date(now.getTime() - 45000);
+      await calls.updateMany(
+        { receiverUid: uid, status: "ringing", createdAt: { $lt: staleBefore } },
+        { $set: { status: "missed", endedAt: now, updatedAt: now } }
+      );
+      const call = await calls.findOne(
+        { receiverUid: uid, status: "ringing", createdAt: { $gte: staleBefore } },
+        { sort: { createdAt: -1 } }
+      );
+      if (!call) return { status: 200, body: { call: null } };
+      await calls.updateOne(
+        { _id: call._id, status: "ringing" },
+        { $set: { receiverLastSeenAt: now } }
+      );
+      const safeCall = { ...call };
+      delete safeCall.signals;
+      return { status: 200, body: { call: safeCall } };
+    } catch (error) {
+      console.error("Incoming call lookup failed", { message: error?.message?.slice(0, 180) });
+      return { status: 503, body: { error: "Unable to retrieve incoming call" } };
+    }
+  }
+
   async getCallHistory(uid, roomId) {
     if (typeof uid !== "string" || !uid || typeof roomId !== "string" ||
         roomId.length > 260 || roomId.length < 3 ||
@@ -3541,6 +3572,7 @@ export class MongoDBConnection {
     if (url.pathname === "/internal/calls/start" ||
         url.pathname === "/internal/calls/poll" ||
         url.pathname === "/internal/calls/history" ||
+        url.pathname === "/internal/calls/incoming" ||
         url.pathname === "/internal/calls/signal" ||
         url.pathname === "/internal/calls/action") {
       const body = await request.json().catch(() => null);
@@ -3549,6 +3581,7 @@ export class MongoDBConnection {
       if (url.pathname === "/internal/calls/start") result = await this.createCall(body.claims.sub, body.payload);
       else if (url.pathname === "/internal/calls/poll") result = await this.getCallState(body.claims.sub, body.roomId);
       else if (url.pathname === "/internal/calls/history") result = await this.getCallHistory(body.claims.sub, body.roomId);
+      else if (url.pathname === "/internal/calls/incoming") result = await this.getIncomingCall(body.claims.sub);
       else if (url.pathname === "/internal/calls/signal") result = await this.sendCallSignal(body.claims.sub, body.payload);
       else result = await this.updateCall(body.claims.sub, body.payload);
       return json(result.body, result.status);
