@@ -39,13 +39,18 @@ const MatchModal = ({ matchInfo, onContinue, onChat }) => (
     </div>
 );
 
-const NoMoreProfiles = () => (
-    <div className="flex flex-col justify-center items-center h-full text-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-neutral-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p className="text-neutral-500 dark:text-neutral-400 text-xl font-semibold">That's everyone for now!</p>
-        <p className="text-neutral-400 dark:text-neutral-500 mt-1">Check back later for new profiles.</p>
+const NoMoreProfiles = ({ onRefresh }) => (
+    <div className="discover-empty-state">
+        <div className="discover-empty-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3M5.64 5.64l2.12 2.12m8.48 8.48 2.12 2.12m0-12.72-2.12 2.12m-8.48 8.48-2.12 2.12" />
+                <circle cx="12" cy="12" r="5" />
+            </svg>
+        </div>
+        <p className="discover-empty-eyebrow">THAT'S A WRAP FOR NOW</p>
+        <h2>You've seen everyone nearby.</h2>
+        <p>Try widening your preferences or check back soon. There are always new connections ahead.</p>
+        <button type="button" onClick={onRefresh} className="discover-refresh-button">Refresh profiles</button>
     </div>
 );
 
@@ -163,7 +168,11 @@ const SwipeDeck = () => {
           </div>
         )}
         <header className="discover-header flex-shrink-0 flex justify-between items-center px-4 py-4 sm:px-6">
-            <div><p className="page-eyebrow">YOUR NEXT CONNECTION</p><h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-3xl">Discover</h1></div>
+            <div className="discover-heading-copy">
+              <p className="page-eyebrow">YOUR NEXT CONNECTION</p>
+              <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-3xl">Discover</h1>
+              <p className="discover-subtitle">A good connection can start with one swipe.</p>
+            </div>
             <button onClick={() => setShowFilters(true)} className="filter-button rounded-full px-4 py-3 shadow-sm" aria-label="Open filters">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 4a2 2 0 100 4m0-4a2 2 0 110 4m-6 8v-2m0 4v.01M6 14a2 2 0 100-4m0 4a2 2 0 110-4m12 4v-2m0 4v.01M18 14a2 2 0 100-4m0 4a2 2 0 110-4M4 6h16M4 12h16M4 18h16" />
@@ -174,7 +183,7 @@ const SwipeDeck = () => {
         </header>
 
         <main className="discover-stage flex flex-grow flex-col items-center justify-center px-3 pt-2">
-            <div className="relative h-[min(66dvh,680px)] w-[min(90vw,410px)] max-w-full">
+            <div className="discover-card-stack relative h-[min(66dvh,680px)] w-[min(90vw,410px)] max-w-full">
                 <AnimatePresence>
                     {users.length > 0 ? (
                         users.slice(0, 3).reverse().map((user, index) => {
@@ -195,7 +204,7 @@ const SwipeDeck = () => {
                             );
                         })
                     ) : (
-                        <NoMoreProfiles />
+                        <NoMoreProfiles onRefresh={() => fetchUsersToSwipe(activeFilters)} />
                     )}
                 </AnimatePresence>
             </div>
@@ -203,10 +212,12 @@ const SwipeDeck = () => {
 
         <footer className="discover-actions flex-shrink-0 px-4 pb-5 pt-2">
             {users.length > 0 && !newMatchInfo && (
-                <div className="flex justify-center items-center my-4 space-x-4">
+                <div className="discover-action-row flex justify-center items-center my-4 space-x-4" aria-label="Profile actions">
                     <button
+                        type="button"
+                        title="Pass"
                         onClick={() => handleVote(users[0]?.uid, 'left')}
-                        className="p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
+                        className="discover-action-button discover-action-pass p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
                         aria-label="Pass"
                         disabled={!users[0]}
                     >
@@ -215,8 +226,10 @@ const SwipeDeck = () => {
                         </svg>
                     </button>
                     <button
+                        type="button"
+                        title="Super Like"
                         onClick={() => handleVote(users[0]?.uid, 'superlike')}
-                        className="p-4 bg-white rounded-full shadow-lg hover:bg-blue-100 transition-all transform hover:scale-110"
+                        className="discover-action-button discover-action-superlike p-4 bg-white rounded-full shadow-lg hover:bg-blue-100 transition-all transform hover:scale-110"
                         aria-label="Super Like"
                         disabled={!users[0]}
                     >
@@ -225,8 +238,10 @@ const SwipeDeck = () => {
                         </svg>
                     </button>
                     <button
+                        type="button"
+                        title="Like"
                         onClick={() => handleVote(users[0]?.uid, 'right')}
-                        className="p-5 bg-white rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
+                        className="discover-action-button discover-action-like p-5 bg-white rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
                         aria-label="Like"
                         disabled={!users[0]}
                     >
@@ -235,8 +250,10 @@ const SwipeDeck = () => {
                         </svg>
                     </button>
                     <button
+                        type="button"
+                        title="Undo last swipe"
                         onClick={handleUndo}
-                        className="p-4 bg-white rounded-full shadow-lg hover:bg-yellow-100 transition-all transform hover:scale-110"
+                        className="discover-action-button discover-action-undo p-4 bg-white rounded-full shadow-lg hover:bg-yellow-100 transition-all transform hover:scale-110"
                         aria-label="Undo"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
