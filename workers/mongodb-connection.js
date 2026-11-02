@@ -3346,12 +3346,17 @@ export class MongoDBConnection {
   }
 
   async sendCallSignal(uid, payload) {
-    const { callId, candidate } = payload || {};
+    const { callId, candidate, description } = payload || {};
+    const validCandidate = candidate && typeof candidate === "object" &&
+      typeof candidate.candidate === "string" && candidate.candidate.length <= 10000;
+    const validDescription = description && typeof description === "object" &&
+      ["offer", "answer"].includes(description.type) &&
+      typeof description.sdp === "string" && description.sdp.length <= 200000;
     if (typeof callId !== "string" || !/^[a-fA-F0-9]{24}$/.test(callId) ||
-        !candidate || typeof candidate !== "object" ||
-        typeof candidate.candidate !== "string" || candidate.candidate.length > 10000) {
-      return { status: 400, body: { error: "Invalid ICE candidate" } };
+        Number(Boolean(validCandidate)) + Number(Boolean(validDescription)) !== 1) {
+      return { status: 400, body: { error: "Invalid call signal" } };
     }
+    const signalData = validCandidate ? { candidate } : { description: { type: description.type, sdp: description.sdp } };
     try {
       const db = this.getDatabase(await this.getClient());
       const { ObjectId } = await import("mongodb");
@@ -3371,7 +3376,7 @@ export class MongoDBConnection {
         { _id: call._id, status: { $in: ["ringing", "accepted"] },
           $or: [{ callerUid: uid }, { receiverUid: uid }] },
         { $push: { signals: {
-          $each: [{ signalId: crypto.randomUUID(), fromUid: uid, toUid, candidate, createdAt: new Date() }],
+          $each: [{ signalId: crypto.randomUUID(), fromUid: uid, toUid, ...signalData, createdAt: new Date() }],
           $slice: -300
         } }, $set: { updatedAt: new Date() } }
       );
