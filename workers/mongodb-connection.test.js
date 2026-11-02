@@ -6,7 +6,7 @@ import Worker from "./index.js";
 test("discovery builds a valid aggregation expression to exclude boosted users from regular results", async () => {
   let capturedPipeline;
   const users = {
-    findOne: async ({ uid }) => ({ uid, location: { coordinates: [0, 0] } }),
+    findOne: async ({ uid }) => ({ uid, blocked: ["blocked-user"], location: { coordinates: [0, 0] } }),
     aggregate: (pipeline) => {
       capturedPipeline = pipeline;
       return { toArray: async () => [] };
@@ -31,6 +31,7 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
 
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, []);
+  assert.deepEqual(capturedPipeline[0].$match.uid, { $ne: "current-user", $nin: ["blocked-user"] });
   const project = capturedPipeline.find((stage) => stage.$project?.combinedUsers).$project.combinedUsers;
   const condition = project.$let.in.$concatArrays[1].$slice[0].$filter.cond;
   assert.ok(Array.isArray(condition.$not), "$not must receive an array expression in MongoDB aggregation");

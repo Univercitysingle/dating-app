@@ -1110,7 +1110,10 @@ export class MongoDBConnection {
       }
 
       const baseMatchQuery = {
-        uid: { $ne: uid },
+        uid: {
+          $ne: uid,
+          $nin: Array.isArray(currentUser.blocked) ? currentUser.blocked.filter(value => typeof value === "string") : []
+        },
         isProfileVisible: true,
         blocked: { $ne: uid }
       };
