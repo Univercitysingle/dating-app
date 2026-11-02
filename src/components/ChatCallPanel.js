@@ -223,6 +223,11 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     queuedRemoteRef.current = [];
   }, []);
 
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectingRef = useRef(false);
+  const reconnectTimerRef = useRef(null);
+  const [reconnecting, setReconnecting] = useState(false);
+
   const sendCandidate = useCallback(async (callId, candidate) => {
     try {
       await apiClient.post('/calls/signal', { callId, candidate: candidate.toJSON ? candidate.toJSON() : candidate });
@@ -230,6 +235,35 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       setError(messageFor(err, 'Unable to establish the call connection.'));
     }
   }, []);
+
+  const sendDescription = useCallback(async (callId, description) => {
+    try {
+      await apiClient.post('/calls/signal', { callId, description: { type: description.type, sdp: description.sdp } });
+    } catch (err) {
+      setError(messageFor(err, 'Unable to restore the call connection.'));
+    }
+  }, []);
+
+  const restartConnection = useCallback(async () => {
+    const peer = peerRef.current;
+    const activeCall = callRef.current;
+    if (!peer || !activeCall || activeCall.status !== 'accepted' ||
+        activeCall.callerUid !== currentUser?.uid || reconnectingRef.current ||
+        !navigator.onLine || reconnectAttemptsRef.current >= 3) return;
+    reconnectingRef.current = true;
+    setReconnecting(true);
+    setStatus('Network interrupted. Reconnecting…');
+    try {
+      reconnectAttemptsRef.current += 1;
+      const offer = await peer.createOffer({ iceRestart: true });
+      await peer.setLocalDescription(offer);
+      await sendDescription(String(activeCall._id), peer.localDescription);
+    } catch (err) {
+      setError(messageFor(err, 'Automatic reconnection failed. Please check your network.'));
+      reconnectingRef.current = false;
+      setReconnecting(false);
+    }
+  }, [currentUser?.uid, sendDescription]);
 
   const makePeer = useCallback(async type => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
@@ -251,11 +285,26 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       else queuedLocalRef.current.push(event.candidate);
     };
     peer.onconnectionstatechange = () => {
-      if (peer.connectionState === 'connected') setStatus(type === 'video' ? 'Video call connected' : 'Voice call connected');
-      if (['failed', 'disconnected'].includes(peer.connectionState)) setStatus('Connection interrupted. Check your network.');
+      if (peer.connectionState === 'connected') {
+        reconnectAttemptsRef.current = 0;
+        reconnectingRef.current = false;
+        setReconnecting(false);
+        setError('');
+        setStatus(type === 'video' ? 'Video call connected' : 'Voice call connected');
+      } else if (peer.connectionState === 'disconnected' || peer.connectionState === 'failed') {
+        setStatus('Connection lost. Trying to reconnect…');
+        setReconnecting(true);
+        if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = window.setTimeout(() => {
+          if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') restartConnection();
+        }, peer.connectionState === 'failed' ? 500 : 1800);
+      } else if (peer.connectionState === 'connecting') {
+        setStatus('Reconnecting…');
+        setReconnecting(true);
+      }
     };
     return peer;
-  }, [sendCandidate]);
+  }, [sendCandidate, restartConnection]);
 
   const flushLocalCandidates = useCallback(async callId => {
     for (const candidate of queuedLocalRef.current.splice(0)) await sendCandidate(String(callId), candidate);
@@ -393,9 +442,27 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         for (const signal of result.signals || []) {
           if (!signal?.signalId || seenSignalsRef.current.has(signal.signalId)) continue;
           seenSignalsRef.current.add(signal.signalId);
-          if (!peerRef.current || !remoteReadyRef.current) queuedRemoteRef.current.push(signal.candidate);
-          else {
-            try { await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
+          const peer = peerRef.current;
+          if (signal.description && peer) {
+            try {
+              await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
+              remoteReadyRef.current = true;
+              if (signal.description.type === 'offer') {
+                const answer = await peer.createAnswer();
+                await peer.setLocalDescription(answer);
+                await sendDescription(String(next._id), peer.localDescription);
+              }
+              for (const candidate of queuedRemoteRef.current.splice(0)) {
+                try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
+              }
+            } catch (_) {
+              setStatus('Unable to negotiate the restored connection. Retrying…');
+            }
+          } else if (signal.candidate) {
+            if (!peer || !remoteReadyRef.current) queuedRemoteRef.current.push(signal.candidate);
+            else {
+              try { await peer.addIceCandidate(new RTCIceCandidate(signal.candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
+            }
           }
         }
       } catch (err) {
@@ -419,7 +486,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       mounted = false;
       if (pollTimer) window.clearTimeout(pollTimer);
     };
-  }, [roomId, currentUser?.uid, cleanupMedia, setRemoteDescription]);
+  }, [roomId, currentUser?.uid, cleanupMedia, setRemoteDescription, sendDescription]);
 
   useEffect(() => () => cleanupMedia(), [cleanupMedia]);
 
@@ -431,6 +498,30 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     (localStreamRef.current?.getVideoTracks() || []).forEach(track => { track.enabled = cameraOff; });
     setCameraOff(value => !value);
   };
+
+  useEffect(() => {
+    const onOnline = () => {
+      if (callRef.current?.status === 'accepted') {
+        reconnectAttemptsRef.current = 0;
+        reconnectingRef.current = false;
+        setReconnecting(true);
+        restartConnection();
+      }
+    };
+    const onOffline = () => {
+      if (callRef.current?.status === 'accepted') {
+        setReconnecting(true);
+        setStatus('You are offline. Waiting for network…');
+      }
+    };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+    };
+  }, [restartConnection]);
 
   const incoming = call && call.receiverUid === currentUser?.uid && call.status === 'ringing';
   const active = call && ['ringing', 'accepted'].includes(call.status);
@@ -524,6 +615,9 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         <p className="text-lg font-semibold">{otherUser?.name || "Video call"}</p><p className="text-sm text-white/70">Connecting video…</p>
       </div>}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-black/65 to-transparent" />
+      {reconnecting && <div className="absolute left-1/2 top-24 z-10 -translate-x-1/2 rounded-full border border-white/15 bg-black/65 px-4 py-2 text-xs font-medium text-white shadow-lg backdrop-blur-md" role="status">
+        <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />{navigator.onLine ? 'Reconnecting call…' : 'Waiting for network…'}
+      </div>}
       <div className="absolute left-3 right-3 flex items-start justify-between gap-2 sm:left-7 sm:right-7 sm:gap-3" style={{ top: "max(1rem, env(safe-area-inset-top))" }}>
         <div className="min-w-0 max-w-[72vw] rounded-2xl bg-black/35 px-3 py-2.5 backdrop-blur-md sm:max-w-[min(70vw,28rem)] sm:px-4 sm:py-3"><p className="truncate text-base font-semibold">{otherUser?.name || "Video call"}</p><p className="mt-1 text-sm text-white/75">{formatDuration(callDuration)} · {status || "Connected"}</p></div>
         <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-2 text-[10px] text-white/85 backdrop-blur-md sm:gap-2 sm:px-3 sm:text-xs" aria-label={connectionQuality ? `Network signal quality ${connectionQuality} of 5` : "Network signal quality unavailable"}>
@@ -537,11 +631,11 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/80 to-transparent" />
       <div className="absolute inset-x-0 flex flex-col items-center gap-3 px-3 sm:gap-4 sm:px-4" style={{ bottom: "max(1rem, env(safe-area-inset-bottom))" }}>
         {error && <p className="max-w-md rounded-xl bg-rose-950/90 px-4 py-3 text-center text-sm text-rose-100" role="alert">{error}</p>}
-        <div className="flex max-w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-black/55 px-3 py-3 shadow-2xl backdrop-blur-xl sm:gap-6 sm:px-7 sm:py-4">
-          <button type="button" onClick={toggleMute} className={muted ? "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 sm:h-14 sm:w-14" : "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 sm:h-14 sm:w-14"} aria-label={muted ? "Unmute microphone" : "Mute microphone"} title={muted ? "Unmute microphone" : "Mute microphone"}>
+        <div className="flex max-w-full items-center justify-center gap-2 rounded-[2rem] border border-white/15 bg-slate-950/75 px-3 py-3 shadow-2xl backdrop-blur-xl sm:gap-6 sm:px-7 sm:py-4">
+          <button type="button" onClick={toggleMute} className={muted ? "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 sm:h-14 sm:w-14" : "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/15 hover:bg-white/25 active:scale-95 sm:h-14 sm:w-14"} aria-label={muted ? "Unmute microphone" : "Mute microphone"} title={muted ? "Unmute microphone" : "Mute microphone"}>
             {muted ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}<span className="mt-1 text-[9px] font-medium">{muted ? "Unmute" : "Mute"}</span>
           </button>
-          <button type="button" onClick={toggleCamera} className={cameraOff ? "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 sm:h-14 sm:w-14" : "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 sm:h-14 sm:w-14"} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} title={cameraOff ? "Turn camera on" : "Turn camera off"}>
+          <button type="button" onClick={toggleCamera} className={cameraOff ? "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 sm:h-14 sm:w-14" : "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/15 hover:bg-white/25 active:scale-95 sm:h-14 sm:w-14"} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} title={cameraOff ? "Turn camera on" : "Turn camera off"}>
             {cameraOff ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 3 18 18M10 6h5a2 2 0 0 1 2 2v1l4-2v10l-3-1.5M7 6.5A2 2 0 0 0 5 8v8a2 2 0 0 0 2 2h8"/></svg> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>}<span className="mt-1 text-[9px] font-medium">{cameraOff ? "Camera on" : "Camera off"}</span>
           </button>
           <button type="button" onClick={() => finishCall("end")} disabled={callActionInProgressRef.current} className="flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 active:scale-95 disabled:opacity-50 sm:h-16 sm:w-20" aria-label="End video call" title="End call">
