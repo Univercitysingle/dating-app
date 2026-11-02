@@ -2354,8 +2354,9 @@ export class MongoDBConnection {
             continue;
           }
           if (!update[key] || typeof update[key] !== "object" || Array.isArray(update[key])) return { status: 400, body: { error: "Invalid nested profile field format" } };
-          sanitizedUpdate[key] = {};
-          for (const prop of nestedAllowed[key]) if (update[key][prop] !== undefined) sanitizedUpdate[key][prop] = update[key][prop];
+          const nestedValue = {};
+          for (const prop of nestedAllowed[key]) if (update[key][prop] !== undefined) nestedValue[prop] = update[key][prop];
+          if (Object.keys(nestedValue).length) sanitizedUpdate[key] = nestedValue;
         } else sanitizedUpdate[key] = update[key];
       }
       if (sanitizedUpdate.mobileNumber) {
