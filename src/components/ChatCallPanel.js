@@ -273,22 +273,25 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const finishCall = async action => {
     if (callActionInProgressRef.current) return;
     callActionInProgressRef.current = true;
-    const active = callRef.current;
-    if (active?._id) {
-      try {
-        await apiClient.post('/calls/action', { callId: String(active._id), action });
-      } catch (err) {
-        // Keep the call and media alive if the server did not confirm the end
-        // action. Clearing the UI here can leave a zombie active session in DB.
-        setError(messageFor(err, 'Could not update the call status. Please retry.'));
-        return;
+    try {
+      const active = callRef.current;
+      if (active?._id) {
+        try {
+          await apiClient.post('/calls/action', { callId: String(active._id), action });
+        } catch (err) {
+          // Keep the call and media alive if the server did not confirm the end
+          // action. Clearing the UI here can leave a zombie active session in DB.
+          setError(messageFor(err, 'Could not update the call status. Please retry.'));
+          return;
+        }
       }
+      cleanupMedia();
+      callRef.current = null;
+      setCall(null);
+      setStatus(action === 'decline' ? 'Call declined' : 'Call ended');
+    } finally {
+      callActionInProgressRef.current = false;
     }
-    cleanupMedia();
-    callRef.current = null;
-    setCall(null);
-    setStatus(action === 'decline' ? 'Call declined' : 'Call ended');
-    callActionInProgressRef.current = false;
   };
 
   useEffect(() => {
