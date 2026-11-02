@@ -336,9 +336,14 @@ nav.fixed.bottom-0.left-0.right-0 a svg {
 
 .login-page {
   isolation: isolate;
+  min-height: 100vh;
+  background-color: #24172d;
   background-image:
     linear-gradient(135deg, rgba(31, 20, 42, 0.7), rgba(53, 24, 52, 0.45)),
-    var(--login-background, url('/bg.webp'));
+    url('/bg.webp');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .login-card {
