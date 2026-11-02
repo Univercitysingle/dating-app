@@ -2332,12 +2332,13 @@ export class MongoDBConnection {
       if (isAccountRestricted(current)) return { status: 403, body: { error: "Account is suspended or banned." } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
       const allowedFields = onboardingComplete
-        ? ["sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "lastActiveAt"]
-        : ["name", "birthday", "gender", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "mobileNumber", "lastActiveAt", "isOnboardingComplete"];
+        ? ["sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "badges", "lastActiveAt"]
+        : ["name", "birthday", "gender", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "mobileNumber", "photos", "badges", "lastActiveAt", "isOnboardingComplete"];
       const nestedAllowed = {
         lifestyle: ["drinking", "smoking", "exercise", "diet", "lookingFor"],
         socialMediaLinks: ["instagram", "spotify", "tiktok"],
-        education: ["school", "degree"]
+        education: ["school", "degree"],
+        badges: ["height"]
       };
       const sanitizedUpdate = {};
       for (const key of allowedFields) {
