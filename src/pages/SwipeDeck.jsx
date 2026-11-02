@@ -194,17 +194,20 @@ const SwipeDeck = () => {
             {swipeError}
           </div>
         )}
-        <header className="discover-header flex-shrink-0 flex justify-between items-center px-4 py-4 sm:px-6">
-            <div className="discover-heading-copy">
-              <p className="page-eyebrow">YOUR NEXT CONNECTION</p>
-              <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-3xl">Discover</h1>
-              <p className="discover-subtitle">A good connection can start with one swipe.</p>
-            </div>
-            <button onClick={() => setShowFilters(true)} className="filter-button rounded-full px-4 py-3 shadow-sm" aria-label="Open filters">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 4a2 2 0 100 4m0-4a2 2 0 110 4m-6 8v-2m0 4v.01M6 14a2 2 0 100-4m0 4a2 2 0 110-4m12 4v-2m0 4v.01M18 14a2 2 0 100-4m0 4a2 2 0 110-4M4 6h16M4 12h16M4 18h16" />
+        <header className="discover-header discover-header-compact flex-shrink-0 flex justify-end items-center" aria-label="Discover controls">
+            <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                className="filter-button discover-filter-icon-button"
+                aria-label={activeFilterCount > 0 ? `Open filters, ${activeFilterCount} active` : 'Open filters'}
+                title="Filters"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 6h16M7 12h10m-7 6h4" />
+                    <circle cx="8" cy="6" r="2" fill="currentColor" stroke="none" />
+                    <circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" />
+                    <circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" />
                 </svg>
-                <span>Filters</span>
                 {activeFilterCount > 0 && <span className="filter-count" aria-label={`${activeFilterCount} active filters`}>{activeFilterCount}</span>}
             </button>
         </header>
