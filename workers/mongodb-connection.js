@@ -2527,8 +2527,7 @@ export class MongoDBConnection {
         email, name, role, isProfileVisible: payload.isProfileVisible !== false,
         mustSetPassword: true, isOnboardingComplete: false, interests: [], profilePrompts: [],
         blocked: [], photos: [], totalPhotoSize: 0, isVerified: false, plan: "basic",
-        createdAt: now, updatedAt: now,
-        callerLastSeenAt: now, receiverLastSeenAt: now
+        createdAt: now, updatedAt: now
       };
       const result = await users.insertOne(user);
       delete user.password;
@@ -3102,7 +3101,8 @@ export class MongoDBConnection {
       const call = {
         roomId, callerUid: uid, receiverUid, type, status: "ringing",
         offer: { type: "offer", sdp: offer.sdp }, answer: null, signals: [],
-        createdAt: now, updatedAt: now
+        createdAt: now, updatedAt: now,
+        callerLastSeenAt: now, receiverLastSeenAt: now
       };
       const inserted = await calls.insertOne(call);
       call._id = inserted.insertedId;
