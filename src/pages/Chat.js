@@ -93,7 +93,7 @@ function Chat() {
     };
     if (user?.uid && chatId) {
       refreshCallHistory();
-      const interval = window.setInterval(refreshCallHistory, 4000);
+      const interval = window.setInterval(refreshCallHistory, 15000);
       return () => { cancelled = true; window.clearInterval(interval); };
     }
     return () => { cancelled = true; };
