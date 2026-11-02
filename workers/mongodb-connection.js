@@ -3137,7 +3137,11 @@ export class MongoDBConnection {
         { _id: call._id, status: "ringing" },
         { $set: { receiverLastSeenAt: now } }
       );
-      const safeCall = { ...call };
+      const caller = await db.collection("users").findOne(
+        { uid: call.callerUid },
+        { projection: { _id: 0, name: 1 } }
+      );
+      const safeCall = { ...call, callerName: caller?.name || "Someone" };
       delete safeCall.signals;
       return { status: 200, body: { call: safeCall } };
     } catch (error) {
