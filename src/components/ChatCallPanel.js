@@ -26,6 +26,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const queuedRemoteRef = useRef([]);
   const remoteReadyRef = useRef(false);
   const pollingRef = useRef(false);
+  const callActionInProgressRef = useRef(false);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
@@ -205,6 +206,8 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, []);
 
   const startCall = async type => {
+    if (callActionInProgressRef.current || callRef.current) return;
+    callActionInProgressRef.current = true;
     setError('');
     setStatus('Requesting microphone and camera access…');
     try {
@@ -226,12 +229,19 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       cleanupMedia();
       setStatus('');
       setError(messageFor(err, 'Could not start the call. Check permissions and try again.'));
+    } finally {
+      callActionInProgressRef.current = false;
     }
   };
 
   const acceptCall = async () => {
+    if (callActionInProgressRef.current) return;
+    callActionInProgressRef.current = true;
     const incoming = callRef.current;
-    if (!incoming || incoming.receiverUid !== currentUser?.uid) return;
+    if (!incoming || incoming.receiverUid !== currentUser?.uid) {
+      callActionInProgressRef.current = false;
+      return;
+    }
     setError('');
     setStatus('Connecting…');
     try {
@@ -255,10 +265,14 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       cleanupMedia();
       setError(messageFor(err, 'Could not accept the call.'));
       setStatus('');
+    } finally {
+      callActionInProgressRef.current = false;
     }
   };
 
   const finishCall = async action => {
+    if (callActionInProgressRef.current) return;
+    callActionInProgressRef.current = true;
     const active = callRef.current;
     if (active?._id) {
       try {
@@ -274,6 +288,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     callRef.current = null;
     setCall(null);
     setStatus(action === 'decline' ? 'Call declined' : 'Call ended');
+    callActionInProgressRef.current = false;
   };
 
   useEffect(() => {
