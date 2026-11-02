@@ -19,6 +19,65 @@ import { API_URL } from '../utils/constants';
 import { validateMobileNumber } from '../utils/helpers';
 import SectionCard from '../components/profile/SectionCard';
 
+const countryCallingCodes = [
+  { country: 'United Arab Emirates', flag: '🇦🇪', code: '+971' },
+  { country: 'Sri Lanka', flag: '🇱🇰', code: '+94' },
+  { country: 'India', flag: '🇮🇳', code: '+91' },
+  { country: 'Pakistan', flag: '🇵🇰', code: '+92' },
+  { country: 'Bangladesh', flag: '🇧🇩', code: '+880' },
+  { country: 'Nepal', flag: '🇳🇵', code: '+977' },
+  { country: 'Philippines', flag: '🇵🇭', code: '+63' },
+  { country: 'United Kingdom', flag: '🇬🇧', code: '+44' },
+  { country: 'United States', flag: '🇺🇸', code: '+1' },
+  { country: 'Canada', flag: '🇨🇦', code: '+1' },
+  { country: 'Australia', flag: '🇦🇺', code: '+61' },
+  { country: 'New Zealand', flag: '🇳🇿', code: '+64' },
+  { country: 'Saudi Arabia', flag: '🇸🇦', code: '+966' },
+  { country: 'Qatar', flag: '🇶🇦', code: '+974' },
+  { country: 'Kuwait', flag: '🇰🇼', code: '+965' },
+  { country: 'Bahrain', flag: '🇧🇭', code: '+973' },
+  { country: 'Oman', flag: '🇴🇲', code: '+968' },
+  { country: 'Jordan', flag: '🇯🇴', code: '+962' },
+  { country: 'Lebanon', flag: '🇱🇧', code: '+961' },
+  { country: 'Egypt', flag: '🇪🇬', code: '+20' },
+  { country: 'South Africa', flag: '🇿🇦', code: '+27' },
+  { country: 'Nigeria', flag: '🇳🇬', code: '+234' },
+  { country: 'Kenya', flag: '🇰🇪', code: '+254' },
+  { country: 'Germany', flag: '🇩🇪', code: '+49' },
+  { country: 'France', flag: '🇫🇷', code: '+33' },
+  { country: 'Italy', flag: '🇮🇹', code: '+39' },
+  { country: 'Spain', flag: '🇪🇸', code: '+34' },
+  { country: 'Portugal', flag: '🇵🇹', code: '+351' },
+  { country: 'Netherlands', flag: '🇳🇱', code: '+31' },
+  { country: 'Belgium', flag: '🇧🇪', code: '+32' },
+  { country: 'Switzerland', flag: '🇨🇭', code: '+41' },
+  { country: 'Austria', flag: '🇦🇹', code: '+43' },
+  { country: 'Ireland', flag: '🇮🇪', code: '+353' },
+  { country: 'Sweden', flag: '🇸🇪', code: '+46' },
+  { country: 'Norway', flag: '🇳🇴', code: '+47' },
+  { country: 'Denmark', flag: '🇩🇰', code: '+45' },
+  { country: 'Finland', flag: '🇫🇮', code: '+358' },
+  { country: 'Poland', flag: '🇵🇱', code: '+48' },
+  { country: 'Turkey', flag: '🇹🇷', code: '+90' },
+  { country: 'Russia', flag: '🇷🇺', code: '+7' },
+  { country: 'Ukraine', flag: '🇺🇦', code: '+380' },
+  { country: 'China', flag: '🇨🇳', code: '+86' },
+  { country: 'Japan', flag: '🇯🇵', code: '+81' },
+  { country: 'South Korea', flag: '🇰🇷', code: '+82' },
+  { country: 'Singapore', flag: '🇸🇬', code: '+65' },
+  { country: 'Malaysia', flag: '🇲🇾', code: '+60' },
+  { country: 'Indonesia', flag: '🇮🇩', code: '+62' },
+  { country: 'Thailand', flag: '🇹🇭', code: '+66' },
+  { country: 'Vietnam', flag: '🇻🇳', code: '+84' },
+  { country: 'Hong Kong', flag: '🇭🇰', code: '+852' },
+  { country: 'Mexico', flag: '🇲🇽', code: '+52' },
+  { country: 'Brazil', flag: '🇧🇷', code: '+55' },
+  { country: 'Argentina', flag: '🇦🇷', code: '+54' },
+  { country: 'Chile', flag: '🇨🇱', code: '+56' },
+  { country: 'Colombia', flag: '🇨🇴', code: '+57' },
+  { country: 'Peru', flag: '🇵🇪', code: '+51' },
+];
+
 // Reusable components
 const PremiumBadge = () => (
   <span className="ml-2 px-2 py-1 text-xs font-semibold text-accent-dark bg-accent rounded-full">Premium</span>
@@ -42,7 +101,8 @@ function Profile() {
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
-  const [suggestedCountryCode, setSuggestedCountryCode] = useState('');
+  const [mobileCountryCode, setMobileCountryCode] = useState('+971');
+  const [mobileNationalNumber, setMobileNationalNumber] = useState('');
 
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
@@ -80,6 +140,10 @@ function Profile() {
         try {
             const data = await apiClient.get('/users/me');
             setProfile(data);
+            const savedMobile = typeof data.mobileNumber === 'string' ? data.mobileNumber : '';
+            const matchingCallingCode = countryCallingCodes.map(item => item.code).sort((a, b) => b.length - a.length).find(code => savedMobile.startsWith(code));
+            setMobileCountryCode(matchingCallingCode || '+971');
+            setMobileNationalNumber(matchingCallingCode ? savedMobile.slice(matchingCallingCode.length).replace(/\D/g, '') : savedMobile.replace(/\D/g, ''));
             setEditableFields({
                 education: data.education || '',
                 relationshipGoals: data.relationshipGoals || 'Figuring it out',
@@ -118,18 +182,7 @@ function Profile() {
     } else if (currentUser) {
         fetchOwnProfile();
         fetchSubscriptionHistory();
-        apiClient.get('/geolocation').then(geo => {
-            const countryCodeMapping = {
-                'US': '+1',
-                'GB': '+44',
-                'IN': '+91',
-                // Add more mappings as needed
-            };
-            const code = countryCodeMapping[geo.country];
-            if (code) {
-                setSuggestedCountryCode(code);
-            }
-        }).catch(err => console.error('Could not fetch geolocation for country code suggestion.', err));
+
     }
   }, [userId, currentUser?.uid]);
 
@@ -153,14 +206,6 @@ function Profile() {
 
   const handleFieldChange = (e) => {
       const { id, value } = e.target;
-      if (id === 'mobileNumber') {
-          const mobileValue = validateMobileNumber(value);
-          if (mobileValue.length > 16) {
-              return;
-          }
-          setEditableFields(prev => ({...prev, [id]: mobileValue}));
-          return;
-      }
       if (id === 'relationshipGoals' && value !== 'Long-term relationship') {
         setEditableFields(prev => ({
           ...prev,
@@ -175,13 +220,14 @@ function Profile() {
 
   const handleSaveAll = async () => {
       const logger = console;
-      if (!editableFields.mobileNumber) {
+      if (mobileNationalNumber.replace(/\D/g, '').length < 6 || mobileNationalNumber.replace(/\D/g, '').length > 14) {
           toast.error('Mobile number is required.');
           return;
       }
       setSaveStatus('Saving...');
       try {
-          const updatedProfile = await apiClient.put('/users/me', editableFields);
+          const mobileNumber = `${mobileCountryCode}${mobileNationalNumber.replace(/\D/g, '')}`;
+          const updatedProfile = await apiClient.put('/users/me', { ...editableFields, mobileNumber });
           setProfile(updatedProfile);
           setUser(updatedProfile); // Update global user state
           toast.success('Profile saved successfully!');
@@ -311,14 +357,13 @@ function Profile() {
                                     )}
                                     <div>
                                         <label htmlFor="mobileNumber" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Mobile Number</label>
-                                        <div className="mt-1 flex rounded-md shadow-sm">
-                                            {suggestedCountryCode && (
-                                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                                                    {suggestedCountryCode}
-                                                </span>
-                                            )}
-                                            <input type="tel" id="mobileNumber" value={editableFields.mobileNumber} onChange={handleFieldChange} className="block w-full rounded-none rounded-r-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50" maxLength="16"/>
+                                        <div className="mt-1 grid grid-cols-[minmax(145px,0.9fr)_minmax(0,1.5fr)] gap-2">
+                                            <select id="mobileCountryCode" aria-label="Country calling code" autoComplete="tel-country-code" value={mobileCountryCode} onChange={event => setMobileCountryCode(event.target.value)} className="block w-full rounded-md border-gray-300 bg-white text-sm shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50">
+                                                {countryCallingCodes.map((item, index) => <option key={`${item.country}-${index}`} value={item.code}>{item.flag} {item.country} ({item.code})</option>)}
+                                            </select>
+                                            <input type="tel" id="mobileNumber" inputMode="numeric" autoComplete="tel-national" aria-label="Mobile number without country code" value={mobileNationalNumber} onChange={event => setMobileNationalNumber(event.target.value.replace(/\D/g, '').slice(0, 14))} placeholder="50 123 4567" className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50" maxLength="14"/>
                                         </div>
+                                        <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">Choose your country code and enter the number without repeating it.</p>
                                     </div>
                                 </div>
                             ) : (
