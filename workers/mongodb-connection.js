@@ -837,6 +837,81 @@ export class MongoDBConnection {
     }
   }
 
+  getDefaultNotificationPreferences() {
+    return {
+      channels: { inApp: true, desktop: true, sounds: true, callRingtone: true },
+      events: {
+        newMatches: true, newLikes: true, newMessages: true,
+        voiceCalls: true, videoCalls: true, profileViews: true,
+        roomInvitations: true, roomBookings: true, subscriptionUpdates: true,
+        paymentUpdates: true, supportUpdates: true, securityAlerts: true,
+        productUpdates: true
+      }
+    };
+  }
+
+  normalizeNotificationPreferences(value = {}) {
+    const defaults = this.getDefaultNotificationPreferences();
+    const normalized = { channels: { ...defaults.channels }, events: { ...defaults.events } };
+    for (const group of ["channels", "events"]) {
+      if (!value[group] || typeof value[group] !== "object" || Array.isArray(value[group])) continue;
+      for (const key of Object.keys(defaults[group])) {
+        if (typeof value[group][key] === "boolean") normalized[group][key] = value[group][key];
+      }
+    }
+    return normalized;
+  }
+
+  async getNotificationPreferences(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const user = await this.getDatabase(await this.getClient()).collection("users")
+        .findOne({ uid }, { projection: { notificationPreferences: 1, _id: 0 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      return { status: 200, body: this.normalizeNotificationPreferences(user.notificationPreferences) };
+    } catch {
+      return { status: 503, body: { error: "Notification preferences unavailable" } };
+    }
+  }
+
+  async updateNotificationPreferences(uid, preferences) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        !preferences || typeof preferences !== "object" || Array.isArray(preferences)) {
+      return { status: 400, body: { error: "Invalid notification preferences" } };
+    }
+    const allowedGroups = ["channels", "events"];
+    for (const group of Object.keys(preferences)) {
+      if (!allowedGroups.includes(group) || !preferences[group] || typeof preferences[group] !== "object" ||
+          Array.isArray(preferences[group])) {
+        return { status: 400, body: { error: "Invalid notification preference group" } };
+      }
+      const allowedKeys = Object.keys(this.getDefaultNotificationPreferences()[group]);
+      for (const [key, value] of Object.entries(preferences[group])) {
+        if (!allowedKeys.includes(key) || typeof value !== "boolean") {
+          return { status: 400, body: { error: "Invalid notification preference", field: group + "." + key } };
+        }
+      }
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const user = await users.findOne({ uid }, { projection: { notificationPreferences: 1, _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const current = this.normalizeNotificationPreferences(user.notificationPreferences);
+      const next = {
+        channels: { ...current.channels, ...(preferences.channels || {}) },
+        events: { ...current.events, ...(preferences.events || {}) }
+      };
+      await users.updateOne({ _id: user._id }, {
+        $set: { notificationPreferences: next, updatedAt: new Date() }
+      });
+      return { status: 200, body: next };
+    } catch {
+      return { status: 503, body: { error: "Could not save notification preferences" } };
+    }
+  }
+
   async getNotifications(uid) {
     if (typeof uid !== "string" || !uid || uid.length > 128) {
       return { status: 400, body: { error: "Invalid user identity" } };
@@ -3681,6 +3756,17 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.recordSwipe(body.claims.sub, body.targetUid, body.action, body.canonical === true);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/notification-preferences") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = body.preferences === null || body.preferences === undefined
+        ? await this.getNotificationPreferences(body.claims.sub)
+        : await this.updateNotificationPreferences(body.claims.sub, body.preferences);
       return json(result.body, result.status);
     }
 
