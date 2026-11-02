@@ -1,10 +1,5 @@
 User-agent: *
-Allow: /login
-Allow: /faq
-Allow: /safety
-Allow: /terms
-Allow: /cookies
-Allow: /privacy-settings
+Allow: /
 Disallow: /discover
 Disallow: /likes
 Disallow: /conversations
