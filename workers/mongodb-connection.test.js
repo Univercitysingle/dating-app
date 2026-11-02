@@ -1056,7 +1056,7 @@ test("call signaling keeps a rolling candidate buffer without a lifetime 429 cap
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.success, true);
-  assert.equal(capturedFilter._id, activeCall._id);
+  assert.equal(String(capturedFilter._id), callId);
   assert.deepEqual(capturedFilter.$or, [{ callerUid: "caller-uid" }, { receiverUid: "caller-uid" }]);
   assert.equal(capturedUpdate.$push.signals.$slice, -300);
   assert.equal(capturedUpdate.$push.signals.$each.length, 1);
