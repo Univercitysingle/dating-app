@@ -320,9 +320,21 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         pollingRef.current = false;
       }
     };
-    poll();
-    const interval = window.setInterval(poll, 1200);
-    return () => { mounted = false; window.clearInterval(interval); };
+    let pollTimer = null;
+    const runPoll = async () => {
+      await poll();
+      if (!mounted) return;
+      // Poll more frequently while ringing or connected, but reduce idle chat
+      // traffic. The old fixed 1.2s interval generated 50 requests per minute
+      // for every open chat, even when neither user was calling.
+      const activeCall = callRef.current && ["ringing", "accepted"].includes(callRef.current.status);
+      pollTimer = window.setTimeout(runPoll, activeCall ? 1200 : 3000);
+    };
+    runPoll();
+    return () => {
+      mounted = false;
+      if (pollTimer) window.clearTimeout(pollTimer);
+    };
   }, [roomId, currentUser?.uid, cleanupMedia, setRemoteDescription]);
 
   useEffect(() => () => cleanupMedia(), [cleanupMedia]);
