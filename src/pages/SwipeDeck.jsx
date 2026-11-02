@@ -135,6 +135,20 @@ const SwipeDeck = () => {
     }
   };
 
+  useEffect(() => {
+    const handleSwipeKeys = (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp') return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(target.tagName))) return;
+      if (isVoting || newMatchInfo || showFilters || !users[0]) return;
+      event.preventDefault();
+      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : 'superlike';
+      handleVote(users[0].uid, direction);
+    };
+    window.addEventListener('keydown', handleSwipeKeys);
+    return () => window.removeEventListener('keydown', handleSwipeKeys);
+  }, [users, isVoting, newMatchInfo, showFilters]);
+
   const handleSwipe = () => {
     // This function is called when the card animation is complete
     // We don't need to do anything here anymore, as the card is already removed from the DOM by AnimatePresence
