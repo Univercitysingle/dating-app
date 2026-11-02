@@ -2975,3 +2975,112 @@ input, textarea, select {
 @media (prefers-reduced-motion: reduce) {
   .discover-page .discover-stage .relative.w-full.h-full.rounded-2xl img { transition: none; }
 }
+
+
+/* Discover: icon-only controls and viewport-fitted swipe deck. */
+.discover-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom));
+  min-height: 0;
+  overflow: hidden;
+}
+.discover-header.discover-header-compact {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1120px;
+  min-height: 56px;
+  flex: 0 0 56px;
+  margin: 0 auto;
+  padding: 8px clamp(12px, 3vw, 28px);
+}
+.discover-filter-icon-button {
+  position: relative;
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.96);
+}
+.discover-filter-icon-button svg {
+  width: 21px;
+  height: 21px;
+}
+.discover-filter-icon-button .filter-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  font-size: 9px;
+}
+.discover-page > .discover-stage {
+  box-sizing: border-box;
+  min-height: 0;
+  flex: 1 1 0%;
+  padding: 0 12px;
+}
+.discover-page .discover-card-stack {
+  box-sizing: border-box;
+  width: min(90vw, 410px);
+  height: min(100%, 680px);
+  min-height: 0;
+  max-height: 100%;
+}
+.discover-page > .discover-actions {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  padding: 2px 12px max(8px, env(safe-area-inset-bottom));
+}
+.discover-page .discover-action-row {
+  margin: 4px 0;
+}
+@media (max-width: 640px) {
+  .discover-page {
+    height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom));
+  }
+  .discover-header.discover-header-compact {
+    min-height: 48px;
+    flex-basis: 48px;
+    padding: 5px 14px;
+  }
+  .discover-filter-icon-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+  .discover-page > .discover-stage {
+    padding: 0 10px;
+  }
+  .discover-page .discover-card-stack {
+    width: min(100%, 420px);
+    height: 100%;
+    max-height: 680px;
+  }
+  .discover-page > .discover-actions {
+    padding-top: 0;
+    padding-bottom: max(5px, env(safe-area-inset-bottom));
+  }
+  .discover-page .discover-action-row {
+    gap: clamp(8px, 3vw, 16px);
+    margin: 2px 0;
+  }
+}
+@media (max-height: 650px) {
+  .discover-header.discover-header-compact {
+    min-height: 42px;
+    flex-basis: 42px;
+  }
+  .discover-page .discover-action-row {
+    margin: 0;
+  }
+  .discover-page > .discover-actions {
+    padding-bottom: max(3px, env(safe-area-inset-bottom));
+  }
+}
