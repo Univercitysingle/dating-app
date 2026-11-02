@@ -486,6 +486,35 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       headerTarget
     )}
 
+    {incoming && <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-5 py-8 text-white" role="dialog" aria-modal="true" aria-label={videoCall ? 'Incoming video call' : 'Incoming voice call'}>
+      <div className="flex w-full max-w-sm flex-col items-center text-center">
+        <div className="mb-5 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white/15 bg-slate-700 text-4xl font-semibold shadow-2xl">
+          {otherUser?.photos?.[0]?.url
+            ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" />
+            : (otherUser?.name || '♡').trim().charAt(0).toUpperCase()}
+        </div>
+        <p className="mb-2 text-sm font-medium uppercase tracking-[0.22em] text-emerald-300">Incoming {videoCall ? 'video' : 'voice'} call</p>
+        <h2 className="text-3xl font-semibold tracking-tight">{otherUser?.name || 'Someone is calling'}</h2>
+        <p className="mt-3 text-sm text-slate-300">Calling you…</p>
+        {videoCall && <div className="mt-4 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs text-slate-300">Camera will start when you answer</div>}
+        <div className="mt-16 flex w-full items-start justify-center gap-12">
+          <button type="button" onClick={() => finishCall('decline')} disabled={callActionInProgressRef.current} className="flex min-w-24 flex-col items-center gap-3 disabled:opacity-50" aria-label="Reject call">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 shadow-lg transition hover:bg-rose-500 active:scale-95">
+              <svg viewBox="0 0 24 24" className="h-7 w-7 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 1 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <span className="text-sm font-semibold">Decline</span>
+          </button>
+          <button type="button" onClick={acceptCall} disabled={callActionInProgressRef.current} className="flex min-w-24 flex-col items-center gap-3 disabled:opacity-50" aria-label="Answer call">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 shadow-lg transition hover:bg-emerald-400 active:scale-95">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 1 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <span className="text-sm font-semibold">Answer</span>
+          </button>
+        </div>
+        {error && <p className="mt-8 rounded-xl bg-rose-950/70 px-4 py-3 text-sm text-rose-200" role="alert">{error}</p>}
+        {status && status !== 'Incoming call' && <p className="mt-3 text-sm text-slate-300" role="status">{status}</p>}
+      </div>
+    </div>}
     {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
     {active && <div className="mt-3 grid gap-3">
