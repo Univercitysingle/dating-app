@@ -60,6 +60,7 @@ const SwipeDeck = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [swipeError, setSwipeError] = useState(null);
+  const [isVoting, setIsVoting] = useState(false);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});
@@ -96,8 +97,14 @@ const SwipeDeck = () => {
   }, [swipeError]);
 
   const handleVote = async (userId, direction) => {
-    // Optimistic UI update
-    setUsers((prevUsers) => prevUsers.filter(u => u.uid !== userId));
+    if (!userId || isVoting) return;
+    const selectedUser = users.find((candidate) => candidate.uid === userId);
+    if (!selectedUser) return;
+
+    setIsVoting(true);
+    setSwipeError(null);
+    // Remove the active card immediately, then restore it if the API rejects the action.
+    setUsers((prevUsers) => prevUsers.filter((candidate) => candidate.uid !== userId));
 
     try {
       if (direction === 'right') {
@@ -118,7 +125,13 @@ const SwipeDeck = () => {
     } catch (err) {
       console.error("Error recording swipe:", err);
       setSwipeError(err.data?.message || `Failed to record ${direction} action.`);
-      // Note: In a real-world app, you might want to add the user back to the deck on failure.
+      setUsers((prevUsers) => (
+        prevUsers.some((candidate) => candidate.uid === userId)
+          ? prevUsers
+          : [selectedUser, ...prevUsers]
+      ));
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -219,7 +232,7 @@ const SwipeDeck = () => {
                         onClick={() => handleVote(users[0]?.uid, 'left')}
                         className="discover-action-button discover-action-pass p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
                         aria-label="Pass"
-                        disabled={!users[0]}
+                        disabled={!users[0] || isVoting}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
