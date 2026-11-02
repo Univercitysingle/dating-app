@@ -27,36 +27,7 @@ function categoryForNotification(type, notification = {}) {
   if (type === 'support') return 'supportUpdates';
   if (type === 'security') return 'securityAlerts';
   if (type === 'product_update') return 'productUpdates';
-  return incomingCall ? (
-    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-gradient-to-b from-emerald-950 via-slate-950 to-slate-950 px-5 py-8 text-white" role="dialog" aria-modal="true" aria-label={incomingCall.type === 'video' ? 'Incoming video call' : 'Incoming voice call'}>
-      <div className="flex w-full max-w-sm flex-col items-center text-center">
-        <div className="mb-6 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white/15 bg-slate-700 text-4xl font-semibold shadow-2xl">
-          {incomingCall.callerPhoto || incomingCall.callerAvatar
-            ? <img src={incomingCall.callerPhoto || incomingCall.callerAvatar} alt="" className="h-full w-full object-cover" />
-            : (incomingCall.callerName || '♡').trim().charAt(0).toUpperCase()}
-        </div>
-        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.22em] text-emerald-300">Incoming {incomingCall.type === 'video' ? 'video' : 'voice'} call</p>
-        <h2 className="text-3xl font-semibold tracking-tight">{incomingCall.callerName || 'Someone is calling'}</h2>
-        <p className="mt-3 text-sm text-slate-300">Calling you…</p>
-        {incomingCall.type === 'video' && <p className="mt-3 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs text-slate-300">Video call · Camera starts when you answer</p>}
-        <div className="mt-16 flex w-full items-start justify-center gap-14">
-          <button type="button" onClick={rejectIncomingCall} disabled={callActionBusy} className="flex min-w-24 flex-col items-center gap-3 disabled:opacity-50" aria-label="Reject incoming call">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 shadow-lg transition hover:bg-rose-500 active:scale-95">
-              <svg viewBox="0 0 24 24" className="h-7 w-7 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 1 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
-            </span>
-            <span className="text-sm font-semibold">{callActionBusy ? 'Please wait…' : 'Decline'}</span>
-          </button>
-          <button type="button" onClick={answerIncomingCall} disabled={callActionBusy} className="flex min-w-24 flex-col items-center gap-3 disabled:opacity-50" aria-label="Answer incoming call">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 shadow-lg transition hover:bg-emerald-400 active:scale-95">
-              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 0-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 0 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
-            </span>
-            <span className="text-sm font-semibold">Answer</span>
-          </button>
-        </div>
-        {callActionError && <p className="mt-6 rounded-xl bg-rose-950/70 px-4 py-3 text-sm text-rose-200" role="alert">{callActionError}</p>}
-      </div>
-    </div>
-  ) : null;
+  return null;
 }
 
 export default function IncomingCallMonitor() {
@@ -349,5 +320,34 @@ export default function IncomingCallMonitor() {
     };
   }, [user?.uid]);
 
-  return null;
+  return incomingCall ? (
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-gradient-to-b from-emerald-950 via-slate-950 to-slate-950 px-5 py-8 text-white" role="dialog" aria-modal="true" aria-label={incomingCall.type === 'video' ? 'Incoming video call' : 'Incoming voice call'}>
+      <div className="flex w-full max-w-sm flex-col items-center text-center">
+        <div className="mb-6 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white/15 bg-slate-700 text-4xl font-semibold shadow-2xl">
+          {incomingCall.callerPhoto || incomingCall.callerAvatar
+            ? <img src={incomingCall.callerPhoto || incomingCall.callerAvatar} alt="" className="h-full w-full object-cover" />
+            : (incomingCall.callerName || '♡').trim().charAt(0).toUpperCase()}
+        </div>
+        <p className="mb-2 text-sm font-semibold uppercase tracking-[0.22em] text-emerald-300">Incoming {incomingCall.type === 'video' ? 'video' : 'voice'} call</p>
+        <h2 className="text-3xl font-semibold tracking-tight">{incomingCall.callerName || 'Someone is calling'}</h2>
+        <p className="mt-3 text-sm text-slate-300">Calling you…</p>
+        {incomingCall.type === 'video' && <p className="mt-3 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs text-slate-300">Video call · Camera starts when you answer</p>}
+        <div className="mt-16 flex w-full items-start justify-center gap-14">
+          <button type="button" onClick={rejectIncomingCall} disabled={callActionBusy} className="flex min-w-24 flex-col items-center gap-3 disabled:opacity-50" aria-label="Reject incoming call">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-600 shadow-lg transition hover:bg-rose-500 active:scale-95">
+              <svg viewBox="0 0 24 24" className="h-7 w-7 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 1 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <span className="text-sm font-semibold">{callActionBusy ? 'Please wait…' : 'Decline'}</span>
+          </button>
+          <button type="button" onClick={answerIncomingCall} disabled={callActionBusy} className="flex min-w-24 flex-col items-center gap-3 disabled:opacity-50" aria-label="Answer incoming call">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 shadow-lg transition hover:bg-emerald-400 active:scale-95">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 1 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <span className="text-sm font-semibold">Answer</span>
+          </button>
+        </div>
+        {callActionError && <p className="mt-6 rounded-xl bg-rose-950/70 px-4 py-3 text-sm text-rose-200" role="alert">{callActionError}</p>}
+      </div>
+    </div>
+  ) : null;
 }
