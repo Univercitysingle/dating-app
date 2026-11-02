@@ -125,7 +125,9 @@ const Onboarding = () => {
       if (lookingFor === 'Casual (FWB)' && !sexualOrientation) return 'Please select your sexual orientation.';
     }
     if (step === 4) {
-      if (!/^\+[1-9]\d{7,14}$/.test(mobileNumber.trim())) return 'Enter your mobile number in international format, for example +971501234567.';
+      const nationalNumber = mobileNumber.replace(/\D/g, '');
+      if (nationalNumber.length < 6 || nationalNumber.length > 14) return 'Enter a valid mobile number without the country code.';
+      if (/^(\d)\1{5,}$/.test(nationalNumber)) return 'Please enter a valid mobile number.';
       const feet = Number(heightFeet);
       const inches = Number(heightInches);
       if (!heightFeet || !heightInches || feet < 3 || feet > 8 || inches < 0 || inches > 11) return 'Enter a valid height in feet and inches.';
@@ -168,7 +170,7 @@ const Onboarding = () => {
         location,
         personalityType,
         ...(sexualOrientation ? { sexualOrientation } : {}),
-        mobileNumber: `${countryCode}${mobileNumber.replace(/\\D/g, '')}`,
+        mobileNumber: `${countryCode}${mobileNumber.replace(/\D/g, '')}`,
         education: education.trim(),
         relationshipGoals,
         lifestyle: { lookingFor },
@@ -327,7 +329,7 @@ const Onboarding = () => {
                     </div>
                     <div>
                       <label htmlFor="mobileNumber" className="sr-only">Mobile number without country code</label>
-                      <input id="mobileNumber" name="mobileNumber" type="tel" inputMode="numeric" autoComplete="tel-national" required value={mobileNumber} onChange={e => setMobileNumber(e.target.value.replace(/\\D/g, '').slice(0, 14))} maxLength={14} placeholder="50 123 4567" className={inputClass.replace('mt-2 ', '')} />
+                      <input id="mobileNumber" name="mobileNumber" type="tel" inputMode="numeric" autoComplete="tel-national" required value={mobileNumber} onChange={e => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 14))} maxLength={14} placeholder="50 123 4567" className={inputClass.replace('mt-2 ', '')} />
                     </div>
                   </div>
                   <p className="mt-2 text-xs text-gray-400">Select your country code, then enter your mobile number. Do not include the country code again.</p>
