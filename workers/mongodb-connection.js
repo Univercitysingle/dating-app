@@ -2527,7 +2527,8 @@ export class MongoDBConnection {
         email, name, role, isProfileVisible: payload.isProfileVisible !== false,
         mustSetPassword: true, isOnboardingComplete: false, interests: [], profilePrompts: [],
         blocked: [], photos: [], totalPhotoSize: 0, isVerified: false, plan: "basic",
-        createdAt: now, updatedAt: now
+        createdAt: now, updatedAt: now,
+        callerLastSeenAt: now, receiverLastSeenAt: now
       };
       const result = await users.insertOne(user);
       delete user.password;
@@ -3155,11 +3156,34 @@ export class MongoDBConnection {
         roomId, status: { $in: ["ringing", "accepted"] },
         $or: [{ callerUid: uid }, { receiverUid: uid }]
       }, { sort: { createdAt: -1 } });
-      if (call?.status === "ringing" && Date.now() - new Date(call.createdAt).getTime() > 45000) {
-        await calls.updateOne({ _id: call._id, status: "ringing" }, {
-          $set: { status: "missed", endedAt: new Date(), updatedAt: new Date() }
-        });
-        call = null;
+      if (call) {
+        const now = new Date();
+        const heartbeatField = call.callerUid === uid ? "callerLastSeenAt" : "receiverLastSeenAt";
+        const otherHeartbeatField = call.callerUid === uid ? "receiverLastSeenAt" : "callerLastSeenAt";
+        await calls.updateOne(
+          { _id: call._id, status: { $in: ["ringing", "accepted"] } },
+          { $set: { [heartbeatField]: now } }
+        );
+        call[heartbeatField] = now;
+
+        if (call.status === "ringing" && now.getTime() - new Date(call.createdAt).getTime() > 45000) {
+          await calls.updateOne({ _id: call._id, status: "ringing" }, {
+            $set: { status: "missed", endedAt: now, updatedAt: now }
+          });
+          call = null;
+        } else if (call.status === "accepted") {
+          // Each participant renews their own lease through the existing poll.
+          // If the other browser closes or loses connectivity, the session is
+          // released instead of blocking all future calls indefinitely.
+          const otherSeen = call[otherHeartbeatField] || call.connectedAt || call.updatedAt || call.createdAt;
+          const otherSeenAt = new Date(otherSeen).getTime();
+          if (!Number.isFinite(otherSeenAt) || now.getTime() - otherSeenAt > 90000) {
+            await calls.updateOne({ _id: call._id, status: "accepted" }, {
+              $set: { status: "ended", endedAt: now, updatedAt: now, endReason: "participant_timeout" }
+            });
+            call = null;
+          }
+        }
       }
       if (!call) return { status: 200, body: { call: null, signals: [] } };
       const signals = (Array.isArray(call.signals) ? call.signals : [])
@@ -3239,6 +3263,8 @@ export class MongoDBConnection {
       if (action === "accept") {
         set.answer = { type: "answer", sdp: answer.sdp };
         set.connectedAt = now;
+        set.callerLastSeenAt = now;
+        set.receiverLastSeenAt = now;
       } else {
         set.endedAt = now;
       }
