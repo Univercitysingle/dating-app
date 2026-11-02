@@ -1080,3 +1080,64 @@ test("call signaling rejects non-participants before writing candidates", async 
   assert.equal(result.status, 403);
   assert.equal(writeAttempted, false);
 });
+
+
+test("accepted calls are ended when the other participant stops polling", async () => {
+  const now = Date.now();
+  const call = {
+    _id: { toString: () => "call-id" },
+    roomId: "caller-uid-receiver-uid",
+    callerUid: "caller-uid",
+    receiverUid: "receiver-uid",
+    status: "accepted",
+    createdAt: new Date(now - 180000),
+    connectedAt: new Date(now - 180000),
+    updatedAt: new Date(now - 180000),
+    callerLastSeenAt: new Date(now - 120000),
+    receiverLastSeenAt: new Date(now - 2000),
+    signals: []
+  };
+  const updates = [];
+  const calls = {
+    async findOne() { return call; },
+    async updateOne(filter, update) { updates.push({ filter, update }); return { matchedCount: 1, modifiedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => calls }) });
+  const result = await connection.getCallState("receiver-uid", call.roomId);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call, null);
+  assert.equal(updates.length, 2);
+  assert.equal(updates[0].update.$set.receiverLastSeenAt instanceof Date, true);
+  assert.equal(updates[1].update.$set.status, "ended");
+  assert.equal(updates[1].update.$set.endReason, "participant_timeout");
+});
+
+test("accepted calls stay active while both participants renew their heartbeats", async () => {
+  const now = Date.now();
+  const call = {
+    _id: { toString: () => "call-id" },
+    roomId: "caller-uid-receiver-uid",
+    callerUid: "caller-uid",
+    receiverUid: "receiver-uid",
+    status: "accepted",
+    createdAt: new Date(now - 20000),
+    connectedAt: new Date(now - 20000),
+    updatedAt: new Date(now - 20000),
+    callerLastSeenAt: new Date(now - 2000),
+    receiverLastSeenAt: new Date(now - 2000),
+    signals: []
+  };
+  const updates = [];
+  const calls = {
+    async findOne() { return call; },
+    async updateOne(filter, update) { updates.push({ filter, update }); return { matchedCount: 1, modifiedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => calls }) });
+  const result = await connection.getCallState("receiver-uid", call.roomId);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call.status, "accepted");
+  assert.equal(result.body.call.receiverLastSeenAt instanceof Date, true);
+  assert.equal(updates.length, 1);
+});
