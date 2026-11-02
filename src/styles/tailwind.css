@@ -2729,3 +2729,249 @@ input, textarea, select {
     height: 18px;
   }
 }
+
+
+
+/* Tinder-inspired Discover experience */
+.discover-page {
+  position: relative;
+  min-height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom));
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 22%, rgba(233, 75, 120, .075), transparent 38%),
+    linear-gradient(180deg, #fffdfc 0%, #f8f5f7 100%);
+}
+.discover-header {
+  max-width: 1120px;
+  padding-top: clamp(18px, 3vh, 30px);
+  padding-bottom: 14px;
+}
+.discover-heading-copy h1 {
+  color: #30252e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(30px, 4vw, 40px);
+  font-weight: 500;
+  letter-spacing: -.045em;
+  line-height: 1;
+}
+.discover-heading-copy .page-eyebrow { margin-bottom: 9px; }
+.discover-subtitle {
+  margin-top: 8px;
+  color: #887b84;
+  font-size: 12px;
+  letter-spacing: .01em;
+}
+.discover-header .filter-button {
+  min-height: 46px;
+  padding: 0 17px;
+  border-color: #eadfe4;
+  border-radius: 999px;
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 5px 18px rgba(64, 38, 52, .055);
+}
+.discover-header .filter-button:hover {
+  border-color: #dba6b8;
+  color: #a3475d;
+  box-shadow: 0 8px 22px rgba(164, 71, 93, .1);
+}
+.discover-header .filter-count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: #a3475d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+.discover-stage {
+  position: relative;
+  min-height: 0;
+  padding-bottom: 2px;
+}
+.discover-card-stack {
+  isolation: isolate;
+  filter: drop-shadow(0 18px 28px rgba(48, 30, 42, .12));
+}
+.discover-page .discover-stage .relative.w-full.h-full.rounded-2xl {
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 25px;
+  box-shadow: 0 22px 60px rgba(42, 25, 39, .18);
+  background: #211c22;
+}
+.discover-page .discover-stage .relative.w-full.h-full.rounded-2xl img {
+  transition: transform 450ms ease;
+}
+.discover-page .discover-stage .relative.w-full.h-full.rounded-2xl:hover img {
+  transform: scale(1.015);
+}
+.discover-card-caption {
+  min-height: 42%;
+  padding: 26px 24px 24px;
+  background: linear-gradient(180deg, transparent 0%, rgba(15, 12, 17, .28) 34%, rgba(15, 12, 17, .92) 100%);
+}
+.discover-profile-badge {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255,255,255,.32);
+  border-radius: 999px;
+  background: rgba(20, 17, 22, .34);
+  color: rgba(255,255,255,.96);
+  font-size: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.discover-profile-badge:first-child span { color: #9fe4c3; }
+.discover-actions {
+  max-width: 580px;
+  padding-top: 6px;
+}
+.discover-action-row { gap: clamp(14px, 3vw, 24px); }
+.discover-page .discover-actions .discover-action-button {
+  display: inline-flex;
+  width: 58px;
+  height: 58px;
+  min-width: 58px;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #eee5e9;
+  border-radius: 50%;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 8px 24px rgba(49, 31, 43, .1);
+}
+.discover-page .discover-actions .discover-action-button svg { width: 25px; height: 25px; }
+.discover-page .discover-actions .discover-action-pass { color: #df5571; }
+.discover-page .discover-actions .discover-action-superlike {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  color: #4e9bc9;
+}
+.discover-page .discover-actions .discover-action-like {
+  width: 66px;
+  height: 66px;
+  min-width: 66px;
+  min-height: 66px;
+  color: #36a77b;
+}
+.discover-page .discover-actions .discover-action-undo {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  color: #c49b45;
+}
+.discover-page .discover-actions .discover-action-button:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.045);
+  box-shadow: 0 13px 28px rgba(49, 31, 43, .14);
+}
+.discover-page .discover-actions .discover-action-button:active:not(:disabled) {
+  transform: scale(.96);
+}
+.discover-page .discover-actions .discover-action-button:focus-visible {
+  outline: 3px solid rgba(163,71,93,.3);
+  outline-offset: 4px;
+}
+.discover-empty-state {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 26px;
+  border: 1px solid rgba(235,224,230,.9);
+  border-radius: 26px;
+  background: rgba(255,255,255,.82);
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(49,31,43,.07);
+}
+.discover-empty-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 22px;
+  background: #fff0f4;
+  color: #ad4d6b;
+}
+.discover-empty-icon svg { width: 31px; height: 31px; }
+.discover-empty-eyebrow {
+  margin-top: 22px;
+  color: #a3475d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .17em;
+}
+.discover-empty-state h2 {
+  max-width: 290px;
+  margin-top: 9px;
+  color: #30252e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: -.035em;
+  line-height: 1.15;
+}
+.discover-empty-state > p:not(.discover-empty-eyebrow) {
+  max-width: 300px;
+  margin-top: 11px;
+  color: #837781;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.discover-refresh-button {
+  min-height: 44px;
+  margin-top: 22px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #a3475d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 7px 18px rgba(163,71,93,.2);
+}
+.discover-refresh-button:hover { background: #87364d; transform: translateY(-1px); }
+@media (min-width: 900px) {
+  .discover-page { min-height: calc(100dvh - var(--bottom-nav-height)); }
+  .discover-stage { padding-top: 4px; }
+  .discover-card-stack { height: min(68dvh, 690px); width: min(86vw, 440px); }
+  .discover-page .discover-actions { padding-bottom: 22px; }
+}
+@media (max-width: 640px) {
+  .discover-page { min-height: calc(100dvh - var(--bottom-nav-height) - env(safe-area-inset-bottom)); }
+  .discover-header { padding: 16px 16px 10px; }
+  .discover-heading-copy h1 { font-size: 30px; }
+  .discover-subtitle { margin-top: 6px; font-size: 11px; }
+  .discover-header .filter-button { min-height: 42px; padding: 0 13px; font-size: 12px; }
+  .discover-stage { flex: 1 1 auto; justify-content: center; padding: 2px 12px 0; }
+  .discover-card-stack { width: min(100%, 420px); height: min(66dvh, 650px); }
+  .discover-page .discover-stage .relative.w-full.h-full.rounded-2xl { border-radius: 22px; }
+  .discover-card-caption { padding: 20px 18px 19px; }
+  .discover-card-caption h3 { font-size: clamp(27px, 8vw, 34px); }
+  .discover-actions { padding: 4px 12px max(10px, env(safe-area-inset-bottom)); }
+  .discover-action-row { gap: clamp(12px, 4vw, 20px); margin: 10px 0 4px; }
+  .discover-page .discover-actions .discover-action-button { width: 54px; height: 54px; min-width: 54px; min-height: 54px; }
+  .discover-page .discover-actions .discover-action-superlike,
+  .discover-page .discover-actions .discover-action-undo { width: 48px; height: 48px; min-width: 48px; min-height: 48px; }
+  .discover-page .discover-actions .discover-action-like { width: 62px; height: 62px; min-width: 62px; min-height: 62px; }
+}
+@media (max-width: 380px) {
+  .discover-card-stack { height: min(62dvh, 590px); }
+  .discover-action-row { gap: 10px; }
+  .discover-page .discover-actions .discover-action-button { width: 49px; height: 49px; min-width: 49px; min-height: 49px; }
+  .discover-page .discover-actions .discover-action-superlike,
+  .discover-page .discover-actions .discover-action-undo { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .discover-page .discover-actions .discover-action-like { width: 57px; height: 57px; min-width: 57px; min-height: 57px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .discover-page .discover-stage .relative.w-full.h-full.rounded-2xl img { transition: none; }
+}
