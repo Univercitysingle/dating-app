@@ -449,6 +449,51 @@ function Login() {
           )}
         </div>
       </div>
+      <section className="login-seo-content relative z-10 w-full max-w-5xl mt-10 mb-8 px-2 text-white" aria-labelledby="dating-intro-title">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-pink-200">Hart2Hart</p>
+          <h1 id="dating-intro-title" className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Meet people. Build genuine connections.</h1>
+          <p className="mt-3 text-sm sm:text-base leading-7 text-white/85">
+            Hart2Hart is a dating app designed to help adults discover profiles, express interest, connect through conversations and get to know each other at their own pace.
+            Create a profile, explore people on Discover and start a conversation when the interest is mutual.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          <article className="rounded-2xl border border-white/15 bg-black/25 p-4 backdrop-blur-md">
+            <h2 className="font-semibold text-white">Discover profiles</h2>
+            <p className="mt-2 text-sm leading-6 text-white/80">Explore member profiles and learn about people before deciding whether to connect.</p>
+          </article>
+          <article className="rounded-2xl border border-white/15 bg-black/25 p-4 backdrop-blur-md">
+            <h2 className="font-semibold text-white">Connect by mutual interest</h2>
+            <p className="mt-2 text-sm leading-6 text-white/80">Like profiles, see who likes you and build connections when interest is shared.</p>
+          </article>
+          <article className="rounded-2xl border border-white/15 bg-black/25 p-4 backdrop-blur-md">
+            <h2 className="font-semibold text-white">Chat and meet</h2>
+            <p className="mt-2 text-sm leading-6 text-white/80">Continue getting to know your matches through private conversations and video calls.</p>
+          </article>
+        </div>
+        <div className="mx-auto mt-8 max-w-3xl">
+          <h2 className="text-xl font-bold text-center">Frequently asked questions</h2>
+          <div className="mt-4 space-y-3 text-sm leading-6">
+            <details className="rounded-xl border border-white/15 bg-black/25 p-4">
+              <summary className="cursor-pointer font-semibold">What is Hart2Hart?</summary>
+              <p className="mt-2 text-white/80">Hart2Hart is an online dating app where adults can discover profiles, show interest, match and communicate.</p>
+            </details>
+            <details className="rounded-xl border border-white/15 bg-black/25 p-4">
+              <summary className="cursor-pointer font-semibold">How do I start using Hart2Hart?</summary>
+              <p className="mt-2 text-white/80">Create an account, complete your profile and browse the Discover experience to find people you may want to connect with.</p>
+            </details>
+            <details className="rounded-xl border border-white/15 bg-black/25 p-4">
+              <summary className="cursor-pointer font-semibold">Can I chat with people I connect with?</summary>
+              <p className="mt-2 text-white/80">Yes. The app includes conversations for connecting with other members. Video calling is available where supported.</p>
+            </details>
+            <details className="rounded-xl border border-white/15 bg-black/25 p-4">
+              <summary className="cursor-pointer font-semibold">Is Hart2Hart for adults?</summary>
+              <p className="mt-2 text-white/80">Hart2Hart is intended for adults aged 18 and over.</p>
+            </details>
+          </div>
+        </div>
+      </section>
       <div className="relative z-10 w-full mt-6">
         <Footer />
       </div>
