@@ -19,6 +19,65 @@ const steps = [
 const inputClass = 'mt-2 block w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-pink-400 focus:ring-4 focus:ring-pink-100';
 const labelClass = 'block text-sm font-semibold text-gray-800';
 
+const countryCallingCodes = [
+  { country: 'United Arab Emirates', flag: '🇦🇪', code: '+971' },
+  { country: 'Sri Lanka', flag: '🇱🇰', code: '+94' },
+  { country: 'India', flag: '🇮🇳', code: '+91' },
+  { country: 'Pakistan', flag: '🇵🇰', code: '+92' },
+  { country: 'Bangladesh', flag: '🇧🇩', code: '+880' },
+  { country: 'Nepal', flag: '🇳🇵', code: '+977' },
+  { country: 'Philippines', flag: '🇵🇭', code: '+63' },
+  { country: 'United Kingdom', flag: '🇬🇧', code: '+44' },
+  { country: 'United States', flag: '🇺🇸', code: '+1' },
+  { country: 'Canada', flag: '🇨🇦', code: '+1' },
+  { country: 'Australia', flag: '🇦🇺', code: '+61' },
+  { country: 'New Zealand', flag: '🇳🇿', code: '+64' },
+  { country: 'Saudi Arabia', flag: '🇸🇦', code: '+966' },
+  { country: 'Qatar', flag: '🇶🇦', code: '+974' },
+  { country: 'Kuwait', flag: '🇰🇼', code: '+965' },
+  { country: 'Bahrain', flag: '🇧🇭', code: '+973' },
+  { country: 'Oman', flag: '🇴🇲', code: '+968' },
+  { country: 'Jordan', flag: '🇯🇴', code: '+962' },
+  { country: 'Lebanon', flag: '🇱🇧', code: '+961' },
+  { country: 'Egypt', flag: '🇪🇬', code: '+20' },
+  { country: 'South Africa', flag: '🇿🇦', code: '+27' },
+  { country: 'Nigeria', flag: '🇳🇬', code: '+234' },
+  { country: 'Kenya', flag: '🇰🇪', code: '+254' },
+  { country: 'Germany', flag: '🇩🇪', code: '+49' },
+  { country: 'France', flag: '🇫🇷', code: '+33' },
+  { country: 'Italy', flag: '🇮🇹', code: '+39' },
+  { country: 'Spain', flag: '🇪🇸', code: '+34' },
+  { country: 'Portugal', flag: '🇵🇹', code: '+351' },
+  { country: 'Netherlands', flag: '🇳🇱', code: '+31' },
+  { country: 'Belgium', flag: '🇧🇪', code: '+32' },
+  { country: 'Switzerland', flag: '🇨🇭', code: '+41' },
+  { country: 'Austria', flag: '🇦🇹', code: '+43' },
+  { country: 'Ireland', flag: '🇮🇪', code: '+353' },
+  { country: 'Sweden', flag: '🇸🇪', code: '+46' },
+  { country: 'Norway', flag: '🇳🇴', code: '+47' },
+  { country: 'Denmark', flag: '🇩🇰', code: '+45' },
+  { country: 'Finland', flag: '🇫🇮', code: '+358' },
+  { country: 'Poland', flag: '🇵🇱', code: '+48' },
+  { country: 'Turkey', flag: '🇹🇷', code: '+90' },
+  { country: 'Russia', flag: '🇷🇺', code: '+7' },
+  { country: 'Ukraine', flag: '🇺🇦', code: '+380' },
+  { country: 'China', flag: '🇨🇳', code: '+86' },
+  { country: 'Japan', flag: '🇯🇵', code: '+81' },
+  { country: 'South Korea', flag: '🇰🇷', code: '+82' },
+  { country: 'Singapore', flag: '🇸🇬', code: '+65' },
+  { country: 'Malaysia', flag: '🇲🇾', code: '+60' },
+  { country: 'Indonesia', flag: '🇮🇩', code: '+62' },
+  { country: 'Thailand', flag: '🇹🇭', code: '+66' },
+  { country: 'Vietnam', flag: '🇻🇳', code: '+84' },
+  { country: 'Hong Kong', flag: '🇭🇰', code: '+852' },
+  { country: 'Mexico', flag: '🇲🇽', code: '+52' },
+  { country: 'Brazil', flag: '🇧🇷', code: '+55' },
+  { country: 'Argentina', flag: '🇦🇷', code: '+54' },
+  { country: 'Chile', flag: '🇨🇱', code: '+56' },
+  { country: 'Colombia', flag: '🇨🇴', code: '+57' },
+  { country: 'Peru', flag: '🇵🇪', code: '+51' },
+];
+
 const ChoiceCard = ({ selected, onClick, children }) => (
   <button
     type="button"
@@ -41,6 +100,7 @@ const Onboarding = () => {
   const [photo, setPhoto] = useState(null);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
+  const [countryCode, setCountryCode] = useState('+971');
   const [mobileNumber, setMobileNumber] = useState('');
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
@@ -109,7 +169,7 @@ const Onboarding = () => {
         location,
         personalityType,
         ...(sexualOrientation ? { sexualOrientation } : {}),
-        mobileNumber: mobileNumber.trim(),
+        mobileNumber: `${countryCode}${mobileNumber.replace(/\\D/g, '')}`,
         education: education.trim(),
         relationshipGoals,
         lifestyle: { lookingFor },
@@ -256,9 +316,22 @@ const Onboarding = () => {
             {step === 4 && (
               <div className="space-y-5">
                 <div>
-                  <label className={labelClass} htmlFor="mobileNumber">Mobile number</label>
-                  <input id="mobileNumber" type="tel" inputMode="tel" autoComplete="tel" required value={mobileNumber} onChange={e => { const value = validateMobileNumber(e.target.value); if (value.length <= 16) setMobileNumber(value); }} maxLength={16} placeholder="+971501234567" className={inputClass} />
-                  <p className="mt-2 text-xs text-gray-400">Use international format, including your country code.</p>
+                  <span className={labelClass}>Mobile number</span>
+                  <div className="mt-2 grid grid-cols-[minmax(145px,0.9fr)_minmax(0,1.5fr)] gap-2">
+                    <div>
+                      <label htmlFor="countryCode" className="sr-only">Country calling code</label>
+                      <select id="countryCode" autoComplete="tel-country-code" value={countryCode} onChange={e => setCountryCode(e.target.value)} className="block w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-900 shadow-sm outline-none transition focus:border-pink-400 focus:ring-4 focus:ring-pink-100">
+                        {countryCallingCodes.map((item, index) => (
+                          <option key={`${item.country}-${index}`} value={item.code}>{item.flag} {item.country} ({item.code})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="mobileNumber" className="sr-only">Mobile number without country code</label>
+                      <input id="mobileNumber" name="mobileNumber" type="tel" inputMode="numeric" autoComplete="tel-national" required value={mobileNumber} onChange={e => setMobileNumber(e.target.value.replace(/\\D/g, '').slice(0, 14))} maxLength={14} placeholder="50 123 4567" className={inputClass.replace('mt-2 ', '')} />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-400">Select your country code, then enter your mobile number. Do not include the country code again.</p>
                 </div>
                 <div>
                   <span className={labelClass}>Your height</span>
