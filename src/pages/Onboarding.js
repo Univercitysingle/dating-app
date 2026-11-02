@@ -6,7 +6,6 @@ import PhotoUploader from '../components/PhotoUploader';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { subYears } from 'date-fns';
-import { validateMobileNumber } from '../utils/helpers';
 
 const steps = [
   { title: 'The basics', subtitle: 'Start with a few details about you.' },
