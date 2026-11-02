@@ -207,6 +207,13 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, [stopRingtone]);
 
   const cleanupMedia = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    reconnectingRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    setReconnecting(false);
     if (peerRef.current) {
       peerRef.current.onicecandidate = null;
       peerRef.current.close();
@@ -241,6 +248,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       await apiClient.post('/calls/signal', { callId, description: { type: description.type, sdp: description.sdp } });
     } catch (err) {
       setError(messageFor(err, 'Unable to restore the call connection.'));
+      throw err;
     }
   }, []);
 
