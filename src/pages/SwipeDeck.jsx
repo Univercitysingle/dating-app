@@ -55,6 +55,46 @@ const NoMoreProfiles = ({ onRefresh }) => (
 );
 
 
+const DiscoverLoadingState = () => {
+  const [isSlow, setIsSlow] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setIsSlow(true), 8000);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  return (
+    <div className="discover-loading" role="status" aria-live="polite" aria-atomic="true">
+      <div className="discover-loading__header">
+        <span className="discover-skeleton discover-skeleton--filter" aria-hidden="true" />
+      </div>
+      <div className="discover-loading__stage">
+        <div className="discover-loading__card" aria-hidden="true">
+          <div className="discover-skeleton discover-skeleton--photo" />
+          <div className="discover-loading__caption">
+            <span className="discover-skeleton discover-skeleton--badge" />
+            <span className="discover-skeleton discover-skeleton--name" />
+            <span className="discover-skeleton discover-skeleton--meta" />
+            <span className="discover-skeleton discover-skeleton--bio" />
+          </div>
+          <span className="discover-loading__hint">Preparing profile cards</span>
+        </div>
+      </div>
+      <div className="discover-loading__actions" aria-hidden="true">
+        <span className="discover-skeleton discover-skeleton--action" />
+        <span className="discover-skeleton discover-skeleton--action discover-skeleton--action-small" />
+        <span className="discover-skeleton discover-skeleton--action discover-skeleton--action-large" />
+        <span className="discover-skeleton discover-skeleton--action discover-skeleton--action-small" />
+      </div>
+      <p className="discover-loading__message">
+        {isSlow
+          ? 'This is taking longer than usual. We are still looking for profiles, please keep this page open.'
+          : 'Finding people who match your preferences...'}
+      </p>
+    </div>
+  );
+};
+
 const SwipeDeck = () => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,11 +220,26 @@ const SwipeDeck = () => {
   }).length;
 
   if (isLoading) {
-    return <div className="state-panel flex min-h-[60vh] items-center justify-center"><p>Finding people for you…</p></div>;
+    return <DiscoverLoadingState />;
   }
 
   if (error) {
-    return <div className="state-panel state-error flex min-h-[60vh] items-center justify-center"><p role="alert">We could not load profiles. {error}</p></div>;
+    return (
+      <div className="discover-load-error" role="alert">
+        <div className="discover-empty-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M10.3 3.9 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+          </svg>
+        </div>
+        <p className="discover-empty-eyebrow">CONNECTION INTERRUPTED</p>
+        <h2>We couldn't load profiles.</h2>
+        <p>Please check your connection and try again. Your preferences are still here.</p>
+        <button type="button" className="discover-refresh-button" onClick={() => fetchUsersToSwipe(activeFilters)}>
+          Try again
+        </button>
+        <span className="discover-load-error__detail">{error}</span>
+      </div>
+    );
   }
 
   return (
