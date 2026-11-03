@@ -2,8 +2,8 @@ import React from 'react';
 
 const CookiePolicyPage = () => {
     return (
-        <div className="container mx-auto p-8">
-            <h1 className="text-3xl font-bold mb-6">Cookie Policy</h1>
+        <main className="legal-page"><div className="legal-page__content container mx-auto p-8">
+            <h1 className="legal-page__title text-3xl font-bold mb-6">Cookie Policy</h1>
             <p>This page explains how we use cookies and similar technologies to help us ensure that our services function properly, prevent fraud and other harm, and analyze and improve the services in accordance with our Privacy Policy.</p>
 
             <div className="prose mt-4">
@@ -23,7 +23,7 @@ const CookiePolicyPage = () => {
                 <h2>3. Your choices</h2>
                 <p>You have the right to choose whether or not to accept cookies. However, they are an important part of how our services work, so you should be aware that if you choose to refuse or remove cookies, this could affect the availability and functionality of the services.</p>
             </div>
-        </div>
+        </div></main>
     );
 };
 
