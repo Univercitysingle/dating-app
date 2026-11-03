@@ -5,6 +5,7 @@ import SwipeCard from '../components/SwipeCard';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Filter from '../components/Filter';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const MatchModal = ({ matchInfo, onContinue, onChat }) => (
     <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
@@ -116,7 +117,7 @@ const SwipeDeck = () => {
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching users for swipe deck:", err);
-      setError(err.data?.message || err.message || "Failed to load users.");
+      setError(getUserFriendlyError(err, 'We could not load profiles. Please try again.'));
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -164,7 +165,7 @@ const SwipeDeck = () => {
       }
     } catch (err) {
       console.error("Error recording swipe:", err);
-      setSwipeError(err.data?.message || `Failed to record ${direction} action.`);
+      setSwipeError(getUserFriendlyError(err, `Your ${direction} could not be saved. Please try again.`));
       setUsers((prevUsers) => (
         prevUsers.some((candidate) => candidate.uid === userId)
           ? prevUsers
@@ -202,7 +203,7 @@ const SwipeDeck = () => {
       }
     } catch (err) {
       console.error("Error undoing swipe:", err);
-      setSwipeError(err.data?.message || "Failed to undo swipe.");
+      setSwipeError(getUserFriendlyError(err, 'Your last action could not be undone. Please try again.'));
     }
   };
 
