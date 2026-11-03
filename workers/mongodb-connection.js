@@ -3643,6 +3643,31 @@ export class MongoDBConnection {
     }
   }
 
+  async markChatRead(uid, payload) {
+    const { roomId, messageIds } = payload || {};
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
+        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid)) ||
+        !Array.isArray(messageIds) || messageIds.length > 100) {
+      return { status: 400, body: { error: "Invalid read receipt" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const ids = messageIds
+        .filter(id => typeof id === "string" && /^[a-fA-F0-9]{24}$/.test(id))
+        .map(id => new ObjectId(id));
+      if (!ids.length) return { status: 200, body: { readCount: 0 } };
+      const db = this.getDatabase(await this.getClient());
+      const now = new Date();
+      const result = await db.collection("chatmessages").updateMany(
+        { _id: { $in: ids }, roomId, receiverUid: uid, status: { $in: ["sent", "delivered"] } },
+        { $set: { status: "read", deliveredAt: now, readAt: now } }
+      );
+      return { status: 200, body: { readCount: result.modifiedCount } };
+    } catch {
+      return { status: 503, body: { error: "Could not mark messages as read" } };
+    }
+  }
+
   async createChatMessage(uid, payload) {
     const { roomId, receiverUid, messageContent } = payload || {};
     if (typeof uid !== "string" || !uid || typeof receiverUid !== "string" || !receiverUid ||
@@ -3800,7 +3825,8 @@ export class MongoDBConnection {
         url.pathname === "/internal/chat/rollback" ||
         url.pathname === "/internal/chat/typing-read" ||
         url.pathname === "/internal/chat/typing-write" ||
-        url.pathname === "/internal/chat/delivered") {
+        url.pathname === "/internal/chat/delivered" ||
+        url.pathname === "/internal/chat/read") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
       let result;
@@ -3816,6 +3842,8 @@ export class MongoDBConnection {
         result = await this.updateTypingStatus(body.claims.sub, body.payload);
       } else if (url.pathname === "/internal/chat/delivered") {
         result = await this.markChatDelivered(body.claims.sub, body.payload);
+      } else if (url.pathname === "/internal/chat/read") {
+        result = await this.markChatRead(body.claims.sub, body.payload);
       } else {
         result = await this.deleteChatMessage(body.claims.sub, body.messageId);
       }
