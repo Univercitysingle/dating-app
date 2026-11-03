@@ -1852,6 +1852,7 @@ test("chat history returns the requested page in chronological order", async () 
   let capturedSort;
   let capturedSkip;
   let capturedLimit;
+  let capturedMaxTimeMS;
   const users = {
     async findOne({ uid }) {
       return uid === "alice" ? { uid, role: "user", blocked: [] } :
@@ -1862,6 +1863,7 @@ test("chat history returns the requested page in chronological order", async () 
     sort(value) { capturedSort = value; return this; },
     skip(value) { capturedSkip = value; return this; },
     limit(value) { capturedLimit = value; return this; },
+    maxTimeMS(value) { capturedMaxTimeMS = value; return this; },
     async toArray() { return [newer, older]; }
   };
   const messages = {
@@ -1891,5 +1893,6 @@ test("chat history returns the requested page in chronological order", async () 
   assert.deepEqual(capturedSort, { timestamp: -1, _id: -1 });
   assert.equal(capturedSkip, 50);
   assert.equal(capturedLimit, 25);
+  assert.equal(capturedMaxTimeMS, 10000);
   assert.deepEqual(result.body.messages.map(message => message._id), ["older", "newer"]);
 });
