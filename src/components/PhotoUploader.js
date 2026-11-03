@@ -32,7 +32,7 @@ export const convertPhotoToWebP = async (file) => {
       return file;
     }
 
-    const baseName = file.name.replace(/\\.[^.]+$/, '') || 'photo';
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
     return new File([webpBlob], baseName + '.webp', {
       type: 'image/webp',
       lastModified: file.lastModified
