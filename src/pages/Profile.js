@@ -19,6 +19,7 @@ import { API_URL } from '../utils/constants';
 import SectionCard from '../components/profile/SectionCard';
 import NotificationPreferencesPanel from '../components/NotificationPreferencesPanel';
 import LoadingState from '../components/LoadingState';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const countryCallingCodes = [
   { country: 'United Arab Emirates', flag: '🇦🇪', code: '+971' },
@@ -133,7 +134,7 @@ function Profile() {
             const data = await apiClient.get(`/users/${userId}`);
             setProfile(data);
         } catch (error) {
-            setFetchError(error.message || 'Failed to fetch profile.');
+            setFetchError(getUserFriendlyError(error, 'We could not load this profile. Please try again.'));
         }
     };
 
@@ -160,7 +161,7 @@ function Profile() {
                 siblings: data.siblings || '',
             });
         } catch (error) {
-            setFetchError(error.message || 'Failed to fetch own profile.');
+            setFetchError(getUserFriendlyError(error, 'We could not load your profile. Please try again.'));
         }
     };
 
