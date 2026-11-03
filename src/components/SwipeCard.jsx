@@ -113,6 +113,20 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
     ? resolveWorkerPhotoUrl(rawImageSources[currentImageIndex])
     : '';
 
+  useEffect(() => {
+    if (imageSources.length < 2 || typeof window === 'undefined') return undefined;
+    const nextIndex = (currentImageIndex + 1) % imageSources.length;
+    const nextSource = imageSources[nextIndex];
+    if (!nextSource) return undefined;
+    const preloadedImage = new window.Image();
+    preloadedImage.decoding = 'async';
+    preloadedImage.src = nextSource;
+    return () => {
+      preloadedImage.onload = null;
+      preloadedImage.onerror = null;
+    };
+  }, [currentImageIndex, photos]);
+
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {
       setExitX(300);
