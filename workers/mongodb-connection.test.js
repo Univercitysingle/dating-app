@@ -3,7 +3,7 @@ import test from "node:test";
 import { MongoDBConnection } from "./mongodb-connection.js";
 import Worker from "./index.js";
 
-test("discovery builds a valid aggregation expression to exclude boosted users from regular results", async () => {
+test("discovery combines boosted and regular candidates with safe array defaults", async () => {
   let capturedPipeline;
   const users = {
     findOne: async ({ uid }) => ({ uid, blocked: ["blocked-user"], location: { coordinates: [0, 0] } }),
@@ -31,12 +31,21 @@ test("discovery builds a valid aggregation expression to exclude boosted users f
 
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, []);
-  assert.deepEqual(capturedPipeline[0].$match.uid, { $ne: "current-user", $nin: ["blocked-user"] });
+  assert.deepEqual(capturedPipeline[0].$match.uid, {
+    $type: "string",
+    $ne: "current-user",
+    $nin: ["blocked-user"]
+  });
   const project = capturedPipeline.find((stage) => stage.$project?.combinedUsers).$project.combinedUsers;
-  const condition = project.$let.in.$concatArrays[1].$slice[0].$filter.cond;
-  assert.ok(Array.isArray(condition.$not), "$not must receive an array expression in MongoDB aggregation");
-  assert.deepEqual(condition.$not[0].$in, ["$$regularUser.uid", { $ifNull: ["$$boostedIds", []] }]);
-  assert.deepEqual(project.$let.vars.boostedIds, { $map: { input: { $ifNull: ["$boostedUsers", []] }, as: "boostedUser", in: "$$boostedUser.uid" } });
+  assert.deepEqual(project.$let.vars.boostedUsers, { $ifNull: ["$boostedUsers", []] });
+  assert.deepEqual(project.$let.vars.regularUsers, { $ifNull: ["$regularUsers", []] });
+  const combined = project.$let.in.$concatArrays;
+  assert.equal(combined[0], "$boostedUsers");
+  assert.equal(combined[1].$slice[0], "$regularUsers");
+  assert.deepEqual(combined[1].$slice[1], {
+    $max: [0, { $subtract: [100, { $size: "$boostedUsers" }] }]
+  });
+  assert.doesNotMatch(JSON.stringify(project), /"\\$in"/);
 });
 
 test("chat history is denied when either participant has blocked the other", async () => {
