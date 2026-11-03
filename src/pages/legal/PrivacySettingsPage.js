@@ -5,8 +5,8 @@ const PrivacySettingsPage = () => {
     const [shareData, setShareData] = useState(true);
 
     return (
-        <div className="container mx-auto p-8">
-            <h1 className="text-3xl font-bold mb-6">Privacy Settings</h1>
+        <main className="legal-page"><div className="legal-page__content container mx-auto p-8">
+            <h1 className="legal-page__title text-3xl font-bold mb-6">Privacy Settings</h1>
             <p className="mb-8">Manage your privacy settings to control how your information is used and shared.</p>
 
             <div className="space-y-6">
@@ -32,7 +32,7 @@ const PrivacySettingsPage = () => {
                     </label>
                 </div>
             </div>
-        </div>
+        </div></main>
     );
 };
 
