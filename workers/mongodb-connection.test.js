@@ -1345,11 +1345,17 @@ test("chat conversations exclude users blocked in either direction", async () =>
     { roomId: "alice-blocked-alice", senderUid: "blocked-alice", receiverUid: "alice", messageContent: "hidden" },
     { roomId: "alice-allowed", senderUid: "alice", receiverUid: "allowed", messageContent: "visible" }
   ];
+  let profileBatchQueries = 0;
   const db = {
     collection(name) {
       if (name === "users") return {
         async findOne(filter) {
           return filter.uid === "alice" ? currentUser : otherUsers[filter.uid] || null;
+        },
+        find(filter) {
+          profileBatchQueries++;
+          assert.deepEqual(filter.uid.$in, ["blocked-by-alice", "blocked-alice", "allowed"]);
+          return { async toArray() { return Object.values(otherUsers); } };
         }
       };
       return {
@@ -1363,6 +1369,7 @@ test("chat conversations exclude users blocked in either direction", async () =>
   connection.getClient = async () => ({ db: () => db });
   const result = await connection.getChatConversations("alice");
   assert.equal(result.status, 200);
+  assert.equal(profileBatchQueries, 1, "counterpart profiles should be fetched in one batch");
   assert.deepEqual(result.body.map(item => item.roomId), ["alice-allowed"]);
   assert.equal(result.body[0].otherUser.email, undefined);
   assert.equal(result.body[0].otherUser.mobileNumber, undefined);
