@@ -3500,7 +3500,7 @@ export class MongoDBConnection {
         );
         if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
             (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) continue;
-        byRoom.set(message.roomId, { roomId: message.roomId, otherUser, lastMessage: message });
+        byRoom.set(message.roomId, { roomId: message.roomId, otherUser: sanitizePublicProfile(otherUser), lastMessage: message });
       }
       return { status: 200, body: [...byRoom.values()] };
     } catch {
