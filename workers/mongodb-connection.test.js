@@ -273,12 +273,16 @@ test("profile updates cannot bypass photo upload controls or self-assign verific
 
   const result = await connection.updateCurrentUserProfile("user-1", {
     bio: "Updated bio",
+    familyStatus: "Single",
+    siblings: "One sibling",
     photos: [{ url: "https://attacker.example/impersonation.jpg", order: 0 }],
     badges: { verified: true, premium: true }
   });
 
   assert.ok(capturedUpdate, "profile update should reach the database");
   assert.equal(capturedUpdate.$set.bio, "Updated bio");
+  assert.equal(capturedUpdate.$set.familyStatus, "Single");
+  assert.equal(capturedUpdate.$set.siblings, "One sibling");
   assert.equal(Object.hasOwn(capturedUpdate.$set, "photos"), false, "photos must only change through the validated photo endpoints");
   assert.equal(Object.hasOwn(capturedUpdate.$set, "badges"), false, "users must not grant themselves verification or premium badges");
 });
