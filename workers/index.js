@@ -821,6 +821,21 @@ export default {
       if (!isCdnConfigured(env)) return json({ message: "Attachment storage is not configured (CDN_HOSTNAME is missing)" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        // Apply an account-scoped quota in addition to the general edge/IP limit.
+        // This prevents repeated uploads by the same account across changing IPs.
+        if (env.RATE_LIMITER) {
+          const limiterId = env.RATE_LIMITER.idFromName("support-upload-user:" + claims.sub);
+          const limiter = env.RATE_LIMITER.get(limiterId);
+          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "support-upload", limit: 10, windowMs: 60 * 60 * 1000 })
+          });
+          if (!rateResponse.ok) return json({ message: "Support attachment rate limit service unavailable" }, 503);
+          const rate = await rateResponse.json();
+          if (!rate.allowed) return new Response(JSON.stringify({ message: "Support attachment upload limit reached. Please retry later." }), {
+            status: 429, headers: { ...JSON_HEADERS, "retry-after": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))) }
+          });
+        }
         const form = await request.formData().catch(() => null);
         const file = form && form.get("file");
         const ticketId = form && form.get("ticketId");
