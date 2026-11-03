@@ -1329,3 +1329,103 @@ test("notification preferences reject unknown keys and non-boolean values", asyn
   assert.equal(unknown.status, 400);
   assert.equal(invalid.status, 400);
 });
+
+// Chat privacy regression coverage: blocked conversations must not reappear
+// in the inbox, and a participant cannot retrieve history after either side
+// blocks the other.
+test("chat conversations exclude users blocked in either direction", async () => {
+  const currentUser = { uid: "alice", blocked: ["blocked-by-alice"] };
+  const otherUsers = {
+    "blocked-by-alice": { uid: "blocked-by-alice", name: "Blocked by Alice" },
+    "blocked-alice": { uid: "blocked-alice", name: "Blocked Alice", blocked: ["alice"] },
+    "allowed": { uid: "allowed", name: "Allowed", email: "private@example.com", mobileNumber: "+971500000000" }
+  };
+  const messages = [
+    { roomId: "alice-blocked-by-alice", senderUid: "alice", receiverUid: "blocked-by-alice", messageContent: "hidden" },
+    { roomId: "alice-blocked-alice", senderUid: "blocked-alice", receiverUid: "alice", messageContent: "hidden" },
+    { roomId: "alice-allowed", senderUid: "alice", receiverUid: "allowed", messageContent: "visible" }
+  ];
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne(filter) {
+          return filter.uid === "alice" ? currentUser : otherUsers[filter.uid] || null;
+        }
+      };
+      return {
+        find() {
+          return { sort() { return this; }, limit() { return this; }, async toArray() { return messages; } };
+        }
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const result = await connection.getChatConversations("alice");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.map(item => item.roomId), ["alice-allowed"]);
+  assert.equal(result.body[0].otherUser.email, undefined);
+  assert.equal(result.body[0].otherUser.mobileNumber, undefined);
+});
+
+test("chat history is denied when either participant has blocked the other", async () => {
+  for (const blockedDirection of ["viewer", "other"]) {
+    const db = {
+      collection(name) {
+        if (name === "users") return {
+          async findOne(filter) {
+            if (filter.uid === "alice") {
+              return { uid: "alice", role: "user", blocked: blockedDirection === "viewer" ? ["bob"] : [] };
+            }
+            if (filter.uid === "bob") {
+              return { uid: "bob", blocked: blockedDirection === "other" ? ["alice"] : [] };
+            }
+            return null;
+          }
+        };
+        return {
+          async findOne() { return { senderUid: "alice", receiverUid: "bob" }; },
+          find() { assert.fail("blocked chat history must not be queried"); }
+        };
+      }
+    };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({ db: () => db });
+    const result = await connection.getChatHistory("alice", "alice-bob");
+    assert.equal(result.status, 403, blockedDirection);
+  }
+});
+
+test("delivery receipts update only messages addressed to the authenticated recipient", async () => {
+  const { ObjectId } = await import("mongodb");
+  const messageId = "abcdef0123456789abcdef01";
+  let capturedFilter;
+  const db = {
+    collection() {
+      return {
+        async updateMany(filter) {
+          capturedFilter = filter;
+          return { modifiedCount: 1 };
+        }
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const result = await connection.markChatDelivered("bob", {
+    roomId: "alice-bob",
+    messageIds: [messageId]
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedFilter, {
+    _id: { $in: [new ObjectId(messageId)] },
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    status: "sent"
+  });
+  const oversized = await connection.markChatDelivered("bob", {
+    roomId: "alice-bob",
+    messageIds: Array.from({ length: 101 }, () => messageId)
+  });
+  assert.equal(oversized.status, 400);
+});
