@@ -1885,3 +1885,72 @@ test("support attachment uploads enforce an account-scoped hourly quota", async 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("chat send rate limit rejects excess messages before accessing MongoDB", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const unsigned = encode({ alg: "RS256", typ: "JWT", kid: "chat-limit-test" }) + "." +
+    encode({
+      iss: "https://securetoken.google.com/test-project",
+      aud: "test-project",
+      sub: "chat-user-1",
+      user_id: "chat-user-1",
+      iat: now,
+      exp: now + 3600,
+      auth_time: now
+    });
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    return new Response(JSON.stringify({
+      keys: [{ ...publicJwk, kid: "chat-limit-test", alg: "RS256", use: "sig" }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  let databaseAccessed = false;
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    RATE_LIMITER: {
+      idFromName(name) {
+        assert.equal(name, "chat-send-user:chat-user-1");
+        return "chat-send-limit";
+      },
+      get() {
+        return {
+          async fetch(_url, options) {
+            assert.deepEqual(JSON.parse(options.body), { key: "chat-send", limit: 30, windowMs: 60000 });
+            return new Response(JSON.stringify({ allowed: false, resetAt: Date.now() + 30000 }), {
+              status: 200, headers: { "content-type": "application/json" }
+            });
+          }
+        };
+      }
+    },
+    MONGODB_CONNECTION: {
+      idFromName() { databaseAccessed = true; throw new Error("MongoDB must not be accessed"); },
+      get() { databaseAccessed = true; throw new Error("MongoDB must not be accessed"); }
+    }
+  };
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/chat/send", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ roomId: "chat-user-1-other", receiverUid: "other", messageContent: "spam" })
+    }), env);
+    assert.equal(response.status, 429);
+    assert.ok(Number(response.headers.get("retry-after")) > 0);
+    assert.equal(databaseAccessed, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
