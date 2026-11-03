@@ -1391,6 +1391,7 @@ test("chat conversations exclude users blocked in either direction", async () =>
     { roomId: "alice-allowed", senderUid: "alice", receiverUid: "allowed", messageContent: "visible" }
   ];
   let profileBatchQueries = 0;
+  const inboxIndexes = [];
   const db = {
     collection(name) {
       if (name === "users") return {
@@ -1404,11 +1405,16 @@ test("chat conversations exclude users blocked in either direction", async () =>
         }
       };
       return {
-        aggregate(pipeline) {
+        async createIndex(keys, options) {
+          inboxIndexes.push({ keys, options });
+          return options.name;
+        },
+        aggregate(pipeline, options) {
+          assert.deepEqual(options, { maxTimeMS: 10000 });
           assert.deepEqual(pipeline, [
             { $match: { $or: [{ senderUid: "alice" }, { receiverUid: "alice" }] } },
             { $sort: { timestamp: -1, _id: -1 } },
-            { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
+            { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
             { $replaceRoot: { newRoot: "$lastMessage" } },
             { $sort: { timestamp: -1, _id: -1 } }
           ]);
@@ -1420,7 +1426,18 @@ test("chat conversations exclude users blocked in either direction", async () =>
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({ db: () => db });
   const result = await connection.getChatConversations("alice");
+  await connection.chatConversationIndexesPromise;
   assert.equal(result.status, 200);
+  assert.deepEqual(inboxIndexes, [
+    {
+      keys: { senderUid: 1, timestamp: -1, _id: -1 },
+      options: { name: "chat_sender_inbox_latest" }
+    },
+    {
+      keys: { receiverUid: 1, timestamp: -1, _id: -1 },
+      options: { name: "chat_receiver_inbox_latest" }
+    }
+  ]);
   assert.equal(profileBatchQueries, 1, "counterpart profiles should be fetched in one batch");
   assert.deepEqual(result.body.map(item => item.roomId), ["alice-allowed"]);
   assert.equal(result.body[0].otherUser.email, undefined);
