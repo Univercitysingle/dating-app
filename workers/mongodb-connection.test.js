@@ -1429,3 +1429,77 @@ test("delivery receipts update only messages addressed to the authenticated reci
   });
   assert.equal(oversized.status, 400);
 });
+
+test("chat message creation persists a normalized message and returns its MongoDB ID", async () => {
+  const inserted = [];
+  const users = {
+    async findOne(query) {
+      return query.uid === "alice" ? { uid: "alice" } : { uid: "bob" };
+    }
+  };
+  const messages = {
+    async insertOne(document) {
+      inserted.push(document);
+      return { insertedId: { toString: () => "abcdef0123456789abcdef01" } };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "chatmessages") return messages;
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createChatMessage("alice", {
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    messageContent: "  Hello Bob  "
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(String(result.body._id), "abcdef0123456789abcdef01");
+  assert.equal(result.body.senderUid, "alice");
+  assert.equal(result.body.receiverUid, "bob");
+  assert.equal(result.body.roomId, "alice-bob");
+  assert.equal(result.body.messageContent, "Hello Bob");
+  assert.equal(result.body.status, "sent");
+  assert.ok(result.body.timestamp instanceof Date);
+  assert.equal(inserted.length, 1);
+  assert.equal(inserted[0].messageContent, "Hello Bob");
+});
+
+test("chat message creation rejects invalid room identities and blocked recipients before persistence", async () => {
+  let insertCount = 0;
+  const users = {
+    async findOne(query) {
+      if (query.uid === "alice") return { uid: "alice", blocked: ["bob"] };
+      if (query.uid === "bob") return { uid: "bob", blocked: [] };
+      return null;
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      return { async insertOne() { insertCount++; return { insertedId: "unexpected" }; } };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const invalidRoom = await connection.createChatMessage("alice", {
+    roomId: "alice-charlie", receiverUid: "bob", messageContent: "Hello"
+  });
+  assert.equal(invalidRoom.status, 400);
+
+  const blocked = await connection.createChatMessage("alice", {
+    roomId: "alice-bob", receiverUid: "bob", messageContent: "Hello"
+  });
+  assert.equal(blocked.status, 403);
+  assert.equal(insertCount, 0);
+});
+
