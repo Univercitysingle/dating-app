@@ -1111,6 +1111,7 @@ export class MongoDBConnection {
 
       const baseMatchQuery = {
         uid: {
+          $type: "string",
           $ne: uid,
           $nin: Array.isArray(currentUser.blocked) ? currentUser.blocked.filter(value => typeof value === "string") : []
         },
@@ -1181,19 +1182,21 @@ export class MongoDBConnection {
           $project: {
             combinedUsers: {
               $let: {
-                vars: { boostedIds: { $map: { input: { $ifNull: ["$boostedUsers", []] }, as: "boostedUser", in: "$$boostedUser.uid" } } },
+                vars: {
+                  boostedUsers: { $ifNull: ["$boostedUsers", []] },
+                  regularUsers: { $ifNull: ["$regularUsers", []] }
+                },
                 in: {
+                  // The facet predicates are mutually exclusive. Avoid an
+                  // unnecessary aggregation $in expression here: malformed
+                  // legacy profile data can otherwise make MongoDB treat its
+                  // second argument as missing and fail the entire Discover
+                  // request.
                   $concatArrays: [
                     "$boostedUsers",
                     {
                       $slice: [
-                        {
-                          $filter: {
-                            input: "$regularUsers",
-                            as: "regularUser",
-                            cond: { $not: [{ $in: ["$$regularUser.uid", { $ifNull: ["$$boostedIds", []] }] }] }
-                          }
-                        },
+                        "$regularUsers",
                         { $max: [0, { $subtract: [100, { $size: "$boostedUsers" }] }] }
                       ]
                     }
