@@ -74,5 +74,38 @@ for path in "${paths[@]}"; do
   check_get "$PAGES_URL" "$path" "Pages "
 done
 
+# Exercise authenticated chat reads using a real room from the dedicated test
+# account. These GET requests do not create messages or alter delivery state.
+check_chat_room_reads() {
+  local base_url="$1"
+  local origin="$2"
+  local response_file
+  response_file="$(mktemp)"
+  local status
+  status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/chat/conversations")"
+  if [[ "$status" != "200" ]]; then
+    echo "::error::Authenticated GET $origin/api/chat/conversations returned HTTP $status"
+    rm -f "$response_file"
+    return 1
+  fi
+  local room_id
+  room_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const c=Array.isArray(x)?x[0]:null;process.stdout.write(c&&typeof c.roomId==="string"?c.roomId:"")' "$response_file")"
+  rm -f "$response_file"
+  if [[ -z "$room_id" ]]; then
+    echo "SKIP authenticated chat history/typing reads for $origin (test account has no conversations)"
+    return 0
+  fi
+  local encoded_room
+  encoded_room="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$room_id")"
+  check_get "$base_url" "/api/chat/history/$encoded_room?limit=1" "$origin"
+  check_get "$base_url" "/api/chat/typing?roomId=$encoded_room" "$origin"
+}
+
+check_chat_room_reads "$WORKER_URL" "Worker "
+check_chat_room_reads "$PAGES_URL" "Pages "
+
 unset id_token
 echo "Authenticated staging smoke tests passed on the Worker and Pages API routes."
