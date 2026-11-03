@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
+import LoadingState from '../components/LoadingState';
 
 const SupportPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -116,7 +117,7 @@ const SupportPage = () => {
         </div>
       )}
 
-      {isLoading && <p>Loading tickets...</p>}
+      {isLoading && <LoadingState compact title="Updating your support requests" message="Loading your tickets or submitting your request." slowMessage="The support service is responding slowly. Please keep this page open while we wait." />}
       {!isLoading && !error && tickets.length === 0 && <p>You have no support tickets.</p>}
 
       <div className="space-y-4">
