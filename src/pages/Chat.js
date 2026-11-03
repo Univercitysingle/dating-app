@@ -25,6 +25,7 @@ function Chat() {
   const typingLastSentAtRef = useRef(0);
   const messagesEndRef = useRef(null);
   const historyPollRef = useRef(null);
+  const pendingMessageRef = useRef(null);
   const addMessageRef = useRef(addMessage);
   useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
 
@@ -203,10 +204,22 @@ function Chat() {
       return;
     }
 
-    const tempId = `temp_${Date.now()}`;
     const messageContent = input.trim();
+    // Keep the same idempotency key when the user retries the same text after
+    // a timeout or lost response. A changed draft receives a fresh key.
+    const pending = pendingMessageRef.current;
+    const clientMessageId = pending?.messageContent === messageContent
+      ? pending.clientMessageId
+      : (window.crypto?.randomUUID?.() ||
+        `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, character => {
+          const random = Math.floor(Math.random() * 16);
+          return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+        }));
+    pendingMessageRef.current = { clientMessageId, messageContent };
+    const tempId = `temp_${clientMessageId}`;
     const message = {
       _id: tempId,
+      clientMessageId,
       roomId: chatId,
       senderUid: user.uid,
       receiverUid: receiverUid,
@@ -236,10 +249,12 @@ function Chat() {
         roomId: chatId,
         messageContent,
         receiverUid,
+        clientMessageId,
       });
       if (!savedMessage || !savedMessage._id) {
         throw new Error('The chat service did not confirm message persistence.');
       }
+      pendingMessageRef.current = null;
       addMessage({
         ...savedMessage,
         _id: String(savedMessage._id),
