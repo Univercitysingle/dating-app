@@ -2,6 +2,12 @@ name: Authenticated staging smoke tests
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - .github/workflows/staging-authenticated-smoke.yml
+      - scripts/staging-authenticated-smoke.sh
 
 permissions:
   contents: read
@@ -17,6 +23,7 @@ jobs:
     timeout-minutes: 5
     env:
       WORKER_URL: https://dating-app-api-staging.enadoctemp.workers.dev
+      PAGES_URL: https://dating-app-staging.pages.dev
       FIREBASE_WEB_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
       STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
       STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
