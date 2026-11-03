@@ -265,7 +265,7 @@ function Profile() {
   };
 
   if (fetchError) return <p className="text-red-500 p-4">Error: {fetchError}</p>;
-  if (!profile) return <LoadingState title="Loading your profile" message="Fetching your profile details and photos." slowMessage="Your profile is taking longer to load. Please wait a moment, then retry if it does not appear." />;
+  if (!profile) return <LoadingState spinnerOnly />;
 
   const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
   // Contact details are private on other users' profiles; only the profile owner or superadmin may view them.
