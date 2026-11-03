@@ -2297,18 +2297,18 @@ export class MongoDBConnection {
         try {
           const configured = String(this.env.CDN_HOSTNAME || "").trim();
           if (!configured) return false;
-          const base = new URL(/^https:\\/\\//i.test(configured) ? configured : "https://" + configured);
+          const base = new URL(/^https:\/\/\//i.test(configured) ? configured : "https://" + configured);
           const supplied = new URL(item.url);
           if (base.protocol !== "https:" || supplied.protocol !== "https:" ||
               base.username || base.password || base.search || base.hash ||
               supplied.username || supplied.password || supplied.search || supplied.hash) return false;
-          const expectedPath = base.pathname.replace(/\\/+$/, "") + "/" + encodeURIComponent(item.key);
+          const expectedPath = base.pathname.replace(/\/+$/, "") + "/" + encodeURIComponent(item.key);
           return supplied.origin === base.origin && supplied.pathname === expectedPath;
         } catch {
           return false;
         }
       }).map(item => ({
-        key: item.key, url: item.url, name: item.name.replace(/[\\r\\n\\0]/g, "_").slice(0, 180),
+        key: item.key, url: item.url, name: item.name.replace(/[\r\n\0]/g, "_").slice(0, 180),
         type: item.type, size: Number(item.size)
       })) : [];
       const message = { ticketId: ticket._id, senderId: user._id, message: payload.message.trim(), ...(attachments.length ? { attachments } : {}), createdAt: now, updatedAt: now };
