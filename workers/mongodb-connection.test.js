@@ -37,13 +37,13 @@ test("discovery combines boosted and regular candidates with safe array defaults
     $nin: ["blocked-user"]
   });
   const project = capturedPipeline.find((stage) => stage.$project?.combinedUsers).$project.combinedUsers;
-  assert.deepEqual(project.$let.vars.boostedUsers, { $ifNull: ["$boostedUsers", []] });
-  assert.deepEqual(project.$let.vars.regularUsers, { $ifNull: ["$regularUsers", []] });
-  const combined = project.$let.in.$concatArrays;
-  assert.equal(combined[0], "$boostedUsers");
-  assert.equal(combined[1].$slice[0], "$regularUsers");
+  const combined = project.$concatArrays;
+  assert.deepEqual(combined[0], { $ifNull: ["$boostedUsers", []] });
+  assert.deepEqual(combined[1].$slice[0], { $ifNull: ["$regularUsers", []] });
   assert.deepEqual(combined[1].$slice[1], {
-    $max: [0, { $subtract: [100, { $size: "$boostedUsers" }] }]
+    $max: [0, {
+      $subtract: [100, { $size: { $ifNull: ["$boostedUsers", []] } }]
+    }]
   });
   assert.doesNotMatch(JSON.stringify(project), /"\$in"/);
 });
