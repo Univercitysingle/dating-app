@@ -3520,9 +3520,22 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const conversation = await db.collection("chatmessages").findOne(
         { roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] },
-        { projection: { _id: 1 } }
+        { projection: { senderUid: 1, receiverUid: 1 } }
       );
       if (!conversation) return { status: 403, body: { error: "Not a participant in this conversation" } };
+      const otherUid = conversation.senderUid === uid
+        ? conversation.receiverUid
+        : conversation.receiverUid === uid ? conversation.senderUid : null;
+      if (!otherUid) return { status: 403, body: { error: "Not a participant in this conversation" } };
+      const [currentUser, otherUser] = await Promise.all([
+        db.collection("users").findOne({ uid }, { projection: { blocked: 1 } }),
+        db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } })
+      ]);
+      if (!currentUser || !otherUser ||
+          (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(otherUid)) ||
+          (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) {
+        return { status: 403, body: { error: "Typing status is unavailable for this conversation" } };
+      }
       const now = new Date();
       await db.collection("chatTyping").updateOne(
         { roomId, uid },
@@ -3544,10 +3557,22 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const conversation = await db.collection("chatmessages").findOne(
         { roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] },
-        { projection: { _id: 1 } }
+        { projection: { senderUid: 1, receiverUid: 1 } }
       );
       if (!conversation) return { status: 403, body: { error: "Not a participant in this conversation" } };
-      const otherUid = roomId.split("-").filter(part => part !== uid).join("-");
+      const otherUid = conversation.senderUid === uid
+        ? conversation.receiverUid
+        : conversation.receiverUid === uid ? conversation.senderUid : null;
+      if (!otherUid) return { status: 403, body: { error: "Not a participant in this conversation" } };
+      const [currentUser, otherUser] = await Promise.all([
+        db.collection("users").findOne({ uid }, { projection: { blocked: 1 } }),
+        db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } })
+      ]);
+      if (!currentUser || !otherUser ||
+          (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(otherUid)) ||
+          (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) {
+        return { status: 403, body: { error: "Typing status is unavailable for this conversation" } };
+      }
       const presence = await db.collection("chatTyping").findOne({ roomId, uid: otherUid });
       const typing = Boolean(presence?.isTyping && Date.now() - new Date(presence.updatedAt).getTime() < 5000);
       return { status: 200, body: { isTyping: typing } };
