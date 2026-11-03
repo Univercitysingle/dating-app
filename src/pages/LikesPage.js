@@ -44,7 +44,7 @@ const LikesPage = () => {
     }, []);
 
     if (loading) {
-        return <LoadingState title="Finding your admirers" message="Loading people who have liked your profile." slowMessage="We are still waiting for your likes to load. You can stay on this page while we finish." />;
+        return <LoadingState spinnerOnly />;
     }
 
     if (error) {
