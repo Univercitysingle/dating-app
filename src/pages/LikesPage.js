@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/apiClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -12,9 +12,27 @@ const LikesPage = () => {
     const navigate = useNavigate();
     const { user: currentUser } = useAuth();
 
+    const fetchLikes = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await apiClient.get('/users/likes');
+            if (response?.forbidden) {
+                setError('This feature is available with an eligible premium plan.');
+            } else {
+                const usersArray = response?.data || response;
+                setUsers(Array.isArray(usersArray) ? usersArray : []);
+            }
+        } catch (err) {
+            setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     const handleChat = (targetUid) => {
-        if (!currentUser || !currentUser.uid) {
-            alert("Your user ID is not available, cannot start chat.");
+        if (!currentUser?.uid) {
+            setError('Your account details are still loading. Please try again in a moment.');
             return;
         }
         const chatId = [currentUser.uid, targetUid].sort().join('-');
@@ -22,34 +40,15 @@ const LikesPage = () => {
     };
 
     useEffect(() => {
-        const fetchLikes = async () => {
-            try {
-                const response = await apiClient.get('/users/likes');
-                console.log("Likes API raw response:", response);
-
-                if (response.forbidden) {
-                    setError(response.error || 'This feature is for premium users only.');
-                } else {
-                    // ✅ Ensure we set the actual data array
-                    const usersArray = response.data || response;
-                    setUsers(Array.isArray(usersArray) ? usersArray : []);
-                }
-            } catch (err) {
-                setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchLikes();
-    }, []);
+    }, [fetchLikes]);
 
     if (loading) {
         return <LoadingState spinnerOnly />;
     }
 
     if (error) {
-        return <div className="state-panel state-error mx-4 my-8 text-center" role="alert"><p>{error}</p><button type="button" onClick={() => window.location.reload()} className="app-primary-button mt-4 rounded-full px-5 py-2.5 text-sm font-semibold text-white">Try again</button></div>;
+        return <div className="state-panel state-error mx-4 my-8 text-center" role="alert"><p>{error}</p><button type="button" onClick={fetchLikes} className="app-primary-button mt-4 rounded-full px-5 py-2.5 text-sm font-semibold text-white">Try again</button></div>;
     }
 
     return (
