@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 import ConversationListItem from '../components/ConversationListItem';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 function ConversationsPage() {
   const { user: currentUser } = useAuth();
@@ -18,7 +19,7 @@ function ConversationsPage() {
       const data = await apiClient.get('/chat/conversations');
       setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || 'Failed to fetch conversations.');
+      setError(getUserFriendlyError(err, 'We could not load your conversations. Please try again.'));
     } finally {
       setIsLoading(false);
     }
