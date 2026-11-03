@@ -58,10 +58,25 @@ function Chat() {
         const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
         if (!cancelled && Array.isArray(result?.messages)) {
           result.messages.forEach(message => addMessageRef.current(message));
-          const unreadIncoming = result.messages.filter(message =>
-            message.receiverUid === user.uid && message.status !== 'read' &&
+          const incomingMessages = result.messages.filter(message =>
+            message.receiverUid === user.uid &&
             message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
           );
+          const awaitingDelivery = incomingMessages.filter(message => message.status === 'sent');
+          if (awaitingDelivery.length) {
+            try {
+              await apiClient.post('/chat/delivered', {
+                roomId: chatId,
+                messageIds: awaitingDelivery.map(message => String(message._id)),
+              });
+              if (!cancelled) awaitingDelivery.forEach(message =>
+                addMessageRef.current({ ...message, status: 'delivered' })
+              );
+            } catch (deliveryError) {
+              logger.debug('Message delivery receipt deferred:', deliveryError?.status || 'network error');
+            }
+          }
+          const unreadIncoming = incomingMessages.filter(message => message.status !== 'read');
           if (unreadIncoming.length) {
             try {
               await apiClient.post('/chat/read', {
