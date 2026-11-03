@@ -1503,3 +1503,77 @@ test("chat message creation rejects invalid room identities and blocked recipien
   assert.equal(insertCount, 0);
 });
 
+
+
+test("typing status resolves hyphenated participant IDs from persisted message identities", async () => {
+  const roomId = "alice-west-01-bob-east-02";
+  const message = { senderUid: "alice-west-01", receiverUid: "bob-east-02" };
+  const presenceQueries = [];
+  const typingUpdates = [];
+  const db = {
+    collection(name) {
+      if (name === "chatmessages") return { async findOne(filter, options) {
+        assert.equal(filter.roomId, roomId);
+        assert.deepEqual(options.projection, { senderUid: 1, receiverUid: 1 });
+        return message;
+      } };
+      if (name === "users") return { async findOne(filter) {
+        return { uid: filter.uid, blocked: [] };
+      } };
+      if (name === "chatTyping") return {
+        async findOne(filter) {
+          presenceQueries.push(filter);
+          return { isTyping: true, updatedAt: new Date() };
+        },
+        async updateOne(filter, update, options) {
+          typingUpdates.push({ filter, update, options });
+          return { matchedCount: 1, modifiedCount: 1 };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const write = await connection.updateTypingStatus("alice-west-01", { roomId, isTyping: true });
+  const read = await connection.getTypingStatus("alice-west-01", roomId);
+
+  assert.equal(write.status, 200);
+  assert.equal(read.status, 200);
+  assert.equal(read.body.isTyping, true);
+  assert.deepEqual(typingUpdates[0].filter, { roomId, uid: "alice-west-01" });
+  assert.equal(typingUpdates[0].options.upsert, true);
+  assert.deepEqual(presenceQueries[0], { roomId, uid: "bob-east-02" });
+});
+
+test("typing status is denied after either participant blocks the other", async () => {
+  for (const blockedUid of ["bob-east-02", "alice-west-01"]) {
+    let writeCount = 0;
+    const roomId = "alice-west-01-bob-east-02";
+    const db = {
+      collection(name) {
+        if (name === "chatmessages") return {
+          async findOne() { return { senderUid: "alice-west-01", receiverUid: "bob-east-02" }; }
+        };
+        if (name === "users") return {
+          async findOne(filter) { return { uid: filter.uid, blocked: filter.uid === "alice-west-01" && blockedUid === "bob-east-02" || filter.uid === "bob-east-02" && blockedUid === "alice-west-01" ? [blockedUid] : [] }; }
+        };
+        if (name === "chatTyping") return {
+          async updateOne() { writeCount++; return { modifiedCount: 1 }; },
+          async findOne() { assert.fail("Blocked typing presence must not be read"); }
+        };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    const write = await connection.updateTypingStatus("alice-west-01", { roomId, isTyping: true });
+    const read = await connection.getTypingStatus("alice-west-01", roomId);
+    assert.equal(write.status, 403);
+    assert.equal(read.status, 403);
+    assert.equal(writeCount, 0);
+  }
+});
