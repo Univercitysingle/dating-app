@@ -6,6 +6,8 @@ on:
       - migrate-to-serverless
     paths:
       - "workers/**"
+      - "package.json"
+      - "package-lock.json"
       - "wrangler.jsonc"
       - ".github/workflows/deploy-worker-staging.yml"
   workflow_dispatch:
