@@ -99,14 +99,31 @@ check_chat_room_reads() {
   echo "PASS authenticated inbox structure $origin (unique rooms with matching latest messages)"
   local room_id
   room_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const c=Array.isArray(x)?x[0]:null;process.stdout.write(c&&typeof c.roomId==="string"?c.roomId:"")' "$response_file")"
-  rm -f "$response_file"
   if [[ -z "$room_id" ]]; then
+    rm -f "$response_file"
     echo "SKIP authenticated chat history/typing reads for $origin (test account has no conversations)"
     return 0
   fi
   local encoded_room
   encoded_room="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$room_id")"
-  check_get "$base_url" "/api/chat/history/$encoded_room?limit=1" "$origin"
+  local history_file
+  history_file="$(mktemp)"
+  status="$(curl --silent --show-error --output "$history_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/chat/history/$encoded_room?limit=1")"
+  if [[ "$status" != "200" ]]; then
+    echo "::error::Authenticated GET $origin/api/chat/history returned HTTP $status"
+    rm -f "$response_file" "$history_file"
+    return 1
+  fi
+  if ! node -e 'const fs=require("fs");const inbox=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const history=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));const conversation=inbox.find(item=>item.roomId===process.argv[3]);const messages=history.messages;if(!conversation||!conversation.lastMessage||!Array.isArray(messages)||messages.length!==1||String(conversation.lastMessage._id)!==String(messages[0]._id))throw Error("Inbox latest message does not match newest persisted history message")' "$response_file" "$history_file" "$room_id"; then
+    echo "::error::Inbox latest message did not match persisted chat history for $origin."
+    rm -f "$response_file" "$history_file"
+    return 1
+  fi
+  rm -f "$response_file" "$history_file"
+  echo "PASS authenticated inbox latest message matches persisted chat history $origin"
   check_get "$base_url" "/api/chat/typing?roomId=$encoded_room" "$origin"
 }
 
