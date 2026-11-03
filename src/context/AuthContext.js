@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { getAuth, onIdTokenChanged } from 'firebase/auth';
-import app from '../firebase'; // Import your Firebase app instance
+import app from '../firebase';
 import apiClient from '../api/apiClient';
 import logger from '../utils/logger';
 
@@ -11,66 +11,113 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const lastUid = useRef(null);
 
-  // Avoid logging the full user profile or authentication credentials.
-
   useEffect(() => {
-    logger.info("AuthContext: Setting up Firebase onIdTokenChanged listener.");
     const auth = getAuth(app);
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      logger.info("AuthContext: onIdTokenChanged event fired.");
-      if (firebaseUser) {
-        logger.info(`AuthContext: Firebase user detected (UID: ${firebaseUser.uid}).`);
-        const token = await firebaseUser.getIdToken();
-        localStorage.setItem("authToken", token);
+    let active = true;
 
-        if (firebaseUser.uid !== lastUid.current) {
-          logger.info(`AuthContext: User ID changed from ${lastUid.current} to ${firebaseUser.uid}. Fetching profile.`);
-          try {
-            const currentUser = await apiClient.get('/users/me');
-            logger.info("AuthContext: Successfully fetched user profile.");
-            setUser(currentUser);
-            lastUid.current = firebaseUser.uid;
-          } catch (error) {
-            logger.error("AuthContext: Failed to fetch user on token change. Signing out.", { error });
-            setUser(null);
-            localStorage.removeItem("authToken");
-            lastUid.current = null;
-            await auth.signOut();
-          }
-        } else {
-          logger.info(`AuthContext: User ID is the same (${firebaseUser.uid}). Skipping profile fetch.`);
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (!active) return;
+      setIsLoading(true);
+
+      try {
+        if (!firebaseUser) {
+          setUser(null);
+          localStorage.removeItem('authToken');
+          lastUid.current = null;
+          return;
         }
-      } else {
-        logger.info("AuthContext: No Firebase user. Clearing user state.");
-        setUser(null);
-        localStorage.removeItem("authToken");
-        lastUid.current = null;
+
+        const token = await firebaseUser.getIdToken();
+        if (!active) return;
+        localStorage.setItem('authToken', token);
+
+        if (firebaseUser.uid === lastUid.current) return;
+
+        try {
+          const currentUser = await apiClient.get('/users/me');
+          if (!active) return;
+          setUser(currentUser);
+          lastUid.current = firebaseUser.uid;
+        } catch (error) {
+          if (!active) return;
+          logger.error('Unable to load profile during Firebase session restoration.', {
+            status: error?.status || null,
+            message: error?.message || 'Profile request failed'
+          });
+
+          // A temporary API, database, or permission failure is not proof that
+          // the Firebase session is invalid. Only a 401 invalidates the session.
+          if (error?.status === 401) {
+            setUser(null);
+            localStorage.removeItem('authToken');
+            lastUid.current = null;
+            try {
+              await auth.signOut();
+            } catch (signOutError) {
+              logger.warn('Firebase sign-out after an unauthorized profile response failed.', {
+                message: signOutError?.message || 'Sign-out failed'
+              });
+            }
+          } else {
+            lastUid.current = null;
+          }
+        }
+      } catch (error) {
+        // Token refresh/network errors should not silently destroy a valid
+        // Firebase session. A subsequent token event can retry profile loading.
+        logger.warn('Firebase session restoration failed.', {
+          message: error?.message || 'Session restoration failed'
+        });
+      } finally {
+        if (active) setIsLoading(false);
       }
-      logger.info("AuthContext: Finished processing onIdTokenChanged event. Setting isLoading to false.");
-      setIsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []); // Empty dependency array to run only once on mount
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   const login = useCallback(async (token, userData = null) => {
-    localStorage.setItem("authToken", token);
-    logger.info("AuthContext: login called.", { hasToken: Boolean(token), hasUserData: Boolean(userData) });
+    if (token) localStorage.setItem('authToken', token);
+    logger.info('AuthContext: login called.', {
+      hasToken: Boolean(token),
+      hasUserData: Boolean(userData)
+    });
+
     if (userData) {
       setUser(userData);
-      lastUid.current = userData.uid;
-      logger.info("AuthContext: User state set directly with provided data.");
-    } else {
-      try {
-        const currentUser = await apiClient.get('/users/me');
-        setUser(currentUser);
-        lastUid.current = currentUser.uid;
-      } catch (error) {
-        logger.error("Failed to fetch user on login:", error);
-        setUser(null);
-        localStorage.removeItem("authToken");
+      lastUid.current = userData.uid || getAuth(app).currentUser?.uid || null;
+      return userData;
+    }
+
+    try {
+      const currentUser = await apiClient.get('/users/me');
+      setUser(currentUser);
+      lastUid.current = currentUser.uid || getAuth(app).currentUser?.uid || null;
+      return currentUser;
+    } catch (error) {
+      logger.error('Unable to load profile after login.', {
+        status: error?.status || null,
+        message: error?.message || 'Profile request failed'
+      });
+
+      if (error?.status === 401) {
+        localStorage.removeItem('authToken');
         lastUid.current = null;
+        try {
+          await getAuth(app).signOut();
+        } catch (signOutError) {
+          logger.warn('Firebase sign-out after an unauthorized login response failed.', {
+            message: signOutError?.message || 'Sign-out failed'
+          });
+        }
       }
+
+      // Let the login screen handle the failure instead of navigating as if
+      // authentication and profile initialization both succeeded.
+      throw error;
     }
   }, []);
 
@@ -78,13 +125,21 @@ export function AuthProvider({ children }) {
     try {
       await apiClient.post('/auth/logout');
     } catch (error) {
-      logger.error('Logout failed:', error);
+      logger.warn('API logout request failed; clearing the local Firebase session anyway.', {
+        message: error?.message || 'Logout request failed'
+      });
     } finally {
-      const auth = getAuth(app);
-      await auth.signOut(); // Sign out from Firebase
-      setUser(null);
-      localStorage.removeItem("authToken");
-      lastUid.current = null;
+      try {
+        await getAuth(app).signOut();
+      } catch (error) {
+        logger.warn('Firebase sign-out failed.', {
+          message: error?.message || 'Sign-out failed'
+        });
+      } finally {
+        setUser(null);
+        localStorage.removeItem('authToken');
+        lastUid.current = null;
+      }
     }
   }, []);
 
@@ -93,7 +148,7 @@ export function AuthProvider({ children }) {
     setUser,
     isLoading,
     login,
-    logout,
+    logout
   }), [user, isLoading, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
