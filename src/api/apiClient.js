@@ -26,10 +26,13 @@ const apiClient = {
         : localStorage.getItem("authToken");
       if (token && firebaseUser) localStorage.setItem("authToken", token);
     } catch (error) {
+      // If Firebase cannot refresh because of a transient network failure,
+      // try the last cached token. The API remains responsible for validating it.
+      token = localStorage.getItem("authToken");
       logger.warn("Unable to refresh Firebase ID token before API request.", {
         message: error && typeof error.message === "string" ? error.message : "Token refresh failed",
+        usingCachedToken: Boolean(token)
       });
-      token = null;
     }
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
