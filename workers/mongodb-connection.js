@@ -3511,8 +3511,7 @@ export class MongoDBConnection {
   async updateTypingStatus(uid, payload) {
     const { roomId, isTyping } = payload || {};
     if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
-        ![uid + "-" + (roomId.split("-").filter(part => part !== uid).join("-")),
-          (roomId.split("-").filter(part => part !== uid).join("-")) + "-" + uid].includes(roomId) ||
+        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid)) ||
         typeof isTyping !== "boolean") {
       return { status: 400, body: { error: "Invalid typing status" } };
     }
