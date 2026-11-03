@@ -63,6 +63,7 @@ paths=(
   "/api/users/discover"
   "/api/users/likes"
   "/api/users/me/subscriptions"
+  "/api/chat/conversations"
 )
 
 for path in "${paths[@]}"; do
