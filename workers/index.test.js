@@ -2103,3 +2103,72 @@ test("chat send fails closed when the account rate limiter is not configured", a
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("authenticated chat read receipts route to the MongoDB Durable Object", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const unsigned = encode({ alg: "RS256", typ: "JWT", kid: "chat-read-route-test" }) + "." +
+    encode({
+      iss: "https://securetoken.google.com/test-project",
+      aud: "test-project",
+      sub: "chat-reader",
+      user_id: "chat-reader",
+      iat: now,
+      exp: now + 3600,
+      auth_time: now
+    });
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    return new Response(JSON.stringify({
+      keys: [{ ...publicJwk, kid: "chat-read-route-test", alg: "RS256", use: "sig" }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  let internalRequest;
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/chat/read", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ roomId: "chat-reader-chat-sender", messageIds: ["abcdef0123456789abcdef01"] })
+    }), {
+      FIREBASE_PROJECT_ID: "test-project",
+      MONGODB_CONNECTION: {
+        idFromName(name) {
+          assert.equal(name, "mongo-primary");
+          return name;
+        },
+        get() {
+          return {
+            async fetch(url, options) {
+              assert.equal(url, "https://internal.invalid/internal/chat/read");
+              internalRequest = JSON.parse(options.body);
+              return new Response(JSON.stringify({ readCount: 1 }), {
+                status: 200, headers: { "content-type": "application/json" }
+              });
+            }
+          };
+        }
+      }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(internalRequest.claims.sub, "chat-reader");
+    assert.deepEqual(internalRequest.payload, {
+      roomId: "chat-reader-chat-sender",
+      messageIds: ["abcdef0123456789abcdef01"]
+    });
+    assert.deepEqual(await response.json(), { readCount: 1 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
