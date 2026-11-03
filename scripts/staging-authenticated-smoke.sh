@@ -91,6 +91,12 @@ check_chat_room_reads() {
     rm -f "$response_file"
     return 1
   fi
+  if ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!Array.isArray(x))throw Error("Inbox response must be an array");const ids=[];for(const c of x){if(!c||typeof c.roomId!=="string"||!c.lastMessage||c.lastMessage.roomId!==c.roomId)throw Error("Inbox conversation is missing a consistent room and latest message");ids.push(c.roomId)}if(new Set(ids).size!==ids.length)throw Error("Inbox contains duplicate conversations")' "$response_file"; then
+    echo "::error::Authenticated GET $origin/api/chat/conversations returned an invalid inbox structure."
+    rm -f "$response_file"
+    return 1
+  fi
+  echo "PASS authenticated inbox structure $origin (unique rooms with matching latest messages)"
   local room_id
   room_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const c=Array.isArray(x)?x[0]:null;process.stdout.write(c&&typeof c.roomId==="string"?c.roomId:"")' "$response_file")"
   rm -f "$response_file"
