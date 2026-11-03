@@ -1168,7 +1168,7 @@ export class MongoDBConnection {
           $facet: {
             boostedUsers: [
               { $match: { boostExpiresAt: { $gt: new Date() } } },
-              { $limit: 40 }
+              { $limit: 10 }
             ],
             regularUsers: [
               { $match: { $or: [{ boostExpiresAt: { $lte: new Date() } }, { boostExpiresAt: { $exists: false } }] } },
@@ -1194,7 +1194,7 @@ export class MongoDBConnection {
                             cond: { $not: [{ $in: ["$$regularUser.uid", { $ifNull: ["$$boostedIds", []] }] }] }
                           }
                         },
-                        { $max: [0, { $subtract: [20, { $size: "$boostedUsers" }] }] }
+                        { $max: [0, { $subtract: [100, { $size: "$boostedUsers" }] }] }
                       ]
                     }
                   ]
