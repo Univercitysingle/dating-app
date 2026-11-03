@@ -5,6 +5,46 @@ import { getUserFriendlyError } from '../utils/apiErrors';
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 
+// Convert still JPEG/PNG images without resizing. The browser's WebP encoder
+// uses its highest-quality setting. Animated GIFs are kept unchanged so their
+// animation is not lost. If WebP encoding is unavailable or produces a file
+// over the API limit, retain the validated original instead.
+export const convertPhotoToWebP = async (file) => {
+  if (!file || (file.type !== 'image/jpeg' && file.type !== 'image/png')) return file;
+  if (typeof createImageBitmap !== 'function') return file;
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+
+    context.drawImage(bitmap, 0, 0);
+    const webpBlob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/webp', 1);
+    });
+
+    if (!webpBlob || webpBlob.type !== 'image/webp' ||
+        webpBlob.size < 1 || webpBlob.size > MAX_PHOTO_SIZE) {
+      return file;
+    }
+
+    const baseName = file.name.replace(/\\.[^.]+$/, '') || 'photo';
+    return new File([webpBlob], baseName + '.webp', {
+      type: 'image/webp',
+      lastModified: file.lastModified
+    });
+  } catch {
+    // Encoding is an optimization, not a reason to block a valid upload.
+    return file;
+  } finally {
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+  }
+};
+
 const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -28,10 +68,9 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
 
     setIsUploading(true);
     try {
-      // Upload the original file unchanged. Do not resize, recompress, or
-      // convert it, so its original dimensions and image quality are preserved.
+      const uploadFile = await convertPhotoToWebP(file);
       const formData = new FormData();
-      formData.append('photo', file, file.name);
+      formData.append('photo', uploadFile, uploadFile.name);
 
       const response = await apiClient.post('/users/photos', formData);
       onUploadComplete(response);
