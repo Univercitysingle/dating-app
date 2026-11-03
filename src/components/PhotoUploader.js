@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import apiClient from '../api/apiClient';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -35,7 +36,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       const response = await apiClient.post('/users/photos', formData);
       onUploadComplete(response);
     } catch (err) {
-      setError(err.data?.message || err.message || 'Failed to upload photo.');
+      setError(getUserFriendlyError(err, 'Your photo could not be uploaded. Please try again.'));
     } finally {
       setIsUploading(false);
       input.value = '';
