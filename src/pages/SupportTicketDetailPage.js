@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import apiClient from '../api/apiClient';
+import LoadingState from '../components/LoadingState';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const SupportTicketDetailPage = () => {
   const { ticketId } = useParams();
@@ -8,6 +10,8 @@ const SupportTicketDetailPage = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [isSending, setIsSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [attachments, setAttachments] = useState([]);
 
@@ -20,9 +24,9 @@ const SupportTicketDetailPage = () => {
       setMessages(response.messages);
     } catch (err) {
       if (err.status === 404) {
-        setError('Ticket not found or you do not have permission to view it.');
+        setError('We could not find this ticket or you do not have permission to view it.');
       } else {
-        setError(err.response?.data?.message || 'An error occurred while fetching ticket details.');
+        setError(getUserFriendlyError(err, 'We could not load this ticket. Please try again.'));
       }
     } finally {
       setIsLoading(false);
@@ -37,6 +41,8 @@ const SupportTicketDetailPage = () => {
     e.preventDefault();
     if (!newMessage.trim() && !attachments.length) return;
 
+    setActionError(null);
+    setIsSending(true);
     try {
       const uploaded = [];
       for (const file of attachments) {
@@ -54,16 +60,18 @@ const SupportTicketDetailPage = () => {
       setNewMessage('');
       setAttachments([]);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while sending the message.');
+      setActionError(getUserFriendlyError(err, 'Your reply could not be sent. Please try again.'));
+    } finally {
+      setIsSending(false);
     }
   };
 
   if (isLoading) {
-    return <p>Loading ticket details...</p>;
+    return <LoadingState spinnerOnly />;
   }
 
   if (error) {
-    return <p className="text-red-500">{error}</p>;
+    return <div className="mx-auto max-w-2xl p-6 text-center" role="alert"><p className="text-red-600">{error}</p><button type="button" onClick={fetchTicketDetails} className="mt-4 rounded-full bg-primary px-5 py-2 text-white">Try again</button></div>;
   }
 
   if (!ticket) {
@@ -105,6 +113,7 @@ const SupportTicketDetailPage = () => {
         </div>
 
         <div className="mt-6">
+          {actionError && <p role="alert" className="mb-3 text-sm text-red-600">{actionError}</p>}
           <form onSubmit={handleSendMessage}>
             <textarea
               rows="4"
@@ -118,9 +127,10 @@ const SupportTicketDetailPage = () => {
             {attachments.length > 0 && <p className="text-sm text-gray-500 mt-1">{attachments.map(file => file.name).join(', ')}</p>}
             <button
               type="submit"
-              className="mt-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+              disabled={isSending}
+              className="mt-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-60"
             >
-              Send
+              {isSending ? "Sending..." : "Send"}
             </button>
           </form>
         </div>
