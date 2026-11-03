@@ -66,7 +66,7 @@ function ConversationsPage() {
             </label>
           </div>
 
-          {isLoading && <div className="inbox-loading"><LoadingState compact title="Loading your conversations" message="Checking for new messages and recent chats." slowMessage="Your inbox is taking a little longer to respond. Your conversations are safe, please try again shortly if this continues." /></div>}
+          {isLoading && <div className="inbox-loading"><LoadingState compact spinnerOnly /></div>}
           {error && <div className="state-panel state-error mx-4 my-4 text-sm" role="alert">{error}<button type="button" onClick={fetchConversations} className="ml-2 font-semibold underline">Retry</button></div>}
           {!isLoading && !error && filteredConversations.length > 0 && (
             <div className="inbox-conversation-list">
