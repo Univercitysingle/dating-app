@@ -3853,3 +3853,104 @@ input, textarea, select {
 }
 
 /* Keep the legal page background aligned with the public authentication theme. */
+
+
+/* Clear, reassuring feedback for requests that need time to complete. */
+.app-loading-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: #171321;
+  color: #fff;
+}
+.app-loading-state {
+  display: flex;
+  min-height: min(58vh, 420px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px 20px;
+  text-align: center;
+  color: #282438;
+}
+.app-loading-state--compact {
+  min-height: 180px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 20px;
+  text-align: left;
+}
+.app-loading-spinner {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 3px solid rgba(233, 75, 120, .16);
+  border-top-color: var(--app-accent, #e94b78);
+  border-right-color: var(--app-accent, #e94b78);
+  border-radius: 50%;
+  animation: app-loading-spin .8s linear infinite;
+}
+.app-loading-state--compact .app-loading-spinner {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  border-width: 2.5px;
+}
+.app-loading-copy {
+  max-width: 420px;
+}
+.app-loading-title {
+  margin: 0;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+.app-loading-message {
+  margin: 6px 0 0;
+  color: #777487;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.app-loading-reassurance {
+  margin: 8px 0 0;
+  color: #a34b6a;
+  font-size: 12px;
+  font-weight: 650;
+}
+.app-loading-screen .app-loading-state {
+  color: #fff;
+}
+.app-loading-screen .app-loading-message {
+  color: rgba(255,255,255,.7);
+}
+.app-loading-screen .app-loading-reassurance {
+  color: #ffb5cb;
+}
+.inbox-loading {
+  padding: 0 12px;
+}
+.inbox-loading .app-loading-state {
+  min-height: 170px;
+}
+@keyframes app-loading-spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 640px) {
+  .app-loading-state {
+    min-height: 42vh;
+    padding: 26px 18px;
+  }
+  .app-loading-state--compact {
+    min-height: 150px;
+    padding: 16px 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-spinner { animation-duration: 1.8s; }
+}
