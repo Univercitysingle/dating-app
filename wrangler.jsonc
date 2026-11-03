@@ -34,6 +34,13 @@
           "head_sampling_rate": 1
         }
       },
+      "services": [
+        {
+          "binding": "CDN_PROXY",
+          "service": "dateme",
+          "environment": "production"
+        }
+      ],
       "durable_objects": {
         "bindings": [
           { "name": "RATE_LIMITER", "class_name": "RateLimiter" },
