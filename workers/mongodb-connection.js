@@ -3574,7 +3574,11 @@ export class MongoDBConnection {
         });
       }
       return { status: 200, body: conversations };
-    } catch {
+    } catch (error) {
+      console.error("Chat conversations query failed", {
+        name: error && typeof error.name === "string" ? error.name : "Error",
+        message: error && typeof error.message === "string" ? error.message.slice(0, 200) : undefined
+      });
       return { status: 503, body: { error: "Chat conversations unavailable" } };
     }
   }
