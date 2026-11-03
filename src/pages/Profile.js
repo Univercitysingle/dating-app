@@ -236,7 +236,7 @@ function Profile() {
           setIsEditing(false);
       } catch (error) {
           logger.error(`Profile.js: Error saving profile:`, error);
-          toast.error(`Error: ${error.data?.message || 'Failed to save'}`);
+          toast.error(getUserFriendlyError(error, 'Your profile changes could not be saved. Please try again.'));
       } finally {
           setSaveStatus('');
       }
@@ -265,7 +265,7 @@ function Profile() {
     }
   };
 
-  if (fetchError) return <p className="text-red-500 p-4">Error: {fetchError}</p>;
+  if (fetchError) return <div className="mx-auto max-w-xl p-6 text-center" role="alert"><p className="text-red-600">{fetchError}</p><button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-full bg-primary px-5 py-2 text-white">Try again</button></div>;
   if (!profile) return <LoadingState spinnerOnly />;
 
   const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
