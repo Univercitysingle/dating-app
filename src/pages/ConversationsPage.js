@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 import ConversationListItem from '../components/ConversationListItem';
-import LoadingState from '../components/LoadingState';
 
 function ConversationsPage() {
   const { user: currentUser } = useAuth();
@@ -66,7 +65,6 @@ function ConversationsPage() {
             </label>
           </div>
 
-          {isLoading && <div className="inbox-loading"><LoadingState compact spinnerOnly /></div>}
           {error && <div className="state-panel state-error mx-4 my-4 text-sm" role="alert">{error}<button type="button" onClick={fetchConversations} className="ml-2 font-semibold underline">Retry</button></div>}
           {!isLoading && !error && filteredConversations.length > 0 && (
             <div className="inbox-conversation-list">
