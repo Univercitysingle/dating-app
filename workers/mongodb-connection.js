@@ -3516,7 +3516,7 @@ export class MongoDBConnection {
         db.collection("chatmessages").aggregate([
           { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
           { $sort: { timestamp: -1, _id: -1 } },
-          { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
+          { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
           { $replaceRoot: { newRoot: "$lastMessage" } },
           { $sort: { timestamp: -1, _id: -1 } }
         ]).toArray()
