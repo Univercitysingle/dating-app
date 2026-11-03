@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import PhotoUploader from './PhotoUploader';
+import { getUserFriendlyError } from '../utils/apiErrors';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const PhotoEditor = ({ photos, onSave, onCancel }) => {
@@ -38,7 +39,7 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
       setLocalPhotos(responsePhotos || localPhotos.filter(photo => photo?.url !== photoUrl));
     } catch (err) {
       console.error('Failed to delete photo:', err);
-      setActionError(err?.data?.message || err?.message || 'Unable to delete this photo. Please try again.');
+      setActionError(getUserFriendlyError(err, 'Unable to delete this photo. Please try again.'));
     } finally {
       setIsDeleting(false);
     }
@@ -56,6 +57,7 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
       onSave(savedPhotos ? { ...updatedUser, photos: savedPhotos } : { photos: localPhotos });
     } catch (err) {
       console.error('Failed to save photo order:', err);
+      setActionError(getUserFriendlyError(err, 'Your photo changes could not be saved. Please try again.'));
     }
   };
 
