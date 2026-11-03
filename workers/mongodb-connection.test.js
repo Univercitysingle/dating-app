@@ -1864,7 +1864,7 @@ test("chat history returns the requested page in chronological order", async () 
     roomId: "alice-bob",
     $or: [{ senderUid: "alice" }, { receiverUid: "alice" }]
   });
-  assert.deepEqual(capturedSort, { timestamp: -1 });
+  assert.deepEqual(capturedSort, { timestamp: -1, _id: -1 });
   assert.equal(capturedSkip, 50);
   assert.equal(capturedLimit, 25);
   assert.deepEqual(result.body.messages.map(message => message._id), ["older", "newer"]);
