@@ -2,6 +2,9 @@ import React from 'react';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const MessageStatus = ({ status }) => {
+  if (status === 'sending') {
+    return <span className="ml-2 text-xs text-white/75" role="status">Sending…</span>;
+  }
   if (status === 'read') {
     return <span className="ml-2 text-sky-400" title="Read" aria-label="Read">✓✓</span>;
   }
