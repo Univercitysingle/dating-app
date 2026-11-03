@@ -2,8 +2,8 @@ import React from 'react';
 
 const TermsPage = () => {
     return (
-        <div className="container mx-auto p-8">
-            <h1 className="text-3xl font-bold mb-6">Terms of Service</h1>
+        <main className="legal-page"><div className="legal-page__content container mx-auto p-8">
+            <h1 className="legal-page__title text-3xl font-bold mb-6">Terms of Service</h1>
             <p>Welcome to our dating app. By using our service, you agree to these terms. Please read them carefully.</p>
 
             <div className="prose mt-4">
@@ -22,7 +22,7 @@ const TermsPage = () => {
                 <h2>5. Disclaimer of Warranties</h2>
                 <p>The service is provided "as is" without any warranties of any kind. We do not guarantee that the service will always be safe, secure, or error-free.</p>
             </div>
-        </div>
+        </div></main>
     );
 };
 
