@@ -1330,6 +1330,51 @@ test("notification preferences reject unknown keys and non-boolean values", asyn
   assert.equal(invalid.status, 400);
 });
 
+test("support ticket messages accept only ticket-scoped URLs on the configured CDN", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ticketId = "0123456789abcdef01234567";
+  const ticketObjectId = new ObjectId(ticketId);
+  const validKey = "support-" + ticketId + "-1793700000000-123e4567-e89b-42d3-a456-426614174000.pdf";
+  const cdnUrl = "https://dateme.enadoctemp.workers.dev/" + validKey;
+  let insertedMessage;
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne() { return { _id: new ObjectId("abcdef012345abcdef012345") }; }
+      };
+      if (name === "supporttickets") return {
+        async findOne() { return { _id: ticketObjectId, status: "Open" }; },
+        async updateOne() { return { modifiedCount: 1 }; }
+      };
+      if (name === "ticketmessages") return {
+        async insertOne(document) {
+          insertedMessage = document;
+          return { insertedId: new ObjectId("fedcba987654fedcba987654") };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.addSupportTicketMessage("user-1", ticketId, {
+    message: "Please review these files",
+    attachments: [
+      { key: validKey, url: cdnUrl, name: "document.pdf", type: "application/pdf", size: 1024 },
+      { key: validKey, url: "https://attacker.example/" + validKey, name: "external.pdf", type: "application/pdf", size: 1024 },
+      { key: "support-" + ticketId + "-other-user-file.pdf", url: cdnUrl, name: "wrong-key.pdf", type: "application/pdf", size: 1024 },
+      { key: validKey, url: cdnUrl + "?download=1", name: "query.pdf", type: "application/pdf", size: 1024 }
+    ]
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(insertedMessage.attachments.length, 1);
+  assert.equal(insertedMessage.attachments[0].url, cdnUrl);
+  assert.equal(insertedMessage.attachments[0].name, "document.pdf");
+});
+
 // Chat privacy regression coverage: blocked conversations must not reappear
 // in the inbox, and a participant cannot retrieve history after either side
 // blocks the other.
