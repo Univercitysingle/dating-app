@@ -6,6 +6,75 @@ import SuperLikeNotification from './SuperLikeNotification';
 import ProfileDetailView from './profile/ProfileDetailView';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl } from '../utils/media';
 
+const ProfilePhoto = ({ src, fallbackSrc, alt, className = '', priority = false }) => {
+  const [activeSrc, setActiveSrc] = useState(src || '');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasFailed, setHasFailed] = useState(!src);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    setActiveSrc(src || '');
+    setIsLoaded(false);
+    setHasFailed(!src);
+  }, [src, retryKey]);
+
+  const handleError = () => {
+    if (activeSrc === src && fallbackSrc && fallbackSrc !== src) {
+      setActiveSrc(fallbackSrc);
+      setIsLoaded(false);
+      return;
+    }
+    setHasFailed(true);
+    setIsLoaded(false);
+  };
+
+  return (
+    <div className={`profile-photo-frame ${className}`} role="img" aria-label={alt}>
+      {!isLoaded && !hasFailed && (
+        <div className="profile-photo-placeholder" aria-hidden="true">
+          <span className="profile-photo-placeholder__spinner" />
+          <span className="profile-photo-placeholder__label">Loading photo</span>
+        </div>
+      )}
+      {hasFailed ? (
+        <div className="profile-photo-failed">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <circle cx="8.5" cy="9" r="1.5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m4 17 5-5 3 3 2-2 6 5" />
+          </svg>
+          <span>Photo unavailable</span>
+          {src && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setRetryKey((value) => value + 1);
+              }}
+              className="profile-photo-retry"
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      ) : (
+        <img
+          key={activeSrc}
+          src={activeSrc}
+          alt=""
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+          decoding="async"
+          draggable={false}
+          onLoad={() => setIsLoaded(true)}
+          onError={handleError}
+          className={`profile-photo-image ${isLoaded ? 'is-loaded' : ''}`}
+        />
+      )}
+    </div>
+  );
+};
+
 const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -35,12 +104,14 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
   }
 
   const { name, age, photos } = user;
-  const rawImageSources =
-    photos && photos.length > 0
-      ? photos.map(photo => typeof photo === 'string' ? photo : photo?.url).filter(Boolean)
-      : ['https://placehold.co/400x600?text=Profile+Image'];
+  const rawImageSources = Array.isArray(photos)
+    ? photos.map(photo => typeof photo === 'string' ? photo : photo?.url).filter(Boolean)
+    : [];
   const imageSources = rawImageSources.map(resolvePhotoUrl);
-  const workerFallbackUrl = resolveWorkerPhotoUrl(rawImageSources[currentImageIndex]);
+  const currentImageSource = imageSources[currentImageIndex] || '';
+  const workerFallbackUrl = rawImageSources[currentImageIndex]
+    ? resolveWorkerPhotoUrl(rawImageSources[currentImageIndex])
+    : '';
 
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {
@@ -94,22 +165,12 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
 
         <motion.div className="w-full h-full overflow-y-auto">
             <div className="relative w-full h-full">
-                <img
-                    src={imageSources[currentImageIndex]}
+                <ProfilePhoto
+                    src={currentImageSource}
+                    fallbackSrc={workerFallbackUrl}
                     alt={name ? `${name}'s profile photo` : 'User profile photo'}
-                    loading={currentImageIndex === 0 ? 'eager' : 'lazy'}
-                    decoding="async"
-                    draggable={false}
-                    onError={(event) => {
-                      const image = event.currentTarget;
-                      if (workerFallbackUrl && image.src !== workerFallbackUrl) {
-                        image.src = workerFallbackUrl;
-                        return;
-                      }
-                      image.onerror = null;
-                      image.src = '/logo.jpg';
-                    }}
-                    className="profile-card-photo h-full w-full object-cover"
+                    priority={currentImageIndex === 0}
+                    className="profile-card-photo h-full w-full"
                 />
 
                 {/* Navigation Areas */}
@@ -200,17 +261,12 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="relative h-[55vh] min-h-[330px] max-h-[560px] bg-neutral-800 sm:h-[460px]">
-              <img
-                src={imageSources[currentImageIndex]}
+              <ProfilePhoto
+                src={currentImageSource}
+                fallbackSrc={workerFallbackUrl}
                 alt={name ? `${name}'s profile photo` : 'User profile photo'}
-                className="h-full w-full object-cover"
-                decoding="async"
-                onError={(event) => {
-                  const image = event.currentTarget;
-                  if (workerFallbackUrl && image.src !== workerFallbackUrl) { image.src = workerFallbackUrl; return; }
-                  image.onerror = null;
-                  image.src = '/logo.jpg';
-                }}
+                priority
+                className="h-full w-full"
               />
               <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-neutral-950 via-neutral-950/45 to-transparent" />
               {imageSources.length > 1 && <>
