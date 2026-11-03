@@ -2,8 +2,8 @@ import React from 'react';
 
 const SafetyTipsPage = () => {
     return (
-        <div className="container mx-auto p-8">
-            <h1 className="text-3xl font-bold mb-6">Online Dating Safety Tips</h1>
+        <main className="legal-page"><div className="legal-page__content container mx-auto p-8">
+            <h1 className="legal-page__title text-3xl font-bold mb-6">Online Dating Safety Tips</h1>
 
             <ul className="list-disc list-inside space-y-4">
                 <li>
@@ -22,7 +22,7 @@ const SafetyTipsPage = () => {
                     <strong>Trust Your Instincts:</strong> If something feels off, it probably is. Don't feel bad about cutting a date short or blocking someone if you feel uncomfortable or unsafe.
                 </li>
             </ul>
-        </div>
+        </div></main>
     );
 };
 
