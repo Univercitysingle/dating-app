@@ -3851,3 +3851,5 @@ input, textarea, select {
 @media (prefers-reduced-motion: reduce) {
   .legal-page__content { animation: none; }
 }
+
+/* Keep the legal page background aligned with the public authentication theme. */
