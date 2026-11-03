@@ -3489,20 +3489,35 @@ export class MongoDBConnection {
           .sort({ timestamp: -1 }).limit(500).toArray()
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
-      const byRoom = new Map();
+      const latestByRoom = new Map();
       for (const message of messages) {
-        if (typeof message.roomId !== "string" || byRoom.has(message.roomId)) continue;
+        if (typeof message.roomId !== "string" || latestByRoom.has(message.roomId)) continue;
         const otherUid = message.senderUid === uid ? message.receiverUid : message.senderUid;
         if (typeof otherUid !== "string" || !otherUid || otherUid === uid) continue;
-        const otherUser = await db.collection("users").findOne(
-          { uid: otherUid },
-          { projection: { password: 0, lastLoginIp: 0, email: 0, mobileNumber: 0, location: 0, lastLoginDevice: 0 } }
-        );
-        if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
-            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) continue;
-        byRoom.set(message.roomId, { roomId: message.roomId, otherUser: sanitizePublicProfile(otherUser), lastMessage: message });
+        latestByRoom.set(message.roomId, { otherUid, lastMessage: message });
       }
-      return { status: 200, body: [...byRoom.values()] };
+      // Fetch all counterpart profiles in one query instead of issuing one
+      // sequential MongoDB round trip per conversation.
+      const otherUids = [...new Set([...latestByRoom.values()].map(item => item.otherUid))];
+      const otherUsers = otherUids.length
+        ? await db.collection("users").find(
+            { uid: { $in: otherUids } },
+            { projection: { password: 0, lastLoginIp: 0, email: 0, mobileNumber: 0, location: 0, lastLoginDevice: 0 } }
+          ).toArray()
+        : [];
+      const usersByUid = new Map(otherUsers.map(otherUser => [otherUser.uid, otherUser]));
+      const conversations = [];
+      for (const [roomId, item] of latestByRoom) {
+        const otherUser = usersByUid.get(item.otherUid);
+        if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(item.otherUid)) ||
+            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) continue;
+        conversations.push({
+          roomId,
+          otherUser: sanitizePublicProfile(otherUser),
+          lastMessage: item.lastMessage
+        });
+      }
+      return { status: 200, body: conversations };
     } catch {
       return { status: 503, body: { error: "Chat conversations unavailable" } };
     }
