@@ -1433,7 +1433,7 @@ test("chat history refuses cross-user access and limits result pagination", asyn
   const messages = [{ roomId: "alice-bob", senderUid: "alice", receiverUid: "bob", messageContent: "Hi" }];
   const db = {
     collection(name) {
-      if (name === "users") return { async findOne(filter) { return filter.uid === "alice" ? { uid: "alice", role: "user" } : null; } };
+      if (name === "users") return { async findOne(filter) { return filter.uid === "alice" ? { uid: "alice", role: "user" } : filter.uid === "bob" ? { uid: "bob", role: "user" } : null; } };
       return {
         find(query) {
           capturedQuery = query;
