@@ -3,6 +3,7 @@ import apiClient from '../api/apiClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoadingState from '../components/LoadingState';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const LikesPage = () => {
     const [users, setUsers] = useState([]);
@@ -34,7 +35,7 @@ const LikesPage = () => {
                     setUsers(Array.isArray(usersArray) ? usersArray : []);
                 }
             } catch (err) {
-                setError(err.message || 'An error occurred');
+                setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
             } finally {
                 setLoading(false);
             }
@@ -48,7 +49,7 @@ const LikesPage = () => {
     }
 
     if (error) {
-        return <div className="state-panel state-error mx-4 my-8 text-center" role="alert">{error}</div>;
+        return <div className="state-panel state-error mx-4 my-8 text-center" role="alert"><p>{error}</p><button type="button" onClick={() => window.location.reload()} className="app-primary-button mt-4 rounded-full px-5 py-2.5 text-sm font-semibold text-white">Try again</button></div>;
     }
 
     return (
