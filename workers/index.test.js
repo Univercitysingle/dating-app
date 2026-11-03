@@ -1954,3 +1954,152 @@ test("chat send rate limit rejects excess messages before accessing MongoDB", as
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("chat send persists through MongoDB and returns the saved message", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const unsigned = encode({ alg: "RS256", typ: "JWT", kid: "chat-send-success-test" }) + "." +
+    encode({
+      iss: "https://securetoken.google.com/test-project",
+      aud: "test-project",
+      sub: "chat-sender-1",
+      user_id: "chat-sender-1",
+      iat: now,
+      exp: now + 3600,
+      auth_time: now
+    });
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    return new Response(JSON.stringify({
+      keys: [{ ...publicJwk, kid: "chat-send-success-test", alg: "RS256", use: "sig" }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const savedMessage = {
+    _id: "message-123",
+    roomId: "chat-sender-1-chat-receiver-1",
+    senderUid: "chat-sender-1",
+    receiverUid: "chat-receiver-1",
+    messageContent: "Hello",
+    timestamp: "2026-11-03T10:00:00.000Z"
+  };
+  let internalRequest;
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    RATE_LIMITER: {
+      idFromName(name) {
+        assert.equal(name, "chat-send-user:chat-sender-1");
+        return "chat-send-limiter";
+      },
+      get() {
+        return {
+          async fetch(_url, options) {
+            assert.deepEqual(JSON.parse(options.body), { key: "chat-send", limit: 30, windowMs: 60000 });
+            return new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 60000 }), {
+              status: 200, headers: { "content-type": "application/json" }
+            });
+          }
+        };
+      }
+    },
+    MONGODB_CONNECTION: {
+      idFromName(name) {
+        assert.equal(name, "mongo-primary");
+        return "mongo-primary";
+      },
+      get() {
+        return {
+          async fetch(url, options) {
+            assert.equal(url, "https://internal.invalid/internal/chat/send");
+            internalRequest = JSON.parse(options.body);
+            return new Response(JSON.stringify(savedMessage), {
+              status: 201, headers: { "content-type": "application/json" }
+            });
+          }
+        };
+      }
+    }
+  };
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/chat/send", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({
+        roomId: savedMessage.roomId,
+        receiverUid: savedMessage.receiverUid,
+        messageContent: savedMessage.messageContent
+      })
+    }), env);
+    assert.equal(response.status, 201);
+    assert.deepEqual(internalRequest.claims.sub, "chat-sender-1");
+    assert.deepEqual(internalRequest.payload, {
+      roomId: savedMessage.roomId,
+      receiverUid: savedMessage.receiverUid,
+      messageContent: "Hello"
+    });
+    const body = await response.json();
+    assert.equal(body._id, savedMessage._id);
+    assert.equal(body.senderUid, savedMessage.senderUid);
+    assert.equal(body.realtimeSync, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("chat send fails closed when the account rate limiter is not configured", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const unsigned = encode({ alg: "RS256", typ: "JWT", kid: "chat-no-limiter-test" }) + "." +
+    encode({
+      iss: "https://securetoken.google.com/test-project",
+      aud: "test-project",
+      sub: "chat-user-no-limiter",
+      user_id: "chat-user-no-limiter",
+      iat: now,
+      exp: now + 3600,
+      auth_time: now
+    });
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    keys: [{ ...publicJwk, kid: "chat-no-limiter-test", alg: "RS256", use: "sig" }]
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  let databaseAccessed = false;
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/chat/send", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ roomId: "chat-user-no-limiter-other", receiverUid: "other", messageContent: "Hello" })
+    }), {
+      FIREBASE_PROJECT_ID: "test-project",
+      MONGODB_CONNECTION: {
+        idFromName() { databaseAccessed = true; throw new Error("MongoDB must not be accessed"); },
+        get() { databaseAccessed = true; throw new Error("MongoDB must not be accessed"); }
+      }
+    });
+    assert.equal(response.status, 503);
+    assert.equal(databaseAccessed, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
