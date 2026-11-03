@@ -141,6 +141,7 @@ export class MongoDBConnection {
     this.clientPromise = null;
     this.discoveryMatchIndexesPromise = null;
     this.subscriptionIndexMigrationPromise = null;
+    this.chatMessageIdIndexPromise = null;
   }
 
   async getClient() {
@@ -3669,16 +3670,19 @@ export class MongoDBConnection {
   }
 
   async createChatMessage(uid, payload) {
-    const { roomId, receiverUid, messageContent } = payload || {};
+    const { roomId, receiverUid, messageContent, clientMessageId } = payload || {};
     if (typeof uid !== "string" || !uid || typeof receiverUid !== "string" || !receiverUid ||
         receiverUid === uid || typeof roomId !== "string" ||
         ![uid + "-" + receiverUid, receiverUid + "-" + uid].includes(roomId) ||
-        typeof messageContent !== "string" || !messageContent.trim() || messageContent.length > 5000) {
-      return { status: 400, body: { error: "Invalid roomId, receiverUid, or messageContent" } };
+        typeof messageContent !== "string" || !messageContent.trim() || messageContent.length > 5000 ||
+        (clientMessageId !== undefined && (typeof clientMessageId !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientMessageId)))) {
+      return { status: 400, body: { error: "Invalid roomId, receiverUid, messageContent, or clientMessageId" } };
     }
     try {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
+      const messages = db.collection("chatmessages");
       const [sender, receiver] = await Promise.all([
         users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } }),
         users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } })
@@ -3692,10 +3696,54 @@ export class MongoDBConnection {
           (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid))) {
         return { status: 403, body: { error: "Messaging is unavailable for this conversation" } };
       }
-      const message = { roomId, senderUid: uid, receiverUid, messageContent: messageContent.trim(), timestamp: now, status: "sent" };
-      const inserted = await db.collection("chatmessages").insertOne(message);
-      message._id = inserted.insertedId;
-      return { status: 201, body: message };
+
+      if (clientMessageId) {
+        // The unique partial index makes retries safe even if the original request
+        // committed but its HTTP response was lost, including concurrent retries.
+        if (!this.chatMessageIdIndexPromise) {
+          this.chatMessageIdIndexPromise = messages.createIndex(
+            { senderUid: 1, clientMessageId: 1 },
+            {
+              name: "chat_sender_client_message_unique",
+              unique: true,
+              partialFilterExpression: { clientMessageId: { $type: "string" } }
+            }
+          ).catch((error) => {
+            this.chatMessageIdIndexPromise = null;
+            throw error;
+          });
+        }
+        await this.chatMessageIdIndexPromise;
+        const existing = await messages.findOne({ senderUid: uid, clientMessageId });
+        if (existing) {
+          if (existing.roomId !== roomId || existing.receiverUid !== receiverUid ||
+              existing.messageContent !== messageContent.trim()) {
+            return { status: 409, body: { error: "This message retry key was already used for different content" } };
+          }
+          return { status: 200, body: existing };
+        }
+      }
+
+      const message = {
+        roomId, senderUid: uid, receiverUid, messageContent: messageContent.trim(),
+        timestamp: now, status: "sent",
+        ...(clientMessageId ? { clientMessageId } : {})
+      };
+      try {
+        const inserted = await messages.insertOne(message);
+        message._id = inserted.insertedId;
+        return { status: 201, body: message };
+      } catch (insertError) {
+        if (clientMessageId && insertError?.code === 11000) {
+          const existing = await messages.findOne({ senderUid: uid, clientMessageId });
+          if (existing && existing.roomId === roomId && existing.receiverUid === receiverUid &&
+              existing.messageContent === messageContent.trim()) {
+            return { status: 200, body: existing };
+          }
+          if (existing) return { status: 409, body: { error: "This message retry key was already used for different content" } };
+        }
+        throw insertError;
+      }
     } catch {
       return { status: 503, body: { error: "Unable to send chat message" } };
     }
