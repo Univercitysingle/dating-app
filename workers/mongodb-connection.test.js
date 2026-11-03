@@ -1774,3 +1774,48 @@ test("typing status is denied after either participant blocks the other", async 
     assert.equal(writeCount, 0);
   }
 });
+
+
+test("concurrent chat send retry resolves duplicate-key race to the original message", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId("abcdef0123456789abcdef01");
+  const clientMessageId = "123e4567-e89b-42d3-a456-426614174000";
+  const saved = {
+    _id: id, roomId: "alice-bob", senderUid: "alice", receiverUid: "bob",
+    messageContent: "Hello Bob", clientMessageId, status: "sent",
+    timestamp: new Date("2026-11-03T10:00:00.000Z")
+  };
+  let lookupCount = 0;
+  let insertCount = 0;
+  const users = { async findOne({ uid }) { return { uid, blocked: [] }; } };
+  const messages = {
+    async createIndex() { return "chat_sender_client_message_unique"; },
+    async findOne() {
+      lookupCount++;
+      return lookupCount === 1 ? null : saved;
+    },
+    async insertOne() {
+      insertCount++;
+      const error = new Error("duplicate key");
+      error.code = 11000;
+      throw error;
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : messages; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createChatMessage("alice", {
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    messageContent: "Hello Bob",
+    clientMessageId
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(String(result.body._id), String(id));
+  assert.equal(result.body.clientMessageId, clientMessageId);
+  assert.equal(lookupCount, 2);
+  assert.equal(insertCount, 1);
+});
