@@ -218,38 +218,30 @@ function Chat() {
     setError(null);
     setIsSending(true);
 
-    // Send via Socket.io if available
-    let sentViaSocket = false;
-    if (socket && socket.connected) {
-      socket.emit('sendMessage', {
+    // MongoDB through the Worker API is the authoritative message store.
+    // Socket.IO is disabled in the Cloudflare serverless deployment and must
+    // never be treated as proof that a message was persisted.
+    try {
+      const savedMessage = await apiClient.post('/chat/send', {
         roomId: chatId,
         messageContent,
         receiverUid,
       });
-      addMessage({ ...message, status: 'sent' });
-      sentViaSocket = true;
-    }
-
-    // Fallback or serverless HTTP transmission
-    if (!sentViaSocket) {
-      try {
-        const savedMessage = await apiClient.post('/chat/send', {
-          roomId: chatId,
-          messageContent,
-          receiverUid,
-        });
-        if (savedMessage && savedMessage._id) {
-          addMessage({ ...savedMessage, _id: String(savedMessage._id), roomId: savedMessage.roomId || chatId });
-        }
-      } catch (sendErr) {
-        logger.error('Failed to send message via HTTP fallback:', sendErr);
-        removeMessage(chatId, tempId);
-        setInput(messageContent);
-        setError('Message could not be sent. Your text has been restored. Please try again.');
-      } finally {
-        setIsSending(false);
+      if (!savedMessage || !savedMessage._id) {
+        throw new Error('The chat service did not confirm message persistence.');
       }
-    } else {
+      addMessage({
+        ...savedMessage,
+        _id: String(savedMessage._id),
+        roomId: savedMessage.roomId || chatId,
+        status: savedMessage.status || 'sent',
+      });
+    } catch (sendErr) {
+      logger.error('Failed to persist chat message:', sendErr);
+      removeMessage(chatId, tempId);
+      setInput(messageContent);
+      setError('Message could not be sent. Your text has been restored. Please try again.');
+    } finally {
       setIsSending(false);
     }
   };
