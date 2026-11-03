@@ -45,7 +45,7 @@ test("discovery combines boosted and regular candidates with safe array defaults
   assert.deepEqual(combined[1].$slice[1], {
     $max: [0, { $subtract: [100, { $size: "$boostedUsers" }] }]
   });
-  assert.doesNotMatch(JSON.stringify(project), /"\\$in"/);
+  assert.doesNotMatch(JSON.stringify(project), /"\$in"/);
 });
 
 test("chat history is denied when either participant has blocked the other", async () => {
