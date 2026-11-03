@@ -18,6 +18,7 @@ import BadgesDisplay from '../components/BadgesDisplay';
 import { API_URL } from '../utils/constants';
 import SectionCard from '../components/profile/SectionCard';
 import NotificationPreferencesPanel from '../components/NotificationPreferencesPanel';
+import LoadingState from '../components/LoadingState';
 
 const countryCallingCodes = [
   { country: 'United Arab Emirates', flag: '🇦🇪', code: '+971' },
@@ -264,7 +265,7 @@ function Profile() {
   };
 
   if (fetchError) return <p className="text-red-500 p-4">Error: {fetchError}</p>;
-  if (!profile) return <p className="p-4">Loading profile...</p>;
+  if (!profile) return <LoadingState title="Loading your profile" message="Fetching your profile details and photos." slowMessage="Your profile is taking longer to load. Please wait a moment, then retry if it does not appear." />;
 
   const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
   // Contact details are private on other users' profiles; only the profile owner or superadmin may view them.
