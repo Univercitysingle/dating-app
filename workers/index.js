@@ -1951,6 +1951,20 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        // Bound message creation per authenticated account, independent of IP.
+        if (chatRoute[1] === "send" && env.RATE_LIMITER) {
+          const limiterId = env.RATE_LIMITER.idFromName("chat-send-user:" + claims.sub);
+          const limiter = env.RATE_LIMITER.get(limiterId);
+          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "chat-send", limit: 30, windowMs: 60000 })
+          });
+          if (!rateResponse.ok) return json({ error: "Chat rate limit service unavailable" }, 503);
+          const rate = await rateResponse.json();
+          if (!rate.allowed) return new Response(JSON.stringify({ error: "Message limit reached. Please wait before sending more messages." }), {
+            status: 429, headers: { ...JSON_HEADERS, "retry-after": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))) }
+          });
+        }
         if (!env.MONGODB_CONNECTION) return json({ error: "Chat service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
