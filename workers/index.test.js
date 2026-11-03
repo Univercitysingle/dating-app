@@ -1439,7 +1439,12 @@ test("chat history refuses cross-user access and limits result pagination", asyn
           capturedQuery = query;
           return { sort() { return this; }, skip(value) { capturedSkip = value; return this; }, limit(value) { capturedLimit = value; return this; }, async toArray() { return messages; } };
         },
-        async findOne() { return { _id: "message-id" }; }
+        async findOne(query) {
+          if (query && query.roomId === "alice-bob") {
+            return { roomId: "alice-bob", senderUid: "alice", receiverUid: "bob", _id: "message-id" };
+          }
+          return { _id: "message-id" };
+        }
       };
     }
   };
