@@ -57,21 +57,21 @@ function Chat() {
         const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
         if (!cancelled && Array.isArray(result?.messages)) {
           result.messages.forEach(message => addMessageRef.current(message));
-          const undelivered = result.messages.filter(message =>
-            message.receiverUid === user.uid && message.status === 'sent' &&
+          const unreadIncoming = result.messages.filter(message =>
+            message.receiverUid === user.uid && message.status !== 'read' &&
             message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
           );
-          if (undelivered.length) {
+          if (unreadIncoming.length) {
             try {
-              await apiClient.post('/chat/delivered', {
+              await apiClient.post('/chat/read', {
                 roomId: chatId,
-                messageIds: undelivered.map(message => String(message._id)),
+                messageIds: unreadIncoming.map(message => String(message._id)),
               });
-              if (!cancelled) undelivered.forEach(message =>
-                addMessageRef.current({ ...message, status: 'delivered' })
+              if (!cancelled) unreadIncoming.forEach(message =>
+                addMessageRef.current({ ...message, status: 'read' })
               );
-            } catch (deliveryError) {
-              logger.debug('Message delivery receipt deferred:', deliveryError?.status || 'network error');
+            } catch (readError) {
+              logger.debug('Message read receipt deferred:', readError?.status || 'network error');
             }
           }
         }
