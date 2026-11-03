@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import LoadingState from '../components/LoadingState';
 
 const LikesPage = () => {
     const [users, setUsers] = useState([]);
@@ -43,7 +44,7 @@ const LikesPage = () => {
     }, []);
 
     if (loading) {
-        return <div className="state-panel mx-4 my-8 text-center">Loading people who liked you…</div>;
+        return <LoadingState title="Finding your admirers" message="Loading people who have liked your profile." slowMessage="We are still waiting for your likes to load. You can stay on this page while we finish." />;
     }
 
     if (error) {
