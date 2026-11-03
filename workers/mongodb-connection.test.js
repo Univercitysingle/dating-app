@@ -1616,6 +1616,59 @@ test("chat message creation persists a normalized message and returns its MongoD
   assert.equal(inserted[0].messageContent, "Hello Bob");
 });
 
+test("chat message retries with the same client ID return the existing persisted message", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId("abcdef0123456789abcdef01");
+  const existing = {
+    _id: id, roomId: "alice-bob", senderUid: "alice", receiverUid: "bob",
+    messageContent: "Hello Bob", clientMessageId: "123e4567-e89b-42d3-a456-426614174000",
+    status: "sent", timestamp: new Date("2026-11-03T10:00:00.000Z")
+  };
+  let insertCount = 0;
+  const users = { async findOne({ uid }) { return { uid, blocked: [] }; } };
+  const messages = {
+    async createIndex(keys, options) {
+      assert.deepEqual(keys, { senderUid: 1, clientMessageId: 1 });
+      assert.equal(options.unique, true);
+    },
+    async findOne(filter) {
+      return filter.senderUid === "alice" && filter.clientMessageId === existing.clientMessageId ? existing : null;
+    },
+    async insertOne() { insertCount++; return { insertedId: id }; }
+  };
+  const db = { collection(name) { return name === "users" ? users : messages; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const payload = {
+    roomId: "alice-bob", receiverUid: "bob", messageContent: "  Hello Bob  ",
+    clientMessageId: existing.clientMessageId
+  };
+
+  const firstRetry = await connection.createChatMessage("alice", payload);
+  const secondRetry = await connection.createChatMessage("alice", payload);
+
+  assert.equal(firstRetry.status, 200);
+  assert.equal(secondRetry.status, 200);
+  assert.equal(String(firstRetry.body._id), String(id));
+  assert.equal(insertCount, 0);
+
+  const reusedKey = await connection.createChatMessage("alice", {
+    ...payload, messageContent: "Different content"
+  });
+  assert.equal(reusedKey.status, 409);
+  assert.equal(insertCount, 0);
+});
+
+test("chat message creation rejects malformed client message IDs", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const result = await connection.createChatMessage("alice", {
+    roomId: "alice-bob", receiverUid: "bob", messageContent: "Hello",
+    clientMessageId: "not-a-uuid"
+  });
+  assert.equal(result.status, 400);
+});
+
 test("chat message creation rejects invalid room identities and blocked recipients before persistence", async () => {
   let insertCount = 0;
   const users = {
