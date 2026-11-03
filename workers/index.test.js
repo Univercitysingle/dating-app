@@ -735,6 +735,12 @@ test("discovery returns ordered public profiles with super-like metadata", async
   assert.equal(result.body[0].superLikedByCurrentUser, true);
   assert.equal(result.body[0].photos[0].url, "https://cdn.example.com/photos/a.jpg");
   assert.ok(pipeline.some(stage => stage.$lookup && stage.$lookup.from === "matches"));
+  const initialMatch = pipeline.find(stage => stage.$match)?.$match;
+  assert.equal(initialMatch.uid.$type, "string", "profiles without a valid UID must not enter the candidate pipeline");
+  const combinedUsersProjection = pipeline.find(stage => stage.$project?.combinedUsers)?.$project.combinedUsers;
+  assert.ok(combinedUsersProjection, "boosted and regular candidates should be combined safely");
+  assert.doesNotMatch(JSON.stringify(combinedUsersProjection), /"\\$in"/,
+    "Discover candidate assembly must not rely on an aggregation $in with potentially missing array values");
 });
 
 test("likes query returns pending likers with privacy filtering and premium blur metadata", async () => {
