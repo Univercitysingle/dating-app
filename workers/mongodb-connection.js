@@ -1171,7 +1171,7 @@ export class MongoDBConnection {
               { $limit: 40 }
             ],
             regularUsers: [
-              { $match: { $or: [{ boostExpiresAt: { $lte: new Date() } }, { boostExpiresAt: { $exists: false }] } },
+              { $match: { $or: [{ boostExpiresAt: { $lte: new Date() } }, { boostExpiresAt: { $exists: false } }] } },
               { $sort: { lastActiveAt: -1 } },
               { $limit: 100 }
             ]
