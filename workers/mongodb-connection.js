@@ -1161,34 +1161,19 @@ export class MongoDBConnection {
         pipeline.push({ $match: baseMatchQuery });
       }
       pipeline.push(
-        {
-          $lookup: {
-            from: "matches",
-            let: { candidateUid: "$uid" },
-            pipeline: [{
-              $match: {
-                $expr: {
-                  $or: [
-                    { $and: [{ $eq: ["$user1Uid", "$$candidateUid"] }, { $eq: ["$user2Uid", uid] }] },
-                    { $and: [{ $eq: ["$user1Uid", uid] }, { $eq: ["$user2Uid", "$$candidateUid"] }] }
-                  ]
-                }
-              }
-            }, { $limit: 1 }],
-            as: "interaction"
-          }
-        },
-        { $match: { interaction: { $eq: [] } } },
+        // Narrow the candidate set before checking interactions. The previous
+        // pipeline performed a correlated matches lookup for every visible user
+        // before applying any limits, which becomes expensive as the user base grows.
         {
           $facet: {
             boostedUsers: [
               { $match: { boostExpiresAt: { $gt: new Date() } } },
-              { $limit: 10 }
+              { $limit: 40 }
             ],
             regularUsers: [
-              { $match: { $or: [{ boostExpiresAt: { $lte: new Date() } }, { boostExpiresAt: { $exists: false } }] } },
+              { $match: { $or: [{ boostExpiresAt: { $lte: new Date() } }, { boostExpiresAt: { $exists: false }] } },
               { $sort: { lastActiveAt: -1 } },
-              { $limit: 20 }
+              { $limit: 100 }
             ]
           }
         },
@@ -1220,6 +1205,25 @@ export class MongoDBConnection {
         },
         { $unwind: "$combinedUsers" },
         { $replaceRoot: { newRoot: "$combinedUsers" } },
+        {
+          $lookup: {
+            from: "matches",
+            let: { candidateUid: "$uid" },
+            pipeline: [{
+              $match: {
+                $expr: {
+                  $or: [
+                    { $and: [{ $eq: ["$user1Uid", "$candidateUid"] }, { $eq: ["$user2Uid", uid] }] },
+                    { $and: [{ $eq: ["$user1Uid", uid] }, { $eq: ["$user2Uid", "$candidateUid"] }] }
+                  ]
+                }
+              }
+            }, { $limit: 1 }],
+            as: "interaction"
+          }
+        },
+        { $match: { interaction: { $eq: [] } } },
+        { $limit: 20 },
         { $project: { uid: 1 } }
       );
 
