@@ -1804,3 +1804,67 @@ test("CDN uploads fail clearly when the service binding is not configured", asyn
     /CDN_PROXY service binding is not configured/
   );
 });
+
+
+test("support attachment uploads enforce an account-scoped hourly quota", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const unsigned = encode({ alg: "RS256", typ: "JWT", kid: "support-upload-test" }) + "." +
+    encode({
+      iss: "https://securetoken.google.com/test-project",
+      aud: "test-project",
+      sub: "support-user-1",
+      user_id: "support-user-1",
+      iat: now,
+      exp: now + 3600,
+      auth_time: now
+    });
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const originalFetch = globalThis.fetch;
+  let limiterRequest;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    return new Response(JSON.stringify({
+      keys: [{ ...publicJwk, kid: "support-upload-test", alg: "RS256", use: "sig" }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    RATE_LIMITER: {
+      idFromName(name) {
+        assert.equal(name, "support-upload-user:support-user-1");
+        return "support-upload-limiter";
+      },
+      get() {
+        return {
+          async fetch(_url, options) {
+            limiterRequest = JSON.parse(options.body);
+            return new Response(JSON.stringify({ allowed: false, resetAt: Date.now() + 60000 }), {
+              status: 200, headers: { "content-type": "application/json" }
+            });
+          }
+        };
+      }
+    }
+  };
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/support-attachments", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token }
+    }), env);
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get("retry-after") !== null, true);
+    assert.deepEqual(limiterRequest, { key: "support-upload", limit: 10, windowMs: 3600000 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
