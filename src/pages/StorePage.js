@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const storeItems = [
   { id: 'super-like-5', name: '5 Super Likes', price: 500, description: 'Get noticed with 5 Super Likes.' },
@@ -126,7 +127,7 @@ const StorePage = () => {
       document.body.appendChild(form);
       form.requestSubmit();
     } catch (error) {
-      setNotification({ show: true, message: error.data?.error || error.data?.message || error.message || 'Could not start checkout. Please try again.', type: 'error' });
+      setNotification({ show: true, message: getUserFriendlyError(error, 'We could not start checkout. Please try again.'), type: 'error' });
     } finally {
       setIsProcessing(false);
     }
