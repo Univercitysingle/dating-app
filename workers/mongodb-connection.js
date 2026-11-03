@@ -3513,8 +3513,13 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const [user, messages] = await Promise.all([
         db.collection("users").findOne({ uid }, { projection: { _id: 1, uid: 1, blocked: 1 } }),
-        db.collection("chatmessages").find({ $or: [{ senderUid: uid }, { receiverUid: uid }] })
-          .sort({ timestamp: -1 }).limit(500).toArray()
+        db.collection("chatmessages").aggregate([
+          { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
+          { $sort: { timestamp: -1, _id: -1 } },
+          { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
+          { $replaceRoot: { newRoot: "$lastMessage" } },
+          { $sort: { timestamp: -1, _id: -1 } }
+        ]).toArray()
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
       const latestByRoom = new Map();
