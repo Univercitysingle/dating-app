@@ -1952,7 +1952,8 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         // Bound message creation per authenticated account, independent of IP.
-        if (chatRoute[1] === "send" && env.RATE_LIMITER) {
+        if (chatRoute[1] === "send") {
+          if (!env.RATE_LIMITER) return json({ error: "Chat rate limit service unavailable" }, 503);
           const limiterId = env.RATE_LIMITER.idFromName("chat-send-user:" + claims.sub);
           const limiter = env.RATE_LIMITER.get(limiterId);
           const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
