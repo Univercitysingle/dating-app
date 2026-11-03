@@ -2001,8 +2001,10 @@ export default {
           return json(result, response.status);
         }
         const payload = await request.json().catch(() => null);
-        if (chatRoute[1] === "typing" || chatRoute[1] === "delivered") {
-          const internalPath = chatRoute[1] === "typing" ? "/internal/chat/typing-write" : "/internal/chat/delivered";
+        if (chatRoute[1] === "typing" || chatRoute[1] === "delivered" || chatRoute[1] === "read") {
+          const internalPath = chatRoute[1] === "typing"
+            ? "/internal/chat/typing-write"
+            : chatRoute[1] === "read" ? "/internal/chat/read" : "/internal/chat/delivered";
           const response = await connection.fetch("https://internal.invalid" + internalPath, {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ claims, payload })
