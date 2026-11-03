@@ -1697,6 +1697,22 @@ test("chat message remains saved when Firebase Realtime Database rejects the syn
     }), {
       FIREBASE_PROJECT_ID: "test-project",
       FIREBASE_DATABASE_URL: "https://test-project-default-rtdb.firebaseio.com",
+      RATE_LIMITER: {
+        idFromName(name) {
+          assert.equal(name, "chat-send-user:sender-uid");
+          return "chat-send-test";
+        },
+        get() {
+          return {
+            async fetch(_url, options) {
+              assert.deepEqual(JSON.parse(options.body), { key: "chat-send", limit: 30, windowMs: 60000 });
+              return new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 60000 }), {
+                status: 200, headers: { "content-type": "application/json" }
+              });
+            }
+          };
+        }
+      },
       MONGODB_CONNECTION: connection
     });
     assert.equal(response.status, 201);
