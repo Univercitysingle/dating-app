@@ -1448,6 +1448,58 @@ test("chat history is denied when either participant has blocked the other", asy
   }
 });
 
+test("chat history returns the newest page in chronological order and supports older pages", async () => {
+  const newestFirst = [
+    { _id: "newest", timestamp: new Date("2026-11-03T12:00:00.000Z") },
+    { _id: "middle", timestamp: new Date("2026-11-03T11:00:00.000Z") },
+    { _id: "oldest", timestamp: new Date("2026-11-03T10:00:00.000Z") }
+  ];
+  let sortSpec;
+  let skipValue;
+  let limitValue;
+  let messageQuery;
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          if (uid === "alice") return { uid, role: "user", blocked: [] };
+          if (uid === "bob") return { uid, blocked: [] };
+          return null;
+        }
+      };
+      return {
+        async findOne() {
+          return { senderUid: "alice", receiverUid: "bob" };
+        },
+        find(query) {
+          messageQuery = query;
+          return {
+            sort(value) { sortSpec = value; return this; },
+            skip(value) { skipValue = value; return this; },
+            limit(value) { limitValue = value; return this; },
+            async toArray() { return newestFirst.slice(skipValue, skipValue + limitValue); }
+          };
+        }
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getChatHistory("alice", "alice-bob", 2, 1);
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(sortSpec, { timestamp: -1 });
+  assert.equal(skipValue, 1);
+  assert.equal(limitValue, 2);
+  assert.deepEqual(messageQuery, {
+    roomId: "alice-bob",
+    $or: [{ senderUid: "alice" }, { receiverUid: "alice" }]
+  });
+  assert.deepEqual(result.body.messages.map(message => message._id), ["oldest", "middle"]);
+});
+
 test("delivery receipts update only messages addressed to the authenticated recipient", async () => {
   const { ObjectId } = await import("mongodb");
   const messageId = "abcdef0123456789abcdef01";
