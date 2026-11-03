@@ -29,7 +29,10 @@ function Chat() {
   useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
 
   const messages = allMessages[chatId] || [];
-  const otherUserUid = chatId ? chatId.split('-').find(uid => uid && uid !== user?.uid) : null;
+  // Resolve the peer from persisted message identities. Splitting room IDs is
+  // unsafe because Firebase UIDs may themselves contain hyphens.
+  const otherUserUid = messages.find(message => message.senderUid === user?.uid)?.receiverUid ||
+    messages.find(message => message.receiverUid === user?.uid)?.senderUid || null;
   const otherProfilePath = otherUser?.uid || otherUserUid ? `/profile/${encodeURIComponent(otherUser?.uid || otherUserUid)}` : '/profile';
 
   const scrollToBottom = () => {
@@ -188,7 +191,7 @@ function Chat() {
         }
       }
     };
-  }, [socket, chatId, user?.uid]);
+  }, [socket, chatId, user?.uid, otherUserUid]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
