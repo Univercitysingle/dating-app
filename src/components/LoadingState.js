@@ -5,6 +5,7 @@ const LoadingState = ({
   message = 'Please wait while we get things ready.',
   slowMessage = 'This is taking a little longer than expected. Your request is still in progress.',
   compact = false,
+  spinnerOnly = false,
 }) => {
   const [isSlow, setIsSlow] = useState(false);
 
@@ -15,16 +16,18 @@ const LoadingState = ({
 
   return (
     <div
-      className={`loading-state${compact ? ' loading-state--compact' : ''}`}
+      className={`loading-state${compact ? ' loading-state--compact' : ''}${spinnerOnly ? ' loading-state--spinner-only' : ''}`}
       role="status"
       aria-live="polite"
       aria-atomic="true"
     >
       <span className="loading-state__spinner" aria-hidden="true" />
-      <div className="loading-state__copy">
-        <p className="loading-state__title">{title}</p>
-        <p className="loading-state__message">{isSlow ? slowMessage : message}</p>
-      </div>
+      {!spinnerOnly && (
+        <div className="loading-state__copy">
+          <p className="loading-state__title">{title}</p>
+          <p className="loading-state__message">{isSlow ? slowMessage : message}</p>
+        </div>
+      )}
     </div>
   );
 };
