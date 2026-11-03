@@ -1181,28 +1181,30 @@ export class MongoDBConnection {
         {
           $project: {
             combinedUsers: {
-              $let: {
-                vars: {
-                  boostedUsers: { $ifNull: ["$boostedUsers", []] },
-                  regularUsers: { $ifNull: ["$regularUsers", []] }
-                },
-                in: {
-                  // The facet predicates are mutually exclusive. Avoid an
-                  // unnecessary aggregation $in expression here: malformed
-                  // legacy profile data can otherwise make MongoDB treat its
-                  // second argument as missing and fail the entire Discover
-                  // request.
-                  $concatArrays: [
-                    "$boostedUsers",
+              // The facet predicates are mutually exclusive. Avoid an
+              // unnecessary aggregation $in expression here: malformed
+              // legacy profile data can otherwise make MongoDB treat its
+              // second argument as missing and fail the entire Discover
+              // request.
+              $concatArrays: [
+                { $ifNull: ["$boostedUsers", []] },
+                {
+                  $slice: [
+                    { $ifNull: ["$regularUsers", []] },
                     {
-                      $slice: [
-                        "$regularUsers",
-                        { $max: [0, { $subtract: [100, { $size: "$boostedUsers" }] }] }
+                      $max: [
+                        0,
+                        {
+                          $subtract: [
+                            100,
+                            { $size: { $ifNull: ["$boostedUsers", []] } }
+                          ]
+                        }
                       ]
                     }
                   ]
                 }
-              }
+              ]
             }
           }
         },
