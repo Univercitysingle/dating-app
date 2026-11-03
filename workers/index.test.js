@@ -1436,6 +1436,7 @@ test("chat history refuses cross-user access and limits result pagination", asyn
   let capturedQuery;
   let capturedLimit;
   let capturedSkip;
+  let capturedMaxTimeMS;
   const messages = [{ roomId: "alice-bob", senderUid: "alice", receiverUid: "bob", messageContent: "Hi" }];
   const db = {
     collection(name) {
@@ -1443,7 +1444,7 @@ test("chat history refuses cross-user access and limits result pagination", asyn
       return {
         find(query) {
           capturedQuery = query;
-          return { sort() { return this; }, skip(value) { capturedSkip = value; return this; }, limit(value) { capturedLimit = value; return this; }, async toArray() { return messages; } };
+          return { sort() { return this; }, skip(value) { capturedSkip = value; return this; }, limit(value) { capturedLimit = value; return this; }, maxTimeMS(value) { capturedMaxTimeMS = value; return this; }, async toArray() { return messages; } };
         },
         async findOne(query) {
           if (query && query.roomId === "alice-bob") {
@@ -1462,6 +1463,7 @@ test("chat history refuses cross-user access and limits result pagination", asyn
   assert.equal(result.status, 200);
   assert.equal(capturedLimit, 100);
   assert.equal(capturedSkip, 2);
+  assert.equal(capturedMaxTimeMS, 10000);
   assert.equal(capturedQuery.roomId, "alice-bob");
   assert.deepEqual(capturedQuery.$or, [{ senderUid: "alice" }, { receiverUid: "alice" }]);
 });
