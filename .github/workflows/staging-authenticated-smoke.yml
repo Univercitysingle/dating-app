@@ -1,0 +1,43 @@
+name: Authenticated staging smoke tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dating-app-authenticated-staging-smoke
+  cancel-in-progress: false
+
+jobs:
+  authenticated-smoke:
+    if: github.ref_name == 'migrate-to-serverless'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WORKER_URL: https://dating-app-api-staging.enadoctemp.workers.dev
+      STAGING_TEST_FIREBASE_ID_TOKEN: ${{ secrets.STAGING_TEST_FIREBASE_ID_TOKEN }}
+    steps:
+      - name: Check out migration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: migrate-to-serverless
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate staging test credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$STAGING_TEST_FIREBASE_ID_TOKEN" ]]; then
+            echo "::error::Add a fresh Firebase ID token for a dedicated staging test account as the GitHub Actions secret STAGING_TEST_FIREBASE_ID_TOKEN, then rerun this workflow."
+            exit 1
+          fi
+
+      - name: Run read-only authenticated API smoke tests
+        shell: bash
+        run: bash scripts/staging-authenticated-smoke.sh
