@@ -1942,7 +1942,7 @@ export default {
       }
     }
 
-    const chatRoute = url.pathname.match(/^\/api\/chat\/(history\/([^/]+)|conversations|send|delivered|typing)$/);
+    const chatRoute = url.pathname.match(/^\/api\/chat\/(history\/([^/]+)|conversations|send|delivered|read|typing)$/);
     if (chatRoute) {
       const methodAllowed = chatRoute[1] === "history/" + chatRoute[2] ? request.method === "GET"
         : chatRoute[1] === "conversations" || chatRoute[1] === "typing" && request.method === "GET"
