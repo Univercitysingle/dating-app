@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
+import { getUserFriendlyError } from '../utils/apiErrors';
 import PhotoUploader from '../components/PhotoUploader';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -190,7 +191,7 @@ const Onboarding = () => {
         window.location.href = '/discover';
       }
     } catch (err) {
-      setError(err.data?.message || err.message || 'We could not save your profile. Please try again.');
+      setError(getUserFriendlyError(err, 'We could not save your profile. Please try again.'));
     } finally {
       setIsSaving(false);
     }
