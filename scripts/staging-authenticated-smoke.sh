@@ -2,11 +2,13 @@
 set -euo pipefail
 
 : "${WORKER_URL:?WORKER_URL is required}"
+: "${PAGES_URL:?PAGES_URL is required}"
 : "${FIREBASE_WEB_API_KEY:?FIREBASE_WEB_API_KEY is required}"
 : "${STAGING_TEST_EMAIL:?STAGING_TEST_EMAIL is required}"
 : "${STAGING_TEST_PASSWORD:?STAGING_TEST_PASSWORD is required}"
 
 WORKER_URL="${WORKER_URL%/}"
+PAGES_URL="${PAGES_URL%/}"
 auth_file="$(mktemp)"
 trap 'rm -f "$auth_file"' EXIT
 
@@ -25,17 +27,19 @@ id_token="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(p
 unset auth_payload STAGING_TEST_PASSWORD
 
 check_get() {
-  local path="$1"
+  local base_url="$1"
+  local path="$2"
+  local origin="$3"
   local response_file
   response_file="$(mktemp)"
   local status
   status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
     --header "Authorization: Bearer $id_token" \
     --header 'Accept: application/json' \
-    "$WORKER_URL$path")"
+    "$base_url$path")"
 
   if [[ "$status" != "200" ]]; then
-    echo "::error::Authenticated GET $path returned HTTP $status"
+    echo "::error::Authenticated GET $origin$path returned HTTP $status"
     # Print only a sanitized error field, never the response body or user data.
     node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const m=x.error||x.message;if(m)console.error(String(m).slice(0,240));}catch{}' "$response_file"
     rm -f "$response_file"
@@ -43,21 +47,31 @@ check_get() {
   fi
 
   if ! node -e 'const fs=require("fs");JSON.parse(fs.readFileSync(process.argv[1],"utf8"))' "$response_file"; then
-    echo "::error::Authenticated GET $path returned non-JSON content."
+    echo "::error::Authenticated GET $origin$path returned non-JSON content."
     rm -f "$response_file"
     return 1
   fi
 
   rm -f "$response_file"
-  echo "PASS authenticated GET $path -> HTTP 200 (JSON)"
+  echo "PASS authenticated GET $origin$path -> HTTP 200 (JSON)"
 }
 
 # Read-only checks only. These requests do not create messages, uploads,
 # support tickets, subscriptions, or payment transactions.
-check_get "/api/users/me"
-check_get "/api/users/discover"
-check_get "/api/users/likes"
-check_get "/api/users/me/subscriptions"
+paths=(
+  "/api/users/me"
+  "/api/users/discover"
+  "/api/users/likes"
+  "/api/users/me/subscriptions"
+)
+
+for path in "${paths[@]}"; do
+  check_get "$WORKER_URL" "$path" "Worker "
+done
+
+for path in "${paths[@]}"; do
+  check_get "$PAGES_URL" "$path" "Pages "
+done
 
 unset id_token
-echo "Authenticated staging smoke tests passed."
+echo "Authenticated staging smoke tests passed on the Worker and Pages API routes."
