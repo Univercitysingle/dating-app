@@ -3126,3 +3126,128 @@ input, textarea, select {
     background-position: 58% center;
   }
 }
+
+
+/* Login page: keep the shared public photograph visible above auth theme defaults. */
+.auth-page.login-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  background: #24172d;
+}
+.auth-page.login-page::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: #24172d;
+  background-image:
+    linear-gradient(135deg, rgba(24, 14, 32, .62), rgba(48, 20, 44, .48)),
+    url('../../public/bg.webp');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  content: "";
+  pointer-events: none;
+}
+.auth-page.login-page::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at 18% 18%, rgba(246, 111, 151, .18), transparent 42%),
+    linear-gradient(180deg, rgba(15, 10, 22, .06), rgba(15, 10, 22, .28));
+  content: "";
+  pointer-events: none;
+}
+.login-page .login-card {
+  width: min(100%, 440px);
+  padding: clamp(24px, 5vw, 38px);
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 28px;
+  background: rgba(25, 19, 33, .76);
+  box-shadow: 0 28px 90px rgba(8, 5, 14, .42);
+  backdrop-filter: blur(24px) saturate(125%);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+}
+.login-page .login-card h2 {
+  margin-top: 2px;
+  letter-spacing: -.035em;
+  text-shadow: 0 2px 18px rgba(0,0,0,.18);
+}
+.login-page .login-card .login-control {
+  min-height: 52px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 14px;
+  background: rgba(255,255,255,.11);
+  color: #fff;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.login-page .login-card .login-control::placeholder {
+  color: rgba(255,255,255,.68);
+}
+.login-page .login-card .login-control:focus {
+  border-color: #ffabc4;
+  background: rgba(255,255,255,.16);
+  box-shadow: 0 0 0 4px rgba(255,171,196,.16);
+  outline: none;
+}
+.login-page .login-card .app-primary-button {
+  min-height: 52px;
+  border-radius: 999px;
+  background: linear-gradient(110deg, #f36b96, #c52f68);
+  box-shadow: 0 10px 26px rgba(197,47,104,.3);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+.login-page .login-card .app-primary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(197,47,104,.38);
+  filter: brightness(1.06);
+}
+.login-page .login-card button:focus-visible {
+  outline: 3px solid rgba(255,190,210,.85);
+  outline-offset: 3px;
+}
+.login-page .login-card > img {
+  border: 1px solid rgba(255,255,255,.3);
+  box-shadow: 0 12px 32px rgba(0,0,0,.24);
+}
+.login-page .login-seo-content {
+  text-shadow: 0 1px 12px rgba(0,0,0,.2);
+}
+.login-page .login-seo-content article,
+.login-page .login-seo-content details {
+  border-color: rgba(255,255,255,.2);
+  background: rgba(20,14,27,.38);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+@media (max-width: 640px) {
+  .auth-page.login-page {
+    justify-content: flex-start;
+    padding: max(22px, env(safe-area-inset-top)) 16px 28px;
+    background-attachment: scroll;
+  }
+  .auth-page.login-page::before {
+    background-position: 58% center;
+  }
+  .login-page .login-card {
+    margin-top: clamp(12px, 4vh, 32px);
+    padding: 24px 20px;
+    border-radius: 24px;
+  }
+  .login-page .login-card > img {
+    width: 68px;
+    height: 68px;
+  }
+  .login-page .login-seo-content {
+    margin-top: 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-page .login-card .login-control,
+  .login-page .login-card .app-primary-button {
+    transition: none;
+  }
+}
