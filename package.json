@@ -15,7 +15,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "depcheck": "depcheck",
-    "test:worker": "node --test workers/mongodb-connection.test.js"
+    "test:worker": "node --test workers/*.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.574.0",
