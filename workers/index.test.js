@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject } from "./index.js";
 
 function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
@@ -1752,4 +1752,55 @@ test("call signaling endpoints bypass the generic per-IP API limiter", async () 
   assert.equal(limiterCalls, 0);
   assert.equal(response.status, 503);
   assert.match((await response.json()).error, /Authentication is not configured/);
+});
+
+
+test("CDN uploads use the service binding instead of the public workers.dev hostname", async () => {
+  let capturedRequest;
+  let publicFetchCalled = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    publicFetchCalled = true;
+    throw new Error("Public CDN fetch must not be used");
+  };
+  try {
+    const response = await requestCdnObject({
+      CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/",
+      JWT_SECRET: "test-secret-that-is-at-least-thirty-two-characters",
+      CDN_PROXY: {
+        async fetch(request) {
+          capturedRequest = request;
+          return new Response(JSON.stringify({ key: "photos-user-1757226432186.webp" }), { status: 201 });
+        }
+      }
+    }, "photos-user-1757226432186.webp", "PUT", {
+      "Content-Type": "image/webp",
+      "Origin": "https://dating-app-staging.pages.dev"
+    }, new Uint8Array([1, 2, 3]), { sub: "user" });
+
+    assert.equal(response.status, 201);
+    assert.equal(publicFetchCalled, false);
+    assert.ok(capturedRequest instanceof Request);
+    assert.equal(new URL(capturedRequest.url).hostname, "dateme.enadoctemp.workers.dev");
+    assert.equal(capturedRequest.method, "PUT");
+    assert.equal(capturedRequest.headers.get("Content-Type"), "image/webp");
+    assert.equal(capturedRequest.headers.get("Origin"), "https://dating-app-staging.pages.dev");
+    const token = capturedRequest.headers.get("Authorization").replace(/^Bearer /, "");
+    const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+    assert.equal(claims.sub, "user");
+    assert.equal(claims.key, "photos-user-1757226432186.webp");
+    assert.equal(claims.method, "PUT");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("CDN uploads fail clearly when the service binding is not configured", async () => {
+  await assert.rejects(
+    requestCdnObject({
+      CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/",
+      JWT_SECRET: "test-secret-that-is-at-least-thirty-two-characters"
+    }, "photos-user-1757226432186.webp", "PUT", {}, new Uint8Array([1]), { sub: "user" }),
+    /CDN_PROXY service binding is not configured/
+  );
 });
