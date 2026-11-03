@@ -4,7 +4,7 @@ import app from '../firebase';
 
 const API_TIMEOUT_MS = 60000;
 
-async function readResponseBody(response) {
+async function readResponseBody(response, isError = false) {
   const contentType = response.headers.get('content-type') || '';
   if (response.status === 204) return null;
   if (contentType.includes('application/json')) {
@@ -16,6 +16,7 @@ async function readResponseBody(response) {
   }
   const text = await response.text();
   if (!text) return null;
+  if (!isError) return text;
   try {
     return JSON.parse(text);
   } catch {
@@ -97,7 +98,7 @@ const apiClient = {
 
     try {
       const response = await fetch(url, config);
-      const responseData = await readResponseBody(response);
+      const responseData = await readResponseBody(response, !response.ok);
       logger.debug(`API Response - ${config.method} ${url}`, { status: response.status });
 
       if (!response.ok) {
