@@ -78,6 +78,7 @@ function Login() {
         password
       );
       if (!userCredential.user.emailVerified) {
+        await auth.signOut();
         setError('Please verify your email before logging in.');
         return;
       }
@@ -102,7 +103,7 @@ function Login() {
           body: JSON.stringify({ email, password }),
         });
         const data = await response.json();
-        logger.info("Superadmin login API response:", { data });
+        logger.info("Superadmin login API response received.", { ok: response.ok, hasToken: Boolean(data.token), hasUser: Boolean(data.user) });
         if (!response.ok) {
           throw new Error(data.error || 'Superadmin login failed');
         }
