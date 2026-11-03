@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import LoadingState from '../components/LoadingState';
+import { getUserFriendlyError } from '../utils/apiErrors';
 
 const SupportPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -23,7 +24,7 @@ const SupportPage = () => {
       const response = await apiClient.get('/support-tickets');
       setTickets(response);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while fetching tickets.');
+      setError(getUserFriendlyError(err, 'We could not load your support tickets. Please try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -53,9 +54,9 @@ const SupportPage = () => {
       setSubject('');
       setMessage('');
       setAttachments([]);
-      fetchTickets();
+      await fetchTickets();
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while creating the ticket.');
+      setError(getUserFriendlyError(err, 'We could not submit your support request. Please try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +120,8 @@ const SupportPage = () => {
 
       {isLoading && <LoadingState compact title="Updating your support requests" message="Loading your tickets or submitting your request." slowMessage="The support service is responding slowly. Please keep this page open while we wait." />}
       {!isLoading && !error && tickets.length === 0 && <p>You have no support tickets.</p>}
+
+      {error && !showCreateForm && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert"><p>{error}</p><button type="button" onClick={fetchTickets} className="mt-2 font-semibold underline">Try again</button></div>}
 
       <div className="space-y-4">
         {tickets.map((ticket) => (
