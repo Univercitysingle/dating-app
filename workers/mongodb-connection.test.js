@@ -1819,3 +1819,53 @@ test("concurrent chat send retry resolves duplicate-key race to the original mes
   assert.equal(lookupCount, 2);
   assert.equal(insertCount, 1);
 });
+
+
+test("chat history returns the requested page in chronological order", async () => {
+  const older = { _id: "older", timestamp: new Date("2026-11-01T10:00:00.000Z") };
+  const newer = { _id: "newer", timestamp: new Date("2026-11-01T10:05:00.000Z") };
+  let capturedQuery;
+  let capturedSort;
+  let capturedSkip;
+  let capturedLimit;
+  const users = {
+    async findOne({ uid }) {
+      return uid === "alice" ? { uid, role: "user", blocked: [] } :
+        uid === "bob" ? { uid, blocked: [] } : null;
+    }
+  };
+  const cursor = {
+    sort(value) { capturedSort = value; return this; },
+    skip(value) { capturedSkip = value; return this; },
+    limit(value) { capturedLimit = value; return this; },
+    async toArray() { return [newer, older]; }
+  };
+  const messages = {
+    async findOne(query) {
+      assert.deepEqual(query, {
+        roomId: "alice-bob",
+        $or: [{ senderUid: "alice" }, { receiverUid: "alice" }]
+      });
+      return { senderUid: "alice", receiverUid: "bob" };
+    },
+    find(query) { capturedQuery = query; return cursor; }
+  };
+  const db = {
+    collection(name) { return name === "users" ? users : messages; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getChatHistory("alice", "alice-bob", 25, 50);
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedQuery, {
+    roomId: "alice-bob",
+    $or: [{ senderUid: "alice" }, { receiverUid: "alice" }]
+  });
+  assert.deepEqual(capturedSort, { timestamp: -1 });
+  assert.equal(capturedSkip, 50);
+  assert.equal(capturedLimit, 25);
+  assert.deepEqual(result.body.messages.map(message => message._id), ["older", "newer"]);
+});
