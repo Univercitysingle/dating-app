@@ -3539,7 +3539,7 @@ export class MongoDBConnection {
         chatMessages.aggregate([
           { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
           { $sort: { timestamp: -1, _id: -1 } },
-          { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
+          { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
           { $replaceRoot: { newRoot: "$lastMessage" } },
           { $sort: { timestamp: -1, _id: -1 } }
         ], { maxTimeMS: 10000 }).toArray()
