@@ -1490,7 +1490,7 @@ test("chat history returns the newest page in chronological order and supports o
   const result = await connection.getChatHistory("alice", "alice-bob", 2, 1);
 
   assert.equal(result.status, 200);
-  assert.deepEqual(sortSpec, { timestamp: -1 });
+  assert.deepEqual(sortSpec, { timestamp: -1, _id: -1 });
   assert.equal(skipValue, 1);
   assert.equal(limitValue, 2);
   assert.deepEqual(messageQuery, {
