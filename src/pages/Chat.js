@@ -354,10 +354,10 @@ function Chat() {
             value={input}
             onChange={handleInputChange}
             className="chat-message-input flex-grow"
-            placeholder={isRoomJoined ? "Write a message…" : "Connecting to chat…"}
+            placeholder={!isRoomJoined ? "Connecting to chat…" : isSending ? "Sending message…" : "Write a message…"}
             aria-label="Message"
             autoComplete="off"
-            disabled={!isRoomJoined}
+            disabled={!isRoomJoined || isSending}
           />
           <button
             type="submit"
