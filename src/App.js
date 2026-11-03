@@ -45,6 +45,7 @@ import CookiePolicyPage from './pages/legal/CookiePolicyPage';
 import PrivacySettingsPage from './pages/legal/PrivacySettingsPage';
 import DebugSwipeCardPage from './pages/DebugSwipeCardPage';
 import IncomingCallMonitor from './components/IncomingCallMonitor';
+import LoadingState from './components/LoadingState';
 
 function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -60,10 +61,7 @@ function PrivateRoute({ children }) {
   if (isLoading) {
     console.log('PrivateRoute Decision: Rendering loading screen.');
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-neutral-50 font-sans text-center">
-        <h1 className="text-4xl font-bold text-primary mb-2">Hart2Hart</h1>
-        <p className="text-lg text-neutral-600">Loading...</p>
-      </div>
+      <LoadingState title="Checking your session" message="Securely reconnecting you to Hart2Hart." slowMessage="Your connection is taking longer than expected. We are still checking your session." />
     );
   }
 
@@ -86,9 +84,7 @@ function PublicHomeRoute() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-950 text-white">
-        <p>Loading Hart2Hart...</p>
-      </div>
+      <div className="app-loading-screen"><LoadingState title="Welcome to Hart2Hart" message="Preparing your experience." /></div>
     );
   }
 
@@ -100,10 +96,7 @@ function AdminRoute({ children }) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center h-screen bg-neutral-50 font-sans text-center">
-        <h1 className="text-3xl font-bold text-neutral-800">Loading Admin Section...</h1>
-        <p className="text-primary-dark font-bold">Hart2Hart</p>
-      </div>
+      <LoadingState title="Opening your admin workspace" message="Verifying access and loading your dashboard." />
     );
   }
 
