@@ -226,6 +226,7 @@ function Chat() {
         messageContent,
         receiverUid,
       });
+      addMessage({ ...message, status: 'sent' });
       sentViaSocket = true;
     }
 
