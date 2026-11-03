@@ -1481,6 +1481,7 @@ test("chat history returns the newest page in chronological order and supports o
   let sortSpec;
   let skipValue;
   let limitValue;
+  let maxTimeMSValue;
   let messageQuery;
   const db = {
     collection(name) {
@@ -1501,6 +1502,7 @@ test("chat history returns the newest page in chronological order and supports o
             sort(value) { sortSpec = value; return this; },
             skip(value) { skipValue = value; return this; },
             limit(value) { limitValue = value; return this; },
+            maxTimeMS(value) { maxTimeMSValue = value; return this; },
             async toArray() { return newestFirst.slice(skipValue, skipValue + limitValue); }
           };
         }
@@ -1517,6 +1519,7 @@ test("chat history returns the newest page in chronological order and supports o
   assert.deepEqual(sortSpec, { timestamp: -1, _id: -1 });
   assert.equal(skipValue, 1);
   assert.equal(limitValue, 2);
+  assert.equal(maxTimeMSValue, 10000);
   assert.deepEqual(messageQuery, {
     roomId: "alice-bob",
     $or: [{ senderUid: "alice" }, { receiverUid: "alice" }]
