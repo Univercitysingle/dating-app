@@ -142,6 +142,7 @@ export class MongoDBConnection {
     this.discoveryMatchIndexesPromise = null;
     this.subscriptionIndexMigrationPromise = null;
     this.chatMessageIdIndexPromise = null;
+    this.chatConversationIndexesPromise = null;
   }
 
   async getClient() {
@@ -3511,15 +3512,37 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     try {
       const db = this.getDatabase(await this.getClient());
+      const chatMessages = db.collection("chatmessages");
+      // These compound indexes support each side of the participant OR query
+      // and keep newest-message ordering efficient as chat history grows.
+      // Index creation is non-blocking so a DDL lock cannot stall inbox reads.
+      if (!this.chatConversationIndexesPromise && typeof chatMessages.createIndex === "function") {
+        this.chatConversationIndexesPromise = Promise.all([
+          chatMessages.createIndex(
+            { senderUid: 1, timestamp: -1, _id: -1 },
+            { name: "chat_sender_inbox_latest" }
+          ),
+          chatMessages.createIndex(
+            { receiverUid: 1, timestamp: -1, _id: -1 },
+            { name: "chat_receiver_inbox_latest" }
+          )
+        ]).catch((error) => {
+          this.chatConversationIndexesPromise = null;
+          console.error("MongoDB chat inbox index creation failed", {
+            name: error && typeof error.name === "string" ? error.name : "Error",
+            message: error && typeof error.message === "string" ? error.message.slice(0, 200) : undefined
+          });
+        });
+      }
       const [user, messages] = await Promise.all([
         db.collection("users").findOne({ uid }, { projection: { _id: 1, uid: 1, blocked: 1 } }),
-        db.collection("chatmessages").aggregate([
+        chatMessages.aggregate([
           { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
           { $sort: { timestamp: -1, _id: -1 } },
-          { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
+          { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
           { $replaceRoot: { newRoot: "$lastMessage" } },
           { $sort: { timestamp: -1, _id: -1 } }
-        ]).toArray()
+        ], { maxTimeMS: 10000 }).toArray()
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
       const latestByRoom = new Map();
