@@ -100,18 +100,25 @@ async function createCdnAuthorizationToken(env, claims, key, method) {
   return unsigned + "." + signatureB64;
 }
 
-async function requestCdnObject(env, key, method, headers, body, claims) {
-  // The dateme proxy accepts root-level object routes only.
-  // Firebase identity is verified by this API Worker first. A short-lived
-  // HS256 token then authorizes the server-to-server CDN operation.
+export async function requestCdnObject(env, key, method, headers, body, claims) {
+  // Use a Cloudflare Service Binding for Worker-to-Worker traffic. Calling
+  // the public workers.dev hostname from another Worker can fail with 1042.
+  // CDN_HOSTNAME remains the public URL used by browsers for image retrieval.
   const token = await createCdnAuthorizationToken(env, claims, key, method);
   const requestHeaders = new Headers(headers || {});
   requestHeaders.set("Authorization", "Bearer " + token);
-  return fetch(getCdnObjectUrl(env, key, "root"), {
+  const targetUrl = getCdnObjectUrl(env, key, "root");
+  const init = {
     method,
     headers: requestHeaders,
     ...(body === undefined ? {} : { body })
-  });
+  };
+
+  if (!env.CDN_PROXY || typeof env.CDN_PROXY.fetch !== "function") {
+    throw new Error("CDN_PROXY service binding is not configured");
+  }
+
+  return env.CDN_PROXY.fetch(new Request(targetUrl, init));
 }
 
 function getAppMediaUrl(env, key) {
