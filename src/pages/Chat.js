@@ -16,6 +16,7 @@ function Chat() {
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const [otherUser, setOtherUser] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
   const { user } = useAuth();
   const { socket, allMessages, addMessage, removeMessage } = useSocket();
@@ -184,7 +185,7 @@ function Chat() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isSending) return;
 
     const receiverUid = otherUser?.uid;
     if (!receiverUid) {
@@ -201,6 +202,7 @@ function Chat() {
       receiverUid: receiverUid,
       messageContent: messageContent,
       timestamp: new Date().toISOString(),
+      status: 'sending',
     };
 
     // Stop the live typing signal as the message is submitted.
@@ -213,6 +215,8 @@ function Chat() {
     // Optimistically update UI
     addMessage(message);
     setInput('');
+    setError(null);
+    setIsSending(true);
 
     // Send via Socket.io if available
     let sentViaSocket = false;
@@ -240,8 +244,12 @@ function Chat() {
         logger.error('Failed to send message via HTTP fallback:', sendErr);
         removeMessage(chatId, tempId);
         setInput(messageContent);
-        logger.warn('The message was not persisted; the draft has been restored.');
+        setError('Message could not be sent. Your text has been restored. Please try again.');
+      } finally {
+        setIsSending(false);
       }
+    } else {
+      setIsSending(false);
     }
   };
 
@@ -336,11 +344,11 @@ function Chat() {
           <button
             type="submit"
             className="chat-send-button flex-shrink-0 disabled:cursor-not-allowed"
-            disabled={!isRoomJoined || !input.trim()}
-            aria-label="Send message"
-            title="Send message"
+            disabled={!isRoomJoined || !input.trim() || isSending}
+            aria-label={isSending ? 'Sending message' : 'Send message'}
+            title={isSending ? 'Sending…' : 'Send message'}
           >
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 3-7.2 18-3.7-7.1L3 10.2 21 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10.1 13.9 15 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            {isSending ? <span className="chat-send-spinner" aria-hidden="true" /> : <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 3-7.2 18-3.7-7.1L3 10.2 21 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10.1 13.9 15 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
           </button>
         </form>
       </footer>
