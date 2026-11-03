@@ -3494,8 +3494,12 @@ export class MongoDBConnection {
         }
         query = participantQuery;
       }
+      // Read newest messages first so the default page always contains the
+      // latest conversation activity, then reverse for chronological display.
+      // Increasing skip loads progressively older pages.
       const messages = await db.collection("chatmessages").find(query)
-        .sort({ timestamp: 1 }).skip(skip).limit(limit).toArray();
+        .sort({ timestamp: -1 }).skip(skip).limit(limit).toArray();
+      messages.reverse();
       return { status: 200, body: { messages } };
     } catch {
       return { status: 503, body: { error: "Chat history unavailable" } };
