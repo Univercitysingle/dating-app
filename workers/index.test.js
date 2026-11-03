@@ -1839,6 +1839,7 @@ test("support attachment uploads enforce an account-scoped hourly quota", async 
   };
   const env = {
     FIREBASE_PROJECT_ID: "test-project",
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/",
     RATE_LIMITER: {
       idFromName(name) {
         assert.equal(name, "support-upload-user:support-user-1");
