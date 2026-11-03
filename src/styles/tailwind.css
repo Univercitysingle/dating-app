@@ -3434,3 +3434,77 @@ input, textarea, select {
     transition: none !important;
   }
 }
+
+
+/* Responsive auth layout: tablet widths, short screens and touch-first controls. */
+.login-page .login-card button,
+.login-page .login-card input {
+  max-width: 100%;
+}
+.login-page .login-card button {
+  touch-action: manipulation;
+}
+.login-page .login-card .space-y-2 button {
+  min-height: 40px;
+}
+.login-page .login-card input {
+  min-width: 0;
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .auth-page.login-page {
+    padding-inline: clamp(22px, 5vw, 56px);
+  }
+  .login-page .login-card {
+    width: min(100%, 460px);
+  }
+  .login-page .login-seo-content {
+    width: min(100%, 900px);
+    padding-inline: clamp(8px, 2vw, 20px);
+  }
+}
+@media (max-height: 700px) and (min-width: 641px) {
+  .auth-page.login-page {
+    justify-content: flex-start;
+    padding-top: 22px;
+    padding-bottom: 28px;
+  }
+  .login-page .login-card {
+    gap: 13px;
+    padding-block: 24px;
+  }
+  .login-page .login-card > img {
+    width: 60px;
+    height: 60px;
+  }
+  .login-page .login-seo-content {
+    margin-top: 26px;
+  }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .auth-page.login-page {
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .login-page .login-card {
+    gap: 10px;
+    padding: 18px 24px;
+  }
+  .login-page .login-card > img {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+  .login-page .login-card h2 {
+    font-size: 25px;
+  }
+  .login-page .login-card .login-control {
+    min-height: 46px;
+  }
+  .login-page .login-card .app-primary-button,
+  .login-page .login-card > button:not(.text-green-400):not(.text-yellow-400):not(.text-indigo-400) {
+    min-height: 46px;
+  }
+  .login-page .login-seo-content {
+    margin-top: 22px;
+  }
+}
