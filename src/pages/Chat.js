@@ -44,7 +44,12 @@ function Chat() {
     // Keep the room hydrated from MongoDB even if Firebase RTDB or Socket.IO
     // realtime delivery is unavailable. The API enforces participant access.
     let cancelled = false;
+    let historySyncInProgress = false;
     const syncHistory = async () => {
+      // Avoid overlapping polls when MongoDB or the network takes longer than
+      // the three-second refresh interval.
+      if (cancelled || historySyncInProgress) return;
+      historySyncInProgress = true;
       try {
         const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
         if (!cancelled && Array.isArray(result?.messages)) {
@@ -69,6 +74,8 @@ function Chat() {
         }
       } catch (historyError) {
         if (!cancelled) logger.debug('Chat history refresh unavailable:', historyError?.status || 'network error');
+      } finally {
+        historySyncInProgress = false;
       }
     };
     if (user?.uid && chatId) {
