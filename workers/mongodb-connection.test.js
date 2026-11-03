@@ -1534,6 +1534,46 @@ test("delivery receipts update only messages addressed to the authenticated reci
   assert.equal(oversized.status, 400);
 });
 
+test("read receipts update only unread messages addressed to the authenticated recipient", async () => {
+  const { ObjectId } = await import("mongodb");
+  const messageId = "abcdef0123456789abcdef01";
+  let capturedFilter;
+  let capturedUpdate;
+  const db = {
+    collection() {
+      return {
+        async updateMany(filter, update) {
+          capturedFilter = filter;
+          capturedUpdate = update;
+          return { modifiedCount: 1 };
+        }
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const result = await connection.markChatRead("bob", {
+    roomId: "alice-bob",
+    messageIds: [messageId]
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.readCount, 1);
+  assert.deepEqual(capturedFilter, {
+    _id: { $in: [new ObjectId(messageId)] },
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    status: { $in: ["sent", "delivered"] }
+  });
+  assert.equal(capturedUpdate.$set.status, "read");
+  assert.ok(capturedUpdate.$set.deliveredAt instanceof Date);
+  assert.ok(capturedUpdate.$set.readAt instanceof Date);
+  const oversized = await connection.markChatRead("bob", {
+    roomId: "alice-bob",
+    messageIds: Array.from({ length: 101 }, () => messageId)
+  });
+  assert.equal(oversized.status, 400);
+});
+
 test("chat message creation persists a normalized message and returns its MongoDB ID", async () => {
   const inserted = [];
   const users = {
