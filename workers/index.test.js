@@ -739,7 +739,7 @@ test("discovery returns ordered public profiles with super-like metadata", async
   assert.equal(initialMatch.uid.$type, "string", "profiles without a valid UID must not enter the candidate pipeline");
   const combinedUsersProjection = pipeline.find(stage => stage.$project?.combinedUsers)?.$project.combinedUsers;
   assert.ok(combinedUsersProjection, "boosted and regular candidates should be combined safely");
-  assert.doesNotMatch(JSON.stringify(combinedUsersProjection), /"\\$in"/,
+  assert.doesNotMatch(JSON.stringify(combinedUsersProjection), /"\$in"/,
     "Discover candidate assembly must not rely on an aggregation $in with potentially missing array values");
 });
 
