@@ -218,8 +218,6 @@ check_individual_public_profile_privacy() {
   echo "PASS individual public-profile privacy $origin"
 }
 
-check_individual_public_profile_privacy "$WORKER_URL" "Worker"
-check_individual_public_profile_privacy "$PAGES_URL" "Pages"
 
 # Exercise authenticated chat reads using a real room from the dedicated test
 # account. These GET requests do not create messages or alter delivery state.
@@ -341,6 +339,12 @@ sign_in_test_account "$STAGING_TEST_EMAIL" "$STAGING_TEST_PASSWORD" account_a
 unset STAGING_TEST_PASSWORD
 sign_in_test_account "$STAGING_TEST_EMAIL_B" "$STAGING_TEST_PASSWORD_B" account_b
 unset STAGING_TEST_PASSWORD_B
+
+# Run public-profile privacy checks as the second account, not a possible superadmin.
+id_token="$account_b_TOKEN"
+check_individual_public_profile_privacy "$WORKER_URL" "Worker"
+check_individual_public_profile_privacy "$PAGES_URL" "Pages"
+unset id_token
 
 if [[ "$account_a_UID" == "$account_b_UID" ]]; then
   echo "::error::The two staging test credentials resolve to the same Firebase user."
