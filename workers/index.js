@@ -1983,17 +1983,24 @@ export default {
           const skipRaw = url.searchParams.get("skip");
           const afterRaw = url.searchParams.get("after");
           const afterId = url.searchParams.get("afterId");
+          const beforeRaw = url.searchParams.get("before");
+          const beforeId = url.searchParams.get("beforeId");
           const limit = limitRaw === null ? 50 : Number(limitRaw);
           const skip = skipRaw === null ? 0 : Number(skipRaw);
+          const hasAfter = afterRaw !== null || afterId !== null;
+          const hasBefore = beforeRaw !== null || beforeId !== null;
+          const validCursor = (timestamp, id) => timestamp !== null && id !== null &&
+            !Number.isNaN(Date.parse(timestamp)) && /^[a-fA-F0-9]{24}$/.test(id);
           if (!Number.isInteger(limit) || !Number.isInteger(skip) || limit < 1 || limit > 100 || skip < 0 ||
-              ((afterRaw === null) !== (afterId === null)) ||
-              (afterRaw !== null && (Number.isNaN(Date.parse(afterRaw)) || !/^[a-fA-F0-9]{24}$/.test(afterId)))) {
+              (hasAfter && !validCursor(afterRaw, afterId)) ||
+              (hasBefore && !validCursor(beforeRaw, beforeId)) || (hasAfter && hasBefore)) {
             return json({ error: "Invalid pagination or message cursor" }, 400);
           }
-          const after = afterRaw === null ? null : { timestamp: new Date(afterRaw), id: afterId };
+          const after = hasAfter ? { timestamp: new Date(afterRaw), id: afterId } : null;
+          const before = hasBefore ? { timestamp: new Date(beforeRaw), id: beforeId } : null;
           const response = await connection.fetch("https://internal.invalid/internal/chat/history", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, roomId, limit, skip, after })
+            body: JSON.stringify({ claims, roomId, limit, skip, after, before })
           });
           const result = await response.json().catch(() => ({ error: "Chat history unavailable" }));
           return json(result, response.status);
