@@ -51,6 +51,6 @@ jobs:
             fi
           done
 
-      - name: Run authenticated API and two-account chat acceptance tests
+      - name: Run authenticated API, incremental cursor, and two-account chat acceptance tests
         shell: bash
         run: bash scripts/staging-authenticated-smoke.sh
