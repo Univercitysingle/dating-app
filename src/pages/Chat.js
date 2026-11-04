@@ -197,12 +197,17 @@ function Chat() {
 
   useEffect(() => {
     let cancelled = false;
+    let requestInFlight = false;
     const refreshCallHistory = async () => {
+      if (cancelled || requestInFlight) return;
+      requestInFlight = true;
       try {
         const result = await apiClient.get('/calls/history', { params: { roomId: chatId } });
         if (!cancelled && Array.isArray(result?.calls)) setCallHistory(result.calls);
       } catch (historyError) {
         if (!cancelled) logger.debug('Call history refresh unavailable:', historyError?.status || 'network error');
+      } finally {
+        requestInFlight = false;
       }
     };
     const pollCallHistory = () => {
@@ -228,12 +233,17 @@ function Chat() {
 
   useEffect(() => {
     let cancelled = false;
+    let requestInFlight = false;
     const refreshTyping = async () => {
+      if (cancelled || requestInFlight) return;
+      requestInFlight = true;
       try {
         const result = await apiClient.get('/chat/typing', { params: { roomId: chatId } });
         if (!cancelled) setIsTyping(Boolean(result?.isTyping));
       } catch (_) {
         if (!cancelled) setIsTyping(false);
+      } finally {
+        requestInFlight = false;
       }
     };
     const pollTyping = () => {
