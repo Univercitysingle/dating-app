@@ -225,8 +225,14 @@ retry_file="$(mktemp)"
 status="$(curl --silent --show-error --output "$retry_file" --write-out '%{http_code}' \
   --header "Authorization: Bearer $account_a_TOKEN" --header 'Content-Type: application/json' \
   --data-binary "$retry_payload" "$WORKER_URL/api/chat/send")"
-if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(String(x._id)!==process.argv[2]||x.clientMessageId!==process.argv[3])process.exit(1)' "$retry_file" "$message_id" "$client_message_id"; then
-  echo "::error::Retrying the same clientMessageId did not return the original persisted message."
+retry_same_message="false"
+retry_key_returned="false"
+if [[ -s "$retry_file" ]]; then
+  retry_same_message="$(node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(String(x._id)===process.argv[2]))}catch{process.stdout.write("false")}' "$retry_file" "$message_id")"
+  retry_key_returned="$(node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(x.clientMessageId===process.argv[2]))}catch{process.stdout.write("false")}' "$retry_file" "$client_message_id")"
+fi
+if [[ "$status" != "200" || "$retry_same_message" != "true" ]]; then
+  echo "::error::Idempotent retry failed (HTTP $status, original_message_returned=$retry_same_message, retry_key_returned=$retry_key_returned)."
   rm -f "$retry_file"
   exit 1
 fi
