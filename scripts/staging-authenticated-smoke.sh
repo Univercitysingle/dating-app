@@ -99,6 +99,37 @@ for path in "${paths[@]}"; do
   check_get "$PAGES_URL" "$path" "Pages "
 done
 
+# Verify public Discover cards use the public-profile allowlist. This checks
+# both direct Worker access and the Pages /api proxy without exposing profile
+# values in CI output.
+check_discover_profile_privacy() {
+  local base_url="$1"
+  local origin="$2"
+  local response_file status
+  response_file="$(mktemp)"
+  status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/users/discover")"
+  if [[ "$status" != "200" ]]; then
+    echo "::error::Authenticated Discover privacy check failed for $origin (HTTP $status)."
+    rm -f "$response_file"
+    return 1
+  fi
+  if ! node -e 'const fs=require("fs");const profiles=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!Array.isArray(profiles))throw Error("Discover response must be an array");const forbidden=new Set(["password","passwordhash","email","emailaddress","email_address","emailid","mail","mobile","mobilenumber","mobile_number","phone","phonenumber","phone_number","whatsapp","whatsappnumber","lastloginip","lastlogindevice","role","birthday","coordinates","latitude","longitude","lat","lng","exactlocation"]);const normalize=k=>k.replace(/[^a-z0-9_]/gi,"").toLowerCase();const visit=(value,path)=>{if(!value||typeof value!=="object")return;if(Array.isArray(value)){for(let i=0;i<value.length;i++)visit(value[i],path+"["+i+"]");return}for(const [key,nested] of Object.entries(value)){if(forbidden.has(normalize(key)))throw Error("Discover profile exposes restricted field: "+path+"."+key);if(key==="location"&&nested&&typeof nested==="object"&&!Array.isArray(nested)){const allowed=new Set(["city","region","state","country","countryCode","cityName"]);for(const locationKey of Object.keys(nested)){if(!allowed.has(locationKey))throw Error("Discover profile exposes non-public location detail: "+locationKey)}}visit(nested,path+"."+key)}};for(const profile of profiles)visit(profile,"profile")' "$response_file"; then
+    echo "::error::Discover returned a profile with restricted account, contact, or precise-location data for $origin."
+    rm -f "$response_file"
+    return 1
+  fi
+  local count
+  count="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(x.length))' "$response_file")"
+  rm -f "$response_file"
+  echo "PASS Discover public-profile privacy $origin ($count profiles checked)"
+}
+
+check_discover_profile_privacy "$WORKER_URL" "Worker"
+check_discover_profile_privacy "$PAGES_URL" "Pages"
+
 # Exercise authenticated chat reads using a real room from the dedicated test
 # account. These GET requests do not create messages or alter delivery state.
 check_chat_room_reads() {
