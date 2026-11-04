@@ -183,6 +183,36 @@ test("rate limiter enforces a configured count within a window", async () => {
   assert.equal((await (await call()).json()).allowed, false);
 });
 
+test("rate limiter serializes concurrent requests at the limit boundary", async () => {
+  const values = new Map();
+  const storage = {
+    get: async (key) => values.get(key),
+    put: async (key, value) => values.set(key, value)
+  };
+  let transactionTail = Promise.resolve();
+  const state = {
+    storage: {
+      ...storage,
+      transaction: async (callback) => {
+        const result = transactionTail.then(() => callback(storage));
+        transactionTail = result.catch(() => {});
+        return result;
+      }
+    }
+  };
+  const limiter = new RateLimiter(state);
+  const call = () => limiter.fetch(new Request("https://do.test", {
+    method: "POST",
+    body: JSON.stringify({ key: "concurrent-user", limit: 5, windowMs: 10000 }),
+    headers: { "content-type": "application/json" }
+  }));
+  const responses = await Promise.all(Array.from({ length: 20 }, call));
+  const results = await Promise.all(responses.map(response => response.json()));
+  assert.equal(results.filter(result => result.allowed).length, 5);
+  assert.equal(results.filter(result => !result.allowed).length, 15);
+  assert.equal(values.get("concurrent-user").count, 20);
+});
+
 test("Report creation rejects invalid input before touching MongoDB", async () => {
   const connection = new MongoDBConnection({}, {});
   const selfReport = await connection.createReport("user-a", {
