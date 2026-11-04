@@ -2356,3 +2356,83 @@ test("chat history returns the requested page in chronological order", async () 
   assert.equal(capturedMaxTimeMS, 10000);
   assert.deepEqual(result.body.messages.map(message => message._id), ["older", "newer"]);
 });
+
+
+test("photo ordering rejects URLs that are not already owned by the current profile", async () => {
+  const storedPhotos = [
+    { url: "photos-current-user-1700000000000.webp", size: 1200, order: 0 },
+    { url: "photos-current-user-1700000000001.webp", size: 2400, order: 1 }
+  ];
+  let updateCalled = false;
+  const users = {
+    async findOne() { return { uid: "current-user", photos: storedPhotos }; },
+    async updateOne() { updateCalled = true; return { matchedCount: 1 }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  connection.getCurrentUserProfile = async () => ({ status: 200, body: {} });
+
+  const result = await connection.updatePhotoOrder("current-user", [
+    { url: "photos-current-user-1700000000000.webp" },
+    { url: "photos-another-user-1700000000001.webp" }
+  ]);
+
+  assert.equal(result.status, 400);
+  assert.equal(updateCalled, false);
+});
+
+test("photo ordering rejects duplicate entries", async () => {
+  const users = {
+    async findOne() {
+      return {
+        uid: "current-user",
+        photos: [{ url: "photos-current-user-1700000000000.webp" }]
+      };
+    },
+    async updateOne() {
+      assert.fail("Duplicate photo order must not update the profile");
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+
+  const result = await connection.updatePhotoOrder("current-user", [
+    { url: "photos-current-user-1700000000000.webp" },
+    { url: "photos-current-user-1700000000000.webp" }
+  ]);
+
+  assert.equal(result.status, 400);
+});
+
+test("photo ordering preserves stored metadata and derives order from the submitted sequence", async () => {
+  const storedPhotos = [
+    { url: "photos-current-user-1700000000000.webp", size: 1200, order: 0 },
+    { url: "photos-current-user-1700000000001.webp", size: 2400, order: 1 }
+  ];
+  let update;
+  const users = {
+    async findOne() { return { uid: "current-user", photos: storedPhotos }; },
+    async updateOne(filter, operation) {
+      update = { filter, operation };
+      return { matchedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  connection.getCurrentUserProfile = async () => ({ status: 200, body: {} });
+
+  const result = await connection.updatePhotoOrder("current-user", [
+    { url: storedPhotos[1].url, size: 999999 },
+    { url: storedPhotos[0].url, size: 999999 }
+  ]);
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(update.filter, { uid: "current-user" });
+  assert.deepEqual(update.operation.$set.photos, [
+    { url: storedPhotos[1].url, order: 0, size: 2400 },
+    { url: storedPhotos[0].url, order: 1, size: 1200 }
+  ]);
+});
