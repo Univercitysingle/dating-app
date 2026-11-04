@@ -1646,7 +1646,21 @@ test("chat conversations exclude users blocked in either direction", async () =>
   const messages = [
     { roomId: "alice-blocked-by-alice", senderUid: "alice", receiverUid: "blocked-by-alice", messageContent: "hidden" },
     { roomId: "alice-blocked-alice", senderUid: "blocked-alice", receiverUid: "alice", messageContent: "hidden" },
-    { roomId: "alice-allowed", senderUid: "alice", receiverUid: "allowed", messageContent: "visible" }
+    {
+      _id: { toHexString: () => "6729a0000000000000000002" },
+      roomId: "alice-allowed",
+      senderUid: "alice",
+      receiverUid: "allowed",
+      messageContent: "visible",
+      timestamp: new Date("2026-11-04T06:00:00.000Z"),
+      status: "sent",
+      clientMessageId: "6729a000-0000-4000-8000-000000000002",
+      email: "private@example.com",
+      ipAddress: "203.0.113.10",
+      internalNotes: "must not leak",
+      moderationFlags: ["internal"],
+      paymentReference: "private-payment-id"
+    }
   ];
   let profileBatchQueries = 0;
   const inboxIndexes = [];
@@ -1712,6 +1726,11 @@ test("chat conversations exclude users blocked in either direction", async () =>
   assert.equal(result.body[0].unreadCount, 2);
   assert.equal(result.body[0].otherUser.email, undefined);
   assert.equal(result.body[0].otherUser.mobileNumber, undefined);
+  assert.deepEqual(Object.keys(result.body[0].lastMessage).sort(), [
+    "_id", "clientMessageId", "messageContent", "receiverUid", "roomId",
+    "senderUid", "status", "timestamp"
+  ].sort());
+  assert.equal(result.body[0].lastMessage._id, "6729a0000000000000000002");
 });
 
 test("chat history is denied when either participant has blocked the other", async () => {
