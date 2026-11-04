@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import ConversationsPage from './ConversationsPage';
@@ -31,7 +31,8 @@ describe('ConversationsPage inbox synchronization', () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
+    cleanup();
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
@@ -47,7 +48,8 @@ describe('ConversationsPage inbox synchronization', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Alex')).toBeInTheDocument();
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText('Alex')).toBeInTheDocument();
     expect(screen.getByText('3 unread')).toBeInTheDocument();
     expect(screen.getByText('Sam')).toBeInTheDocument();
   });
