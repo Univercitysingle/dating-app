@@ -38,7 +38,7 @@ describe('ConversationsPage inbox synchronization', () => {
 
   it('shows unread totals and unread conversation highlighting data', async () => {
     apiClient.get.mockResolvedValue([
-      conversation('room-a', 'Alex', '2026-11-04T09:00:00.000Z', 3),
+      conversation('room-a', 'Alex', '2026-11-04T09:00:00.000Z', '3'),
       conversation('room-b', 'Sam', '2026-11-04T08:00:00.000Z', 0),
     ]);
 
@@ -52,6 +52,7 @@ describe('ConversationsPage inbox synchronization', () => {
     expect(screen.getByText('Alex')).toBeInTheDocument();
     expect(screen.getByText('3 unread')).toBeInTheDocument();
     expect(screen.getByText('Sam')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Alex, 3 unread messages' })).toHaveClass('bg-rose-50/70');
   });
 
   it('refreshes the inbox every five seconds and reorders new activity', async () => {
