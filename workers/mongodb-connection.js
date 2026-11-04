@@ -3475,6 +3475,12 @@ export class MongoDBConnection {
     if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
     skip = Number.isInteger(skip) ? Math.max(0, Math.min(skip, 100000)) : 0;
+    // Worker-to-Durable-Object requests cross a JSON boundary, which
+    // serializes Date values as ISO strings. Normalize the cursor timestamp
+    // before validating it so incremental history works in the deployed path.
+    if (after && typeof after.timestamp === "string") {
+      after = { ...after, timestamp: new Date(after.timestamp) };
+    }
     if (after && (!(after.timestamp instanceof Date) || Number.isNaN(after.timestamp.getTime()) ||
         typeof after.id !== "string" || !/^[a-fA-F0-9]{24}$/.test(after.id))) {
       return { status: 400, body: { error: "Invalid message cursor" } };
