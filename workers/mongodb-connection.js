@@ -2484,8 +2484,8 @@ export class MongoDBConnection {
         badges: ["height"]
       };
       const sanitizedUpdate = {};
-      if (Object.hasOwn(update, "photos")) {
-        if (onboardingComplete || !Array.isArray(update.photos) || update.photos.length < 1 || update.photos.length > 6) {
+      if (Object.hasOwn(update, "photos") && !onboardingComplete) {
+        if (!Array.isArray(update.photos) || update.photos.length < 1 || update.photos.length > 6) {
           return { status: 400, body: { error: "Profile photos must be uploaded before they can be added to onboarding." } };
         }
         const currentPhotos = Array.isArray(current.photos) ? current.photos : [];
