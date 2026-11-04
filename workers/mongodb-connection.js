@@ -553,9 +553,32 @@ export class MongoDBConnection {
       const size = Number.isFinite(photo.size) && photo.size > 0 ? photo.size : 0;
       const result = await users.updateOne(
         { uid, "photos.url": key, "photos.1": { $exists: true } },
-        { $pull: { photos: { url: key } }, $inc: { totalPhotoSize: -size }, $set: { updatedAt: new Date() } }
+        { $set: { "photos.$.deletionPending": true, "photos.$.deletionRequestedAt": new Date(), updatedAt: new Date() } }
       );
       if (!result.modifiedCount) return { status: 409, body: { message: "Photo list changed; refresh and retry" } };
+      return { status: 200, body: { message: "Photo deletion queued" } };
+    } catch {
+      return { status: 503, body: { message: "Photo metadata service unavailable" } };
+    }
+  }
+
+  async finalizeUploadedPhotoDeletion(uid, key) {
+    if (typeof uid !== "string" || !uid || typeof key !== "string" || !key.startsWith("photos-" + uid + "-") ||
+        key.length > 256 || ![".jpg", ".jpeg", ".png", ".gif", ".webp"].some(ext => key.endsWith(ext))) {
+      return { status: 400, body: { message: "Invalid photo key" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const user = await users.findOne({ uid }, { projection: { photos: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const photo = (user.photos || []).find(item => item.url === key && item.deletionPending === true);
+      if (!photo) return { status: 404, body: { message: "Pending photo deletion not found" } };
+      const size = Number.isFinite(photo.size) && photo.size > 0 ? photo.size : 0;
+      const result = await users.updateOne(
+        { uid, photos: { $elemMatch: { url: key, deletionPending: true } } },
+        { $pull: { photos: { url: key, deletionPending: true } }, $inc: { totalPhotoSize: -size }, $set: { updatedAt: new Date() } }
+      );
+      if (!result.modifiedCount) return { status: 409, body: { message: "Photo deletion state changed; retry" } };
       return { status: 200, body: { message: "Photo deleted successfully" } };
     } catch {
       return { status: 503, body: { message: "Photo metadata service unavailable" } };
@@ -4077,12 +4100,14 @@ export class MongoDBConnection {
 
 
 
-    if (url.pathname === "/internal/photo-upload" || url.pathname === "/internal/photo-delete") {
+    if (url.pathname === "/internal/photo-upload" || url.pathname === "/internal/photo-delete" || url.pathname === "/internal/photo-delete-finalize") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
       const result = url.pathname === "/internal/photo-upload"
         ? await this.addUploadedPhoto(body.claims.sub, body.photo)
-        : await this.removeUploadedPhoto(body.claims.sub, body.key);
+        : url.pathname === "/internal/photo-delete-finalize"
+          ? await this.finalizeUploadedPhotoDeletion(body.claims.sub, body.key)
+          : await this.removeUploadedPhoto(body.claims.sub, body.key);
       return json(result.body, result.status);
     }
 
