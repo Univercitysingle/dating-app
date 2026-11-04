@@ -134,6 +134,59 @@ test("chat history is denied when either participant has blocked the other", asy
 });
 
 
+test("chat history responses expose only approved message fields", async () => {
+  const message = {
+    _id: { toHexString: () => "6729a0000000000000000001" },
+    roomId: "current-user-other-user",
+    senderUid: "current-user",
+    receiverUid: "other-user",
+    messageContent: "Hello",
+    timestamp: new Date("2026-11-04T06:00:00.000Z"),
+    status: "sent",
+    clientMessageId: "6729a000-0000-4000-8000-000000000001",
+    email: "private@example.com",
+    mobileNumber: "+971500000000",
+    internalNotes: "must not leak",
+    moderationFlags: ["internal"],
+    ipAddress: "203.0.113.10",
+    paymentReference: "private-payment-id"
+  };
+  const users = {
+    async findOne({ uid }) {
+      if (uid === "current-user") return { uid, role: "user", blocked: [] };
+      if (uid === "other-user") return { uid, blocked: [] };
+      return null;
+    }
+  };
+  const chatmessages = {
+    async findOne() { return { senderUid: "current-user", receiverUid: "other-user" }; },
+    find() {
+      return {
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
+        maxTimeMS() { return this; },
+        async toArray() { return [message]; }
+      };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : chatmessages; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getChatHistory("current-user", "current-user-other-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.messages.length, 1);
+  const returned = result.body.messages[0];
+  assert.deepEqual(Object.keys(returned).sort(), [
+    "_id", "clientMessageId", "messageContent", "receiverUid", "roomId",
+    "senderUid", "status", "timestamp"
+  ].sort());
+  assert.equal(returned._id, "6729a0000000000000000001");
+  assert.equal(returned.messageContent, "Hello");
+});
+
 test("chat history incremental cursor uses stable timestamp and ObjectId ordering", async () => {
   const cursorTimestamp = new Date("2026-11-04T06:00:00.000Z");
   const cursorId = "6729a0000000000000000001";
