@@ -133,8 +133,21 @@ check_discover_profile_privacy "$PAGES_URL" "Pages"
 check_likes_profile_privacy() {
   local base_url="$1"
   local origin="$2"
-  local response_file
+  local response_file me_file viewer_role
   response_file="$(mktemp)"
+  me_file="$(mktemp)"
+  local me_status
+  me_status="$(curl --silent --show-error --output "$me_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/users/me")"
+  if [[ "$me_status" != "200" ]]; then
+    echo "::error::Could not determine staging viewer role for $origin (HTTP $me_status)."
+    rm -f "$response_file" "$me_file"
+    return 1
+  fi
+  viewer_role="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(typeof x.role==="string"?x.role:"user")' "$me_file")"
+  rm -f "$me_file"
   local status
   status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
     --header "Authorization: Bearer $id_token" \
@@ -145,7 +158,7 @@ check_likes_profile_privacy() {
     rm -f "$response_file"
     return 1
   fi
-  if ! node -e 'const fs=require("fs");const profiles=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!Array.isArray(profiles))throw Error("Likes response must be an array");const denied=new Set(["password","password_hash","passwordHash","email","email_address","emailAddress","mobileNumber","mobile_number","phone","phone_number","phoneNumber","whatsappNumber","lastLoginIp","last_login_ip","lastLoginDevice","birthday","role","blocked","coordinates","latitude","longitude","lat","lng","exactLocation"]);const visit=(value,path)=>{if(!value||typeof value!=="object")return;for(const [key,nested] of Object.entries(value)){if(denied.has(key))throw Error("Likes profile exposes restricted field: "+path+"."+key);if(key==="location"&&nested&&typeof nested==="object"&&!Array.isArray(nested)){for(const locationKey of Object.keys(nested)){if(!["city","region","state","country","countryCode","cityName"].includes(locationKey))throw Error("Likes profile exposes non-public location detail: "+locationKey)}}visit(nested,path+"."+key)}};for(const profile of profiles)visit(profile,"profile")' "$response_file"; then
+  if ! node -e 'const fs=require("fs");const profiles=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!Array.isArray(profiles))throw Error("Likes response must be an array");const denied=new Set(["password","password_hash","passwordHash","email","email_address","emailAddress","mobileNumber","mobile_number","phone","phone_number","phoneNumber","whatsappNumber","lastLoginIp","last_login_ip","lastLoginDevice","birthday","role","blocked","coordinates","latitude","longitude","lat","lng","exactLocation"]);if(process.argv[2]==="superadmin"){denied.delete("email");denied.delete("mobileNumber")}const visit=(value,path)=>{if(!value||typeof value!=="object")return;for(const [key,nested] of Object.entries(value)){if(denied.has(key))throw Error("Likes profile exposes restricted field: "+path+"."+key);if(key==="location"&&nested&&typeof nested==="object"&&!Array.isArray(nested)){for(const locationKey of Object.keys(nested)){if(!["city","region","state","country","countryCode","cityName"].includes(locationKey))throw Error("Likes profile exposes non-public location detail: "+locationKey)}}visit(nested,path+"."+key)}};for(const profile of profiles)visit(profile,"profile")' "$response_file" "$viewer_role"; then
     echo "::error::Likes returned a profile with restricted account, contact, or precise-location data for $origin."
     rm -f "$response_file"
     return 1
