@@ -2572,3 +2572,75 @@ test("admin profile visibility updates cannot reactivate suspended or banned acc
   assert.equal(result.status, 403);
   assert.equal(writeCount, 0);
 });
+
+
+test("photo deletion marks metadata pending before CDN cleanup and retains the photo on failure", async () => {
+  let capturedUpdate;
+  const users = {
+    async findOne() {
+      return { photos: [
+        { url: "photos-user-1700000000000.webp", size: 1024 },
+        { url: "photos-user-1700000000001.webp", size: 2048 }
+      ] };
+    },
+    async updateOne(_filter, update) {
+      capturedUpdate = update;
+      return { modifiedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+
+  const result = await connection.removeUploadedPhoto("user", "photos-user-1700000000000.webp");
+  assert.equal(result.status, 200);
+  assert.equal(capturedUpdate.$set["photos.$.deletionPending"], true);
+  assert.equal(Object.hasOwn(capturedUpdate, "$pull"), false);
+  assert.equal(Object.hasOwn(capturedUpdate, "$inc"), false);
+});
+
+test("photo deletion finalization removes only pending metadata and decrements stored size", async () => {
+  let capturedFilter;
+  let capturedUpdate;
+  const users = {
+    async findOne() {
+      return { photos: [
+        { url: "photos-user-1700000000000.webp", size: 1024, deletionPending: true }
+      ] };
+    },
+    async updateOne(filter, update) {
+      capturedFilter = filter;
+      capturedUpdate = update;
+      return { modifiedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+
+  const result = await connection.finalizeUploadedPhotoDeletion("user", "photos-user-1700000000000.webp");
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedFilter.photos, { $elemMatch: { url: "photos-user-1700000000000.webp", deletionPending: true } });
+  assert.deepEqual(capturedUpdate.$pull, { photos: { url: "photos-user-1700000000000.webp", deletionPending: true } });
+  assert.deepEqual(capturedUpdate.$inc, { totalPhotoSize: -1024 });
+});
+
+test("photo deletion finalization refuses to remove metadata without a pending marker", async () => {
+  let writeCount = 0;
+  const users = {
+    async findOne() {
+      return { photos: [{ url: "photos-user-1700000000000.webp", size: 1024 }] };
+    },
+    async updateOne() {
+      writeCount++;
+      return { modifiedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+
+  const result = await connection.finalizeUploadedPhotoDeletion("user", "photos-user-1700000000000.webp");
+  assert.equal(result.status, 404);
+  assert.equal(writeCount, 0);
+});
