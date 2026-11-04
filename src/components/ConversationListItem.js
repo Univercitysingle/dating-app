@@ -5,16 +5,18 @@ import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../ut
 
 const ConversationListItem = ({ conversation }) => {
   const { otherUser, lastMessage } = conversation;
+  const unreadCount = Number.isFinite(conversation.unreadCount) ? Math.max(0, conversation.unreadCount) : 0;
+  const hasUnread = unreadCount > 0;
   const photoValue = otherUser?.photos?.[0]?.url;
   const avatarUrl = resolvePhotoUrl(photoValue);
   const workerFallbackUrl = resolveWorkerPhotoUrl(photoValue);
 
   return (
-    <Link to={`/chat/${conversation.roomId}`} className="conversation-row flex items-center gap-3 p-4">
+    <Link to={`/chat/${conversation.roomId}`} className={`conversation-row flex items-center gap-3 p-4 transition-colors ${hasUnread ? "bg-rose-50/70 ring-1 ring-inset ring-rose-100" : ""}`}>
       <img
         src={avatarUrl}
         alt={otherUser?.name || 'Profile photo'}
-        className="conversation-avatar h-14 w-14 flex-shrink-0 rounded-full object-cover"
+        className={`conversation-avatar h-14 w-14 flex-shrink-0 rounded-full object-cover ${hasUnread ? "ring-2 ring-rose-400 ring-offset-2" : ""}`}
         onError={(event) => {
           const image = event.currentTarget;
           if (workerFallbackUrl && image.src !== workerFallbackUrl) {
@@ -26,15 +28,16 @@ const ConversationListItem = ({ conversation }) => {
       />
       <div className="min-w-0 flex-grow">
         <div className="mb-1 flex items-center justify-between gap-3">
-          <h3 className="truncate font-semibold text-gray-900">{otherUser.name}</h3>
-          <p className="text-xs text-gray-500">
+          <h3 className={`truncate ${hasUnread ? "font-bold text-gray-950" : "font-semibold text-gray-900"}`}>{otherUser.name}</h3>
+          <p className={`text-xs ${hasUnread ? "font-semibold text-rose-600" : "text-gray-500"}`}>
             {lastMessage ? formatTimestamp(lastMessage.timestamp) : ''}
           </p>
         </div>
-        <p className="truncate text-sm text-gray-600">
+        <p className={`truncate text-sm ${hasUnread ? "font-semibold text-gray-900" : "text-gray-600"}`}>
           {lastMessage ? lastMessage.messageContent : 'No messages yet.'}
         </p>
       </div>
+      {hasUnread && <span className="inline-flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white" aria-label={`${unreadCount} unread messages`}>{unreadCount > 99 ? "99+" : unreadCount}</span>}
     </Link>
   );
 };
