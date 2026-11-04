@@ -27,6 +27,8 @@ jobs:
       FIREBASE_WEB_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
       STAGING_TEST_EMAIL: ${{ secrets.STAGING_TEST_EMAIL }}
       STAGING_TEST_PASSWORD: ${{ secrets.STAGING_TEST_PASSWORD }}
+      STAGING_TEST_EMAIL_B: ${{ secrets.STAGING_TEST_EMAIL_B }}
+      STAGING_TEST_PASSWORD_B: ${{ secrets.STAGING_TEST_PASSWORD_B }}
     steps:
       - name: Check out migration branch only
         uses: actions/checkout@v4
@@ -42,9 +44,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for name in FIREBASE_WEB_API_KEY STAGING_TEST_EMAIL STAGING_TEST_PASSWORD; do
+          for name in FIREBASE_WEB_API_KEY STAGING_TEST_EMAIL STAGING_TEST_PASSWORD STAGING_TEST_EMAIL_B STAGING_TEST_PASSWORD_B; do
             if [[ -z "${!name}" ]]; then
-              echo "::error::Missing required GitHub Actions secret: $name. Configure REACT_APP_FIREBASE_API_KEY, STAGING_TEST_EMAIL, and STAGING_TEST_PASSWORD for a dedicated staging test account."
+              echo "::error::Missing required GitHub Actions secret: $name. Configure REACT_APP_FIREBASE_API_KEY and both dedicated staging test account credential pairs."
               exit 1
             fi
           done
