@@ -193,7 +193,7 @@ check_individual_public_profile_privacy() {
     rm -f "$discover_file" "$profile_file"
     return 1
   fi
-  target_uid="$(node -e 'const fs=require("fs");const token=process.env.ID_TOKEN||"";const part=token.split(".")[1];if(!part)throw Error("Missing authenticated token claims");const claims=JSON.parse(Buffer.from(part,"base64url").toString("utf8"));const viewerUid=claims.sub;const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const list=Array.isArray(x)?x:(Array.isArray(x.users)?x.users:(Array.isArray(x.profiles)?x.profiles:[]));const p=list.find(v=>v&&typeof v.uid==="string"&&v.uid&&v.uid!==viewerUid);if(p)process.stdout.write(p.uid)' "$discover_file")"
+  target_uid="$(node -e 'const fs=require("fs");const token=process.argv[2]||"";const part=token.split(".")[1];if(!part)throw Error("Missing authenticated token claims");const claims=JSON.parse(Buffer.from(part,"base64url").toString("utf8"));const viewerUid=claims.sub;const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const list=Array.isArray(x)?x:(Array.isArray(x.users)?x.users:(Array.isArray(x.profiles)?x.profiles:[]));const p=list.find(v=>v&&typeof v.uid==="string"&&v.uid&&v.uid!==viewerUid);if(p)process.stdout.write(p.uid)' "$discover_file" "$id_token")"
   rm -f "$discover_file"
   if [[ -z "$target_uid" ]]; then
     echo "PASS individual public-profile privacy $origin (no Discover candidate available; endpoint not exercised)"
