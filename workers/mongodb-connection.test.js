@@ -106,7 +106,7 @@ test("chat history incremental cursor uses stable timestamp and ObjectId orderin
     "current-user-other-user",
     100,
     0,
-    { timestamp: cursorTimestamp, id: cursorId }
+    { timestamp: cursorTimestamp.toISOString(), id: cursorId }
   );
   assert.equal(result.status, 200);
   assert.deepEqual(capturedSort, { timestamp: 1, _id: 1 });
