@@ -115,6 +115,7 @@ function json(body, status = 200) {
 
 function isAccountRestricted(user, now = new Date()) {
   if (!user) return true;
+  if (user.deletionRequestedAt || user.accountStatus === "deletion_pending" || user.accountStatus === "deleted") return true;
   if (user.accountStatus === "permanently_banned") return true;
   if (user.accountStatus === "temporarily_suspended") {
     if (!user.suspendedUntil) return true;
@@ -437,7 +438,12 @@ export class MongoDBConnection {
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const existingByUid = await users.findOne({ uid: claims.sub });
-      if (existingByUid) return { status: 200, user: existingByUid };
+      if (existingByUid) {
+        if (existingByUid.deletionRequestedAt || ["deletion_pending", "deleted"].includes(existingByUid.accountStatus)) {
+          return { status: 403, body: { error: "This account is unavailable." } };
+        }
+        return { status: 200, user: existingByUid };
+      }
 
       const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
       if (!email || claims.email_verified !== true) {
@@ -2594,6 +2600,7 @@ export class MongoDBConnection {
       );
 
       if (!user) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
 
       const activeSubscription = await db.collection("subscriptions").findOne(
         { userId: user._id, status: "active" },
@@ -2797,15 +2804,78 @@ export class MongoDBConnection {
     if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) return { status: 400, body: { message: "Invalid user ID" } };
     try {
       const { ObjectId } = await import("mongodb");
-      const users = this.getDatabase(await this.getClient()).collection("users");
+      const client = await this.getClient();
+      const db = this.getDatabase(client);
       const targetId = new ObjectId(userId);
-      const target = await users.findOne({ _id: targetId }, { projection: { role: 1 } });
-      if (!target) return { status: 404, body: { message: "User not found" } };
-      if (target.role === "superadmin") return { status: 403, body: { message: "Superadmin accounts cannot be deleted" } };
-      const result = await users.deleteOne({ _id: targetId });
-      return result.deletedCount ? { status: 200, body: { message: "User deleted successfully" } } : { status: 404, body: { message: "User not found" } };
-    } catch {
-      return { status: 503, body: { message: "Unable to delete user" } };
+      const now = new Date();
+      const session = client.startSession();
+      try {
+        let targetFound = false;
+        await session.withTransaction(async () => {
+          const users = db.collection("users");
+          const target = await users.findOne({ _id: targetId }, { projection: { uid: 1, role: 1, deletionRequestedAt: 1 }, session });
+          if (!target) return;
+          if (target.role === "superadmin") throw new Error("SUPERADMIN_DELETE_FORBIDDEN");
+          if (target.deletionRequestedAt) {
+            targetFound = true;
+            return;
+          }
+          targetFound = true;
+          await users.updateOne(
+            { _id: targetId, role: { $ne: "superadmin" } },
+            { $set: {
+              accountStatus: "deletion_pending",
+              deletionRequestedAt: now,
+              deletionRequestedBy: uid,
+              isProfileVisible: false,
+              isProfileVisibleByAdmin: false,
+              updatedAt: now
+            }, $unset: {
+              darkFantasyAccessUntil: "",
+              creatorGalleryAccessUntil: "",
+              darkFantasyUnlimitedUntil: "",
+              darkFantasyGalleryAccess: ""
+            } },
+            { session }
+          );
+          if (typeof target.uid === "string" && target.uid) {
+            await db.collection("subscriptions").updateMany(
+              { userId: targetId, status: "active" },
+              { $set: { status: "revoked", revokedAt: now, revocationReason: "account_deletion" } },
+              { session }
+            );
+            await db.collection("darkfantasyprofiles").deleteOne({ uid: target.uid }, { session });
+            await db.collection("secretcommunitymemberships").deleteMany({ uid: target.uid }, { session });
+            await db.collection("chatTyping").deleteMany({ uid: target.uid }, { session });
+            await db.collection("videoRooms").updateMany(
+              { hostUid: target.uid, status: "active" },
+              { $set: { status: "ended", endedAt: now, updatedAt: now, endReason: "account_deletion" } },
+              { session }
+            );
+            await db.collection("callSessions").updateMany(
+              { $or: [{ callerUid: target.uid }, { receiverUid: target.uid }], status: { $in: ["ringing", "accepted"] } },
+              { $set: { status: "cancelled", endedAt: now, updatedAt: now, endReason: "account_deletion" } },
+              { session }
+            );
+          }
+        });
+        if (!targetFound) return { status: 404, body: { message: "User not found" } };
+        return {
+          status: 200,
+          body: {
+            message: "Account access disabled and deletion queued.",
+            deletionStatus: "deletion_pending",
+            financialAndAuditRecordsRetained: true
+          }
+        };
+      } finally {
+        await session.endSession();
+      }
+    } catch (error) {
+      if (error?.message === "SUPERADMIN_DELETE_FORBIDDEN") {
+        return { status: 403, body: { message: "Superadmin accounts cannot be deleted" } };
+      }
+      return { status: 503, body: { message: "Unable to queue account deletion" } };
     }
   }
 
@@ -3964,6 +4034,24 @@ export class MongoDBConnection {
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
+
+    // All authenticated Durable Object operations pass this account-state gate.
+    // Cloning preserves the request body for the route handler below.
+    const guardBody = await request.clone().json().catch(() => null);
+    const authenticatedUid = guardBody?.claims?.sub;
+    if (typeof authenticatedUid === "string" && authenticatedUid && guardBody?.claims?.role !== "superadmin") {
+      try {
+        const account = await this.getDatabase(await this.getClient()).collection("users").findOne(
+          { uid: authenticatedUid },
+          { projection: { accountStatus: 1, deletionRequestedAt: 1 } }
+        );
+        if (account && (account.deletionRequestedAt || ["deletion_pending", "deleted"].includes(account.accountStatus))) {
+          return json({ error: "This account is unavailable." }, 403);
+        }
+      } catch {
+        return json({ error: "Account status could not be verified." }, 503);
+      }
+    }
 
     if (url.pathname === "/internal/scheduled-expirations") {
       const body = await request.json().catch(() => ({}));
