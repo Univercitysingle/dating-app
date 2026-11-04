@@ -2283,3 +2283,94 @@ test("authenticated chat delivery receipts route to the MongoDB Durable Object",
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("account deletion disables all authenticated Durable Object operations", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return {
+        async findOne(query, options) {
+          assert.deepEqual(query, { uid: "pending-user" });
+          assert.deepEqual(options, { projection: { accountStatus: 1, deletionRequestedAt: 1 } });
+          return { accountStatus: "deletion_pending", deletionRequestedAt: new Date() };
+        }
+      };
+    }
+  });
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ claims: { sub: "pending-user" } })
+  }));
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "This account is unavailable." });
+});
+
+test("Firebase profile provisioning refuses accounts queued for deletion", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return {
+        async findOne(query) {
+          assert.deepEqual(query, { uid: "pending-user" });
+          return { uid: "pending-user", accountStatus: "deletion_pending", deletionRequestedAt: new Date() };
+        }
+      };
+    }
+  });
+  const result = await connection.findOrCreateUserFromClaims({ sub: "pending-user" });
+  assert.equal(result.status, 403);
+  assert.deepEqual(result.body, { error: "This account is unavailable." });
+});
+
+test("admin account deletion transactionally revokes access and retains financial history", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId();
+  const operations = [];
+  const collection = name => ({
+    async findOne(query) {
+      if (name === "users") {
+        assert.equal(String(query._id), String(targetId));
+        return { _id: targetId, uid: "deleting-user", role: "user" };
+      }
+      return null;
+    },
+    async updateOne(query, update) { operations.push({ name, method: "updateOne", query, update }); return { matchedCount: 1 }; },
+    async updateMany(query, update) { operations.push({ name, method: "updateMany", query, update }); return { modifiedCount: 1 }; },
+    async deleteOne(query) { operations.push({ name, method: "deleteOne", query }); return { deletedCount: 1 }; },
+    async deleteMany(query) { operations.push({ name, method: "deleteMany", query }); return { deletedCount: 1 }; }
+  });
+  const db = { collection };
+  const session = {
+    async withTransaction(callback) { await callback(); },
+    async endSession() {}
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+
+  const result = await connection.deleteAdminUser("superadmin_uid", String(targetId));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.deletionStatus, "deletion_pending");
+  assert.equal(result.body.financialAndAuditRecordsRetained, true);
+  assert.ok(operations.some(op => op.name === "users" && op.method === "updateOne" &&
+    op.update.$set.accountStatus === "deletion_pending" && op.update.$set.isProfileVisible === false));
+  assert.ok(operations.some(op => op.name === "subscriptions" && op.method === "updateMany" &&
+    op.update.$set.status === "revoked"));
+  assert.ok(operations.some(op => op.name === "darkfantasyprofiles" && op.method === "deleteOne"));
+  assert.ok(operations.some(op => op.name === "secretcommunitymemberships" && op.method === "deleteMany"));
+  assert.ok(operations.some(op => op.name === "videoRooms" && op.method === "updateMany" &&
+    op.update.$set.status === "ended"));
+  assert.ok(operations.some(op => op.name === "callSessions" && op.method === "updateMany" &&
+    op.update.$set.status === "cancelled"));
+  assert.equal(operations.some(op => op.name === "purchases"), false);
+  assert.equal(operations.some(op => op.name === "auditlogs"), false);
+  assert.equal(operations.some(op => op.name === "reports"), false);
+  assert.equal(operations.some(op => op.name === "supporttickets"), false);
+});
