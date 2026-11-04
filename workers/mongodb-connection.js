@@ -3471,7 +3471,7 @@ export class MongoDBConnection {
     }
   }
 
-  async getChatHistory(uid, roomId, limit = 50, skip = 0, after = null) {
+  async getChatHistory(uid, roomId, limit = 50, skip = 0, after = null, before = null) {
     if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
     skip = Number.isInteger(skip) ? Math.max(0, Math.min(skip, 100000)) : 0;
@@ -3481,8 +3481,16 @@ export class MongoDBConnection {
     if (after && typeof after.timestamp === "string") {
       after = { ...after, timestamp: new Date(after.timestamp) };
     }
-    if (after && (!(after.timestamp instanceof Date) || Number.isNaN(after.timestamp.getTime()) ||
-        typeof after.id !== "string" || !/^[a-fA-F0-9]{24}$/.test(after.id))) {
+    if (before && typeof before.timestamp === "string") {
+      before = { ...before, timestamp: new Date(before.timestamp) };
+    }
+    const validCursor = cursor => !cursor || (
+      cursor.timestamp instanceof Date &&
+      !Number.isNaN(cursor.timestamp.getTime()) &&
+      typeof cursor.id === "string" &&
+      /^[a-fA-F0-9]{24}$/.test(cursor.id)
+    );
+    if (!validCursor(after) || !validCursor(before) || (after && before)) {
       return { status: 400, body: { error: "Invalid message cursor" } };
     }
     try {
@@ -3507,24 +3515,28 @@ export class MongoDBConnection {
         query = participantQuery;
       }
       let messages;
-      if (after) {
-        // Incremental sync uses a stable (timestamp, ObjectId) cursor so equal
-        // timestamps cannot cause messages to be skipped or returned twice.
+      if (after || before) {
+        // Stable (timestamp, ObjectId) cursors prevent gaps and duplicates
+        // when messages share timestamps or new messages arrive during paging.
         const { ObjectId } = await import("mongodb");
+        const cursor = after || before;
+        const operator = after ? "$gt" : "$lt";
         query = {
           ...query,
           $and: [
             ...(query.$or ? [{ $or: query.$or }] : []),
             { $or: [
-              { timestamp: { $gt: after.timestamp } },
-              { timestamp: after.timestamp, _id: { $gt: new ObjectId(after.id) } }
+              { timestamp: { [operator]: cursor.timestamp } },
+              { timestamp: cursor.timestamp, _id: { [operator]: new ObjectId(cursor.id) } }
             ] }
           ]
         };
         messages = await db.collection("chatmessages").find(query)
-          .sort({ timestamp: 1, _id: 1 }).limit(limit).maxTimeMS(10000).toArray();
+          .sort({ timestamp: after ? 1 : -1, _id: after ? 1 : -1 })
+          .limit(limit).maxTimeMS(10000).toArray();
+        if (before) messages.reverse();
       } else {
-        // Initial page and older-page pagination retain newest-first selection.
+        // Initial page selects the newest messages and returns them chronologically.
         messages = await db.collection("chatmessages").find(query)
           .sort({ timestamp: -1, _id: -1 }).skip(skip).limit(limit).maxTimeMS(10000).toArray();
         messages.reverse();
