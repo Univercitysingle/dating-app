@@ -1009,14 +1009,23 @@ export default {
         });
         const result = await response.json().catch(() => ({ message: "Photo metadata service unavailable" }));
         if (!response.ok) return json(result, response.status);
-        const proxyUrl = getCdnObjectUrl(env, key, "root");
         const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
         const proxyResponse = await requestCdnObject(env, key, "DELETE", { "Origin": frontendOrigin }, undefined, claims);
-        if (!proxyResponse.ok) {
+        // A 404 means a previous attempt already removed the object. Keep the
+        // metadata tombstone until storage is confirmed absent, then finalize it.
+        if (!proxyResponse.ok && proxyResponse.status !== 404) {
           console.error("Photo CDN proxy delete failed", { status: proxyResponse.status });
-          return json({ message: "Photo metadata was deleted but storage cleanup failed" }, 502);
+          return json({ message: "Photo storage cleanup is pending; retry deletion later" }, 502);
         }
-        return json(result, response.status);
+        const finalizeResponse = await connection.fetch("https://internal.invalid/internal/photo-delete-finalize", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, key })
+        });
+        const finalizeResult = await finalizeResponse.json().catch(() => ({ message: "Photo metadata finalization failed" }));
+        if (!finalizeResponse.ok) {
+          console.error("Photo metadata finalization failed", { status: finalizeResponse.status });
+          return json({ message: "Photo storage was removed; profile cleanup is pending" }, 502);
+        }
+        return json(finalizeResult, finalizeResponse.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
