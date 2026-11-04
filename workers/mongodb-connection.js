@@ -608,6 +608,9 @@ export class MongoDBConnection {
         if (isAccountRestricted(account)) return { status: 403, body: { error: "Account is suspended or banned." } };
       }
       const currentPhotos = Array.isArray(account?.photos) ? account.photos : [];
+      if (currentPhotos.some(photo => photo && typeof photo === "object" && photo.deletionPending === true)) {
+        return { status: 409, body: { error: "A photo deletion is pending; retry after cleanup completes." } };
+      }
       if (typeof users.findOne === "function") {
         const currentUrls = currentPhotos.map((photo) => typeof photo === "string" ? photo : photo?.url);
         if (requestedUrls.length !== currentUrls.length ||
