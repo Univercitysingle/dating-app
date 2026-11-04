@@ -145,3 +145,110 @@ check_chat_room_reads "$PAGES_URL" "Pages "
 
 unset id_token
 echo "Authenticated staging smoke tests passed on the Worker and Pages API routes."
+
+
+# Two-account acceptance test. This deliberately writes one uniquely tagged
+# message between the two dedicated staging test accounts, then verifies that
+# the recipient can retrieve it and persist delivery/read receipts.
+: "${STAGING_TEST_EMAIL_B:?STAGING_TEST_EMAIL_B is required}"
+: "${STAGING_TEST_PASSWORD_B:?STAGING_TEST_PASSWORD_B is required}"
+
+sign_in_test_account() {
+  local email="$1" password="$2" output_var="$3"
+  local response_file payload status
+  response_file="$(mktemp)"
+  payload="$(node -e 'process.stdout.write(JSON.stringify({email:process.argv[1],password:process.argv[2],returnSecureToken:true}))' "$email" "$password")"
+  status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+    --header 'Content-Type: application/json' --data-binary "$payload" \
+    "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$FIREBASE_WEB_API_KEY")"
+  unset payload password
+  if [[ "$status" != "200" ]]; then
+    echo "::error::Firebase sign-in for a dedicated two-account staging test account failed (HTTP $status)."
+    rm -f "$response_file"
+    return 1
+  fi
+  local token uid
+  token="$(node -e 'const x=require(process.argv[1]);if(!x.idToken||!x.localId)process.exit(1);process.stdout.write(x.idToken)' "$response_file")"
+  uid="$(node -e 'const x=require(process.argv[1]);process.stdout.write(x.localId)' "$response_file")"
+  rm -f "$response_file"
+  printf -v "${output_var}_TOKEN" '%s' "$token"
+  printf -v "${output_var}_UID" '%s' "$uid"
+}
+
+sign_in_test_account "$STAGING_TEST_EMAIL" "$STAGING_TEST_PASSWORD" account_a
+unset STAGING_TEST_PASSWORD
+sign_in_test_account "$STAGING_TEST_EMAIL_B" "$STAGING_TEST_PASSWORD_B" account_b
+unset STAGING_TEST_PASSWORD_B
+
+if [[ "$account_a_UID" == "$account_b_UID" ]]; then
+  echo "::error::The two staging test credentials resolve to the same Firebase user."
+  exit 1
+fi
+
+room_id="$account_a_UID-$account_b_UID"
+client_message_id="$(node -e 'process.stdout.write(require("crypto").randomUUID())')"
+message_content="Automated staging chat acceptance test $client_message_id"
+send_payload="$(node -e 'process.stdout.write(JSON.stringify({roomId:process.argv[1],receiverUid:process.argv[2],messageContent:process.argv[3],clientMessageId:process.argv[4]}))' "$room_id" "$account_b_UID" "$message_content" "$client_message_id")"
+send_file="$(mktemp)"
+status="$(curl --silent --show-error --output "$send_file" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_a_TOKEN" --header 'Content-Type: application/json' \
+  --data-binary "$send_payload" "$WORKER_URL/api/chat/send")"
+unset send_payload
+if [[ "$status" != "201" && "$status" != "200" ]]; then
+  echo "::error::Two-account staging message send failed (HTTP $status)."
+  rm -f "$send_file"
+  exit 1
+fi
+message_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!x._id||x.senderUid!==process.argv[2]||x.receiverUid!==process.argv[3]||x.roomId!==process.argv[4])process.exit(1);process.stdout.write(String(x._id))' "$send_file" "$account_a_UID" "$account_b_UID" "$room_id")"
+rm -f "$send_file"
+echo "PASS account A sent a persisted message to account B"
+
+encoded_room="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$room_id")"
+received_file="$(mktemp)"
+status="$(curl --silent --show-error --output "$received_file" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_b_TOKEN" --header 'Accept: application/json' \
+  "$PAGES_URL/api/chat/history/$encoded_room?limit=50")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const m=(x.messages||[]).find(v=>String(v._id)===process.argv[2]);if(!m||m.messageContent!==process.argv[3]||m.senderUid!==process.argv[4]||m.receiverUid!==process.argv[5])process.exit(1)' "$received_file" "$message_id" "$message_content" "$account_a_UID" "$account_b_UID"; then
+  echo "::error::Account B could not retrieve the exact message sent by account A."
+  rm -f "$received_file"
+  exit 1
+fi
+rm -f "$received_file"
+echo "PASS account B received the persisted message through the Pages API"
+
+receipt_payload="$(node -e 'process.stdout.write(JSON.stringify({roomId:process.argv[1],messageIds:[process.argv[2]]}))' "$room_id" "$message_id")"
+receipt_file="$(mktemp)"
+status="$(curl --silent --show-error --output "$receipt_file" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_b_TOKEN" --header 'Content-Type: application/json' \
+  --data-binary "$receipt_payload" "$WORKER_URL/api/chat/delivered")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(typeof x.deliveredCount!=="number")process.exit(1)' "$receipt_file"; then
+  echo "::error::Account B could not persist the message delivery receipt."
+  rm -f "$receipt_file"
+  exit 1
+fi
+rm -f "$receipt_file"
+echo "PASS account B persisted a delivery receipt"
+
+status="$(curl --silent --show-error --output "$receipt_file" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_b_TOKEN" --header 'Content-Type: application/json' \
+  --data-binary "$receipt_payload" "$WORKER_URL/api/chat/read")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(typeof x.readCount!=="number")process.exit(1)' "$receipt_file"; then
+  echo "::error::Account B could not persist the message read receipt."
+  rm -f "$receipt_file"
+  exit 1
+fi
+rm -f "$receipt_file" "$receipt_payload"
+echo "PASS account B persisted a read receipt"
+
+sender_history="$(mktemp)"
+status="$(curl --silent --show-error --output "$sender_history" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_a_TOKEN" --header 'Accept: application/json' \
+  "$WORKER_URL/api/chat/history/$encoded_room?limit=50")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const m=(x.messages||[]).find(v=>String(v._id)===process.argv[2]);if(!m||m.status!=="read"||!m.readAt)process.exit(1)' "$sender_history" "$message_id"; then
+  echo "::error::Account A did not observe the persisted read receipt from account B."
+  rm -f "$sender_history"
+  exit 1
+fi
+rm -f "$sender_history"
+unset account_a_TOKEN account_b_TOKEN account_a_UID account_b_UID
+echo "PASS two-account send, receive, delivery, and read receipt acceptance test"
