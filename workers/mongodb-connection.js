@@ -2511,7 +2511,7 @@ export class MongoDBConnection {
         sanitizedUpdate.photos = ownedPhotos;
       }
       for (const key of allowedFields) {
-        if (update[key] === undefined) continue;
+        if (update[key] === undefined || key === "photos") continue;
         if (nestedAllowed[key]) {
           // The onboarding and profile forms represent education as a plain text
           // value. Preserve that established schema while continuing to accept
