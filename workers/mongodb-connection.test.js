@@ -120,6 +120,38 @@ test("chat history incremental cursor uses stable timestamp and ObjectId orderin
   assert.equal(cursorFilter[1]._id.$gt.toString(), cursorId);
 });
 
+test("chat history serializes BSON ObjectIds as plain cursor strings", async () => {
+  const objectId = { toHexString: () => "6729a0000000000000000001" };
+  const users = {
+    async findOne({ uid }) {
+      if (uid === "current-user") return { uid, role: "user", blocked: [] };
+      if (uid === "other-user") return { uid, blocked: [] };
+      return null;
+    }
+  };
+  const chatmessages = {
+    async findOne() { return { senderUid: "current-user", receiverUid: "other-user" }; },
+    find() {
+      return {
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
+        maxTimeMS() { return this; },
+        async toArray() {
+          return [{ _id: objectId, roomId: "current-user-other-user", timestamp: new Date() }];
+        }
+      };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : chatmessages; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getChatHistory("current-user", "current-user-other-user", 1);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.messages[0]._id, "6729a0000000000000000001");
+});
+
 test("chat history rejects malformed incremental cursors before database access", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => { assert.fail("Invalid cursors must not access MongoDB"); };
