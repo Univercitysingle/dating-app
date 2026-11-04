@@ -218,6 +218,39 @@ message_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync
 rm -f "$send_file"
 echo "PASS account A sent a persisted message to account B"
 
+# Exercise two simultaneous requests with a fresh idempotency key. Both calls
+# must resolve to the same persisted message even when they race at insertion.
+race_message_id="$(node -e 'process.stdout.write(require("crypto").randomUUID())')"
+race_content="Automated concurrent idempotency acceptance test $race_message_id"
+race_payload="$(node -e 'process.stdout.write(JSON.stringify({roomId:process.argv[1],receiverUid:process.argv[2],messageContent:process.argv[3],clientMessageId:process.argv[4]}))' "$room_id" "$account_b_UID" "$race_content" "$race_message_id")"
+race_file_a="$(mktemp)"
+race_file_b="$(mktemp)"
+race_status_a_file="$(mktemp)"
+race_status_b_file="$(mktemp)"
+(
+  curl --silent --show-error --output "$race_file_a" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $account_a_TOKEN" --header 'Content-Type: application/json' \
+    --data-binary "$race_payload" "$WORKER_URL/api/chat/send" > "$race_status_a_file"
+) &
+race_pid_a=$!
+(
+  curl --silent --show-error --output "$race_file_b" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $account_a_TOKEN" --header 'Content-Type: application/json' \
+    --data-binary "$race_payload" "$WORKER_URL/api/chat/send" > "$race_status_b_file"
+) &
+race_pid_b=$!
+wait "$race_pid_a"
+wait "$race_pid_b"
+race_status_a="$(cat "$race_status_a_file")"
+race_status_b="$(cat "$race_status_b_file")"
+race_result="$(node -e 'const fs=require("fs");const a=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const b=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));if(!a._id||String(a._id)!==String(b._id)||a.clientMessageId!==process.argv[3]||b.clientMessageId!==process.argv[3])process.exit(1);process.stdout.write(String(a._id))' "$race_file_a" "$race_file_b" "$race_message_id" 2>/dev/null || true)"
+rm -f "$race_file_a" "$race_file_b" "$race_status_a_file" "$race_status_b_file"
+if [[ ( "$race_status_a" != "200" && "$race_status_a" != "201" ) || ( "$race_status_b" != "200" && "$race_status_b" != "201" ) || -z "$race_result" ]]; then
+  echo "::error::Concurrent idempotent sends did not return the same persisted message (HTTP $race_status_a / $race_status_b)."
+  exit 1
+fi
+echo "PASS simultaneous duplicate sends returned one persisted message"
+
 # Retry the exact request with the same clientMessageId. The API must return
 # the original persisted message rather than inserting a duplicate.
 retry_payload="$(node -e 'process.stdout.write(JSON.stringify({roomId:process.argv[1],receiverUid:process.argv[2],messageContent:process.argv[3],clientMessageId:process.argv[4]}))' "$room_id" "$account_b_UID" "$message_content" "$client_message_id")"
