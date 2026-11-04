@@ -72,6 +72,68 @@ test("chat history is denied when either participant has blocked the other", asy
 });
 
 
+test("chat history incremental cursor uses stable timestamp and ObjectId ordering", async () => {
+  const cursorTimestamp = new Date("2026-11-04T06:00:00.000Z");
+  const cursorId = "6729a0000000000000000001";
+  let capturedQuery;
+  let capturedSort;
+  let capturedLimit;
+  const users = {
+    async findOne({ uid }) {
+      if (uid === "current-user") return { uid, role: "user", blocked: [] };
+      if (uid === "other-user") return { uid, blocked: [] };
+      return null;
+    }
+  };
+  const chatmessages = {
+    async findOne() { return { senderUid: "current-user", receiverUid: "other-user" }; },
+    find(query) {
+      capturedQuery = query;
+      return {
+        sort(value) { capturedSort = value; return this; },
+        limit(value) { capturedLimit = value; return this; },
+        maxTimeMS(value) { assert.equal(value, 10000); return this; },
+        async toArray() { return []; }
+      };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : chatmessages; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getChatHistory(
+    "current-user",
+    "current-user-other-user",
+    100,
+    0,
+    { timestamp: cursorTimestamp, id: cursorId }
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedSort, { timestamp: 1, _id: 1 });
+  assert.equal(capturedLimit, 100);
+  assert.deepEqual(capturedQuery.$and[0], {
+    $or: [{ senderUid: "current-user" }, { receiverUid: "current-user" }]
+  });
+  const cursorFilter = capturedQuery.$and[1].$or;
+  assert.equal(cursorFilter[0].timestamp.$gt.getTime(), cursorTimestamp.getTime());
+  assert.equal(cursorFilter[1].timestamp.getTime(), cursorTimestamp.getTime());
+  assert.equal(cursorFilter[1]._id.$gt.toString(), cursorId);
+});
+
+test("chat history rejects malformed incremental cursors before database access", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => { assert.fail("Invalid cursors must not access MongoDB"); };
+  const result = await connection.getChatHistory(
+    "current-user",
+    "current-user-other-user",
+    50,
+    0,
+    { timestamp: new Date("invalid"), id: "not-an-object-id" }
+  );
+  assert.equal(result.status, 400);
+});
+
+
 
 test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and PayHere unique indexes", async () => {
   const order = [];
