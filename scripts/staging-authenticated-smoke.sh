@@ -218,6 +218,35 @@ message_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync
 rm -f "$send_file"
 echo "PASS account A sent a persisted message to account B"
 
+# Retry the exact request with the same clientMessageId. The API must return
+# the original persisted message rather than inserting a duplicate.
+retry_payload="$(node -e 'process.stdout.write(JSON.stringify({roomId:process.argv[1],receiverUid:process.argv[2],messageContent:process.argv[3],clientMessageId:process.argv[4]}))' "$room_id" "$account_b_UID" "$message_content" "$client_message_id")"
+retry_file="$(mktemp)"
+status="$(curl --silent --show-error --output "$retry_file" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_a_TOKEN" --header 'Content-Type: application/json' \
+  --data-binary "$retry_payload" "$WORKER_URL/api/chat/send")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(String(x._id)!==process.argv[2]||x.clientMessageId!==process.argv[3])process.exit(1)' "$retry_file" "$message_id" "$client_message_id"; then
+  echo "::error::Retrying the same clientMessageId did not return the original persisted message."
+  rm -f "$retry_file"
+  exit 1
+fi
+rm -f "$retry_file"
+echo "PASS duplicate send retry returned the original message"
+
+# Reusing the same key with different content must be rejected, not persisted.
+conflict_payload="$(node -e 'process.stdout.write(JSON.stringify({roomId:process.argv[1],receiverUid:process.argv[2],messageContent:process.argv[3],clientMessageId:process.argv[4]}))' "$room_id" "$account_b_UID" "$message_content conflict" "$client_message_id")"
+conflict_file="$(mktemp)"
+status="$(curl --silent --show-error --output "$conflict_file" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_a_TOKEN" --header 'Content-Type: application/json' \
+  --data-binary "$conflict_payload" "$WORKER_URL/api/chat/send")"
+if [[ "$status" != "409" ]]; then
+  echo "::error::Reusing a clientMessageId with different content should return HTTP 409, got $status."
+  rm -f "$conflict_file"
+  exit 1
+fi
+rm -f "$conflict_file"
+echo "PASS conflicting idempotency key reuse rejected with HTTP 409"
+
 encoded_room="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$room_id")"
 received_file="$(mktemp)"
 status="$(curl --silent --show-error --output "$received_file" --write-out '%{http_code}' \
