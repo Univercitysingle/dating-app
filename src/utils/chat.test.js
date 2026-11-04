@@ -1,4 +1,4 @@
-import { getVisibleChatMessageIds } from './chat';
+import { collectPendingDeliveryMessages, getVisibleChatMessageIds } from './chat';
 
 const entry = (id, ratio, isIntersecting = true) => ({
   isIntersecting,
@@ -34,5 +34,41 @@ describe('getVisibleChatMessageIds', () => {
       null,
     ], 2)).toEqual([]);
     expect(getVisibleChatMessageIds(null)).toEqual([]);
+  });
+});
+
+describe('collectPendingDeliveryMessages', () => {
+  const message = (id, status = 'sent') => ({
+    _id: id,
+    receiverUid: 'recipient-uid',
+    status,
+  });
+
+  test('retains failed receipts for retry when a later history page is empty', () => {
+    const pending = new Map();
+    const first = message('6729a0000000000000000001');
+
+    expect(collectPendingDeliveryMessages([first], pending, 'recipient-uid')).toEqual([first]);
+    expect(collectPendingDeliveryMessages([], pending, 'recipient-uid')).toEqual([first]);
+  });
+
+  test('removes a queued receipt when persisted status advances', () => {
+    const pending = new Map();
+    const first = message('6729a0000000000000000001');
+
+    collectPendingDeliveryMessages([first], pending, 'recipient-uid');
+    expect(collectPendingDeliveryMessages([
+      message('6729a0000000000000000001', 'delivered'),
+    ], pending, 'recipient-uid')).toEqual([]);
+    expect(pending.size).toBe(0);
+  });
+
+  test('ignores other recipients and invalid message identifiers', () => {
+    const pending = new Map();
+    expect(collectPendingDeliveryMessages([
+      message('invalid-id'),
+      { ...message('6729a0000000000000000002'), receiverUid: 'someone-else' },
+    ], pending, 'recipient-uid')).toEqual([]);
+    expect(pending.size).toBe(0);
   });
 });
