@@ -1474,7 +1474,7 @@ export class MongoDBConnection {
       if (!candidateUids.length) return { status: 200, body: [] };
       const users = await db.collection("users").find({
         uid: { $in: candidateUids },
-        accountStatus: { $nin: ["temporarily_suspended", "permanently_banned"] },
+        accountStatus: { $nin: ["temporarily_suspended", "permanently_banned", "deletion_pending", "deleted"] },
         darkFantasyAccessUntil: { $gt: new Date() }
       }).limit(100).toArray();
       const results = [];
@@ -2825,6 +2825,7 @@ export class MongoDBConnection {
             { _id: targetId, role: { $ne: "superadmin" } },
             { $set: {
               accountStatus: "deletion_pending",
+              plan: "basic",
               deletionRequestedAt: now,
               deletionRequestedBy: uid,
               isProfileVisible: false,
