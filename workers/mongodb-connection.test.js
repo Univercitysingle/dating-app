@@ -2552,3 +2552,23 @@ test("admins cannot modify another administrative account", async () => {
   assert.equal(result.status, 403);
   assert.equal(writeCount, 0);
 });
+
+
+test("admin profile visibility updates cannot reactivate suspended or banned accounts", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let writeCount = 0;
+  const users = {
+    async findOne() {
+      return { _id: targetId, role: "user", accountStatus: "temporarily_suspended", suspendedUntil: new Date(Date.now() + 86400000) };
+    },
+    async findOneAndUpdate() { writeCount++; return { _id: targetId }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+
+  const result = await connection.updateAdminUser("admin-uid", String(targetId), { isProfileVisible: true });
+  assert.equal(result.status, 403);
+  assert.equal(writeCount, 0);
+});
