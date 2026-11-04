@@ -3573,6 +3573,13 @@ export class MongoDBConnection {
           chatMessages.createIndex(
             { receiverUid: 1, timestamp: -1, _id: -1 },
             { name: "chat_receiver_inbox_latest" }
+          ),
+          // Inbox polling also groups all non-read messages by room. This
+          // index narrows that scan to the recipient and keeps room/status
+          // fields adjacent for the aggregation.
+          chatMessages.createIndex(
+            { receiverUid: 1, roomId: 1, status: 1 },
+            { name: "chat_receiver_unread_room_status" }
           )
         ]).catch((error) => {
           this.chatConversationIndexesPromise = null;
