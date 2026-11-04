@@ -31,6 +31,7 @@ function Chat() {
   const lastRenderedMessageIdRef = useRef(null);
   const historyPollRef = useRef(null);
   const historyCursorRef = useRef(null);
+  const olderHistoryCursorRef = useRef(null);
   const initialHistoryLoadedRef = useRef(false);
   const readReceiptInFlightRef = useRef(new Set());
   const pendingMessageRef = useRef(null);
@@ -68,6 +69,7 @@ function Chat() {
     let cancelled = false;
     let syncInProgress = false;
     historyCursorRef.current = null;
+    olderHistoryCursorRef.current = null;
     initialHistoryLoadedRef.current = false;
 
     const syncHistory = async () => {
@@ -83,7 +85,14 @@ function Chat() {
 
         const fetched = result.messages;
         if (!initialHistoryLoadedRef.current) {
-          setHasOlderMessages(fetched.length === 50);
+          const oldest = fetched.find(message =>
+            message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
+          );
+          olderHistoryCursorRef.current = oldest ? {
+            timestamp: new Date(oldest.timestamp).toISOString(),
+            id: String(oldest._id),
+          } : null;
+          setHasOlderMessages(fetched.length === 50 && Boolean(olderHistoryCursorRef.current));
           initialHistoryLoadedRef.current = true;
         }
         fetched.forEach(message => addMessageRef.current(message));
@@ -297,7 +306,11 @@ function Chat() {
 
   const loadOlderMessages = async () => {
     if (isLoadingOlder || !hasOlderMessages) return;
-    const persistedCount = messages.filter(message => /^[a-fA-F0-9]{24}$/.test(String(message._id))).length;
+    const cursor = olderHistoryCursorRef.current;
+    if (!cursor) {
+      setHasOlderMessages(false);
+      return;
+    }
     const container = messagesContainerRef.current;
     if (container) {
       pendingScrollRestoreRef.current = {
@@ -308,11 +321,18 @@ function Chat() {
     setIsLoadingOlder(true);
     try {
       const result = await apiClient.get(
-        `/chat/history/${encodeURIComponent(chatId)}?limit=50&skip=${persistedCount}`
+        `/chat/history/${encodeURIComponent(chatId)}?limit=50&before=${encodeURIComponent(cursor.timestamp)}&beforeId=${encodeURIComponent(cursor.id)}`
       );
       const olderMessages = Array.isArray(result?.messages) ? result.messages : [];
       olderMessages.forEach(message => addMessageRef.current(message));
-      setHasOlderMessages(olderMessages.length === 50);
+      const oldest = olderMessages.find(message =>
+        message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
+      );
+      olderHistoryCursorRef.current = oldest ? {
+        timestamp: new Date(oldest.timestamp).toISOString(),
+        id: String(oldest._id),
+      } : null;
+      setHasOlderMessages(olderMessages.length === 50 && Boolean(olderHistoryCursorRef.current));
       if (!olderMessages.length) pendingScrollRestoreRef.current = null;
     } catch (historyError) {
       pendingScrollRestoreRef.current = null;
