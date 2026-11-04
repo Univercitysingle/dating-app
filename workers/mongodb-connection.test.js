@@ -2493,24 +2493,25 @@ test("onboarding profile updates preserve metadata for previously uploaded photo
 });
 
 test("completed profiles cannot replace photos through the generic profile update route", async () => {
-  let updateCalled = false;
+  let capturedUpdate;
   const users = {
     async findOne() {
       return { uid: "existing-user", isOnboardingComplete: true, photos: [{ url: "photos-existing-user-1700000000000.webp" }] };
     },
-    async updateOne() {
-      updateCalled = true;
+    async updateOne(_filter, update) {
+      capturedUpdate = update;
       return { matchedCount: 1 };
     }
   };
   const connection = Object.create(MongoDBConnection.prototype);
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({ collection: () => users });
+  connection.getCurrentUserProfile = async () => ({ status: 200, body: {} });
 
   const result = await connection.updateCurrentUserProfile("existing-user", {
     photos: [{ url: "photos-existing-user-1700000000000.webp" }]
   });
 
-  assert.equal(result.status, 400);
-  assert.equal(updateCalled, false);
+  assert.equal(result.status, 200);
+  assert.equal(Object.hasOwn(capturedUpdate.$set, "photos"), false);
 });
