@@ -1614,7 +1614,7 @@ test("chat conversations use a valid inclusion projection and return successfull
           assert.deepEqual(pipeline, [
             { $match: { $or: [{ senderUid: "alice" }, { receiverUid: "alice" }] } },
             { $sort: { timestamp: -1, _id: -1 } },
-            { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
+            { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
             { $replaceRoot: { newRoot: "$lastMessage" } },
             { $sort: { timestamp: -1, _id: -1 } }
           ]);
