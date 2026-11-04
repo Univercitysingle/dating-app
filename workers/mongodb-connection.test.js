@@ -1411,10 +1411,17 @@ test("chat conversations exclude users blocked in either direction", async () =>
         },
         aggregate(pipeline, options) {
           assert.deepEqual(options, { maxTimeMS: 10000 });
+          if (pipeline[0]?.$match?.receiverUid === "alice") {
+            assert.deepEqual(pipeline, [
+              { $match: { receiverUid: "alice", status: { $ne: "read" } } },
+              { $group: { _id: "$roomId", unreadCount: { $sum: 1 } } }
+            ]);
+            return { async toArray() { return [{ _id: "alice-allowed", unreadCount: 2 }]; } };
+          }
           assert.deepEqual(pipeline, [
             { $match: { $or: [{ senderUid: "alice" }, { receiverUid: "alice" }] } },
             { $sort: { timestamp: -1, _id: -1 } },
-            { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
+            { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
             { $replaceRoot: { newRoot: "$lastMessage" } },
             { $sort: { timestamp: -1, _id: -1 } }
           ]);
@@ -1440,6 +1447,7 @@ test("chat conversations exclude users blocked in either direction", async () =>
   ]);
   assert.equal(profileBatchQueries, 1, "counterpart profiles should be fetched in one batch");
   assert.deepEqual(result.body.map(item => item.roomId), ["alice-allowed"]);
+  assert.equal(result.body[0].unreadCount, 2);
   assert.equal(result.body[0].otherUser.email, undefined);
   assert.equal(result.body[0].otherUser.mobileNumber, undefined);
 });
