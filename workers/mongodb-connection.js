@@ -3638,12 +3638,19 @@ export class MongoDBConnection {
         conversations.push({
           roomId,
           otherUser: sanitizePublicProfile(otherUser),
-          lastMessage: {
-            ...item.lastMessage,
-            _id: typeof item.lastMessage._id?.toHexString === "function"
+          lastMessage: (() => {
+            const safeMessage = {};
+            for (const field of [
+              "roomId", "senderUid", "receiverUid", "messageContent", "timestamp",
+              "status", "deliveredAt", "readAt", "clientMessageId"
+            ]) {
+              if (item.lastMessage[field] !== undefined) safeMessage[field] = item.lastMessage[field];
+            }
+            safeMessage._id = typeof item.lastMessage._id?.toHexString === "function"
               ? item.lastMessage._id.toHexString()
-              : String(item.lastMessage._id)
-          },
+              : String(item.lastMessage._id);
+            return safeMessage;
+          })(),
           unreadCount: unreadCountByRoom.get(roomId) || 0
         });
       }
