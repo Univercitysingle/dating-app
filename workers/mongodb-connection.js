@@ -2719,6 +2719,9 @@ export class MongoDBConnection {
       const target = await users.findOne({ _id: targetId }, { projection: { role: 1 } });
       if (!target) return { status: 404, body: { message: "User not found" } };
       if (target.role === "superadmin") return { status: 403, body: { message: "Superadmin accounts cannot be modified" } };
+      if (access.role !== "superadmin" && target.role !== "user") {
+        return { status: 403, body: { message: "Admins cannot modify other administrative accounts" } };
+      }
       const allowed = [
         "name", "email", "gender", "bio", "interests", "profilePrompts", "education",
         "relationshipGoals", "isProfileVisible", "plan", "faceVerified", "isVerified",
@@ -2729,7 +2732,9 @@ export class MongoDBConnection {
       if (Object.keys(update).length === 0) return { status: 400, body: { message: "No supported fields to update" } };
       if (update.role !== undefined) {
         if (!["user", "contributor", "admin", "superadmin"].includes(update.role)) return { status: 400, body: { message: "Invalid role" } };
-        if (access.role !== "superadmin" && update.role === "superadmin") return { status: 403, body: { message: "Admins cannot assign the superadmin role" } };
+        if (access.role !== "superadmin") {
+          return { status: 403, body: { message: "Only superadmins can change account roles" } };
+        }
       }
       if (update.plan !== undefined && !["basic", "premium", "weekly", "monthly", "yearly"].includes(update.plan)) return { status: 400, body: { message: "Invalid plan" } };
       if (update.email !== undefined) {
