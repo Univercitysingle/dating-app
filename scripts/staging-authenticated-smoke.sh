@@ -133,6 +133,7 @@ check_discover_profile_privacy "$PAGES_URL" "Pages"
 check_likes_profile_privacy() {
   local base_url="$1"
   local origin="$2"
+  local endpoint="${3:-/api/users/likes}"
   local response_file me_file viewer_role
   response_file="$(mktemp)"
   me_file="$(mktemp)"
@@ -152,9 +153,9 @@ check_likes_profile_privacy() {
   status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
     --header "Authorization: Bearer $id_token" \
     --header 'Accept: application/json' \
-    "$base_url/api/users/likes")"
+    "$base_url$endpoint")"
   if [[ "$status" != "200" ]]; then
-    echo "::error::Authenticated GET $origin/api/users/likes returned HTTP $status"
+    echo "::error::Authenticated GET $origin$endpoint returned HTTP $status"
     rm -f "$response_file"
     return 1
   fi
@@ -166,11 +167,14 @@ check_likes_profile_privacy() {
   local count
   count="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(x.length))' "$response_file")"
   rm -f "$response_file"
-  echo "PASS Likes public-profile privacy $origin ($count profiles checked)"
+  echo "PASS public-profile privacy $origin$endpoint ($count profiles checked)"
 }
 
 check_likes_profile_privacy "$WORKER_URL" "Worker"
 check_likes_profile_privacy "$PAGES_URL" "Pages"
+
+check_likes_profile_privacy "$WORKER_URL" "Worker" "/api/matches/confirmed"
+check_likes_profile_privacy "$PAGES_URL" "Pages" "/api/matches/confirmed"
 
 # Exercise authenticated chat reads using a real room from the dedicated test
 # account. These GET requests do not create messages or alter delivery state.
