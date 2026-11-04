@@ -3970,7 +3970,7 @@ export class MongoDBConnection {
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
       let result;
       if (url.pathname === "/internal/chat/history") {
-        result = await this.getChatHistory(body.claims.sub, body.roomId, body.limit, body.skip, body.after || null);
+        result = await this.getChatHistory(body.claims.sub, body.roomId, body.limit, body.skip, body.after || null, body.before || null);
       } else if (url.pathname === "/internal/chat/conversations") {
         result = await this.getChatConversations(body.claims.sub);
       } else if (url.pathname === "/internal/chat/send") {
