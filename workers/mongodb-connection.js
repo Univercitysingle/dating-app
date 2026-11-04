@@ -566,27 +566,41 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { error: "Invalid user identity" } };
     if (!Array.isArray(photos)) return { status: 400, body: { error: "Invalid payload. 'photos' must be an array." } };
     if (photos.length > 6) return { status: 400, body: { error: "A maximum of 6 photos is allowed." } };
-    const normalized = [];
+    const requestedUrls = [];
     for (const photo of photos) {
       if (!photo || typeof photo !== "object" || Array.isArray(photo) ||
           typeof photo.url !== "string" || !photo.url || photo.url.length > 2048) {
         return { status: 400, body: { error: "Invalid photo entry." } };
       }
-      const item = { url: photo.url };
-      if (typeof photo.order === "number" && Number.isFinite(photo.order)) item.order = photo.order;
-      if (typeof photo.size === "number" && Number.isFinite(photo.size) && photo.size >= 0) item.size = photo.size;
-      if (typeof photo._id === "string" && /^[a-fA-F0-9]{24}$/.test(photo._id)) item._id = photo._id;
-      normalized.push(item);
+      if (requestedUrls.includes(photo.url)) return { status: 400, body: { error: "Duplicate photo entries are not allowed." } };
+      requestedUrls.push(photo.url);
     }
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
-      // Production collections support findOne; retain compatibility with
-      // lightweight test doubles that only implement updateOne.
+      const account = typeof users.findOne === "function"
+        ? await users.findOne({ uid }, { projection: { photos: 1, accountStatus: 1, suspendedUntil: 1 } })
+        : null;
       if (typeof users.findOne === "function") {
-        const account = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
         if (!account) return { status: 404, body: { error: "User not found" } };
         if (isAccountRestricted(account)) return { status: 403, body: { error: "Account is suspended or banned." } };
       }
+      const currentPhotos = Array.isArray(account?.photos) ? account.photos : [];
+      if (typeof users.findOne === "function") {
+        const currentUrls = currentPhotos.map((photo) => typeof photo === "string" ? photo : photo?.url);
+        if (requestedUrls.length !== currentUrls.length ||
+            requestedUrls.some((url) => !currentUrls.includes(url))) {
+          return { status: 400, body: { error: "Photo order can only contain the current user's existing photos." } };
+        }
+      }
+      const normalized = requestedUrls.map((url, order) => {
+        const existing = currentPhotos.find((photo) => (typeof photo === "string" ? photo : photo?.url) === url);
+        if (!existing) return { url, order };
+        if (typeof existing === "string") return { url, order };
+        const item = { url, order };
+        if (Number.isFinite(existing.size) && existing.size >= 0) item.size = existing.size;
+        if (typeof existing._id === "string" && /^[a-fA-F0-9]{24}$/.test(existing._id)) item._id = existing._id;
+        return item;
+      });
       const result = await users.updateOne({ uid }, { $set: { photos: normalized } });
       if (!result.matchedCount) return { status: 404, body: { error: "User not found" } };
       return await this.getCurrentUserProfile(uid);
