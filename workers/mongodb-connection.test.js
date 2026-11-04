@@ -170,6 +170,56 @@ test("Likes responses expose only sanitized public profile fields", async () => 
   assert.equal(profile.isBlurred, true);
 });
 
+test("superadmin Likes retains contact fields without exposing unrestricted profile records", async () => {
+  const likedUser = {
+    uid: "liked-user",
+    name: "Liked Profile",
+    email: "private@example.com",
+    mobileNumber: "+971500000000",
+    password: "never-return",
+    lastLoginIp: "203.0.113.25",
+    role: "user",
+    birthday: new Date("1995-06-01T00:00:00.000Z"),
+    blocked: ["someone"],
+    internalNotes: "must not leak",
+    metadata: { internalFlag: true },
+    location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45] },
+    bio: "Public biography"
+  };
+  const users = {
+    async findOne({ uid }) {
+      return uid === "current-user" ? { uid, role: "superadmin", plan: "basic" } : null;
+    },
+    find() {
+      return { async toArray() { return [likedUser]; } };
+    }
+  };
+  const matches = {
+    find() {
+      return { async toArray() { return [{ user1Uid: "liked-user", user2Uid: "current-user", status: "pending" }]; } };
+    }
+  };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getLikes("current-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  const profile = result.body[0];
+  assert.equal(profile.email, "private@example.com");
+  assert.equal(profile.mobileNumber, "+971500000000");
+  for (const field of ["password", "lastLoginIp", "role", "birthday", "blocked", "internalNotes", "metadata"]) {
+    assert.equal(Object.hasOwn(profile, field), false, field + " must not be exposed in Likes");
+  }
+  assert.deepEqual(profile.location, { city: "Abu Dhabi", country: "UAE" });
+});
+
 test("chat history is denied when either participant has blocked the other", async () => {
   for (const blockedBy of ["current-user", "other-user"]) {
     const users = {
