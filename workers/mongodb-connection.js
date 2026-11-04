@@ -3471,10 +3471,14 @@ export class MongoDBConnection {
     }
   }
 
-  async getChatHistory(uid, roomId, limit = 50, skip = 0) {
+  async getChatHistory(uid, roomId, limit = 50, skip = 0, after = null) {
     if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
     skip = Number.isInteger(skip) ? Math.max(0, Math.min(skip, 100000)) : 0;
+    if (after && (!(after.timestamp instanceof Date) || Number.isNaN(after.timestamp.getTime()) ||
+        typeof after.id !== "string" || !/^[a-fA-F0-9]{24}$/.test(after.id))) {
+      return { status: 400, body: { error: "Invalid message cursor" } };
+    }
     try {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid }, { projection: { role: 1, blocked: 1 } });
@@ -3496,12 +3500,29 @@ export class MongoDBConnection {
         }
         query = participantQuery;
       }
-      // Read newest messages first so the default page always contains the
-      // latest conversation activity, then reverse for chronological display.
-      // Increasing skip loads progressively older pages.
-      const messages = await db.collection("chatmessages").find(query)
-        .sort({ timestamp: -1, _id: -1 }).skip(skip).limit(limit).maxTimeMS(10000).toArray();
-      messages.reverse();
+      let messages;
+      if (after) {
+        // Incremental sync uses a stable (timestamp, ObjectId) cursor so equal
+        // timestamps cannot cause messages to be skipped or returned twice.
+        const { ObjectId } = await import("mongodb");
+        query = {
+          ...query,
+          $and: [
+            ...(query.$or ? [{ $or: query.$or }] : []),
+            { $or: [
+              { timestamp: { $gt: after.timestamp } },
+              { timestamp: after.timestamp, _id: { $gt: new ObjectId(after.id) } }
+            ] }
+          ]
+        };
+        messages = await db.collection("chatmessages").find(query)
+          .sort({ timestamp: 1, _id: 1 }).limit(limit).maxTimeMS(10000).toArray();
+      } else {
+        // Initial page and older-page pagination retain newest-first selection.
+        messages = await db.collection("chatmessages").find(query)
+          .sort({ timestamp: -1, _id: -1 }).skip(skip).limit(limit).maxTimeMS(10000).toArray();
+        messages.reverse();
+      }
       return { status: 200, body: { messages } };
     } catch {
       return { status: 503, body: { error: "Chat history unavailable" } };
