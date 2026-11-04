@@ -2716,7 +2716,7 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const targetId = new ObjectId(userId);
-      const target = await users.findOne({ _id: targetId }, { projection: { role: 1 } });
+      const target = await users.findOne({ _id: targetId }, { projection: { role: 1, accountStatus: 1, suspendedUntil: 1 } });
       if (!target) return { status: 404, body: { message: "User not found" } };
       if (target.role === "superadmin") return { status: 403, body: { message: "Superadmin accounts cannot be modified" } };
       if (access.role !== "superadmin" && target.role !== "user") {
@@ -2746,6 +2746,13 @@ export class MongoDBConnection {
       if (update.name !== undefined && (typeof update.name !== "string" || update.name.length > 160)) return { status: 400, body: { message: "Invalid name" } };
       if (update.bio !== undefined && (typeof update.bio !== "string" || update.bio.length > 5000)) return { status: 400, body: { message: "Invalid bio" } };
       if (update.isProfileVisible !== undefined && typeof update.isProfileVisible !== "boolean") return { status: 400, body: { message: "Invalid profile visibility" } };
+      if (update.isProfileVisible === true && (
+        target.accountStatus === "temporarily_suspended" ||
+        target.accountStatus === "permanently_banned" ||
+        (target.suspendedUntil && new Date(target.suspendedUntil) > new Date())
+      )) {
+        return { status: 403, body: { message: "Suspended or banned accounts cannot be made visible" } };
+      }
       if (update.interests !== undefined && (!Array.isArray(update.interests) || update.interests.length > 100 || update.interests.some(x => typeof x !== "string" || x.length > 100))) return { status: 400, body: { message: "Invalid interests" } };
       update.updatedAt = new Date();
       const result = await users.findOneAndUpdate(
