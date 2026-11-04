@@ -1981,12 +1981,19 @@ export default {
           try { roomId = decodeURIComponent(chatRoute[2]); } catch { return json({ error: "Invalid room ID" }, 400); }
           const limitRaw = url.searchParams.get("limit");
           const skipRaw = url.searchParams.get("skip");
+          const afterRaw = url.searchParams.get("after");
+          const afterId = url.searchParams.get("afterId");
           const limit = limitRaw === null ? 50 : Number(limitRaw);
           const skip = skipRaw === null ? 0 : Number(skipRaw);
-          if (!Number.isInteger(limit) || !Number.isInteger(skip) || limit < 1 || skip < 0) return json({ error: "Invalid pagination" }, 400);
+          if (!Number.isInteger(limit) || !Number.isInteger(skip) || limit < 1 || limit > 100 || skip < 0 ||
+              ((afterRaw === null) !== (afterId === null)) ||
+              (afterRaw !== null && (Number.isNaN(Date.parse(afterRaw)) || !/^[a-fA-F0-9]{24}$/.test(afterId)))) {
+            return json({ error: "Invalid pagination or message cursor" }, 400);
+          }
+          const after = afterRaw === null ? null : { timestamp: new Date(afterRaw), id: afterId };
           const response = await connection.fetch("https://internal.invalid/internal/chat/history", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, roomId, limit, skip })
+            body: JSON.stringify({ claims, roomId, limit, skip, after })
           });
           const result = await response.json().catch(() => ({ error: "Chat history unavailable" }));
           return json(result, response.status);
