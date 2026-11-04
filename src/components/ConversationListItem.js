@@ -6,7 +6,8 @@ import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../ut
 const ConversationListItem = ({ conversation }) => {
   const otherUser = conversation?.otherUser || {};
   const lastMessage = conversation?.lastMessage || null;
-  const unreadCount = Number.isFinite(conversation.unreadCount) ? Math.max(0, conversation.unreadCount) : 0;
+  const unreadCountValue = Number(conversation?.unreadCount);
+  const unreadCount = Number.isFinite(unreadCountValue) ? Math.max(0, unreadCountValue) : 0;
   const hasUnread = unreadCount > 0;
   const photoValue = otherUser.photos?.[0]?.url;
   const avatarUrl = resolvePhotoUrl(photoValue);
