@@ -110,6 +110,66 @@ test("Discover responses expose only sanitized public profile fields", async () 
   assert.equal(profile.bio, "Public biography");
 });
 
+test("Likes responses expose only sanitized public profile fields", async () => {
+  const likedUser = {
+    uid: "liked-user",
+    name: "Liked Profile",
+    email: "private@example.com",
+    email_address: "private-alias@example.com",
+    mobileNumber: "+971500000000",
+    phone_number: "+971500000001",
+    whatsappNumber: "+971500000002",
+    password: "never-return",
+    lastLoginIp: "203.0.113.25",
+    birthday: new Date("1995-06-01T00:00:00.000Z"),
+    role: "user",
+    blocked: ["someone"],
+    location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45] },
+    bio: "Public biography",
+    profilePrompts: [{ question: "About me", answer: "Public answer", email: "hidden@example.com" }],
+    metadata: { internalFlag: true }
+  };
+  const users = {
+    async findOne({ uid }) {
+      return uid === "current-user" ? { uid, role: "user", plan: "basic" } : null;
+    },
+    find(query) {
+      assert.deepEqual(query, { uid: { $in: ["liked-user"] } });
+      return { async toArray() { return [likedUser]; } };
+    }
+  };
+  const matches = {
+    find(query) {
+      assert.deepEqual(query, { user2Uid: "current-user", status: "pending" });
+      return { async toArray() { return [{ user1Uid: "liked-user", superLike: true }]; } };
+    }
+  };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getLikes("current-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  const profile = result.body[0];
+  for (const field of [
+    "email", "email_address", "mobileNumber", "phone_number", "whatsappNumber",
+    "password", "lastLoginIp", "birthday", "role", "blocked", "metadata"
+  ]) {
+    assert.equal(Object.hasOwn(profile, field), false, field + " must not be exposed in Likes");
+  }
+  assert.deepEqual(profile.location, { city: "Abu Dhabi", country: "UAE" });
+  assert.deepEqual(profile.profilePrompts, [{ question: "About me", answer: "Public answer" }]);
+  assert.equal(profile.bio, "Public biography");
+  assert.equal(profile.likeType, "superlike");
+  assert.equal(profile.isBlurred, true);
+});
+
 test("chat history is denied when either participant has blocked the other", async () => {
   for (const blockedBy of ["current-user", "other-user"]) {
     const users = {
