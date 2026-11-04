@@ -176,6 +176,51 @@ check_likes_profile_privacy "$PAGES_URL" "Pages"
 check_likes_profile_privacy "$WORKER_URL" "Worker" "/api/matches/confirmed"
 check_likes_profile_privacy "$PAGES_URL" "Pages" "/api/matches/confirmed"
 
+# Verify individual public-profile retrieval applies the same privacy allowlist
+# as Discover, Likes, and confirmed Matches. Use a UID returned by Discover.
+check_individual_public_profile_privacy() {
+  local base_url="$1"
+  local origin="$2"
+  local discover_file profile_file target_uid status
+  discover_file="$(mktemp)"
+  profile_file="$(mktemp)"
+  status="$(curl --silent --show-error --output "$discover_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/users/discover")"
+  if [[ "$status" != "200" ]]; then
+    echo "::error::Could not retrieve Discover candidates for individual profile privacy test on $origin (HTTP $status)."
+    rm -f "$discover_file" "$profile_file"
+    return 1
+  fi
+  target_uid="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const list=Array.isArray(x)?x:(Array.isArray(x.users)?x.users:(Array.isArray(x.profiles)?x.profiles:[]));const p=list.find(v=>v&&typeof v.uid==="string"&&v.uid);if(p)process.stdout.write(p.uid)' "$discover_file")"
+  rm -f "$discover_file"
+  if [[ -z "$target_uid" ]]; then
+    echo "PASS individual public-profile privacy $origin (no Discover candidate available; endpoint not exercised)"
+    rm -f "$profile_file"
+    return 0
+  fi
+  status="$(curl --silent --show-error --output "$profile_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/users/$target_uid")"
+  if [[ "$status" != "200" ]]; then
+    echo "::error::Individual public profile returned HTTP $status on $origin."
+    rm -f "$profile_file"
+    return 1
+  fi
+  if ! node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!p||typeof p!=="object"||Array.isArray(p))throw Error("Profile response must be an object");const denied=new Set(["password","password_hash","passwordHash","email","email_address","emailAddress","mobileNumber","mobile_number","phone","phone_number","phoneNumber","whatsappNumber","lastLoginIp","last_login_ip","lastLoginDevice","birthday","role","blocked","coordinates","latitude","longitude","lat","lng","exactLocation"]);const visit=(v,path)=>{if(!v||typeof v!=="object")return;for(const [k,n] of Object.entries(v)){if(denied.has(k))throw Error("Public profile exposes restricted field: "+path+"."+k);if(k==="location"&&n&&typeof n==="object"&&!Array.isArray(n)){for(const lk of Object.keys(n)){if(!["city","region","state","country","countryCode","cityName"].includes(lk))throw Error("Public profile exposes non-public location detail: "+lk)}}visit(n,path+"."+k)}};visit(p,"profile")' "$profile_file"; then
+    echo "::error::Individual public profile exposes restricted account, contact, or precise-location data on $origin."
+    rm -f "$profile_file"
+    return 1
+  fi
+  rm -f "$profile_file"
+  echo "PASS individual public-profile privacy $origin"
+}
+
+check_individual_public_profile_privacy "$WORKER_URL" "Worker"
+check_individual_public_profile_privacy "$PAGES_URL" "Pages"
+
 # Exercise authenticated chat reads using a real room from the dedicated test
 # account. These GET requests do not create messages or alter delivery state.
 check_chat_room_reads() {
