@@ -30,6 +30,9 @@ function Chat() {
   const pendingScrollRestoreRef = useRef(null);
   const lastRenderedMessageIdRef = useRef(null);
   const historyPollRef = useRef(null);
+  const historyCursorRef = useRef(null);
+  const initialHistoryLoadedRef = useRef(false);
+  const readReceiptInFlightRef = useRef(new Set());
   const pendingMessageRef = useRef(null);
   const addMessageRef = useRef(addMessage);
   useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
@@ -60,69 +63,115 @@ function Chat() {
   }, [messages]);
 
   useEffect(() => {
-    // Keep the room hydrated from MongoDB even if Firebase RTDB or Socket.IO
-    // realtime delivery is unavailable. The API enforces participant access.
+    // MongoDB remains authoritative. Fetch the latest page once, then request
+    // only messages newer than the last persisted (timestamp, ObjectId) cursor.
     let cancelled = false;
-    let historySyncInProgress = false;
+    let syncInProgress = false;
+    historyCursorRef.current = null;
+    initialHistoryLoadedRef.current = false;
+
     const syncHistory = async () => {
-      // Avoid overlapping polls when MongoDB or the network takes longer than
-      // the three-second refresh interval.
-      if (cancelled || historySyncInProgress) return;
-      historySyncInProgress = true;
+      if (cancelled || syncInProgress) return;
+      syncInProgress = true;
       try {
-        const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
-        if (!cancelled && Array.isArray(result?.messages)) {
-          setHasOlderMessages(result.messages.length === 50);
-          result.messages.forEach(message => addMessageRef.current(message));
-          const incomingMessages = result.messages.filter(message =>
-            message.receiverUid === user.uid &&
-            message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
-          );
-          const awaitingDelivery = incomingMessages.filter(message => message.status === 'sent');
-          if (awaitingDelivery.length) {
-            try {
-              await apiClient.post('/chat/delivered', {
-                roomId: chatId,
-                messageIds: awaitingDelivery.map(message => String(message._id)),
-              });
-              if (!cancelled) awaitingDelivery.forEach(message =>
-                addMessageRef.current({ ...message, status: 'delivered' })
-              );
-            } catch (deliveryError) {
-              logger.debug('Message delivery receipt deferred:', deliveryError?.status || 'network error');
-            }
-          }
-          const unreadIncoming = incomingMessages.filter(message => message.status !== 'read');
-          if (unreadIncoming.length) {
-            try {
-              await apiClient.post('/chat/read', {
-                roomId: chatId,
-                messageIds: unreadIncoming.map(message => String(message._id)),
-              });
-              if (!cancelled) unreadIncoming.forEach(message =>
-                addMessageRef.current({ ...message, status: 'read' })
-              );
-            } catch (readError) {
-              logger.debug('Message read receipt deferred:', readError?.status || 'network error');
-            }
+        const cursor = historyCursorRef.current;
+        const query = cursor
+          ? `?limit=100&after=${encodeURIComponent(cursor.timestamp)}&afterId=${encodeURIComponent(cursor.id)}`
+          : '?limit=50';
+        const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}${query}`);
+        if (cancelled || !Array.isArray(result?.messages)) return;
+
+        const fetched = result.messages;
+        if (!initialHistoryLoadedRef.current) {
+          setHasOlderMessages(fetched.length === 50);
+          initialHistoryLoadedRef.current = true;
+        }
+        fetched.forEach(message => addMessageRef.current(message));
+
+        const persisted = fetched.filter(message =>
+          message._id && /^[a-fA-F0-9]{24}$/.test(String(message._id))
+        );
+        if (persisted.length) {
+          const latest = persisted[persisted.length - 1];
+          historyCursorRef.current = {
+            timestamp: new Date(latest.timestamp).toISOString(),
+            id: String(latest._id),
+          };
+        }
+
+        // Delivery means the recipient's authenticated client has retrieved
+        // the persisted message. Read is handled separately by visibility.
+        const awaitingDelivery = fetched.filter(message =>
+          message.receiverUid === user.uid &&
+          message.status === 'sent' &&
+          /^[a-fA-F0-9]{24}$/.test(String(message._id))
+        );
+        for (let index = 0; index < awaitingDelivery.length; index += 100) {
+          const batch = awaitingDelivery.slice(index, index + 100);
+          try {
+            await apiClient.post('/chat/delivered', {
+              roomId: chatId,
+              messageIds: batch.map(message => String(message._id)),
+            });
+            if (!cancelled) batch.forEach(message =>
+              addMessageRef.current({ ...message, status: 'delivered' })
+            );
+          } catch (deliveryError) {
+            logger.debug('Message delivery receipt deferred:', deliveryError?.status || 'network error');
           }
         }
       } catch (historyError) {
-        if (!cancelled) logger.debug('Chat history refresh unavailable:', historyError?.status || 'network error');
+        if (!cancelled) logger.debug('Chat history sync unavailable:', historyError?.status || 'network error');
       } finally {
-        historySyncInProgress = false;
+        syncInProgress = false;
       }
     };
+
     if (user?.uid && chatId) {
       syncHistory();
-      historyPollRef.current = setInterval(syncHistory, 3000);
+      historyPollRef.current = window.setInterval(syncHistory, 5000);
     }
     return () => {
       cancelled = true;
-      if (historyPollRef.current) clearInterval(historyPollRef.current);
+      if (historyPollRef.current) window.clearInterval(historyPollRef.current);
       historyPollRef.current = null;
     };
   }, [chatId, user?.uid]);
+
+  useEffect(() => {
+    // Only mark incoming messages as read after their message row is actually
+    // visible in the active, foreground conversation.
+    const container = messagesContainerRef.current;
+    if (!container || !user?.uid || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(async entries => {
+      if (document.visibilityState !== 'visible') return;
+      const visibleIds = entries
+        .filter(entry => entry.isIntersecting)
+        .map(entry => entry.target.getAttribute('data-chat-message-id'))
+        .filter(id => id && /^[a-fA-F0-9]{24}$/.test(id));
+      const visibleUnread = messages.filter(message =>
+        visibleIds.includes(String(message._id)) &&
+        message.receiverUid === user.uid &&
+        message.status !== 'read' &&
+        !readReceiptInFlightRef.current.has(String(message._id))
+      );
+      for (let index = 0; index < visibleUnread.length; index += 100) {
+        const batch = visibleUnread.slice(index, index + 100);
+        const ids = batch.map(message => String(message._id));
+        ids.forEach(id => readReceiptInFlightRef.current.add(id));
+        try {
+          await apiClient.post('/chat/read', { roomId: chatId, messageIds: ids });
+          batch.forEach(message => addMessageRef.current({ ...message, status: 'read' }));
+        } catch (readError) {
+          ids.forEach(id => readReceiptInFlightRef.current.delete(id));
+          logger.debug('Message read receipt deferred:', readError?.status || 'network error');
+        }
+      }
+    }, { root: container, threshold: 0.6 });
+
+    container.querySelectorAll('[data-chat-message-id]').forEach(element => observer.observe(element));
+    return () => observer.disconnect();
+  }, [chatId, user?.uid, messages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,12 +451,16 @@ function Chat() {
             receiverUid: call.receiverUid,
             timestamp: call.createdAt || call.updatedAt,
           }))].sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()).map((msg) => (
-            <ChatMessage
+            <div
               key={msg._id}
-              message={msg}
-              currentUser={user}
-              otherUser={otherUser}
-            />
+              data-chat-message-id={msg.messageType === 'call' ? undefined : String(msg._id)}
+            >
+              <ChatMessage
+                message={msg}
+                currentUser={user}
+                otherUser={otherUser}
+              />
+            </div>
           ))}
         </div>
         <div ref={messagesEndRef} />
