@@ -17,6 +17,8 @@ function Chat() {
   const [otherUser, setOtherUser] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [callHistory, setCallHistory] = useState([]);
   const { user } = useAuth();
   const { socket, allMessages, addMessage, removeMessage } = useSocket();
@@ -24,6 +26,9 @@ function Chat() {
   const typingTimeoutRef = useRef(null);
   const typingLastSentAtRef = useRef(0);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const pendingScrollRestoreRef = useRef(null);
+  const lastRenderedMessageIdRef = useRef(null);
   const historyPollRef = useRef(null);
   const pendingMessageRef = useRef(null);
   const addMessageRef = useRef(addMessage);
@@ -41,7 +46,17 @@ function Chat() {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    const lastMessage = messages[messages.length - 1];
+    const lastMessageId = lastMessage ? String(lastMessage._id) : null;
+    if (pendingScrollRestoreRef.current && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const previous = pendingScrollRestoreRef.current;
+      container.scrollTop = previous.scrollTop + (container.scrollHeight - previous.scrollHeight);
+      pendingScrollRestoreRef.current = null;
+    } else if (lastMessageId && lastMessageId !== lastRenderedMessageIdRef.current) {
+      scrollToBottom();
+    }
+    lastRenderedMessageIdRef.current = lastMessageId;
   }, [messages]);
 
   useEffect(() => {
@@ -57,6 +72,7 @@ function Chat() {
       try {
         const result = await apiClient.get(`/chat/history/${encodeURIComponent(chatId)}?limit=50`);
         if (!cancelled && Array.isArray(result?.messages)) {
+          setHasOlderMessages(result.messages.length === 50);
           result.messages.forEach(message => addMessageRef.current(message));
           const incomingMessages = result.messages.filter(message =>
             message.receiverUid === user.uid &&
@@ -209,6 +225,33 @@ function Chat() {
     };
   }, [socket, chatId, user?.uid, otherUserUid]);
 
+  const loadOlderMessages = async () => {
+    if (isLoadingOlder || !hasOlderMessages) return;
+    const persistedCount = messages.filter(message => /^[a-fA-F0-9]{24}$/.test(String(message._id))).length;
+    const container = messagesContainerRef.current;
+    if (container) {
+      pendingScrollRestoreRef.current = {
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+      };
+    }
+    setIsLoadingOlder(true);
+    try {
+      const result = await apiClient.get(
+        `/chat/history/${encodeURIComponent(chatId)}?limit=50&skip=${persistedCount}`
+      );
+      const olderMessages = Array.isArray(result?.messages) ? result.messages : [];
+      olderMessages.forEach(message => addMessageRef.current(message));
+      setHasOlderMessages(olderMessages.length === 50);
+      if (!olderMessages.length) pendingScrollRestoreRef.current = null;
+    } catch (historyError) {
+      pendingScrollRestoreRef.current = null;
+      setError('Older messages could not be loaded. Please try again.');
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!input.trim() || isSending) return;
@@ -337,8 +380,20 @@ function Chat() {
       </header>
       {error && <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800" role="alert">{error}</div>}
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
-      <main className="chat-messages chat-wallpaper flex-grow overflow-y-auto px-3 py-5 sm:px-6">
+      <main ref={messagesContainerRef} className="chat-messages chat-wallpaper flex-grow overflow-y-auto px-3 py-5 sm:px-6">
         <div className="chat-message-stack mx-auto flex max-w-3xl flex-col gap-3">
+          {hasOlderMessages && (
+            <div className="flex justify-center pb-2">
+              <button
+                type="button"
+                onClick={loadOlderMessages}
+                disabled={isLoadingOlder}
+                className="rounded-full border border-gray-200 bg-white/90 px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm transition hover:bg-white disabled:cursor-wait disabled:opacity-60"
+              >
+                {isLoadingOlder ? 'Loading older messages…' : 'Load older messages'}
+              </button>
+            </div>
+          )}
           {[...messages, ...callHistory.map(call => ({
             _id: `call-${call._id}`,
             messageType: 'call',
