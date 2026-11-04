@@ -2470,7 +2470,7 @@ export class MongoDBConnection {
     if (!update || typeof update !== "object" || Array.isArray(update)) return { status: 400, body: { error: "A JSON profile object is required" } };
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
-      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1, accountStatus: 1, suspendedUntil: 1 } });
+      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1, accountStatus: 1, suspendedUntil: 1, photos: 1 } });
       if (!current) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(current)) return { status: 403, body: { error: "Account is suspended or banned." } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
@@ -2484,6 +2484,32 @@ export class MongoDBConnection {
         badges: ["height"]
       };
       const sanitizedUpdate = {};
+      if (Object.hasOwn(update, "photos")) {
+        if (onboardingComplete || !Array.isArray(update.photos) || update.photos.length < 1 || update.photos.length > 6) {
+          return { status: 400, body: { error: "Profile photos must be uploaded before they can be added to onboarding." } };
+        }
+        const currentPhotos = Array.isArray(current.photos) ? current.photos : [];
+        const requestedUrls = [];
+        for (const photo of update.photos) {
+          if (!photo || typeof photo !== "object" || Array.isArray(photo) ||
+              typeof photo.url !== "string" || !photo.url || photo.url.length > 256 ||
+              requestedUrls.includes(photo.url)) {
+            return { status: 400, body: { error: "Invalid onboarding photo entry." } };
+          }
+          requestedUrls.push(photo.url);
+        }
+        const ownedPhotos = requestedUrls.map((url, order) => {
+          const existing = currentPhotos.find((photo) => photo && typeof photo.url === "string" && photo.url === url);
+          if (!existing) return null;
+          const item = { url, order };
+          if (Number.isInteger(existing.size) && existing.size > 0) item.size = existing.size;
+          return item;
+        });
+        if (ownedPhotos.some((photo) => photo === null)) {
+          return { status: 400, body: { error: "Onboarding photos must belong to the current user's uploaded photos." } };
+        }
+        sanitizedUpdate.photos = ownedPhotos;
+      }
       for (const key of allowedFields) {
         if (update[key] === undefined) continue;
         if (nestedAllowed[key]) {
