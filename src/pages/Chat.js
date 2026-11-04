@@ -9,7 +9,7 @@ import ChatMessage from '../components/ChatMessage';
 import ChatCallPanel from '../components/ChatCallPanel';
 import { database } from '../firebase';
 import { ref, onChildAdded, off } from 'firebase/database';
-import { getVisibleChatMessageIds } from '../utils/chat';
+import { collectPendingDeliveryMessages, getVisibleChatMessageIds } from '../utils/chat';
 
 function Chat() {
   const [input, setInput] = useState('');
@@ -35,6 +35,7 @@ function Chat() {
   const olderHistoryCursorRef = useRef(null);
   const initialHistoryLoadedRef = useRef(false);
   const readReceiptInFlightRef = useRef(new Set());
+  const pendingDeliveryRef = useRef(new Map());
   const pendingMessageRef = useRef(null);
   const addMessageRef = useRef(addMessage);
   useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
@@ -72,6 +73,7 @@ function Chat() {
     historyCursorRef.current = null;
     olderHistoryCursorRef.current = null;
     initialHistoryLoadedRef.current = false;
+    pendingDeliveryRef.current.clear();
 
     const syncHistory = async () => {
       if (cancelled || syncInProgress) return;
@@ -111,10 +113,13 @@ function Chat() {
 
         // Delivery means the recipient's authenticated client has retrieved
         // the persisted message. Read is handled separately by visibility.
-        const awaitingDelivery = fetched.filter(message =>
-          message.receiverUid === user.uid &&
-          message.status === 'sent' &&
-          /^[a-fA-F0-9]{24}$/.test(String(message._id))
+        // Keep failed delivery receipts queued independently of the history
+        // cursor. A successful history sync must not make a failed receipt
+        // disappear from future retry attempts.
+        const awaitingDelivery = collectPendingDeliveryMessages(
+          fetched,
+          pendingDeliveryRef.current,
+          user.uid
         );
         for (let index = 0; index < awaitingDelivery.length; index += 100) {
           const batch = awaitingDelivery.slice(index, index + 100);
@@ -123,10 +128,12 @@ function Chat() {
               roomId: chatId,
               messageIds: batch.map(message => String(message._id)),
             });
+            batch.forEach(message => pendingDeliveryRef.current.delete(String(message._id)));
             if (!cancelled) batch.forEach(message =>
               addMessageRef.current({ ...message, status: 'delivered' })
             );
           } catch (deliveryError) {
+            // Leave the batch in pendingDeliveryRef so the next sync retries it.
             logger.debug('Message delivery receipt deferred:', deliveryError?.status || 'network error');
           }
         }
