@@ -12,6 +12,7 @@ function ConversationsPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [hasLoaded, setHasLoaded] = useState(false);
+  const hasLoadedRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const requestInFlightRef = useRef(false);
   const mountedRef = useRef(true);
@@ -19,7 +20,7 @@ function ConversationsPage() {
   const fetchConversations = useCallback(async ({ silent = false } = {}) => {
     if (requestInFlightRef.current || !currentUser) return;
     requestInFlightRef.current = true;
-    if (!silent && !hasLoaded) setIsLoading(true);
+    if (!silent && !hasLoadedRef.current) setIsLoading(true);
     if (!silent) setIsRefreshing(true);
     try {
       const data = await apiClient.get('/chat/conversations');
@@ -35,9 +36,10 @@ function ConversationsPage() {
       });
       setConversations(nextConversations);
       setError(null);
+      hasLoadedRef.current = true;
       setHasLoaded(true);
     } catch (err) {
-      if (mountedRef.current && (!silent || !hasLoaded)) {
+      if (mountedRef.current && (!silent || !hasLoadedRef.current)) {
         setError(getUserFriendlyError(err, 'We could not load your conversations. Please try again.'));
       }
     } finally {
@@ -47,7 +49,7 @@ function ConversationsPage() {
         setIsRefreshing(false);
       }
     }
-  }, [currentUser, hasLoaded]);
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -64,7 +66,7 @@ function ConversationsPage() {
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', poll);
     };
-  }, [currentUser, fetchConversations]);
+  }, [currentUser?.uid, fetchConversations]);
 
   const totalUnreadCount = conversations.reduce((total, conversation) => {
     const count = Number(conversation.unreadCount);
