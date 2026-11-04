@@ -168,8 +168,8 @@ sign_in_test_account() {
     return 1
   fi
   local token uid
-  token="$(node -e 'const x=require(process.argv[1]);if(!x.idToken||!x.localId)process.exit(1);process.stdout.write(x.idToken)' "$response_file")"
-  uid="$(node -e 'const x=require(process.argv[1]);process.stdout.write(x.localId)' "$response_file")"
+  token="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!x.idToken||!x.localId)process.exit(1);process.stdout.write(x.idToken)' "$response_file")"
+  uid="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(x.localId)' "$response_file")"
   rm -f "$response_file"
   printf -v "${output_var}_TOKEN" '%s' "$token"
   printf -v "${output_var}_UID" '%s' "$uid"
@@ -237,7 +237,7 @@ if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.pa
   rm -f "$receipt_file"
   exit 1
 fi
-rm -f "$receipt_file" "$receipt_payload"
+rm -f "$receipt_file"
 echo "PASS account B persisted a read receipt"
 
 sender_history="$(mktemp)"
