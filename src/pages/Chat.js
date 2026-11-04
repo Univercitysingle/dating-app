@@ -9,6 +9,7 @@ import ChatMessage from '../components/ChatMessage';
 import ChatCallPanel from '../components/ChatCallPanel';
 import { database } from '../firebase';
 import { ref, onChildAdded, off } from 'firebase/database';
+import { getVisibleChatMessageIds } from '../utils/chat';
 
 function Chat() {
   const [input, setInput] = useState('');
@@ -159,10 +160,10 @@ function Chat() {
     if (!container || !user?.uid || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(async entries => {
       if (document.visibilityState !== 'visible') return;
-      const visibleIds = entries
-        .filter(entry => entry.isIntersecting)
-        .map(entry => entry.target.getAttribute('data-chat-message-id'))
-        .filter(id => id && /^[a-fA-F0-9]{24}$/.test(id));
+      // IntersectionObserver fires an initial callback for any intersecting
+      // element, even below the configured threshold. Enforce the 60% rule
+      // explicitly so partially visible messages are not marked as read.
+      const visibleIds = getVisibleChatMessageIds(entries, 0.6);
       const visibleUnread = messages.filter(message =>
         visibleIds.includes(String(message._id)) &&
         message.receiverUid === user.uid &&
