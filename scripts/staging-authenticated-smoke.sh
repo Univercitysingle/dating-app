@@ -136,8 +136,22 @@ check_chat_room_reads() {
     rm -f "$response_file" "$history_file" "$delta_file"
     return 1
   fi
-  rm -f "$response_file" "$history_file" "$delta_file"
-  echo "PASS authenticated inbox latest message matches persisted history and incremental cursor works $origin"
+  local before_query
+  before_query="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const m=x.messages?.[0];if(!m?._id||!m.timestamp)process.exit(1);const p=new URLSearchParams({limit:"10",before:new Date(m.timestamp).toISOString(),beforeId:String(m._id)});process.stdout.write(p.toString())' "$history_file")"
+  local older_file
+  older_file="$(mktemp)"
+  status="$(curl --silent --show-error --output "$older_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/chat/history/$encoded_room?$before_query")"
+  if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const page=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const cursor=JSON.parse(fs.readFileSync(process.argv[2],"utf8")).messages?.[0];if(!cursor||!Array.isArray(page.messages)||page.messages.length>10)throw Error("Older history page has an invalid shape or size");let previous=null;for(const m of page.messages){if(!/^[a-fA-F0-9]{24}$/.test(String(m._id)))throw Error("Older history contains an invalid message ID");const t=Date.parse(m.timestamp),ct=Date.parse(cursor.timestamp);if(!Number.isFinite(t)||t>ct||(t===ct&&String(m._id)>=String(cursor._id)))throw Error("Older history returned a message at or after its cursor");if(previous){const pt=Date.parse(previous.timestamp);if(pt>t||(pt===t&&String(previous._id)>String(m._id)))throw Error("Older history is not in stable chronological order")}previous=m}' "$older_file" "$history_file"; then
+    echo "::error::Authenticated before-cursor chat history failed for $origin (HTTP $status)."
+    node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(x.error||x.message)console.error(String(x.error||x.message).slice(0,200));else console.error("Unexpected older history response shape");}catch{}' "$older_file"
+    rm -f "$response_file" "$history_file" "$delta_file" "$older_file"
+    return 1
+  fi
+  rm -f "$response_file" "$history_file" "$delta_file" "$older_file"
+  echo "PASS authenticated incremental and before-cursor chat history ordering $origin"
   check_get "$base_url" "/api/chat/typing?roomId=$encoded_room" "$origin"
 }
 
