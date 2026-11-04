@@ -48,6 +48,68 @@ test("discovery combines boosted and regular candidates with safe array defaults
   assert.doesNotMatch(JSON.stringify(project), /"\$in"/);
 });
 
+test("Discover responses expose only sanitized public profile fields", async () => {
+  const candidate = {
+    uid: "candidate-user",
+    name: "Candidate",
+    email: "private@example.com",
+    email_address: "private-alias@example.com",
+    mobileNumber: "+971500000000",
+    phone_number: "+971500000001",
+    whatsappNumber: "+971500000002",
+    password: "never-return",
+    lastLoginIp: "203.0.113.20",
+    birthday: new Date("1995-06-01T00:00:00.000Z"),
+    role: "user",
+    blocked: ["someone"],
+    location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45] },
+    profilePrompts: [{ question: "About me", answer: "Public answer", email: "hidden@example.com" }],
+    bio: "Public biography"
+  };
+  const users = {
+    async findOne({ uid }) {
+      return uid === "current-user" ? { uid, blocked: [], preference: "everyone" } : null;
+    },
+    aggregate() {
+      return { toArray: async () => [{ uid: "candidate-user" }] };
+    },
+    find() {
+      return { toArray: async () => [candidate] };
+    }
+  };
+  const matches = {
+    async createIndex() { return "index-created"; },
+    find() {
+      return { project() { return this; }, toArray: async () => [] };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "matches") return matches;
+      assert.fail(`Unexpected collection: ${name}`);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers("current-user", {});
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  const profile = result.body[0];
+  for (const field of [
+    "email", "email_address", "mobileNumber", "phone_number", "whatsappNumber",
+    "password", "lastLoginIp", "birthday", "role", "blocked"
+  ]) {
+    assert.equal(Object.hasOwn(profile, field), false, field + " must not be exposed in Discover");
+  }
+  assert.deepEqual(profile.location, { city: "Abu Dhabi", country: "UAE" });
+  assert.deepEqual(profile.profilePrompts, [{ question: "About me", answer: "Public answer" }]);
+  assert.equal(profile.bio, "Public biography");
+});
+
 test("chat history is denied when either participant has blocked the other", async () => {
   for (const blockedBy of ["current-user", "other-user"]) {
     const users = {
