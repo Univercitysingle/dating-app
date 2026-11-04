@@ -122,8 +122,21 @@ check_chat_room_reads() {
     rm -f "$response_file" "$history_file"
     return 1
   fi
-  rm -f "$response_file" "$history_file"
-  echo "PASS authenticated inbox latest message matches persisted chat history $origin"
+  local cursor_query
+  cursor_query="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const m=x.find(item=>item.roomId===process.argv[2])?.lastMessage;if(!m?._id||!m.timestamp)process.exit(1);const p=new URLSearchParams({limit:"10",after:new Date(m.timestamp).toISOString(),afterId:String(m._id)});process.stdout.write(p.toString())' "$response_file" "$room_id")"
+  local delta_file
+  delta_file="$(mktemp)"
+  status="$(curl --silent --show-error --output "$delta_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
+    "$base_url/api/chat/history/$encoded_room?$cursor_query")"
+  if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!Array.isArray(x.messages))throw Error("Incremental history must return a messages array");for(let i=1;i<x.messages.length;i++){const a=x.messages[i-1],b=x.messages[i];const at=new Date(a.timestamp).getTime(),bt=new Date(b.timestamp).getTime();if(at>bt||(at===bt&&String(a._id)>String(b._id)))throw Error("Incremental messages are not in stable chronological order")}' "$delta_file"; then
+    echo "::error::Authenticated incremental chat history failed for $origin."
+    rm -f "$response_file" "$history_file" "$delta_file"
+    return 1
+  fi
+  rm -f "$response_file" "$history_file" "$delta_file"
+  echo "PASS authenticated inbox latest message matches persisted history and incremental cursor works $origin"
   check_get "$base_url" "/api/chat/typing?roomId=$encoded_room" "$origin"
 }
 
