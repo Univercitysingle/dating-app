@@ -1604,10 +1604,17 @@ test("chat conversations use a valid inclusion projection and return successfull
       };
       return {
         aggregate(pipeline) {
+          if (pipeline[0]?.$match?.receiverUid === "alice") {
+            assert.deepEqual(pipeline, [
+              { $match: { receiverUid: "alice", status: { $ne: "read" } } },
+              { $group: { _id: "$roomId", unreadCount: { $sum: 1 } } }
+            ]);
+            return { async toArray() { return []; } };
+          }
           assert.deepEqual(pipeline, [
             { $match: { $or: [{ senderUid: "alice" }, { receiverUid: "alice" }] } },
             { $sort: { timestamp: -1, _id: -1 } },
-            { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
+            { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
             { $replaceRoot: { newRoot: "$lastMessage" } },
             { $sort: { timestamp: -1, _id: -1 } }
           ]);
