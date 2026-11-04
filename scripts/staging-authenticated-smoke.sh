@@ -24,7 +24,7 @@ if [[ "$auth_status" != "200" ]]; then
 fi
 
 id_token="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!x.idToken)process.exit(1);process.stdout.write(x.idToken)' "$auth_file")"
-unset auth_payload STAGING_TEST_PASSWORD
+unset auth_payload
 
 check_get() {
   local base_url="$1"
