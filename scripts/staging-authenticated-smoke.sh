@@ -117,7 +117,7 @@ check_chat_room_reads() {
     rm -f "$response_file" "$history_file"
     return 1
   fi
-  if ! node -e 'const fs=require("fs");const inbox=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const history=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));const conversation=inbox.find(item=>item.roomId===process.argv[3]);const messages=history.messages;if(!conversation||!conversation.lastMessage||!Array.isArray(messages)||messages.length!==1||String(conversation.lastMessage._id)!==String(messages[0]._id))throw Error("Inbox latest message does not match newest persisted history message")' "$response_file" "$history_file" "$room_id"; then
+  if ! node -e 'const fs=require("fs");const inbox=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const history=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));const conversation=inbox.find(item=>item.roomId===process.argv[3]);const messages=history.messages;if(!conversation||!conversation.lastMessage||!Array.isArray(messages)||messages.length!==1||typeof messages[0]._id!=="string"||!/^[a-fA-F0-9]{24}$/.test(messages[0]._id)||typeof conversation.lastMessage._id!=="string"||!/^[a-fA-F0-9]{24}$/.test(conversation.lastMessage._id)||conversation.lastMessage._id!==messages[0]._id)throw Error("Inbox/history message IDs must be matching 24-character hexadecimal strings")' "$response_file" "$history_file" "$room_id"; then
     echo "::error::Inbox latest message did not match persisted chat history for $origin."
     rm -f "$response_file" "$history_file"
     return 1
