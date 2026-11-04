@@ -931,7 +931,7 @@ test("photo ordering rejects malformed payloads and too many photos", async () =
 });
 
 test("photo ordering persists only supported fields and returns the current profile", async () => {
-  const stored = { _id: "user-id", uid: "user-1", email: "user@example.com", photos: [] };
+  const stored = { _id: "user-id", uid: "user-1", email: "user@example.com", photos: [{ _id: "0123456789abcdef01234567", url: "photo.jpg", order: 0, size: 20 }] };
   let update;
   const users = {
     updateOne: async (_query, value) => { update = value; stored.photos = value.$set.photos.map((photo) => ({ ...photo })); return { matchedCount: 1 }; },
