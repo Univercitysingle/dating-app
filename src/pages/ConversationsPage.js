@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -11,25 +11,65 @@ function ConversationsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const requestInFlightRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  const fetchConversations = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchConversations = useCallback(async ({ silent = false } = {}) => {
+    if (requestInFlightRef.current || !currentUser) return;
+    requestInFlightRef.current = true;
+    if (!silent && !hasLoaded) setIsLoading(true);
+    if (!silent) setIsRefreshing(true);
     try {
       const data = await apiClient.get('/chat/conversations');
-      setConversations(Array.isArray(data) ? data : []);
+      if (!mountedRef.current) return;
+      const nextConversations = Array.isArray(data) ? data : [];
+      // Keep the inbox ordered by the newest persisted message, even if a
+      // response contains equal timestamps or arrives from a cached edge.
+      nextConversations.sort((left, right) => {
+        const leftTime = new Date(left.lastMessage?.timestamp || 0).getTime() || 0;
+        const rightTime = new Date(right.lastMessage?.timestamp || 0).getTime() || 0;
+        if (rightTime !== leftTime) return rightTime - leftTime;
+        return String(right.lastMessage?._id || '').localeCompare(String(left.lastMessage?._id || ''));
+      });
+      setConversations(nextConversations);
+      setError(null);
+      setHasLoaded(true);
     } catch (err) {
-      setError(getUserFriendlyError(err, 'We could not load your conversations. Please try again.'));
+      if (mountedRef.current && (!silent || !hasLoaded)) {
+        setError(getUserFriendlyError(err, 'We could not load your conversations. Please try again.'));
+      }
     } finally {
-      setIsLoading(false);
+      requestInFlightRef.current = false;
+      if (mountedRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, []);
+  }, [currentUser, hasLoaded]);
 
   useEffect(() => {
-    if (currentUser) fetchConversations();
+    mountedRef.current = true;
+    if (!currentUser) return undefined;
+    fetchConversations();
+
+    const poll = () => {
+      if (document.visibilityState === 'visible') fetchConversations({ silent: true });
+    };
+    const interval = window.setInterval(poll, 5000);
+    document.addEventListener('visibilitychange', poll);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', poll);
+    };
   }, [currentUser, fetchConversations]);
 
-  const totalUnreadCount = conversations.reduce((total, conversation) => total + (Number.isFinite(conversation.unreadCount) ? Math.max(0, conversation.unreadCount) : 0), 0);
+  const totalUnreadCount = conversations.reduce((total, conversation) => {
+    const count = Number(conversation.unreadCount);
+    return total + (Number.isFinite(count) ? Math.max(0, count) : 0);
+  }, 0);
 
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -49,7 +89,7 @@ function ConversationsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Messages</h1>
           <p className="mt-1 text-sm text-gray-500">Every good connection starts with a conversation.</p>
         </div>
-        <button type="button" onClick={fetchConversations} disabled={isLoading} className="inbox-refresh" aria-label="Refresh conversations" title="Refresh conversations">
+        <button type="button" onClick={() => fetchConversations()} disabled={isRefreshing || isLoading} className={`inbox-refresh ${isRefreshing ? 'is-refreshing' : ''}`} aria-label="Refresh conversations" title="Refresh conversations">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 9a6.5 6.5 0 0 1 10.8-2L20 12M4 12l3.1 5a6.5 6.5 0 0 0 10.8-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       </div>
@@ -58,7 +98,7 @@ function ConversationsPage() {
         <aside className="inbox-sidebar">
           <div className="inbox-sidebar-header">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2"><h2 className="text-lg font-bold text-gray-900">Chats</h2>{totalUnreadCount > 0 && <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white" aria-label={`${totalUnreadCount} unread messages`}>{totalUnreadCount > 99 ? "99+" : totalUnreadCount} unread</span>}</div>
+              <div className="flex min-w-0 items-center gap-2"><h2 className="text-lg font-bold text-gray-900">Chats</h2>{totalUnreadCount > 0 && <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white" aria-label={`${totalUnreadCount} unread messages`} aria-live="polite">{totalUnreadCount > 99 ? "99+" : totalUnreadCount} unread</span>}</div>
               <span className="inbox-count" aria-label={`${conversations.length} conversations`}>{conversations.length}</span>
             </div>
             <label className="inbox-search mt-4">
@@ -69,12 +109,13 @@ function ConversationsPage() {
           </div>
 
           {error && <div className="state-panel state-error mx-4 my-4 text-sm" role="alert">{error}<button type="button" onClick={fetchConversations} className="ml-2 font-semibold underline">Retry</button></div>}
+          {isLoading && !hasLoaded && <div className="inbox-loading" role="status" aria-live="polite"><div className="app-loading-state app-loading-state--compact"><span className="app-loading-spinner" aria-hidden="true" /><div className="app-loading-copy"><p className="app-loading-title">Loading your conversations</p><p className="app-loading-message">Your latest messages will appear here.</p></div></div></div>}
           {!isLoading && !error && filteredConversations.length > 0 && (
             <div className="inbox-conversation-list">
               {filteredConversations.map((conversation) => <ConversationListItem key={conversation.roomId} conversation={conversation} />)}
             </div>
           )}
-          {!isLoading && !error && filteredConversations.length === 0 && (
+          {!isLoading && hasLoaded && !error && filteredConversations.length === 0 && (
             <div className="inbox-empty">
               <span className="inbox-empty-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5 8 8 0 0 1-3.2-.7L4 20l1.6-4.1A7.5 7.5 0 1 1 20 11.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>
