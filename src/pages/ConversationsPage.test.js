@@ -1,0 +1,86 @@
+import React from 'react';
+import { act, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import apiClient from '../api/apiClient';
+import ConversationsPage from './ConversationsPage';
+
+jest.mock('../api/apiClient', () => ({
+  __esModule: true,
+  default: { get: jest.fn() },
+}));
+
+jest.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ user: { uid: 'test-user' } }),
+}));
+
+const conversation = (roomId, name, timestamp, unreadCount = 0) => ({
+  roomId,
+  otherUser: { name },
+  lastMessage: {
+    _id: '507f1f77bcf86cd799439011',
+    timestamp,
+    messageContent: 'Hello there',
+  },
+  unreadCount,
+});
+
+describe('ConversationsPage inbox synchronization', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    apiClient.get.mockReset();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  it('shows unread totals and unread conversation highlighting data', async () => {
+    apiClient.get.mockResolvedValue([
+      conversation('room-a', 'Alex', '2026-11-04T09:00:00.000Z', 3),
+      conversation('room-b', 'Sam', '2026-11-04T08:00:00.000Z', 0),
+    ]);
+
+    render(
+      <MemoryRouter>
+        <ConversationsPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Alex')).toBeInTheDocument();
+    expect(screen.getByText('3 unread')).toBeInTheDocument();
+    expect(screen.getByText('Sam')).toBeInTheDocument();
+  });
+
+  it('refreshes the inbox every five seconds and reorders new activity', async () => {
+    apiClient.get
+      .mockResolvedValueOnce([
+        conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
+        conversation('room-b', 'Sam', '2026-11-04T07:00:00.000Z', 0),
+      ])
+      .mockResolvedValueOnce([
+        conversation('room-b', 'Sam', '2026-11-04T09:00:00.000Z', 2),
+        conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
+      ]);
+
+    render(
+      <MemoryRouter>
+        <ConversationsPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Alex')).toBeInTheDocument();
+    await act(async () => {
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+    });
+
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('2 unread')).toBeInTheDocument();
+    const links = screen.getAllByRole('link');
+    const samIndex = links.findIndex(link => link.textContent.includes('Sam'));
+    const alexIndex = links.findIndex(link => link.textContent.includes('Alex'));
+    expect(samIndex).toBeGreaterThanOrEqual(0);
+    expect(alexIndex).toBeGreaterThan(samIndex);
+  });
+});
