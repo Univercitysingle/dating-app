@@ -136,9 +136,9 @@ check_likes_profile_privacy() {
   local response_file
   response_file="$(mktemp)"
   local status
-  status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \\
-    --header "Authorization: Bearer $id_token" \\
-    --header 'Accept: application/json' \\
+  status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+    --header "Authorization: Bearer $id_token" \
+    --header 'Accept: application/json' \
     "$base_url/api/users/likes")"
   if [[ "$status" != "200" ]]; then
     echo "::error::Authenticated GET $origin/api/users/likes returned HTTP $status"
