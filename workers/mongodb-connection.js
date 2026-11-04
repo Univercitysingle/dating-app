@@ -3529,7 +3529,16 @@ export class MongoDBConnection {
           .sort({ timestamp: -1, _id: -1 }).skip(skip).limit(limit).maxTimeMS(10000).toArray();
         messages.reverse();
       }
-      return { status: 200, body: { messages } };
+      // Expose Mongo ObjectIds as stable 24-character hex strings. BSON's
+      // JSON representation can vary by driver/serializer, but the public
+      // cursor contract must always be a plain string.
+      const serializedMessages = messages.map(message => ({
+        ...message,
+        _id: typeof message._id?.toHexString === "function"
+          ? message._id.toHexString()
+          : String(message._id)
+      }));
+      return { status: 200, body: { messages: serializedMessages } };
     } catch {
       return { status: 503, body: { error: "Chat history unavailable" } };
     }
@@ -3602,7 +3611,12 @@ export class MongoDBConnection {
         conversations.push({
           roomId,
           otherUser: sanitizePublicProfile(otherUser),
-          lastMessage: item.lastMessage,
+          lastMessage: {
+            ...item.lastMessage,
+            _id: typeof item.lastMessage._id?.toHexString === "function"
+              ? item.lastMessage._id.toHexString()
+              : String(item.lastMessage._id)
+          },
           unreadCount: unreadCountByRoom.get(roomId) || 0
         });
       }
