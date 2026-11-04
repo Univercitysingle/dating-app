@@ -3544,12 +3544,20 @@ export class MongoDBConnection {
       // Expose Mongo ObjectIds as stable 24-character hex strings. BSON's
       // JSON representation can vary by driver/serializer, but the public
       // cursor contract must always be a plain string.
-      const serializedMessages = messages.map(message => ({
-        ...message,
-        _id: typeof message._id?.toHexString === "function"
+      const publicMessageFields = [
+        "roomId", "senderUid", "receiverUid", "messageContent", "timestamp",
+        "status", "deliveredAt", "readAt", "clientMessageId"
+      ];
+      const serializedMessages = messages.map(message => {
+        const safeMessage = {};
+        for (const field of publicMessageFields) {
+          if (message[field] !== undefined) safeMessage[field] = message[field];
+        }
+        safeMessage._id = typeof message._id?.toHexString === "function"
           ? message._id.toHexString()
-          : String(message._id)
-      }));
+          : String(message._id);
+        return safeMessage;
+      });
       return { status: 200, body: { messages: serializedMessages } };
     } catch {
       return { status: 503, body: { error: "Chat history unavailable" } };
