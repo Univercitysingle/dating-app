@@ -367,6 +367,18 @@ fi
 rm -f "$receipt_file"
 echo "PASS account B persisted a read receipt"
 
+inbox_after_read="$(mktemp)"
+status="$(curl --silent --show-error --output "$inbox_after_read" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_b_TOKEN" --header 'Accept: application/json' \
+  "$WORKER_URL/api/chat/conversations")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const c=x.find(v=>v.roomId===process.argv[2]);if(!c||c.unreadCount!==Number(process.argv[3])-1)process.exit(1)' "$inbox_after_read" "$room_id" "$unread_before_read"; then
+  echo "::error::Account B inbox unread count did not decrease by exactly one after marking the message as read."
+  rm -f "$inbox_after_read"
+  exit 1
+fi
+rm -f "$inbox_after_read"
+echo "PASS inbox unread count decreased after read receipt"
+
 sender_history="$(mktemp)"
 status="$(curl --silent --show-error --output "$sender_history" --write-out '%{http_code}' \
   --header "Authorization: Bearer $account_a_TOKEN" --header 'Accept: application/json' \
