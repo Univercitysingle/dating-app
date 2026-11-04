@@ -9,6 +9,31 @@ set -euo pipefail
 
 WORKER_URL="${WORKER_URL%/}"
 PAGES_URL="${PAGES_URL%/}"
+
+# Check public service health before authenticated acceptance tests. Retry
+# transient 5xx/network failures, but fail immediately on client-side errors.
+verify_public_endpoint() {
+  local path="$1" attempt status
+  for attempt in 1 2 3 4 5; do
+    status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$WORKER_URL$path" || true)"
+    if [[ "$status" == "200" ]]; then
+      echo "PASS public endpoint $path returned HTTP 200"
+      return 0
+    fi
+    if [[ "$status" =~ ^4[0-9]{2}$ ]]; then
+      echo "::error::Public endpoint $path returned non-retryable HTTP $status."
+      return 1
+    fi
+    echo "Attempt $attempt/5: $path returned HTTP ${status:-no response}; retrying."
+    sleep 3
+  done
+  echo "::error::Public endpoint $path did not become healthy after 5 attempts."
+  return 1
+}
+
+verify_public_endpoint "/health"
+verify_public_endpoint "/ready"
+verify_public_endpoint "/api/status"
 auth_file="$(mktemp)"
 trap 'rm -f "$auth_file"' EXIT
 
