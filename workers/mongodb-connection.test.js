@@ -120,6 +120,55 @@ test("chat history incremental cursor uses stable timestamp and ObjectId orderin
   assert.equal(cursorFilter[1]._id.$gt.toString(), cursorId);
 });
 
+test("chat history older-page cursor uses stable reverse timestamp and ObjectId ordering", async () => {
+  const cursorTimestamp = new Date("2026-11-04T06:00:00.000Z");
+  const cursorId = "6729a0000000000000000001";
+  let capturedQuery;
+  let capturedSort;
+  let capturedLimit;
+  const users = {
+    async findOne({ uid }) {
+      if (uid === "current-user") return { uid, role: "user", blocked: [] };
+      if (uid === "other-user") return { uid, blocked: [] };
+      return null;
+    }
+  };
+  const chatmessages = {
+    async findOne() { return { senderUid: "current-user", receiverUid: "other-user" }; },
+    find(query) {
+      capturedQuery = query;
+      return {
+        sort(value) { capturedSort = value; return this; },
+        limit(value) { capturedLimit = value; return this; },
+        maxTimeMS(value) { assert.equal(value, 10000); return this; },
+        async toArray() { return []; }
+      };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : chatmessages; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getChatHistory(
+    "current-user",
+    "current-user-other-user",
+    50,
+    0,
+    null,
+    { timestamp: cursorTimestamp.toISOString(), id: cursorId }
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedSort, { timestamp: -1, _id: -1 });
+  assert.equal(capturedLimit, 50);
+  assert.deepEqual(capturedQuery.$and[0], {
+    $or: [{ senderUid: "current-user" }, { receiverUid: "current-user" }]
+  });
+  const cursorFilter = capturedQuery.$and[1].$or;
+  assert.equal(cursorFilter[0].timestamp.$lt.getTime(), cursorTimestamp.getTime());
+  assert.equal(cursorFilter[1].timestamp.getTime(), cursorTimestamp.getTime());
+  assert.equal(cursorFilter[1]._id.$lt.toString(), cursorId);
+});
+
 test("chat history serializes BSON ObjectIds as plain cursor strings", async () => {
   const objectId = { toHexString: () => "6729a0000000000000000001" };
   const users = {
