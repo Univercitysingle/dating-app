@@ -3534,17 +3534,22 @@ export class MongoDBConnection {
           });
         });
       }
-      const [user, messages] = await Promise.all([
+      const [user, messages, unreadCounts] = await Promise.all([
         db.collection("users").findOne({ uid }, { projection: { _id: 1, uid: 1, blocked: 1 } }),
         chatMessages.aggregate([
           { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
           { $sort: { timestamp: -1, _id: -1 } },
-          { $group: { _id: "$roomId", lastMessage: { $first: "$$ROOT" } } },
+          { $group: { _id: "$roomId", lastMessage: { $first: "$ROOT" } } },
           { $replaceRoot: { newRoot: "$lastMessage" } },
           { $sort: { timestamp: -1, _id: -1 } }
+        ], { maxTimeMS: 10000 }).toArray(),
+        chatMessages.aggregate([
+          { $match: { receiverUid: uid, status: { $ne: "read" } } },
+          { $group: { _id: "$roomId", unreadCount: { $sum: 1 } } }
         ], { maxTimeMS: 10000 }).toArray()
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
+      const unreadCountByRoom = new Map(unreadCounts.map(item => [item._id, item.unreadCount]));
       const latestByRoom = new Map();
       for (const message of messages) {
         if (typeof message.roomId !== "string" || latestByRoom.has(message.roomId)) continue;
@@ -3570,7 +3575,8 @@ export class MongoDBConnection {
         conversations.push({
           roomId,
           otherUser: sanitizePublicProfile(otherUser),
-          lastMessage: item.lastMessage
+          lastMessage: item.lastMessage,
+          unreadCount: unreadCountByRoom.get(roomId) || 0
         });
       }
       return { status: 200, body: conversations };
