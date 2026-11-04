@@ -2436,3 +2436,81 @@ test("photo ordering preserves stored metadata and derives order from the submit
     { url: storedPhotos[0].url, order: 1, size: 1200 }
   ]);
 });
+
+
+test("onboarding profile updates reject photo URLs not already uploaded to the account", async () => {
+  let updateCalled = false;
+  const users = {
+    async findOne() {
+      return {
+        uid: "new-user",
+        isOnboardingComplete: false,
+        photos: [{ url: "photos-new-user-1700000000000.webp", size: 2048, order: 0 }]
+      };
+    },
+    async updateOne() {
+      updateCalled = true;
+      return { matchedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+
+  const result = await connection.updateCurrentUserProfile("new-user", {
+    photos: [{ url: "photos-another-user-1700000000000.webp", order: 0 }],
+    isOnboardingComplete: true
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(updateCalled, false);
+});
+
+test("onboarding profile updates preserve metadata for previously uploaded photos", async () => {
+  const uploaded = { url: "photos-new-user-1700000000000.webp", size: 2048, order: 0 };
+  let update;
+  const users = {
+    async findOne() {
+      return { uid: "new-user", isOnboardingComplete: false, photos: [uploaded] };
+    },
+    async updateOne(_filter, value) {
+      update = value;
+      return { matchedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  connection.getCurrentUserProfile = async () => ({ status: 200, body: {} });
+
+  const result = await connection.updateCurrentUserProfile("new-user", {
+    photos: [{ url: uploaded.url, size: 999999, admin: true }],
+    isOnboardingComplete: true
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(update.$set.photos, [{ url: uploaded.url, order: 0, size: 2048 }]);
+});
+
+test("completed profiles cannot replace photos through the generic profile update route", async () => {
+  let updateCalled = false;
+  const users = {
+    async findOne() {
+      return { uid: "existing-user", isOnboardingComplete: true, photos: [{ url: "photos-existing-user-1700000000000.webp" }] };
+    },
+    async updateOne() {
+      updateCalled = true;
+      return { matchedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+
+  const result = await connection.updateCurrentUserProfile("existing-user", {
+    photos: [{ url: "photos-existing-user-1700000000000.webp" }]
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(updateCalled, false);
+});
