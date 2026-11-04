@@ -337,6 +337,25 @@ fi
 rm -f "$receipt_file"
 echo "PASS account B persisted a delivery receipt"
 
+# Verify that inbox unread counts include the newly received messages, then
+# decrease by exactly one after the selected message is marked as read.
+inbox_before_read="$(mktemp)"
+status="$(curl --silent --show-error --output "$inbox_before_read" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $account_b_TOKEN" --header 'Accept: application/json' \
+  "$WORKER_URL/api/chat/conversations")"
+if [[ "$status" != "200" ]]; then
+  echo "::error::Account B could not retrieve its inbox before the read-count check (HTTP $status)."
+  rm -f "$inbox_before_read"
+  exit 1
+fi
+unread_before_read="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const c=x.find(v=>v.roomId===process.argv[2]);if(!c||!Number.isInteger(c.unreadCount)||c.unreadCount<1)process.exit(1);process.stdout.write(String(c.unreadCount))' "$inbox_before_read" "$room_id" 2>/dev/null || true)"
+rm -f "$inbox_before_read"
+if [[ -z "$unread_before_read" ]]; then
+  echo "::error::Account B inbox did not report a positive unread count for the staging conversation."
+  exit 1
+fi
+echo "PASS account B inbox reports unread messages"
+
 status="$(curl --silent --show-error --output "$receipt_file" --write-out '%{http_code}' \
   --header "Authorization: Bearer $account_b_TOKEN" --header 'Content-Type: application/json' \
   --data-binary "$receipt_payload" "$WORKER_URL/api/chat/read")"
