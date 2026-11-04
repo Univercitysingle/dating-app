@@ -127,13 +127,18 @@ function Chat() {
       }
     };
 
+    const pollHistory = () => {
+      if (document.visibilityState === 'visible') syncHistory();
+    };
     if (user?.uid && chatId) {
       syncHistory();
-      historyPollRef.current = window.setInterval(syncHistory, 5000);
+      historyPollRef.current = window.setInterval(pollHistory, 5000);
+      document.addEventListener('visibilitychange', pollHistory);
     }
     return () => {
       cancelled = true;
       if (historyPollRef.current) window.clearInterval(historyPollRef.current);
+      document.removeEventListener('visibilitychange', pollHistory);
       historyPollRef.current = null;
     };
   }, [chatId, user?.uid]);
@@ -183,10 +188,18 @@ function Chat() {
         if (!cancelled) logger.debug('Call history refresh unavailable:', historyError?.status || 'network error');
       }
     };
+    const pollCallHistory = () => {
+      if (document.visibilityState === 'visible') refreshCallHistory();
+    };
     if (user?.uid && chatId) {
       refreshCallHistory();
-      const interval = window.setInterval(refreshCallHistory, 15000);
-      return () => { cancelled = true; window.clearInterval(interval); };
+      const interval = window.setInterval(pollCallHistory, 15000);
+      document.addEventListener('visibilitychange', pollCallHistory);
+      return () => {
+        cancelled = true;
+        window.clearInterval(interval);
+        document.removeEventListener('visibilitychange', pollCallHistory);
+      };
     }
     return () => { cancelled = true; };
   }, [chatId, user?.uid]);
@@ -206,10 +219,18 @@ function Chat() {
         if (!cancelled) setIsTyping(false);
       }
     };
+    const pollTyping = () => {
+      if (document.visibilityState === 'visible') refreshTyping();
+    };
     if (user?.uid && chatId) {
       refreshTyping();
-      const interval = window.setInterval(refreshTyping, 1200);
-      return () => { cancelled = true; window.clearInterval(interval); };
+      const interval = window.setInterval(pollTyping, 1200);
+      document.addEventListener('visibilitychange', pollTyping);
+      return () => {
+        cancelled = true;
+        window.clearInterval(interval);
+        document.removeEventListener('visibilitychange', pollTyping);
+      };
     }
     return () => { cancelled = true; };
   }, [chatId, user?.uid]);
