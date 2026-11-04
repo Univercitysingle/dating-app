@@ -231,7 +231,7 @@ if [[ -s "$retry_file" ]]; then
   retry_same_message="$(node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(String(x._id)===process.argv[2]))}catch{process.stdout.write("false")}' "$retry_file" "$message_id")"
   retry_key_returned="$(node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(x.clientMessageId===process.argv[2]))}catch{process.stdout.write("false")}' "$retry_file" "$client_message_id")"
 fi
-if [[ "$status" != "200" || "$retry_same_message" != "true" ]]; then
+if [[ "$status" != "200" && "$status" != "201" ]] || [[ "$retry_same_message" != "true" || "$retry_key_returned" != "true" ]]; then
   echo "::error::Idempotent retry failed (HTTP $status, original_message_returned=$retry_same_message, retry_key_returned=$retry_key_returned)."
   rm -f "$retry_file"
   exit 1
