@@ -1040,6 +1040,13 @@ test("support ticket endpoints reject anonymous requests", async () => {
 
 test("support ticket internal route validates request structure", async () => {
   const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return { findOne: async () => null };
+    }
+  });
   const response = await connection.fetch(new Request("https://internal.invalid/internal/support-tickets", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ claims: { sub: "user-1" }, action: "POST", payload: { subject: " ", message: "help" } })
