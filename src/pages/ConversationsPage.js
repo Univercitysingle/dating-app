@@ -29,6 +29,8 @@ function ConversationsPage() {
     if (currentUser) fetchConversations();
   }, [currentUser, fetchConversations]);
 
+  const totalUnreadCount = conversations.reduce((total, conversation) => total + (Number.isFinite(conversation.unreadCount) ? Math.max(0, conversation.unreadCount) : 0), 0);
+
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     if (!query) return conversations;
@@ -56,8 +58,8 @@ function ConversationsPage() {
         <aside className="inbox-sidebar">
           <div className="inbox-sidebar-header">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-gray-900">Chats</h2>
-              <span className="inbox-count">{conversations.length}</span>
+              <div className="flex min-w-0 items-center gap-2"><h2 className="text-lg font-bold text-gray-900">Chats</h2>{totalUnreadCount > 0 && <span className="rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white" aria-label={`${totalUnreadCount} unread messages`}>{totalUnreadCount > 99 ? "99+" : totalUnreadCount} unread</span>}</div>
+              <span className="inbox-count" aria-label={`${conversations.length} conversations`}>{conversations.length}</span>
             </div>
             <label className="inbox-search mt-4">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" strokeWidth="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
