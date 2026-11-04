@@ -2515,3 +2515,40 @@ test("completed profiles cannot replace photos through the generic profile updat
   assert.equal(result.status, 200);
   assert.equal(Object.hasOwn(capturedUpdate.$set, "photos"), false);
 });
+
+
+test("admins cannot promote user accounts or change any account role", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let writeCount = 0;
+  const users = {
+    async findOne() { return { _id: targetId, role: "user" }; },
+    async findOneAndUpdate() { writeCount++; return { _id: targetId, role: "admin" }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+
+  for (const role of ["admin", "contributor", "superadmin", "user"]) {
+    const result = await connection.updateAdminUser("admin-uid", String(targetId), { role });
+    assert.equal(result.status, 403);
+  }
+  assert.equal(writeCount, 0);
+});
+
+test("admins cannot modify another administrative account", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let writeCount = 0;
+  const users = {
+    async findOne() { return { _id: targetId, role: "admin" }; },
+    async findOneAndUpdate() { writeCount++; return { _id: targetId }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({ db: () => ({ collection: () => users }) });
+
+  const result = await connection.updateAdminUser("admin-uid", String(targetId), { name: "Changed" });
+  assert.equal(result.status, 403);
+  assert.equal(writeCount, 0);
+});
