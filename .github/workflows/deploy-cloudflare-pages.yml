@@ -184,9 +184,27 @@ jobs:
           frontend_url="https://dating-app-staging.pages.dev"
           manifest="$(curl --fail --silent --show-error "$frontend_url/manifest.json")"
           jq -e 'any(.icons[]; .src == "/logo.jpg" and .type == "image/jpeg")' <<< "$manifest" >/dev/null
-          curl --fail --silent --show-error "$API_ORIGIN/health"
-          curl --fail --silent --show-error "$API_ORIGIN/ready"
-          curl --fail --silent --show-error "$API_ORIGIN/api/status"
+          verify_endpoint() {
+            local path="$1" attempt status
+            for attempt in 1 2 3 4 5; do
+              status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$API_ORIGIN$path" || true)"
+              if [[ "$status" == "200" ]]; then
+                echo "PASS $path returned HTTP 200"
+                return 0
+              fi
+              if [[ "$status" =~ ^4[0-9]{2}$ ]]; then
+                echo "::error::Staging endpoint $path returned non-retryable HTTP $status."
+                return 1
+              fi
+              echo "Attempt $attempt/5: $path returned HTTP ${status:-no response}; retrying."
+              sleep 3
+            done
+            echo "::error::Staging endpoint $path did not become healthy after 5 attempts."
+            return 1
+          }
+          verify_endpoint "/health"
+          verify_endpoint "/ready"
+          verify_endpoint "/api/status"
           for base in "$API_ORIGIN" "$frontend_url"; do
             status="$(curl --silent --show-error --output /tmp/discover-check.json --write-out '%{http_code}' "$base/api/users/discover")"
             if [[ "$status" != "401" ]]; then
