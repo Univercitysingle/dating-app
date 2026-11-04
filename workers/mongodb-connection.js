@@ -1960,7 +1960,13 @@ export class MongoDBConnection {
           });
         }
         const match = matchByUid.get(likedUid);
-        const responseProfile = currentUser.role === "superadmin" ? profile : sanitizePublicProfile(profile);
+        const responseProfile = sanitizePublicProfile(profile);
+        // Superadmins may inspect profile contact details, but still receive
+        // the same public-field allowlist rather than unrestricted DB records.
+        if (currentUser.role === "superadmin") {
+          if (typeof profile.email === "string") responseProfile.email = profile.email;
+          if (typeof profile.mobileNumber === "string") responseProfile.mobileNumber = profile.mobileNumber;
+        }
         result.push({
           ...responseProfile,
           likeType: match && match.superLike ? "superlike" : "like",
