@@ -300,5 +300,61 @@ if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.pa
   exit 1
 fi
 rm -f "$sender_history"
-unset account_a_TOKEN account_b_TOKEN account_a_UID account_b_UID
 echo "PASS two-account send, receive, delivery, and read receipt acceptance test"
+
+# Exercise the authenticated per-account chat-send limit using only the
+# dedicated staging test pair. Thirty concurrent unique sends must be accepted
+# exactly once; the next send must be rejected with HTTP 429 and Retry-After.
+ACCOUNT_B_TOKEN="$account_b_TOKEN" ACCOUNT_A_UID="$account_a_UID" ACCOUNT_B_UID="$account_b_UID" WORKER_URL="$WORKER_URL" node <<'NODE'
+const { randomUUID } = require("node:crypto");
+
+const token = process.env.ACCOUNT_B_TOKEN;
+const senderUid = process.env.ACCOUNT_B_UID;
+const receiverUid = process.env.ACCOUNT_A_UID;
+const workerUrl = process.env.WORKER_URL.replace(/\/$/, "");
+const roomId = senderUid + "-" + receiverUid;
+
+async function send(clientMessageId) {
+  return fetch(workerUrl + "/api/chat/send", {
+    method: "POST",
+    headers: {
+      authorization: "Bearer " + token,
+      "content-type": "application/json",
+      accept: "application/json"
+    },
+    body: JSON.stringify({
+      roomId,
+      receiverUid,
+      messageContent: "Automated rate-limit acceptance " + clientMessageId,
+      clientMessageId
+    })
+  });
+}
+
+(async () => {
+  const keys = Array.from({ length: 30 }, () => randomUUID());
+  const responses = await Promise.all(keys.map(send));
+  const bodies = await Promise.all(responses.map(async (response) => ({
+    status: response.status,
+    body: await response.json().catch(() => ({}))
+  })));
+  const accepted = bodies.filter((item) => item.status === 200 || item.status === 201);
+  const ids = accepted.map((item) => String(item.body._id || ""));
+  if (accepted.length !== 30 || ids.some((id) => !/^[a-fA-F0-9]{24}$/.test(id)) || new Set(ids).size !== 30) {
+    process.stderr.write("Concurrent chat-send acceptance failed: expected 30 successful unique persisted messages; received " + accepted.length + " successes.\n");
+    process.exit(1);
+  }
+
+  const blocked = await send(randomUUID());
+  const retryAfter = Number(blocked.headers.get("retry-after") || 0);
+  if (blocked.status !== 429 || !Number.isInteger(retryAfter) || retryAfter < 1) {
+    process.stderr.write("Chat-send rate limit failed: expected HTTP 429 with a positive Retry-After header; received HTTP " + blocked.status + ".\n");
+    process.exit(1);
+  }
+  process.stdout.write("PASS 30 concurrent authenticated chat sends persisted uniquely; request 31 rejected with HTTP 429\n");
+})().catch((error) => {
+  process.stderr.write("Concurrent chat-send acceptance failed: " + String(error && error.message || "unexpected error").slice(0, 180) + "\n");
+  process.exit(1);
+});
+NODE
+unset account_a_TOKEN account_b_TOKEN account_a_UID account_b_UID
