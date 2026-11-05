@@ -48,7 +48,8 @@ const JSON_HEADERS = {
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "no-referrer",
-  "strict-transport-security": "max-age=31536000; includeSubDomains"
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+  "cross-origin-resource-policy": "same-origin"
 };
 
 function getCdnObjectUrl(env, key, route = "root") {
