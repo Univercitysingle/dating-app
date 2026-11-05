@@ -1162,6 +1162,93 @@ test("admin user write routes reject anonymous requests", async () => {
   for (const call of calls) assert.equal((await worker.fetch(call, env)).status, 401, call.url);
 });
 
+test("admin user deletion runs CDN cleanup after the account deletion route", async () => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" }
+  });
+  const now = Math.floor(Date.now() / 1000);
+  const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const header = encode({ alg: "RS256", typ: "JWT", kid: "admin-route-test" });
+  const payload = encode({
+    aud: "test-project",
+    iss: "https://securetoken.google.com/test-project",
+    sub: "superadmin-user",
+    user_id: "superadmin-user",
+    role: "superadmin",
+    iat: now,
+    exp: now + 3600,
+    auth_time: now
+  });
+  const unsigned = header + "." + payload;
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const calls = [];
+  const photoKey = "photos-target-user-1730000000000.webp";
+  const env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    JWT_SECRET: "test-cdn-jwt-secret-that-is-long-enough-32",
+    FRONTEND_URL: "https://dating-app-staging.pages.dev",
+    MONGODB_CONNECTION: {
+      idFromName: name => name,
+      get: () => ({
+        async fetch(input, options = {}) {
+          const path = new URL(String(input)).pathname;
+          const body = JSON.parse(options.body || "{}");
+          calls.push({ path, body });
+          if (path === "/internal/admin/user-delete") {
+            return new Response(JSON.stringify({ message: "Account access disabled", deletionStatus: "deletion_pending" }), { status: 202 });
+          }
+          if (path === "/internal/admin/user-deletion-assets") {
+            return new Response(JSON.stringify({
+              uid: "target-user", photoKeys: [photoKey], supportKeys: [], unresolvedAssetCount: 0
+            }), { status: 200 });
+          }
+          if (path === "/internal/admin/user-deletion-assets-finalize") {
+            assert.deepEqual(body.deletedKeys, [photoKey]);
+            return new Response(JSON.stringify({ cdnAssetCleanupStatus: "completed", deletedAssetCount: 1 }), { status: 200 });
+          }
+          throw new Error("Unexpected internal route: " + path);
+        }
+      })
+    },
+    CDN_PROXY: {
+      async fetch(request) {
+        calls.push({ path: new URL(request.url).pathname, method: request.method, authorization: request.headers.get("authorization") });
+        assert.equal(request.method, "DELETE");
+        return new Response(null, { status: 204 });
+      }
+    }
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    return new Response(JSON.stringify({
+      keys: [{ ...publicJwk, kid: "admin-route-test", alg: "RS256", use: "sig" }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(new Request(
+      "https://dating-app.test/api/admin/users/0123456789abcdef01234567",
+      { method: "DELETE", headers: { authorization: "Bearer " + token } }
+    ), env);
+    assert.equal(response.status, 202);
+    const result = await response.json();
+    assert.equal(result.cdnAssetCleanupStatus, "completed");
+    assert.deepEqual(calls.filter(call => call.path.startsWith("/internal/admin/user-deletion-assets")).map(call => call.path), [
+      "/internal/admin/user-deletion-assets",
+      "/internal/admin/user-deletion-assets-finalize"
+    ]);
+    assert.equal(calls.filter(call => call.method === "DELETE").length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("admin read methods deny users without an admin role", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({
