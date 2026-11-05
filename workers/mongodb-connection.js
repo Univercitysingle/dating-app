@@ -3122,7 +3122,7 @@ export class MongoDBConnection {
         return {
           status: 200,
           body: {
-            message: "Account access disabled and Firebase identity revoked. Storage cleanup remains pending.",
+            message: "Account access disabled and Firebase identity revoked. Final account anonymization remains pending.",
             deletionStatus: "deletion_pending",
             firebaseAuthDeletionStatus: "completed",
             financialAndAuditRecordsRetained: true
