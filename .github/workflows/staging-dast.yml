@@ -1,14 +1,6 @@
 name: Staging Passive DAST
 
 on:
-  push:
-    branches:
-      - migrate-to-serverless
-    paths:
-      - ".github/workflows/staging-dast.yml"
-      - "public/**"
-      - "src/**"
-      - "workers/**"
   schedule:
     - cron: "17 6 * * 3"
   workflow_dispatch:
