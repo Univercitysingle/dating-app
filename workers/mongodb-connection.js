@@ -3013,6 +3013,128 @@ export class MongoDBConnection {
     }
   }
 
+  async finalizeAdminUserAnonymization(uid, userId) {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) {
+      return { status: 400, body: { message: "Invalid user ID" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const targetId = new ObjectId(userId);
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const user = await users.findOne(
+        { _id: targetId },
+        { projection: {
+          role: 1, accountStatus: 1, firebaseAuthDeletionStatus: 1,
+          cdnAssetCleanupStatus: 1, anonymizationStatus: 1
+        } }
+      );
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      if (user.role === "superadmin") {
+        return { status: 403, body: { message: "Superadmin accounts cannot be anonymized" } };
+      }
+      if (user.accountStatus === "deleted" && user.anonymizationStatus === "completed") {
+        return { status: 200, body: { deletionStatus: "completed", anonymizationStatus: "completed" } };
+      }
+      if (user.accountStatus !== "deletion_pending" ||
+          user.firebaseAuthDeletionStatus !== "completed" ||
+          user.cdnAssetCleanupStatus !== "completed") {
+        return {
+          status: 409,
+          body: {
+            message: "Account anonymization prerequisites are incomplete",
+            deletionStatus: user.accountStatus || "unknown",
+            firebaseAuthDeletionStatus: user.firebaseAuthDeletionStatus || "unknown",
+            cdnAssetCleanupStatus: user.cdnAssetCleanupStatus || "unknown"
+          }
+        };
+      }
+
+      const now = new Date();
+      const result = await users.updateOne(
+        {
+          _id: targetId,
+          role: { $ne: "superadmin" },
+          accountStatus: "deletion_pending",
+          firebaseAuthDeletionStatus: "completed",
+          cdnAssetCleanupStatus: "completed"
+        },
+        {
+          $set: {
+            email: "deleted+" + userId.toLowerCase() + "@account.invalid",
+            name: "Deleted user",
+            role: "user",
+            accountStatus: "deleted",
+            anonymizationStatus: "completed",
+            anonymizedAt: now,
+            plan: "basic",
+            isProfileVisible: false,
+            isProfileVisibleByAdmin: false,
+            isVerified: false,
+            isOnboardingComplete: false,
+            photos: [],
+            totalPhotoSize: 0,
+            updatedAt: now
+          },
+          $unset: {
+            password: "",
+            mobileNumber: "",
+            phoneNumber: "",
+            contactNumber: "",
+            birthday: "",
+            gender: "",
+            sexualOrientation: "",
+            bio: "",
+            interests: "",
+            profilePrompts: "",
+            personalityType: "",
+            personalityQuizResults: "",
+            education: "",
+            relationshipGoals: "",
+            location: "",
+            lastActiveAt: "",
+            socialMediaLinks: "",
+            familyStatus: "",
+            siblings: "",
+            religion: "",
+            politicalLeaning: "",
+            lookingFor: "",
+            pets: "",
+            lifestyle: "",
+            badges: "",
+            videoProfile: "",
+            faceVerified: "",
+            faceVerification: "",
+            mustSetPassword: "",
+            lastLoginIp: "",
+            lastLoginDevice: "",
+            blocked: "",
+            blockedBy: "",
+            darkFantasyAccessUntil: "",
+            creatorGalleryAccessUntil: "",
+            darkFantasyUnlimitedUntil: "",
+            darkFantasyGalleryAccess: ""
+          }
+        }
+      );
+      if (!result.matchedCount) {
+        return { status: 409, body: { message: "Account deletion prerequisites changed; retry required" } };
+      }
+      return {
+        status: 200,
+        body: {
+          deletionStatus: "completed",
+          anonymizationStatus: "completed",
+          retainedHistoricalRecords: true
+        }
+      };
+    } catch {
+      return { status: 503, body: { message: "Unable to finalize account anonymization" } };
+    }
+  }
+
   async deleteAdminUser(uid, userId) {
     const access = await this.requireAdmin(uid, true);
     if (access.status !== 200) return access;
