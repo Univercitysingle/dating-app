@@ -5,7 +5,7 @@ import Login from './Login';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 
 jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(() => ({})),
+  getAuth: jest.fn(() => ({ signOut: jest.fn().mockResolvedValue(undefined) })),
   signInWithEmailAndPassword: jest.fn(),
   signInWithCustomToken: jest.fn(),
   createUserWithEmailAndPassword: jest.fn(),
