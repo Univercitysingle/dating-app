@@ -2868,9 +2868,12 @@ export class MongoDBConnection {
       }
       const allowed = [
         "name", "email", "gender", "bio", "interests", "profilePrompts", "education",
-        "relationshipGoals", "isProfileVisible", "plan", "faceVerified", "isVerified",
-        "mustSetPassword", "role", "location", "lastActiveAt", "photos"
+        "relationshipGoals", "isProfileVisible", "role", "location", "lastActiveAt"
       ];
+      const privilegedFields = ["plan", "faceVerified", "isVerified", "mustSetPassword", "photos"];
+      if (access.role !== "superadmin" && privilegedFields.some(key => Object.prototype.hasOwnProperty.call(payload, key))) {
+        return { status: 403, body: { message: "Only a superadmin can modify subscription, verification, password-setup, or photo fields." } };
+      }
       const update = {};
       for (const key of allowed) if (Object.prototype.hasOwnProperty.call(payload, key)) update[key] = payload[key];
       if (Object.keys(update).length === 0) return { status: 400, body: { message: "No supported fields to update" } };
