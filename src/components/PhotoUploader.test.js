@@ -59,3 +59,39 @@ describe('convertPhotoToWebP', () => {
     await expect(convertPhotoToWebP(png)).resolves.toBe(png);
   });
 });
+
+
+describe('PhotoUploader authenticated API handoff', () => {
+  test('posts the selected image through the API client and returns the CDN response', async () => {
+    const React = require('react');
+    const { fireEvent, render, screen, waitFor } = require('@testing-library/react');
+    const apiClient = require('../api/apiClient').default;
+    const PhotoUploader = require('./PhotoUploader').default;
+    const onUploadComplete = jest.fn();
+    const uploadResponse = {
+      fileUrl: 'https://dateme.enadoctemp.workers.dev/photos-synthetic-user-123.webp'
+    };
+
+    apiClient.post.mockResolvedValue(uploadResponse);
+
+    render(React.createElement(PhotoUploader, { onUploadComplete }));
+
+    const file = new File(['synthetic-image-data'], 'registration-photo.jpg', {
+      type: 'image/jpeg'
+    });
+    fireEvent.change(screen.getByLabelText('Upload Photo'), {
+      target: { files: [file] }
+    });
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledTimes(1);
+      expect(onUploadComplete).toHaveBeenCalledWith(uploadResponse);
+    });
+
+    const [path, formData] = apiClient.post.mock.calls[0];
+    expect(path).toBe('/users/photos');
+    expect(formData).toBeInstanceOf(FormData);
+    expect(formData.get('photo')).toBeInstanceOf(File);
+    expect(formData.get('photo').name).toBe('registration-photo.jpg');
+  });
+});
