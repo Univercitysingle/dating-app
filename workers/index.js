@@ -1316,6 +1316,9 @@ export default {
             body: JSON.stringify({ claims, userId: parts[0], payload })
           });
           const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+          if (request.method === "DELETE" && result?.anonymizationStatus === "completed") {
+            return json(result, response.status);
+          }
           if (request.method === "DELETE" && (response.status === 200 || response.status === 202)) {
             try {
               const assetsResponse = await connection.fetch("https://internal.invalid/internal/admin/user-deletion-assets", {
@@ -1365,9 +1368,35 @@ export default {
                   cdnAssetCleanupStatus: finalizeResponse.status === 409 ? "manual_review_required" : "retry_pending"
                 }, 202);
               }
+              const cdnAssetCleanupStatus = finalizeResult?.cdnAssetCleanupStatus || "completed";
+              if (result.firebaseAuthDeletionStatus === "completed" && cdnAssetCleanupStatus === "completed") {
+                const anonymizeResponse = await connection.fetch("https://internal.invalid/internal/admin/user-deletion-anonymize", {
+                  method: "POST", headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ claims, userId: parts[0] })
+                });
+                const anonymizeResult = await anonymizeResponse.json().catch(() => null);
+                if (!anonymizeResponse.ok || !anonymizeResult ||
+                    anonymizeResult.anonymizationStatus !== "completed") {
+                  return json({
+                    ...result,
+                    cdnAssetCleanupStatus,
+                    anonymizationStatus: "retry_pending",
+                    deletedAssetCount: finalizeResult?.deletedAssetCount ?? deletedKeys.length
+                  }, 202);
+                }
+                return json({
+                  ...result,
+                  cdnAssetCleanupStatus,
+                  deletedAssetCount: finalizeResult?.deletedAssetCount ?? deletedKeys.length,
+                  deletionStatus: "completed",
+                  anonymizationStatus: "completed",
+                  retainedHistoricalRecords: true
+                }, 200);
+              }
               return json({
                 ...result,
-                cdnAssetCleanupStatus: finalizeResult?.cdnAssetCleanupStatus || "completed",
+                cdnAssetCleanupStatus,
+                anonymizationStatus: "awaiting_prerequisites",
                 deletedAssetCount: finalizeResult?.deletedAssetCount ?? deletedKeys.length
               }, response.status);
             } catch {
