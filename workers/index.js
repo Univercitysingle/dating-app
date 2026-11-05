@@ -364,7 +364,7 @@ export default {
       });
     }
     if (url.pathname === "/favicon.ico" && request.method === "GET") {
-      return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400", "cross-origin-resource-policy": "same-origin" } });
+      return new Response(null, { status: 204, headers: { "cache-control": "no-store, no-cache, must-revalidate, max-age=0", "strict-transport-security": "max-age=31536000; includeSubDomains", "x-content-type-options": "nosniff", "cross-origin-resource-policy": "same-origin" } });
     }
 
     // Search crawlers should not index this API origin. Return an explicit
@@ -375,7 +375,10 @@ export default {
         status: 200,
         headers: {
           "content-type": "text/plain; charset=utf-8",
-          "cache-control": "public, max-age=3600",
+          "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+          "pragma": "no-cache",
+          "expires": "0",
+          "strict-transport-security": "max-age=31536000; includeSubDomains",
           "x-content-type-options": "nosniff",
           "cross-origin-resource-policy": "same-origin"
         }
