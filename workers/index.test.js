@@ -1954,6 +1954,27 @@ test("CDN uploads use the service binding instead of the public workers.dev host
   }
 });
 
+test("CDN authorization accepts valid support attachment object keys", async () => {
+  let capturedRequest;
+  const response = await requestCdnObject({
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/",
+    JWT_SECRET: "test-secret-that-is-at-least-thirty-two-characters",
+    CDN_PROXY: {
+      async fetch(request) {
+        capturedRequest = request;
+        return new Response(null, { status: 201 });
+      }
+    }
+  }, "support-0123456789abcdef01234567-1760000000000-123e4567-e89b-42d3-a456-426614174000.jpg",
+  "PUT", { "Content-Type": "image/jpeg" }, new Uint8Array([1, 2, 3]), { sub: "support-user-1" });
+  assert.equal(response.status, 201);
+  assert.ok(capturedRequest instanceof Request);
+  const token = capturedRequest.headers.get("authorization").replace(/^Bearer /, "");
+  const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+  assert.equal(claims.key, "support-0123456789abcdef01234567-1760000000000-123e4567-e89b-42d3-a456-426614174000.jpg");
+  assert.equal(claims.method, "PUT");
+});
+
 test("CDN uploads fail clearly when the service binding is not configured", async () => {
   await assert.rejects(
     requestCdnObject({
