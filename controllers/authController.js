@@ -33,12 +33,7 @@ const login = async (req, res) => {
       if (isMatch) {
         const superadminUID = "superadmin_uid"; // A consistent, unique ID for the superadmin
         const customToken = await admin.auth().createCustomToken(superadminUID, { role: 'superadmin' });
-        log.info({
-          message: "Superadmin login successful",
-          userId: superadminUID,
-          ip: req.ip,
-          device: req.headers['user-agent']
-        });
+        log.info({ message: "Superadmin login successful", userId: superadminUID });
 
         const superadminUserObject = {
           uid: superadminUID,
@@ -54,18 +49,14 @@ const login = async (req, res) => {
           user: superadminUserObject,
         });
       } else {
-        log.warn({
-          message: "Superadmin login failed",
-          email: email,
-          ip: req.ip
-        });
+        log.warn({ message: "Superadmin login failed" });
         return res.status(401).json({ error: "Invalid credentials" });
       }
     }
 
     // Firebase token login for regular users
     if (token) {
-      log.info(`Login attempt for token: ${token.substring(0, 10)}...`);
+      log.info("Firebase token login attempt");
 
       const decodedToken = await admin.auth().verifyIdToken(token);
       const user = await findOrCreateUserFromToken(decodedToken);
@@ -94,16 +85,11 @@ const login = async (req, res) => {
         });
         await loginHistory.save();
 
-        log.info({
-          message: "User login successful",
-          userId: user.uid,
-          ip: req.ip,
-          device: req.headers['user-agent']
-        });
+        log.info({ message: "User login successful", userId: user.uid });
       }
 
       if (!user) {
-        log.warn(`User provisioning failed for token: ${token.substring(0, 10)}...`);
+        log.warn("User provisioning failed for Firebase identity");
         return res.status(403).json({ error: "User provisioning failed. Email may not be verified or token details are insufficient." });
       }
 
