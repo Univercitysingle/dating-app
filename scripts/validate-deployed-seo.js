@@ -133,7 +133,7 @@ async function main() {
     if (routeTwitterTitle !== routeTitle.trim() || routeTwitterDescription !== routeDescription) {
       throw new Error('Public route ' + route + ' has inconsistent Twitter title or description.');
     }
-    if (!routeRobots || !/index,\\s*follow/i.test(routeRobots)) {
+    if (!routeRobots || !/index,\s*follow/i.test(routeRobots)) {
       throw new Error('Public route ' + route + ' must be indexable and followable.');
     }
   }
