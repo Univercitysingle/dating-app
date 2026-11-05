@@ -2940,6 +2940,14 @@ export class MongoDBConnection {
       }
       const uniquePhotoKeys = [...new Set(photoKeys)];
       const uniqueSupportKeys = [...new Set(supportKeys)];
+      await db.collection("users").updateOne(
+        { _id: targetId, accountStatus: "deletion_pending" },
+        { $set: {
+          cdnAssetCleanupStatus: unresolvedAssetCount > 0 ? "manual_review_required" : "pending",
+          cdnAssetCleanupLastAttemptAt: new Date(),
+          updatedAt: new Date()
+        } }
+      );
       return {
         status: 200,
         body: {
@@ -2979,7 +2987,7 @@ export class MongoDBConnection {
       const targetId = new ObjectId(userId);
       const db = this.getDatabase(await this.getClient());
       const now = new Date();
-      await db.collection("users").updateOne(
+      const userUpdate = await db.collection("users").updateOne(
         { _id: targetId, accountStatus: "deletion_pending" },
         { $set: {
           photos: [],
@@ -2989,6 +2997,9 @@ export class MongoDBConnection {
           updatedAt: now
         } }
       );
+      if (!userUpdate.matchedCount) {
+        return { status: 409, body: { message: "Account is not pending deletion" } };
+      }
       await db.collection("ticketmessages").updateMany(
         { senderId: targetId, attachments: { $exists: true } },
         { $unset: { attachments: "" }, $set: { updatedAt: now } }
