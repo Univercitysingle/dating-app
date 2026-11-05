@@ -8,7 +8,7 @@ jest.mock('../models/User', () => {
 });
 
 const User = require('../models/User');
-const { findOrCreateUserFromToken } = require('../utils/userUtils');
+const { findOrCreateUserFromToken, sanitizeUser } = require('../utils/userUtils');
 
 describe('findOrCreateUserFromToken email identity linking', () => {
   beforeEach(() => {
@@ -79,5 +79,40 @@ describe('findOrCreateUserFromToken email identity linking', () => {
     expect(result.uid).toBe('verified-new-uid');
     expect(result.email).toBe('new@example.com');
     expect(result.save).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('sanitizeUser sensitive data handling', () => {
+  const privateFields = {
+    uid: 'profile-owner',
+    email: 'owner@example.com',
+    mobileNumber: '+12345678901',
+    password: '$2b$12$example-hash',
+    lastLoginIp: '203.0.113.10',
+    lastLoginDevice: 'private-device',
+    mustSetPassword: true,
+    blocked: ['other-user'],
+    suspendedUntil: new Date('2030-01-01T00:00:00Z'),
+    name: 'Profile Owner',
+  };
+
+  it('never returns password hashes, including to owners and superadmins', () => {
+    const owner = sanitizeUser({ ...privateFields }, { uid: 'profile-owner', role: 'user' });
+    const superadmin = sanitizeUser({ ...privateFields }, { uid: 'admin', role: 'superadmin' });
+
+    expect(owner).not.toHaveProperty('password');
+    expect(superadmin).not.toHaveProperty('password');
+  });
+
+  it('removes contact and internal security metadata from public profiles', () => {
+    const publicProfile = sanitizeUser({ ...privateFields }, { uid: 'viewer', role: 'user' });
+
+    for (const field of [
+      'email', 'mobileNumber', 'password', 'lastLoginIp',
+      'lastLoginDevice', 'mustSetPassword', 'blocked', 'suspendedUntil',
+    ]) {
+      expect(publicProfile).not.toHaveProperty(field);
+    }
+    expect(publicProfile.name).toBe('Profile Owner');
   });
 });
