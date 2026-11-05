@@ -81,8 +81,13 @@ jobs:
         working-directory: workers
         run: npm install --no-audit --no-fund
 
-      - name: Validate dedicated account-deletion acceptance script syntax
-        run: bash -n scripts/staging-account-deletion-acceptance.sh
+      - name: Validate dedicated account-deletion acceptance script syntax and safety marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/staging-account-deletion-acceptance.sh
+          grep -Fq 'x.name!=="Disposable Account Deletion Test"' scripts/staging-account-deletion-acceptance.sh
+          grep -Fq 'x.plan!=="basic"' scripts/staging-account-deletion-acceptance.sh
 
       - name: Run Worker tests
         working-directory: workers
