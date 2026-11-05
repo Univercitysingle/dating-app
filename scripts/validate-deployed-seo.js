@@ -23,12 +23,15 @@ async function get(path, expectedType) {
 }
 
 function attribute(tag, name) {
-  const match = tag.match(new RegExp('(?:^|\\s)' + name + '=["\\']([^"\\']*)["\\']', 'i'));
-  return match ? match[1] : null;
+  const attributes = tag.matchAll(/([a-zA-Z_:][-a-zA-Z0-9_:]*)="([^"]*)"/g);
+  for (const match of attributes) {
+    if (match[1].toLowerCase() === name.toLowerCase()) return match[2];
+  }
+  return null;
 }
 
 function metaValue(html, keyName, keyValue) {
-  const tags = html.match(/<meta\\b[^>]*>/gi) || [];
+  const tags = html.match(/<meta\b[^>]*>/gi) || [];
   const tag = tags.find((item) => attribute(item, keyName) === keyValue);
   return tag ? attribute(tag, 'content') : null;
 }
@@ -39,7 +42,7 @@ function assertPresent(value, label) {
 
 async function main() {
   const html = await get('/', 'text/html');
-  const titleMatch = html.match(/<title>([\\s\\S]*?)<\\/title>/i);
+  const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? titleMatch[1].trim() : null;
   assertPresent(title, 'title');
   if (title.length < 20 || title.length > 70) throw new Error('Deployed title length is outside 20-70 characters.');
@@ -48,12 +51,12 @@ async function main() {
   assertPresent(description, 'meta description');
   if (description.length < 70 || description.length > 170) throw new Error('Deployed meta description length is outside 70-170 characters.');
 
-  const canonicalTag = (html.match(/<link\\b[^>]*rel=["']canonical["'][^>]*>/i) || [])[0];
+  const canonicalTag = (html.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) || [])[0];
   const canonical = canonicalTag ? attribute(canonicalTag, 'href') : null;
   if (canonical !== siteOrigin + '/') throw new Error('Deployed canonical URL is incorrect: ' + (canonical || 'missing'));
   if (metaValue(html, 'property', 'og:url') !== siteOrigin + '/') throw new Error('Deployed Open Graph URL is incorrect.');
 
-  const jsonLdMatch = html.match(/<script\\s+type=["']application\\/ld\\+json["']\\s*>([\\s\\S]*?)<\\/script>/i);
+  const jsonLdMatch = html.match(/<script\s+type=["']application\/ld\+json["']\s*>([\s\S]*?)<\/script>/i);
   if (!jsonLdMatch) throw new Error('Deployed homepage JSON-LD is missing.');
   let graph;
   try {
@@ -71,7 +74,7 @@ async function main() {
   }
 
   const sitemap = await get('/sitemap.xml', 'xml');
-  const urls = [...sitemap.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map((match) => match[1].trim());
+  const urls = [...sitemap.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((match) => match[1].trim());
   const expected = allowedPaths.map((route) => new URL(route, siteOrigin).href);
   if (new Set(urls).size !== urls.length) throw new Error('Deployed sitemap contains duplicate URLs.');
   if (urls.length !== expected.length || expected.some((url) => !urls.includes(url))) {
@@ -79,7 +82,7 @@ async function main() {
   }
 
   const robots = await get('/robots.txt', 'text/plain');
-  const lines = robots.split(/\\r?\\n/).map((line) => line.trim());
+  const lines = robots.split(/\r?\n/).map((line) => line.trim());
   for (const route of privatePaths) {
     if (!lines.includes('Disallow: ' + route)) throw new Error('Deployed robots.txt does not disallow ' + route);
   }
