@@ -1,5 +1,10 @@
 import { convertPhotoToWebP } from './PhotoUploader';
 
+jest.mock('../api/apiClient', () => ({
+  __esModule: true,
+  default: { post: jest.fn() }
+}));
+
 describe('convertPhotoToWebP', () => {
   afterEach(() => {
     jest.restoreAllMocks();
