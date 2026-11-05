@@ -119,10 +119,15 @@ function isAccountRestricted(user, now = new Date()) {
   if (user.accountStatus === "permanently_banned") return true;
   if (user.accountStatus === "temporarily_suspended") {
     if (!user.suspendedUntil) return true;
-    return new Date(user.suspendedUntil) > now;
+    const suspendedUntil = new Date(user.suspendedUntil);
+    return !Number.isFinite(suspendedUntil.getTime()) || suspendedUntil > now;
   }
   // Backward compatibility for accounts suspended before accountStatus existed.
-  return Boolean(user.suspendedUntil && new Date(user.suspendedUntil) > now);
+  if (user.suspendedUntil) {
+    const suspendedUntil = new Date(user.suspendedUntil);
+    return !Number.isFinite(suspendedUntil.getTime()) || suspendedUntil > now;
+  }
+  return false;
 }
 
 export async function deleteFirebaseAuthIdentity(env, uid) {
