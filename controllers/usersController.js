@@ -72,7 +72,7 @@ const updateCurrentUserProfile = async (req, res) => {
   let allowedFields;
   if (req.user.isOnboardingComplete) {
     allowedFields = [
-      "sexualOrientation", "bio", "photos",
+      "sexualOrientation", "bio",
       "interests", "profilePrompts", "personalityType",
       "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle", "badges",
@@ -80,7 +80,7 @@ const updateCurrentUserProfile = async (req, res) => {
     ];
   } else {
     allowedFields = [
-      "name", "birthday", "gender", "sexualOrientation", "bio", "photos",
+      "name", "birthday", "gender", "sexualOrientation", "bio",
       "interests", "profilePrompts", "personalityType",
       "socialMediaLinks",
       "education", "relationshipGoals", "location", "lifestyle", "badges", "mobileNumber",
@@ -346,28 +346,60 @@ const uploadPhoto = async (req, res) => {
 
 const updatePhotoOrder = async (req, res) => {
   const log = req.log;
-  const { photos } = req.body;
-  log.info(`UsersController: updatePhotoOrder entered for UID: ${req.user.uid}`);
+  const { photos } = req.body || {};
+  const uid = req.user.uid;
+  log.info({ uid }, "UsersController: updatePhotoOrder entered");
 
-  if (!Array.isArray(photos)) {
-      return res.status(400).json({ error: "Invalid payload. 'photos' must be an array." });
+  if (!Array.isArray(photos) || photos.length > MAX_PHOTOS ||
+      photos.some(photo => !photo || typeof photo.url !== 'string' || !photo.url.trim())) {
+    return res.status(400).json({ error: "Invalid photo order payload." });
   }
 
   try {
-    let user = await User.findOneAndUpdate(
-      { uid: req.user.uid },
-      { $set: { photos: photos } },
-      { new: true }
-    );
+    const user = await User.findOne({ uid });
     if (!user) {
-      log.warn(`UsersController: User not found during updatePhotoOrder for UID: ${req.user.uid}`);
       return res.status(404).json({ error: "User not found" });
     }
-    log.info(`UsersController: Successfully updated photo order for UID: ${req.user.uid}.`);
-    res.json(sanitizeUser(user, req.user));
+
+    // The client may reorder existing photos only. It cannot add arbitrary
+    // CDN keys, replace image metadata, or attach another user's objects.
+    const existingByKey = new Map(user.photos.map(photo => [
+      photo.url.substring(photo.url.lastIndexOf('/') + 1),
+      photo,
+    ]));
+    const requestedKeys = photos.map(photo => photo.url.substring(photo.url.lastIndexOf('/') + 1));
+    const uniqueRequestedKeys = new Set(requestedKeys);
+
+    if (requestedKeys.length !== existingByKey.size ||
+        uniqueRequestedKeys.size !== requestedKeys.length ||
+        requestedKeys.some(key => !key || !existingByKey.has(key))) {
+      return res.status(400).json({ error: "Photo order must contain each existing photo exactly once." });
+    }
+
+    const reorderedPhotos = requestedKeys.map((key, order) => {
+      const existingPhoto = existingByKey.get(key);
+      return {
+        _id: existingPhoto._id,
+        url: existingPhoto.url,
+        size: existingPhoto.size,
+        order,
+      };
+    });
+
+    const updatedUser = await User.findOneAndUpdate(
+      { uid },
+      { $set: { photos: reorderedPhotos } },
+      { new: true }
+    );
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    log.info({ uid, photoCount: reorderedPhotos.length }, "User photo order updated");
+    return res.json(sanitizeUser(updatedUser, req.user));
   } catch (err) {
-    log.error({ err }, `UsersController: Error updating photo order for UID ${req.user.uid}`);
-    res.status(500).json({ error: "An unexpected error occurred while updating photo order." });
+    log.error({ err, uid }, "Error updating photo order");
+    return res.status(500).json({ error: "An unexpected error occurred while updating photo order." });
   }
 };
 
