@@ -3158,7 +3158,8 @@ export class MongoDBConnection {
             darkFantasyAccessUntil: "",
             creatorGalleryAccessUntil: "",
             darkFantasyUnlimitedUntil: "",
-            darkFantasyGalleryAccess: ""
+            darkFantasyGalleryAccess: "",
+            cdnAssetCleanupDeletedKeys: ""
           }
         }
       );
