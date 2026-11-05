@@ -371,7 +371,7 @@ export default {
     // public robots policy instead of falling through to the legacy 501 route.
     if (url.pathname === "/robots.txt") {
       if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
-      return new Response(request.method === "HEAD" ? null : "User-agent: *\\nDisallow: /\\n", {
+      return new Response(request.method === "HEAD" ? null : "User-agent: *\nDisallow: /\n", {
         status: 200,
         headers: {
           "content-type": "text/plain; charset=utf-8",
