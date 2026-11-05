@@ -8,7 +8,7 @@
     "dev:backend": "nodemon server.js",
     "dev:frontend": "react-scripts start",
     "dev": "node scripts/dev.js",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node scripts/prerender-seo.js",
     "test": "npm run test:frontend && npm run test:backend && npm run test:worker",
     "test:frontend": "jest --config=jest.config.js --roots src",
     "test:backend": "jest --config=jest.backend.config.js --verbose",
