@@ -102,6 +102,25 @@ test("GET /favicon.ico returns an empty response instead of an unmigrated-route 
   assert.equal(await response.text(), "");
 });
 
+test("API JSON responses explicitly disable browser and intermediary caching", async () => {
+  const response = await worker.fetch(request("/"), { MIGRATION_STAGE: "test" });
+  assert.equal(response.headers.get("cache-control"), "no-store, no-cache, must-revalidate, max-age=0");
+});
+
+test("API robots policy is explicit and cacheable without exposing application data", async () => {
+  const response = await worker.fetch(request("/robots.txt"), {});
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal(response.headers.get("cache-control"), "public, max-age=3600");
+  assert.equal(await response.text(), "User-agent: *\\nDisallow: /\\n");
+});
+
+test("API sitemap path returns a real not-found response instead of a 501 server error", async () => {
+  const response = await worker.fetch(request("/sitemap.xml"), {});
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "Not found" });
+});
+
 test("legacy /api/media reads redirect to the configured CDN hostname", async () => {
   const key = "photos-D6gTK2fprqcNk7hSWpWFPx8kdgE2-1757226432186.jpg";
   const response = await worker.fetch(request("/api/media/" + key), {
