@@ -1206,7 +1206,7 @@ test("admin user deletion runs CDN cleanup after the account deletion route", as
           }
           if (path === "/internal/admin/user-deletion-assets") {
             return new Response(JSON.stringify({
-              uid: "target-user", photoKeys: [photoKey], supportKeys: [], unresolvedAssetCount: 0
+              uid: "target-user", photoKeys: [photoKey], supportKeys: [], completedKeys: [], unresolvedAssetCount: 0
             }), { status: 200 });
           }
           if (path === "/internal/admin/user-deletion-assets-finalize") {
