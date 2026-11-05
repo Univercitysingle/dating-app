@@ -383,7 +383,10 @@ export default {
     }
     if (url.pathname === "/sitemap.xml") {
       if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
-      return json({ error: "Not found" }, 404);
+      return new Response(request.method === "HEAD" ? null : JSON.stringify({ error: "Not found" }), {
+        status: 404,
+        headers: JSON_HEADERS
+      });
     }
 
     // Serve profile photos only through the dedicated CDN/private-storage proxy.
