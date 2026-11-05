@@ -12,6 +12,15 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'scripts/**'
+      - 'controllers/**'
+      - 'middleware/**'
+      - 'models/**'
+      - 'routes/**'
+      - 'services/**'
+      - 'utils/**'
+      - 'tests/**'
+      - 'backend/**'
+      - 'server.js'
       - 'tailwind.config.*'
       - 'postcss.config.*'
       - 'babel.config.*'
@@ -166,6 +175,17 @@ jobs:
 
       - name: Enforce frontend dependency security threshold
         run: npm audit --audit-level=high
+
+      - name: Install legacy backend dependencies
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+
+      - name: Enforce legacy backend dependency security threshold
+        working-directory: backend
+        run: npm audit --audit-level=high
+
+      - name: Run backend regression tests
+        run: npm run test:backend -- --runInBand
 
       - name: Run frontend regression tests
         run: npm run test:frontend -- --runInBand --watchAll=false
