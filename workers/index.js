@@ -249,7 +249,8 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "content-security-policy": "default-src 'none'; form-action https://stagingxpay.info; script-src 'nonce-" + nonce + "'; base-uri 'none'; frame-ancestors 'none'",
-      "x-content-type-options": "nosniff"
+      "x-content-type-options": "nosniff",
+      "cross-origin-resource-policy": "same-origin"
     }
   });
 }
@@ -363,7 +364,7 @@ export default {
       });
     }
     if (url.pathname === "/favicon.ico" && request.method === "GET") {
-      return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400" } });
+      return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400", "cross-origin-resource-policy": "same-origin" } });
     }
 
     // Serve profile photos only through the dedicated CDN/private-storage proxy.
@@ -533,7 +534,7 @@ export default {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       return new Response("Auth test route is working", {
         status: 200,
-        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" }
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "cross-origin-resource-policy": "same-origin" }
       });
     }
 
