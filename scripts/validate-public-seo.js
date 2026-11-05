@@ -85,7 +85,7 @@ for (const requiredType of ['Organization', 'WebSite', 'SoftwareApplication']) {
 }
 
 const routeSeoStart = app.indexOf('const PUBLIC_ROUTE_SEO = {');
-const routeSeoEnd = app.indexOf('\\n};', routeSeoStart);
+const routeSeoEnd = app.indexOf('\n};', routeSeoStart);
 if (routeSeoStart === -1 || routeSeoEnd === -1) {
   throw new Error('Route-specific SEO metadata map is missing from App.js.');
 }
