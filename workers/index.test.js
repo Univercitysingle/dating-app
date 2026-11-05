@@ -121,6 +121,15 @@ test("API sitemap path returns a real not-found response instead of a 501 server
   assert.deepEqual(await response.json(), { error: "Not found" });
 });
 
+test("HEAD requests for API crawler resources do not return response bodies", async () => {
+  const robots = await worker.fetch(request("/robots.txt", "HEAD"), {});
+  const sitemap = await worker.fetch(request("/sitemap.xml", "HEAD"), {});
+  assert.equal(robots.status, 200);
+  assert.equal(sitemap.status, 404);
+  assert.equal(await robots.text(), "");
+  assert.equal(await sitemap.text(), "");
+});
+
 test("legacy /api/media reads redirect to the configured CDN hostname", async () => {
   const key = "photos-D6gTK2fprqcNk7hSWpWFPx8kdgE2-1757226432186.jpg";
   const response = await worker.fetch(request("/api/media/" + key), {
