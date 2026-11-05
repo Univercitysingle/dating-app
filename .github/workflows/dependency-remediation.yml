@@ -50,6 +50,8 @@ jobs:
           npm run build
       - name: Validate legacy backend dependency installation
         run: npm ci --prefix backend --ignore-scripts --no-audit --no-fund
+      - name: Run backend regression tests
+        run: npm run test:backend -- --runInBand
       - name: Validate Cloudflare Worker dependency installation and tests
         run: |
           npm ci --prefix workers --no-audit --no-fund
