@@ -2395,7 +2395,7 @@ test("account deletion disables all authenticated Durable Object operations", as
       return {
         async findOne(query, options) {
           assert.deepEqual(query, { uid: "pending-user" });
-          assert.deepEqual(options, { projection: { accountStatus: 1, deletionRequestedAt: 1 } });
+          assert.deepEqual(options, { projection: { accountStatus: 1, deletionRequestedAt: 1, suspendedUntil: 1 } });
           return { accountStatus: "deletion_pending", deletionRequestedAt: new Date() };
         }
       };
@@ -2404,10 +2404,45 @@ test("account deletion disables all authenticated Durable Object operations", as
   const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ claims: { sub: "pending-user" } })
+    body: JSON.stringify({ claims: { sub: "pending-user", email_verified: true } })
   }));
   assert.equal(response.status, 403);
   assert.deepEqual(await response.json(), { error: "This account is unavailable." });
+});
+
+test("central account guard blocks active suspensions before internal operations", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return {
+        async findOne(query, options) {
+          assert.deepEqual(query, { uid: "suspended-user" });
+          assert.deepEqual(options, { projection: { accountStatus: 1, deletionRequestedAt: 1, suspendedUntil: 1 } });
+          return { accountStatus: "temporarily_suspended", suspendedUntil: new Date(Date.now() + 60_000) };
+        }
+      };
+    }
+  });
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ claims: { sub: "suspended-user", email_verified: true } })
+  }));
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "This account is unavailable." });
+});
+
+test("central account guard blocks unverified non-admin Firebase identities", async () => {
+  const connection = new MongoDBConnection({}, {});
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ claims: { sub: "unverified-user", email_verified: false } })
+  }));
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "Email verification is required to use this service." });
 });
 
 test("Firebase profile provisioning refuses accounts queued for deletion", async () => {
