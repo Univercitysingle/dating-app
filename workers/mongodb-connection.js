@@ -2081,7 +2081,9 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
-      const currentUser = await db.collection("users").findOne({ uid }, { projection: { _id: 1, plan: 1, role: 1 } });
+      const currentUser = await db.collection("users").findOne(
+        { uid }, { projection: { _id: 1, plan: 1, role: 1, blocked: 1 } }
+      );
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
       const matches = await db.collection("matches").find({ user2Uid: uid, status: "pending" }).toArray();
       if (matches.length === 0) return { status: 200, body: [] };
@@ -2095,6 +2097,9 @@ export class MongoDBConnection {
       for (const likedUid of likedUids) {
         const user = usersByUid.get(likedUid);
         if (!user) continue;
+        const viewerBlockedTarget = Array.isArray(currentUser.blocked) && currentUser.blocked.includes(likedUid);
+        const targetBlockedViewer = Array.isArray(user.blocked) && user.blocked.includes(uid);
+        if (user.isProfileVisible === false || viewerBlockedTarget || targetBlockedViewer) continue;
         const profile = { ...user };
         delete profile.password;
         delete profile.lastLoginIp;
