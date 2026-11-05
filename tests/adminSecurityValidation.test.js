@@ -97,4 +97,37 @@ describe('Admin endpoint input validation', () => {
       message: 'A rejection reason of 1-500 characters is required.',
     });
   });
+
+  it('fails closed when a role middleware is configured with an unknown role', () => {
+    const { requireRole } = require('../middleware/adminAuthMiddleware');
+    const res = makeResponse();
+    const next = jest.fn();
+
+    requireRole(['owner'])({ user: { role: 'admin' }, log: { error: jest.fn() } }, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('denies an admin when a route requires superadmin', () => {
+    const { requireRole } = require('../middleware/adminAuthMiddleware');
+    const res = makeResponse();
+    const next = jest.fn();
+
+    requireRole(['superadmin'])({ user: { role: 'admin' }, log: { warn: jest.fn() } }, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('allows a verified superadmin principal through a superadmin-only route', () => {
+    const { requireRole } = require('../middleware/adminAuthMiddleware');
+    const res = makeResponse();
+    const next = jest.fn();
+
+    requireRole(['superadmin'])({ user: { role: 'superadmin' } }, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+  });
 });
