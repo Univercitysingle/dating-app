@@ -2644,3 +2644,63 @@ test("photo deletion finalization refuses to remove metadata without a pending m
   assert.equal(result.status, 404);
   assert.equal(writeCount, 0);
 });
+
+
+test("ordinary Worker admins cannot change paid plan, verification, password, or photos", async () => {
+  const targetId = "507f1f77bcf86cd799439011";
+  let updateCalls = 0;
+  const users = {
+    async findOne() { return { role: "user", accountStatus: "active" }; },
+    async findOneAndUpdate() { updateCalls += 1; return null; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "users");
+    return users;
+  } });
+
+  for (const payload of [
+    { plan: "premium" },
+    { isVerified: true },
+    { faceVerified: true },
+    { mustSetPassword: false },
+    { photos: [{ url: "https://example.invalid/photo.webp" }] }
+  ]) {
+    const result = await connection.updateAdminUser("admin-uid", targetId, payload);
+    assert.equal(result.status, 403);
+  }
+  assert.equal(updateCalls, 0);
+});
+
+test("ordinary Worker admin update responses do not expose contact details", async () => {
+  const targetId = "507f1f77bcf86cd799439011";
+  const users = {
+    async findOne() { return { role: "user", accountStatus: "active" }; },
+    async findOneAndUpdate() {
+      return {
+        _id: targetId,
+        name: "Updated User",
+        email: "private@example.com",
+        mobileNumber: "+971500000000",
+        phoneNumber: "+971500000001",
+        contactNumber: "+971500000002"
+      };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "users");
+    return users;
+  } });
+
+  const result = await connection.updateAdminUser("admin-uid", targetId, { name: "Updated User" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.name, "Updated User");
+  for (const field of ["email", "mobileNumber", "phoneNumber", "contactNumber"]) {
+    assert.equal(Object.hasOwn(result.body, field), false, field + " must be hidden from ordinary admins");
+  }
+});
