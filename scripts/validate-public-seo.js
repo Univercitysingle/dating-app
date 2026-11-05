@@ -103,8 +103,10 @@ for (const route of ['/login', '/register']) {
   }
 }
 const headers = fs.readFileSync(path.join(root, 'public/_headers'), 'utf8');
+const headerLines = headers.split(/\r?\n/).map((line) => line.trim());
 for (const route of ['/login', '/register']) {
-  if (!headers.includes(route + '\\n  X-Robots-Tag: noindex, nofollow, noarchive')) {
+  const routeIndex = headerLines.indexOf(route);
+  if (routeIndex === -1 || headerLines[routeIndex + 1] !== 'X-Robots-Tag: noindex, nofollow, noarchive') {
     throw new Error('Cloudflare Pages _headers must set X-Robots-Tag noindex for ' + route);
   }
 }
