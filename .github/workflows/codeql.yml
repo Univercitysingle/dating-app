@@ -39,11 +39,16 @@ jobs:
         with:
           category: "/language:javascript"
           upload: false
+      - name: Copy CodeQL SARIF into the workspace
+        if: always()
+        run: |
+          mkdir -p results
+          if [ -f ../results/javascript.sarif ]; then cp ../results/javascript.sarif results/javascript.sarif; fi
       - name: Preserve CodeQL SARIF as a workflow artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: codeql-results
-          path: ../results/javascript.sarif
+          path: results/javascript.sarif
           if-no-files-found: warn
           retention-days: 14
