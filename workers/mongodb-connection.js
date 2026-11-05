@@ -241,6 +241,9 @@ export class MongoDBConnection {
     if (!this.clientPromise) {
       this.clientPromise = import("mongodb").then(({ MongoClient }) => {
         const client = new MongoClient(this.env.MONGODB_URI, {
+          // Atlas connections must always use TLS, including when an operator
+          // supplies a standard mongodb:// URI instead of an SRV URI.
+          tls: true,
           maxPoolSize: 1,
           minPoolSize: 0,
           serverSelectionTimeoutMS: 5000,
