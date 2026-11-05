@@ -2872,7 +2872,7 @@ export class MongoDBConnection {
         "name", "email", "gender", "bio", "interests", "profilePrompts", "education",
         "relationshipGoals", "isProfileVisible", "role", "location", "lastActiveAt"
       ];
-      const privilegedFields = ["plan", "faceVerified", "isVerified", "mustSetPassword", "photos"];
+      const privilegedFields = ["email", "plan", "faceVerified", "isVerified", "mustSetPassword", "photos"];
       if (access.role !== "superadmin" && privilegedFields.some(key => Object.prototype.hasOwnProperty.call(payload, key))) {
         return { status: 403, body: { message: "Only a superadmin can modify subscription, verification, password-setup, or photo fields." } };
       }
