@@ -84,6 +84,21 @@ for (const requiredType of ['Organization', 'WebSite', 'SoftwareApplication']) {
   }
 }
 
+const routeSeoStart = app.indexOf('const PUBLIC_ROUTE_SEO = {');
+const routeSeoEnd = app.indexOf('\\n};', routeSeoStart);
+if (routeSeoStart === -1 || routeSeoEnd === -1) {
+  throw new Error('Route-specific SEO metadata map is missing from App.js.');
+}
+const routeSeo = app.slice(routeSeoStart, routeSeoEnd);
+for (const route of allowedPaths) {
+  if (!routeSeo.includes("'" + route + "'")) {
+    throw new Error('Route-specific SEO metadata is missing for ' + route);
+  }
+}
+if (!app.includes('noindex, nofollow, noarchive') || !app.includes('canonicalLink.href = canonicalUrl')) {
+  throw new Error('Route metadata must set private-page noindex and route-specific canonical URLs.');
+}
+
 const privatePaths = [
   '/discover', '/likes', '/conversations', '/matches', '/chat/',
   '/profile', '/admin', '/onboarding',
