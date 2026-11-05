@@ -104,6 +104,16 @@ describe('sanitizeUser sensitive data handling', () => {
     expect(superadmin).not.toHaveProperty('password');
   });
 
+  it('hides email and mobile number from profile owners but exposes them to superadmins', () => {
+    const owner = sanitizeUser({ ...privateFields }, { uid: 'profile-owner', role: 'user' });
+    const superadmin = sanitizeUser({ ...privateFields }, { uid: 'admin', role: 'superadmin' });
+
+    expect(owner).not.toHaveProperty('email');
+    expect(owner).not.toHaveProperty('mobileNumber');
+    expect(superadmin.email).toBe('owner@example.com');
+    expect(superadmin.mobileNumber).toBe('+12345678901');
+  });
+
   it('removes contact and internal security metadata from public profiles', () => {
     const publicProfile = sanitizeUser({ ...privateFields }, { uid: 'viewer', role: 'user' });
 
