@@ -1050,7 +1050,7 @@ test("support ticket internal route validates request structure", async () => {
   });
   const response = await connection.fetch(new Request("https://internal.invalid/internal/support-tickets", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ claims: { sub: "user-1" }, action: "POST", payload: { subject: " ", message: "help" } })
+    body: JSON.stringify({ claims: { sub: "user-1", email_verified: true }, action: "POST", payload: { subject: " ", message: "help" } })
   }));
   assert.equal(response.status, 400);
   assert.match((await response.json()).message, /subject and message/i);
