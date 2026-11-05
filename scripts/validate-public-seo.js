@@ -86,7 +86,7 @@ for (const requiredType of ['Organization', 'WebSite', 'SoftwareApplication']) {
 
 const privatePaths = [
   '/discover', '/likes', '/conversations', '/matches', '/chat/',
-  '/profile', '/admin', '/login', '/register', '/onboarding',
+  '/profile', '/admin', '/onboarding',
   '/set-initial-password', '/unauthorized', '/premium',
   '/manage-subscription', '/support', '/store', '/dark-fantasy',
   '/debug-swipe', '/api/',
@@ -95,6 +95,17 @@ const robotLines = robots.split(/\r?\n/).map((line) => line.trim());
 for (const route of privatePaths) {
   if (!robotLines.includes('Disallow: ' + route)) {
     throw new Error('robots.txt must disallow ' + route);
+  }
+}
+for (const route of ['/login', '/register']) {
+  if (robotLines.includes('Disallow: ' + route)) {
+    throw new Error(route + ' must remain crawlable so search engines can read its noindex response header.');
+  }
+}
+const headers = fs.readFileSync(path.join(root, 'public/_headers'), 'utf8');
+for (const route of ['/login', '/register']) {
+  if (!headers.includes(route + '\\n  X-Robots-Tag: noindex, nofollow, noarchive')) {
+    throw new Error('Cloudflare Pages _headers must set X-Robots-Tag noindex for ' + route);
   }
 }
 
