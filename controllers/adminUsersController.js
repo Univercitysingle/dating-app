@@ -383,25 +383,25 @@ const approvePurchase = async (req, res) => {
     if (typeof purchaseId !== 'string' || !mongoose.Types.ObjectId.isValid(purchaseId)) {
       return res.status(400).json({ message: 'Invalid purchase ID.' });
     }
-    const purchase = await Purchase.findById(purchaseId);
+    const purchase = await Purchase.findOneAndUpdate(
+      { _id: purchaseId, status: 'pending' },
+      { $set: { status: 'completed' } },
+      { new: true }
+    );
 
-    if (!purchase || purchase.status !== 'pending') {
+    if (!purchase) {
       return res.status(404).json({ message: 'Pending purchase not found' });
     }
 
-    purchase.status = 'completed';
-    await purchase.save();
-
-    const user = await User.findById(purchase.userId);
-    if (user) {
-      if (purchase.itemId === 'super-like-5') {
-        user.purchasedSuperLikes += 5;
-      } else if (purchase.itemId === 'undo-swipes-5') {
-        user.purchasedUndoSwipes += 5;
-      } else if (purchase.itemId === 'profile-boost-1') {
-        user.boostExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
-      }
-      await user.save();
+    if (purchase.itemId === 'super-like-5') {
+      await User.updateOne({ _id: purchase.userId }, { $inc: { purchasedSuperLikes: 5 } });
+    } else if (purchase.itemId === 'undo-swipes-5') {
+      await User.updateOne({ _id: purchase.userId }, { $inc: { purchasedUndoSwipes: 5 } });
+    } else if (purchase.itemId === 'profile-boost-1') {
+      await User.updateOne(
+        { _id: purchase.userId },
+        { $set: { boostExpiresAt: new Date(Date.now() + 60 * 60 * 1000) } }
+      );
     }
 
     res.json({ message: 'Purchase approved successfully' });
@@ -422,15 +422,15 @@ const rejectPurchase = async (req, res) => {
       return res.status(400).json({ message: 'A rejection reason of 1-500 characters is required.' });
     }
 
-    const purchase = await Purchase.findById(purchaseId);
+    const purchase = await Purchase.findOneAndUpdate(
+      { _id: purchaseId, status: 'pending' },
+      { $set: { status: 'rejected', rejectionReason: reason.trim() } },
+      { new: true }
+    );
 
-    if (!purchase || purchase.status !== 'pending') {
+    if (!purchase) {
       return res.status(404).json({ message: 'Pending purchase not found' });
     }
-
-    purchase.status = 'rejected';
-    purchase.rejectionReason = reason;
-    await purchase.save();
 
     res.json({ message: 'Purchase rejected successfully' });
   } catch (error) {
