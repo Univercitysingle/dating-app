@@ -8,7 +8,7 @@ const preferences = ['male', 'female', 'everyone'];
 const interests = ['travel', 'music', 'sports', 'movies', 'reading', 'gaming', 'cooking', 'hiking'];
 
 function getRandomElement(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[randomInt(0, arr.length)];
 }
 
 function getRandomInterests() {
