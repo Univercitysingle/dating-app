@@ -9,42 +9,35 @@ const html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
 
 const siteOrigin = 'https://dating-app-staging.pages.dev';
 const allowedPaths = ['/', '/faq', '/safety', '/terms', '/cookies', '/privacy-settings'];
-const allowedUrls = new Set(allowedPaths.map(function (route) {
-  return new URL(route, siteOrigin).href;
-}));
-const sitemapUrls = Array.from(sitemap.matchAll(/<loc>(.*?)<\/loc>/g), function (match) {
-  return match[1].trim();
-});
+const allowedUrls = new Set(allowedPaths.map((route) => new URL(route, siteOrigin).href));
+const sitemapUrls = sitemap.split('<loc>').slice(1).map((part) => part.split('</loc>')[0].trim());
 
 if (sitemapUrls.length === 0) throw new Error('Sitemap contains no URLs.');
 if (new Set(sitemapUrls).size !== sitemapUrls.length) throw new Error('Sitemap contains duplicate URLs.');
-sitemapUrls.forEach(function (url) {
+for (const url of sitemapUrls) {
   if (!allowedUrls.has(url)) throw new Error('Unexpected or non-public sitemap URL: ' + url);
-});
-allowedUrls.forEach(function (url) {
+}
+for (const url of allowedUrls) {
   if (!sitemapUrls.includes(url)) throw new Error('Required public URL is missing from sitemap: ' + url);
-});
+}
 
 function getAttribute(tag, attribute) {
-  const pattern = new RegExp('\\\\b' + attribute + '=["\\x27]([^"\\x27]*)["\\x27]', 'i');
-  const match = tag.match(pattern);
-  return match ? match[1] : null;
+  const marker = attribute + '="';
+  const start = tag.indexOf(marker);
+  if (start === -1) return null;
+  return tag.slice(start + marker.length).split('"')[0];
 }
-const metaTags = Array.from(html.matchAll(/<meta\\b[^>]*>/gi), function (match) {
-  return match[0];
-});
+const metaTags = html.split('<meta').slice(1).map((part) => '<meta' + part.split('>')[0] + '>');
 function getMeta(attribute, value) {
-  const tag = metaTags.find(function (item) {
-    return getAttribute(item, attribute) === value;
-  });
+  const tag = metaTags.find((item) => getAttribute(item, attribute) === value);
   return tag ? getAttribute(tag, 'content') : null;
 }
 function assertPresent(value, label) {
   if (!value || !value.trim()) throw new Error('Missing or empty SEO metadata: ' + label);
 }
 
-const titleMatch = html.match(/<title>(.*?)<\\/title>/i);
-const title = titleMatch ? titleMatch[1].trim() : null;
+const titlePart = html.split('<title>')[1];
+const title = titlePart ? titlePart.split('</title>')[0].trim() : null;
 assertPresent(title, 'title');
 if (title.length < 20 || title.length > 70) {
   throw new Error('Title should be between 20 and 70 characters (currently ' + title.length + ').');
@@ -55,8 +48,8 @@ if (description.length < 70 || description.length > 170) {
   throw new Error('Meta description should be between 70 and 170 characters (currently ' + description.length + ').');
 }
 
-const canonicalMatch = html.match(/<link\\b[^>]*rel=["\\x27]canonical["\\x27][^>]*>/i);
-const canonical = canonicalMatch ? getAttribute(canonicalMatch[0], 'href') : null;
+const canonicalPart = html.split('<link').slice(1).find((part) => part.includes('rel="canonical"'));
+const canonical = canonicalPart ? getAttribute(canonicalPart.split('>')[0], 'href') : null;
 if (canonical !== siteOrigin + '/') throw new Error('Unexpected canonical URL: ' + (canonical || 'missing'));
 
 [
@@ -68,29 +61,28 @@ if (canonical !== siteOrigin + '/') throw new Error('Unexpected canonical URL: '
   ['name', 'twitter:title'],
   ['name', 'twitter:description'],
   ['name', 'twitter:image'],
-].forEach(function (item) {
-  assertPresent(getMeta(item[0], item[1]), item[1]);
-});
+].forEach((item) => assertPresent(getMeta(item[0], item[1]), item[1]));
 if (getMeta('property', 'og:url') !== siteOrigin + '/') {
   throw new Error('Open Graph URL must match the staging homepage.');
 }
 
-const jsonLdMatch = html.match(/<script\\b[^>]*type=["\\x27]application\\/ld\\+json["\\x27][^>]*>([\\s\\S]*?)<\\/script>/i);
-if (!jsonLdMatch) throw new Error('Homepage JSON-LD structured data is missing.');
+const jsonLdPart = html.split('<script type="application/ld+json">')[1];
+const jsonLdText = jsonLdPart ? jsonLdPart.split('</script>')[0].trim() : null;
+if (!jsonLdText) throw new Error('Homepage JSON-LD structured data is missing.');
 let structuredData;
 try {
-  structuredData = JSON.parse(jsonLdMatch[1]);
+  structuredData = JSON.parse(jsonLdText);
 } catch (error) {
   throw new Error('Homepage JSON-LD is invalid JSON: ' + error.message);
 }
 if (structuredData['@context'] !== 'https://schema.org' || !Array.isArray(structuredData['@graph'])) {
   throw new Error('Homepage JSON-LD must use schema.org and an @graph array.');
 }
-['Organization', 'WebSite', 'SoftwareApplication'].forEach(function (requiredType) {
-  if (!structuredData['@graph'].some(function (item) { return item['@type'] === requiredType; })) {
+for (const requiredType of ['Organization', 'WebSite', 'SoftwareApplication']) {
+  if (!structuredData['@graph'].some((item) => item['@type'] === requiredType)) {
     throw new Error('Homepage JSON-LD is missing required type: ' + requiredType);
   }
-});
+}
 
 const privatePaths = [
   '/discover', '/likes', '/conversations', '/matches', '/chat/',
@@ -99,19 +91,19 @@ const privatePaths = [
   '/manage-subscription', '/support', '/store', '/dark-fantasy',
   '/debug-swipe', '/api/',
 ];
-const robotLines = robots.split(/\\r?\\n/).map(function (line) { return line.trim(); });
-privatePaths.forEach(function (route) {
+const robotLines = robots.split(/\r?\n/).map((line) => line.trim());
+for (const route of privatePaths) {
   if (!robotLines.includes('Disallow: ' + route)) {
     throw new Error('robots.txt must disallow ' + route);
   }
-});
+}
 
-allowedPaths.forEach(function (route) {
+for (const route of allowedPaths) {
   const registered = route === '/'
     ? app.includes('path="/"')
     : app.includes('path="' + route + '"');
   if (!registered) throw new Error('Sitemap URL has no matching application route: ' + route);
-});
+}
 if (app.includes('DebugSwipeCardPage') || app.includes('/debug-swipe')) {
   throw new Error('Temporary /debug-swipe route must not be registered in the application.');
 }
