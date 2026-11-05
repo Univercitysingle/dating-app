@@ -2450,3 +2450,70 @@ test("Firebase identity deletion remains pending when admin credentials are unav
     reason: "firebase_admin_credentials_unavailable"
   });
 });
+
+
+test("account deletion storage inventory only returns owned photo and support attachment keys", async () => {
+  const { ObjectId } = await import("mongodb");
+  const userId = new ObjectId();
+  const ticketId = new ObjectId();
+  const photoKey = "photos-deleting-user-1730000000000.webp";
+  const supportKey = "support-" + String(ticketId) + "-1730000000000-123e4567-e89b-42d3-a456-426614174000.pdf";
+  const operations = [];
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne() {
+          return {
+            _id: userId,
+            uid: "deleting-user",
+            accountStatus: "deletion_pending",
+            photos: [{ url: "https://dateme.enadoctemp.workers.dev/" + photoKey, size: 123 }]
+          };
+        },
+        async updateOne(query, update) {
+          operations.push({ name, method: "updateOne", query, update });
+          return { matchedCount: 1 };
+        }
+      };
+      if (name === "supporttickets") return {
+        find(query) {
+          assert.equal(String(query.userId), String(userId));
+          return { async toArray() { return [{ _id: ticketId }]; } };
+        }
+      };
+      if (name === "ticketmessages") return {
+        find(query) {
+          assert.equal(String(query.senderId), String(userId));
+          return { async toArray() {
+            return [{ ticketId, attachments: [{ key: supportKey, url: "https://dateme.enadoctemp.workers.dev/" + supportKey }] }];
+          } };
+        },
+        async updateMany(query, update) {
+          operations.push({ name, method: "updateMany", query, update });
+          return { modifiedCount: 1 };
+        }
+      };
+      throw new Error("Unexpected collection " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const inventory = await connection.getAdminUserDeletionAssets("superadmin_uid", String(userId));
+  assert.equal(inventory.status, 200);
+  assert.deepEqual(inventory.body.photoKeys, [photoKey]);
+  assert.deepEqual(inventory.body.supportKeys, [supportKey]);
+  assert.equal(inventory.body.unresolvedAssetCount, 0);
+
+  const finalized = await connection.finalizeAdminUserDeletionAssets(
+    "superadmin_uid", String(userId), [photoKey, supportKey]
+  );
+  assert.equal(finalized.status, 200);
+  assert.equal(finalized.body.cdnAssetCleanupStatus, "completed");
+  assert.ok(operations.some(op => op.name === "users" && op.method === "updateOne" &&
+    op.update.$set.cdnAssetCleanupStatus === "completed" && op.update.$set.photos.length === 0));
+  assert.ok(operations.some(op => op.name === "ticketmessages" && op.method === "updateMany" &&
+    op.update.$unset.attachments === ""));
+});
