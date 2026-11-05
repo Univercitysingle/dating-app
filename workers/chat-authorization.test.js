@@ -38,6 +38,11 @@ test("chat delivery and read receipts constrain updates to the authenticated rec
   assert.deepEqual(calls[1].filter.status, { $in: ["sent", "delivered"] });
   assert.equal(calls[0].filter._id.$in.length, 1);
   assert.equal(calls[1].filter._id.$in.length, 1);
+  assert.equal(calls[0].update.$set.status, "delivered");
+  assert.ok(calls[0].update.$set.deliveredAt instanceof Date);
+  assert.equal(calls[1].update.$set.status, "read");
+  assert.ok(calls[1].update.$set.deliveredAt instanceof Date);
+  assert.ok(calls[1].update.$set.readAt instanceof Date);
 });
 
 test("chat receipts reject a room that does not contain the authenticated user without database access", async () => {
