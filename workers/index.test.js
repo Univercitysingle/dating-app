@@ -2483,6 +2483,7 @@ test("account anonymization requires Firebase and CDN cleanup and retains histor
   assert.ok(update.$unset.password !== undefined);
   assert.ok(update.$unset.mobileNumber !== undefined);
   assert.ok(update.$unset.location !== undefined);
+  assert.ok(update.$unset.cdnAssetCleanupDeletedKeys !== undefined);
   assert.equal(update.$set.role, "user");
   assert.equal(record._id, userId);
 });
