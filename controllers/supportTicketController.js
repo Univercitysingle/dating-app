@@ -1,17 +1,25 @@
+const mongoose = require('mongoose');
 const SupportTicket = require('../models/SupportTicket');
 const TicketMessage = require('../models/TicketMessage');
 const { v4: uuidv4 } = require('uuid');
 
 const createTicket = async (req, res) => {
-  const { subject, message } = req.body;
+  const { subject, message } = req.body || {};
   const userId = req.user._id;
+
+  if (typeof subject !== 'string' || !subject.trim() || subject.trim().length > 150) {
+    return res.status(400).json({ message: 'Subject must be between 1 and 150 characters.' });
+  }
+  if (typeof message !== 'string' || !message.trim() || message.trim().length > 5000) {
+    return res.status(400).json({ message: 'Message must be between 1 and 5000 characters.' });
+  }
 
   try {
     const ticketNumber = uuidv4();
 
     const newTicket = new SupportTicket({
       userId,
-      subject,
+      subject: subject.trim(),
       ticketNumber,
     });
 
@@ -20,7 +28,7 @@ const createTicket = async (req, res) => {
     const newMessage = new TicketMessage({
       ticketId: newTicket._id,
       senderId: userId,
-      message,
+      message: message.trim(),
     });
 
     await newMessage.save();
@@ -48,6 +56,10 @@ const getTicketByIdForUser = async (req, res) => {
   const { ticketId } = req.params;
   const userId = req.user._id;
 
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+    return res.status(400).json({ message: 'Invalid ticket ID.' });
+  }
+
   try {
     const ticket = await SupportTicket.findOne({ _id: ticketId, userId });
 
@@ -66,8 +78,15 @@ const getTicketByIdForUser = async (req, res) => {
 
 const addMessageToTicket = async (req, res) => {
   const { ticketId } = req.params;
-  const { message } = req.body;
+  const { message } = req.body || {};
   const userId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+    return res.status(400).json({ message: 'Invalid ticket ID.' });
+  }
+  if (typeof message !== 'string' || !message.trim() || message.trim().length > 5000) {
+    return res.status(400).json({ message: 'Message must be between 1 and 5000 characters.' });
+  }
 
   try {
     const ticket = await SupportTicket.findOne({ _id: ticketId, userId });
@@ -83,7 +102,7 @@ const addMessageToTicket = async (req, res) => {
     const newMessage = new TicketMessage({
       ticketId,
       senderId: userId,
-      message,
+      message: message.trim(),
     });
 
     await newMessage.save();
