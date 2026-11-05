@@ -7,8 +7,6 @@ Disallow: /matches
 Disallow: /chat/
 Disallow: /profile
 Disallow: /admin
-Disallow: /login
-Disallow: /register
 Disallow: /onboarding
 Disallow: /set-initial-password
 Disallow: /unauthorized
