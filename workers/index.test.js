@@ -89,6 +89,12 @@ test("GET / returns API metadata without pretending to serve the login UI", asyn
   });
 });
 
+test("API JSON responses include a same-origin resource policy", async () => {
+  const response = await worker.fetch(request("/health"), { MIGRATION_STAGE: "test" });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+});
+
 test("GET /favicon.ico returns an empty response instead of an unmigrated-route error", async () => {
   const response = await worker.fetch(request("/favicon.ico"), {});
   assert.equal(response.status, 204);
