@@ -30,7 +30,7 @@ module.exports = async function (req, res, next) {
       userId: dbUser._id,
       status: 'active',
     });
-    req.log.info({ subscription: activeSubscription }, "Active subscription found");
+    req.log.info({ hasActiveSubscription: Boolean(activeSubscription) }, "Subscription status checked");
 
     // Dynamically add the isPremium property for this request.
     // This will be handled by the sanitizeUser function.
