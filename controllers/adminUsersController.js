@@ -69,7 +69,6 @@ const listUsers = async (req, res) => {
       query.role = role;
     }
 
-    const allowedSortFields = new Set(['createdAt', 'name', 'email', 'role', 'lastActiveAt', 'isProfileVisible', 'plan']);
     const sortOptions = {};
     const safeSortBy = typeof sortBy === 'string' && allowedSortFields.has(sortBy) ? sortBy : 'createdAt';
     sortOptions[safeSortBy] = safeSortBy === 'createdAt' && !sortBy ? -1 : (sortOrder === 'desc' ? -1 : 1);
