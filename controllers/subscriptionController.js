@@ -23,10 +23,32 @@ const escapeHtml = (str) => {
 };
 
 const createSubscriptionPayment = async (req, res) => {
-    const { plan, currency } = req.body;
+    const { plan, currency = 'LKR' } = req.body || {};
+    if (typeof plan !== 'string' || !Object.prototype.hasOwnProperty.call(PLAN_PRICES, plan)) {
+        return res.status(400).json({ error: 'Invalid subscription plan.' });
+    }
+    if (typeof currency !== 'string' || currency !== 'LKR') {
+        return res.status(400).json({ error: 'Unsupported payment currency.' });
+    }
+
+    const publicKey = process.env.WEBXPAY_PUBLIC_KEY;
+    const secretKey = process.env.WEBXPAY_SECRET_KEY;
+    const frontendUrl = process.env.FRONTEND_URL;
+    if (!publicKey || !secretKey || !frontendUrl) {
+        req.log.error('WebXPay is not fully configured. Please check environment variables.');
+        return res.status(503).json({ error: 'Payment gateway is not configured.' });
+    }
+    try {
+        const configuredFrontend = new URL(frontendUrl);
+        if (configuredFrontend.protocol !== 'https:' || configuredFrontend.username || configuredFrontend.password) {
+            return res.status(503).json({ error: 'Payment gateway return URL is invalid.' });
+        }
+    } catch (_) {
+        return res.status(503).json({ error: 'Payment gateway return URL is invalid.' });
+    }
     const userId = req.user.uid;
 
-    // Validate plan and get server-side price
+    // Resolve price exclusively from the server-side plan catalog.
     const price = PLAN_PRICES[plan];
     if (!price) {
         return res.status(400).json({ error: 'Invalid subscription plan.' });
@@ -44,9 +66,6 @@ const createSubscriptionPayment = async (req, res) => {
             return res.status(400).json({ message: `You already have an active subscription.` });
         }
 
-        // Clean up any old pending or processing subscriptions for this user to allow retrying a failed payment
-        await Subscription.deleteMany({ userId: user._id, status: { $in: ['pending', 'processing'] } });
-
         const newSubscription = new Subscription({
             userId: user._id,
             plan: plan,
@@ -56,15 +75,6 @@ const createSubscriptionPayment = async (req, res) => {
 
         const order_id = newSubscription._id.toString();
         const text = `${order_id}|${price}`;
-
-        const publicKey = process.env.WEBXPAY_PUBLIC_KEY;
-        const secretKey = process.env.WEBXPAY_SECRET_KEY;
-        const frontendUrl = process.env.FRONTEND_URL;
-
-        if (!publicKey || !secretKey || !frontendUrl) {
-            req.log.error('WebXPay is not fully configured. Please check environment variables.');
-            return res.status(500).json({ error: 'Payment gateway is not configured.' });
-        }
 
         let keyString = publicKey;
         if (keyString.startsWith('"') && keyString.endsWith('"')) {
@@ -120,6 +130,9 @@ const createSubscriptionPayment = async (req, res) => {
 
 const getSubscriptionStatus = async (req, res) => {
     try {
+        if (typeof req.params.id !== 'string' || !mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: 'Invalid subscription ID.' });
+        }
         const subscription = await Subscription.findById(req.params.id);
 
         if (!subscription) {
