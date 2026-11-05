@@ -2888,12 +2888,13 @@ export class MongoDBConnection {
       const targetId = new ObjectId(userId);
       const now = new Date();
       let targetUid = null;
+      let firebaseAuthAlreadyDeleted = false;
       const session = client.startSession();
       try {
         let targetFound = false;
         await session.withTransaction(async () => {
           const users = db.collection("users");
-          const target = await users.findOne({ _id: targetId }, { projection: { uid: 1, role: 1, deletionRequestedAt: 1 }, session });
+          const target = await users.findOne({ _id: targetId }, { projection: { uid: 1, role: 1, deletionRequestedAt: 1, firebaseAuthDeletionStatus: 1 }, session });
           if (!target) return;
           if (target.role === "superadmin") throw new Error("SUPERADMIN_DELETE_FORBIDDEN");
           // Repeated DELETE requests deliberately replay idempotent database cleanup.
@@ -2901,6 +2902,7 @@ export class MongoDBConnection {
           // repair partial cleanup after a transient failure.
           targetFound = true;
           targetUid = typeof target.uid === "string" ? target.uid : null;
+          firebaseAuthAlreadyDeleted = target.firebaseAuthDeletionStatus === "completed";
           await users.updateOne(
             { _id: targetId, role: { $ne: "superadmin" } },
             { $set: {
@@ -2957,17 +2959,19 @@ export class MongoDBConnection {
           };
         }
 
-        const firebaseDeletion = await deleteFirebaseAuthIdentity(this.env, targetUid);
-        await db.collection("users").updateOne(
-          { _id: targetId },
-          { $set: {
+        const firebaseDeletion = firebaseAuthAlreadyDeleted
+          ? { completed: true, configured: true }
+          : await deleteFirebaseAuthIdentity(this.env, targetUid);
+        if (!firebaseAuthAlreadyDeleted) {
+          const firebaseStatusUpdate = {
             firebaseAuthDeletionStatus: firebaseDeletion.completed ? "completed" :
               (firebaseDeletion.configured ? "retry_pending" : "awaiting_credentials"),
-            firebaseAuthDeletedAt: firebaseDeletion.completed ? new Date() : null,
             firebaseAuthDeletionLastAttemptAt: new Date(),
             updatedAt: new Date()
-          } }
-        );
+          };
+          if (firebaseDeletion.completed) firebaseStatusUpdate.firebaseAuthDeletedAt = new Date();
+          await db.collection("users").updateOne({ _id: targetId }, { $set: firebaseStatusUpdate });
+        }
         if (!firebaseDeletion.completed) {
           return {
             status: 202,
