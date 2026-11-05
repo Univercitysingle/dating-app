@@ -196,6 +196,9 @@ const unblockUser = async (req, res) => {
   const log = req.log;
   const currentUserUid = req.user.uid;
   const { userIdToUnblock } = req.params;
+  if (typeof userIdToUnblock !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(userIdToUnblock)) {
+    return res.status(400).json({ error: 'Invalid user ID.' });
+  }
   log.info(`UsersController: unblockUser entered. CurrentUser: ${currentUserUid}, UserToUnblock: ${userIdToUnblock}`);
 
   if (currentUserUid === userIdToUnblock) {
@@ -226,6 +229,9 @@ const blockUser = async (req, res) => {
   const log = req.log;
   const currentUserUid = req.user.uid;
   const { userIdToBlock } = req.params;
+  if (typeof userIdToBlock !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(userIdToBlock)) {
+    return res.status(400).json({ error: 'Invalid user ID.' });
+  }
   log.info(`UsersController: blockUser entered. CurrentUser: ${currentUserUid}, UserToBlock: ${userIdToBlock}`);
 
   if (currentUserUid === userIdToBlock) {
