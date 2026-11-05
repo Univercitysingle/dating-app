@@ -339,3 +339,11 @@ jobs:
             STATUS="$(curl --silent --show-error --output /tmp/route-response.json --write-out '%{http_code}' "$WORKER_URL$PATH_TO_CHECK")"
             test "$STATUS" = "401" || { echo "Expected anonymous request to $PATH_TO_CHECK to return 401; received $STATUS"; cat /tmp/route-response.json; exit 1; }
           done
+
+      - name: Run OWASP ZAP passive baseline against deployed API Worker
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: https://dating-app-api-staging.enadoctemp.workers.dev
+          fail_action: false
+          allow_issue_writing: false
+          artifact_name: zap-worker-after-deploy
