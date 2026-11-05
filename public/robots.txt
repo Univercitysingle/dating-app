@@ -3,9 +3,20 @@ Allow: /
 Disallow: /discover
 Disallow: /likes
 Disallow: /conversations
+Disallow: /matches
 Disallow: /chat/
 Disallow: /profile
 Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /onboarding
+Disallow: /set-initial-password
+Disallow: /unauthorized
+Disallow: /premium
+Disallow: /manage-subscription
+Disallow: /support
+Disallow: /store
+Disallow: /dark-fantasy
 Disallow: /api/
 
 Sitemap: https://dating-app-staging.pages.dev/sitemap.xml
