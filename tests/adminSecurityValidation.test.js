@@ -24,6 +24,38 @@ describe('Admin endpoint input validation', () => {
     findOneSpy.mockRestore();
   });
 
+  it('rejects malformed user IDs before database access', async () => {
+    const res = makeResponse();
+    const findByIdSpy = jest.spyOn(User, 'findById');
+
+    await adminUsersController.getUserById({ params: { userId: 'not-an-object-id' } }, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid user ID.' });
+    expect(findByIdSpy).not.toHaveBeenCalled();
+    findByIdSpy.mockRestore();
+  });
+
+  it('prevents admins from changing subscription and verification fields', async () => {
+    const res = makeResponse();
+    const findByIdSpy = jest.spyOn(User, 'findById').mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ _id: '507f1f77bcf86cd799439011', role: 'user' }),
+    });
+
+    await adminUsersController.updateUserById({
+      params: { userId: '507f1f77bcf86cd799439011' },
+      user: { role: 'admin' },
+      body: { plan: 'premium' },
+    }, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Only a superadmin can modify subscription, verification, or password-setup fields.',
+    });
+    expect(findByIdSpy).toHaveBeenCalledTimes(1);
+    findByIdSpy.mockRestore();
+  });
+
   it('rejects MongoDB operator objects in user role filters', async () => {
     const res = makeResponse();
     await adminUsersController.listUsers({ query: { role: { $ne: 'user' } } }, res);
