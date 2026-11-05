@@ -162,7 +162,7 @@ jobs:
           echo "CLOUDFLARE_PAGES_PROJECT_NAME=$project" >> "$GITHUB_ENV"
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Run frontend regression tests
         run: npm run test:frontend -- --runInBand --watchAll=false
