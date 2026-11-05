@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const SupportTicket = require('../models/SupportTicket');
 const TicketMessage = require('../models/TicketMessage');
 
@@ -42,6 +43,9 @@ const getAllTickets = async (req, res) => {
 
 const getTicketByIdForAdmin = async (req, res) => {
   const { ticketId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+    return res.status(400).json({ message: 'Invalid ticket ID.' });
+  }
 
   try {
     const ticket = await SupportTicket.findById(ticketId).populate('userId', 'name email');
@@ -61,8 +65,15 @@ const getTicketByIdForAdmin = async (req, res) => {
 
 const addAdminMessageToTicket = async (req, res) => {
   const { ticketId } = req.params;
-  const { message } = req.body;
+  const { message } = req.body || {};
   const adminUserId = req.user._id;
+
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+    return res.status(400).json({ message: 'Invalid ticket ID.' });
+  }
+  if (typeof message !== 'string' || !message.trim() || message.trim().length > 5000) {
+    return res.status(400).json({ message: 'Message must be between 1 and 5000 characters.' });
+  }
 
   try {
     const ticket = await SupportTicket.findById(ticketId);
@@ -74,7 +85,7 @@ const addAdminMessageToTicket = async (req, res) => {
     const newMessage = new TicketMessage({
       ticketId,
       senderId: adminUserId,
-      message,
+      message: message.trim(),
       isFromAdmin: true,
     });
 
@@ -93,7 +104,10 @@ const addAdminMessageToTicket = async (req, res) => {
 
 const updateTicketStatus = async (req, res) => {
   const { ticketId } = req.params;
-  const { status } = req.body;
+  const { status } = req.body || {};
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+    return res.status(400).json({ message: 'Invalid ticket ID.' });
+  }
   const validStatuses = SupportTicket.schema.path('status').enumValues;
   if (typeof status !== 'string' || !validStatuses.includes(status)) {
     return res.status(400).json({ message: 'Invalid ticket status.' });
