@@ -2339,15 +2339,28 @@ test("admin account deletion transactionally revokes access and retains financia
   const { ObjectId } = await import("mongodb");
   const targetId = new ObjectId();
   const operations = [];
+  let storedDeletionRequestedAt = null;
+  let storedDeletionRequestedBy = null;
   const collection = name => ({
     async findOne(query) {
       if (name === "users") {
         assert.equal(String(query._id), String(targetId));
-        return { _id: targetId, uid: "deleting-user", role: "user" };
+        return {
+          _id: targetId, uid: "deleting-user", role: "user",
+          deletionRequestedAt: storedDeletionRequestedAt,
+          deletionRequestedBy: storedDeletionRequestedBy
+        };
       }
       return null;
     },
-    async updateOne(query, update) { operations.push({ name, method: "updateOne", query, update }); return { matchedCount: 1 }; },
+    async updateOne(query, update) {
+      operations.push({ name, method: "updateOne", query, update });
+      if (name === "users") {
+        storedDeletionRequestedAt = update.$set.deletionRequestedAt;
+        storedDeletionRequestedBy = update.$set.deletionRequestedBy;
+      }
+      return { matchedCount: 1 };
+    },
     async updateMany(query, update) { operations.push({ name, method: "updateMany", query, update }); return { modifiedCount: 1 }; },
     async deleteOne(query) { operations.push({ name, method: "deleteOne", query }); return { deletedCount: 1 }; },
     async deleteMany(query) { operations.push({ name, method: "deleteMany", query }); return { deletedCount: 1 }; }
@@ -2380,4 +2393,13 @@ test("admin account deletion transactionally revokes access and retains financia
   assert.equal(operations.some(op => op.name === "auditlogs"), false);
   assert.equal(operations.some(op => op.name === "reports"), false);
   assert.equal(operations.some(op => op.name === "supporttickets"), false);
+
+  const originalRequestedAt = storedDeletionRequestedAt;
+  operations.length = 0;
+  const retry = await connection.deleteAdminUser("superadmin_uid", String(targetId));
+  assert.equal(retry.status, 200);
+  assert.equal(storedDeletionRequestedAt, originalRequestedAt);
+  assert.ok(operations.some(op => op.name === "subscriptions" && op.method === "updateMany"));
+  assert.ok(operations.some(op => op.name === "darkfantasyprofiles" && op.method === "deleteOne"));
+  assert.ok(operations.some(op => op.name === "secretcommunitymemberships" && op.method === "deleteMany"));
 });
