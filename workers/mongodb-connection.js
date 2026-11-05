@@ -4480,12 +4480,17 @@ export class MongoDBConnection {
     const guardBody = await request.clone().json().catch(() => null);
     const authenticatedUid = guardBody?.claims?.sub;
     if (typeof authenticatedUid === "string" && authenticatedUid && guardBody?.claims?.role !== "superadmin") {
+      // Enforce verified email and all account restrictions centrally so a
+      // suspended or unverified user cannot use a less restrictive API route.
+      if (guardBody?.claims?.email_verified !== true) {
+        return json({ error: "Email verification is required to use this service." }, 403);
+      }
       try {
         const account = await this.getDatabase(await this.getClient()).collection("users").findOne(
           { uid: authenticatedUid },
-          { projection: { accountStatus: 1, deletionRequestedAt: 1 } }
+          { projection: { accountStatus: 1, deletionRequestedAt: 1, suspendedUntil: 1 } }
         );
-        if (account && (account.deletionRequestedAt || ["deletion_pending", "deleted"].includes(account.accountStatus))) {
+        if (account && isAccountRestricted(account)) {
           return json({ error: "This account is unavailable." }, 403);
         }
       } catch {
