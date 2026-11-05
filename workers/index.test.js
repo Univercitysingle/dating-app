@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
 import worker, { RateLimiter, MongoDBConnection, requestCdnObject } from "./index.js";
+import { deleteFirebaseAuthIdentity } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
@@ -2376,8 +2377,9 @@ test("admin account deletion transactionally revokes access and retains financia
   connection.getDatabase = () => db;
 
   const result = await connection.deleteAdminUser("superadmin_uid", String(targetId));
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 202);
   assert.equal(result.body.deletionStatus, "deletion_pending");
+  assert.equal(result.body.firebaseAuthDeletionStatus, "awaiting_credentials");
   assert.equal(result.body.financialAndAuditRecordsRetained, true);
   assert.ok(operations.some(op => op.name === "users" && op.method === "updateOne" &&
     op.update.$set.accountStatus === "deletion_pending" && op.update.$set.isProfileVisible === false));
@@ -2397,9 +2399,54 @@ test("admin account deletion transactionally revokes access and retains financia
   const originalRequestedAt = storedDeletionRequestedAt;
   operations.length = 0;
   const retry = await connection.deleteAdminUser("superadmin_uid", String(targetId));
-  assert.equal(retry.status, 200);
+  assert.equal(retry.status, 202);
+  assert.equal(retry.body.firebaseAuthDeletionStatus, "awaiting_credentials");
   assert.equal(storedDeletionRequestedAt, originalRequestedAt);
   assert.ok(operations.some(op => op.name === "subscriptions" && op.method === "updateMany"));
   assert.ok(operations.some(op => op.name === "darkfantasyprofiles" && op.method === "deleteOne"));
   assert.ok(operations.some(op => op.name === "secretcommunitymemberships" && op.method === "deleteMany"));
+});
+
+
+test("Firebase identity deletion uses service-account OAuth and treats missing identities as complete", async () => {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    requests.push({ url: String(url), options });
+    if (String(url) === "https://oauth2.googleapis.com/token") {
+      assert.equal(options.method, "POST");
+      assert.match(String(options.body), /grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer/);
+      return new Response(JSON.stringify({ access_token: "test-firebase-access-token" }), {
+        status: 200, headers: { "content-type": "application/json" }
+      });
+    }
+    assert.equal(String(url), "https://identitytoolkit.googleapis.com/v1/projects/test-project/accounts:delete");
+    assert.equal(options.headers.authorization, "Bearer test-firebase-access-token");
+    assert.deepEqual(JSON.parse(options.body), { localId: "firebase-user-123" });
+    return new Response(JSON.stringify({ error: { message: "USER_NOT_FOUND" } }), {
+      status: 400, headers: { "content-type": "application/json" }
+    });
+  };
+
+  try {
+    const result = await deleteFirebaseAuthIdentity({
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "firebase-admin@test-project.iam.gserviceaccount.com",
+      FIREBASE_PRIVATE_KEY: privateKey.export({ type: "pkcs8", format: "pem" })
+    }, "firebase-user-123");
+    assert.deepEqual(result, { completed: true, configured: true });
+    assert.equal(requests.length, 2);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test("Firebase identity deletion remains pending when admin credentials are unavailable", async () => {
+  const result = await deleteFirebaseAuthIdentity({}, "firebase-user-123");
+  assert.deepEqual(result, {
+    completed: false,
+    configured: false,
+    reason: "firebase_admin_credentials_unavailable"
+  });
 });
