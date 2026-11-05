@@ -4,10 +4,16 @@ const User = require('../models/User');
 // List all reports with pagination and filtering
 const listReports = async (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
+    const { page: rawPage, limit: rawLimit, status, search } = req.query;
+    const page = rawPage === undefined ? 1 : Number(rawPage);
+    const limit = rawLimit === undefined ? 10 : Number(rawLimit);
+    if ((rawPage !== undefined && (typeof rawPage !== 'string' || !/^\\d{1,6}$/.test(rawPage))) ||
+        (rawLimit !== undefined && (typeof rawLimit !== 'string' || !/^\\d{1,3}$/.test(rawLimit))) ||
+        !Number.isSafeInteger(page) || page < 1 || page > 100000 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      return res.status(400).json({ message: 'Invalid pagination. Page must be 1-100000 and limit must be 1-100.' });
+    }
     const skip = (page - 1) * limit;
-    const { status, search } = req.query;
     const validStatuses = Report.schema.path('status').enumValues;
     if (status !== undefined && (typeof status !== 'string' || !validStatuses.includes(status))) {
       return res.status(400).json({ message: 'Invalid report status.' });
