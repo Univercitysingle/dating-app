@@ -5,8 +5,14 @@ const submitReport = async (req, res) => {
   const reporterUid = req.user.uid; // From authMiddleware
   const { reportedUserUid, reason, category } = req.body;
 
-  if (!reportedUserUid || !reason || !category) {
-    return res.status(400).json({ error: 'Missing required fields: reportedUserUid, reason, category.' });
+  if (typeof reportedUserUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(reportedUserUid)) {
+    return res.status(400).json({ error: 'A valid reportedUserUid is required.' });
+  }
+  if (typeof reason !== 'string' || !reason.trim() || reason.length > 2000) {
+    return res.status(400).json({ error: 'Reason must be a non-empty string of at most 2000 characters.' });
+  }
+  if (typeof category !== 'string') {
+    return res.status(400).json({ error: 'A valid report category is required.' });
   }
 
   if (reporterUid === reportedUserUid) {
@@ -41,15 +47,15 @@ const submitReport = async (req, res) => {
     await newReport.save();
 
     res.status(201).json({ message: 'Report submitted successfully.', reportId: newReport._id });
-    console.log(`Report submitted successfully by UID: ${reporterUid} against UID: ${reportedUserUid}, Report ID: ${newReport._id}`);
+    console.log('Report submitted successfully.');
 
   } catch (error) {
     if (error.name === 'ValidationError') {
         // Log validation errors as well, as they are client input issues but good to monitor
-        console.error(`Validation error submitting report by UID ${reporterUid} against UID ${reportedUserUid}:`, error.message);
+        console.warn('Report validation failed.');
         return res.status(400).json({ error: error.message });
     }
-    console.error(`Error submitting report by UID ${reporterUid} against UID ${reportedUserUid}:`, error);
+    console.error('Report submission failed.');
     res.status(500).json({ error: 'An unexpected error occurred while submitting report.' });
   }
 };
