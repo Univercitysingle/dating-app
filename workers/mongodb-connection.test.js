@@ -2662,6 +2662,7 @@ test("ordinary Worker admins cannot change paid plan, verification, password, or
   } });
 
   for (const payload of [
+    { email: "attacker-controlled@example.com" },
     { plan: "premium" },
     { isVerified: true },
     { faceVerified: true },
