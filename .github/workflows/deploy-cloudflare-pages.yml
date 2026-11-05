@@ -164,6 +164,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Enforce frontend dependency security threshold
+        run: npm audit --audit-level=high
+
       - name: Run frontend regression tests
         run: npm run test:frontend -- --runInBand --watchAll=false
 
