@@ -11,8 +11,8 @@ const getAllTickets = async (req, res) => {
     return res.status(400).json({ message: 'Invalid ticket status.' });
   }
 
-  const pageValue = typeof rawPage === 'string' && /^\\d{1,6}$/.test(rawPage) ? Number(rawPage) : 1;
-  const limitValue = typeof rawLimit === 'string' && /^\\d{1,3}$/.test(rawLimit) ? Number(rawLimit) : 10;
+  const pageValue = typeof rawPage === 'string' && /^\d{1,6}$/.test(rawPage) ? Number(rawPage) : 1;
+  const limitValue = typeof rawLimit === 'string' && /^\d{1,3}$/.test(rawLimit) ? Number(rawLimit) : 10;
   const page = Math.min(Math.max(pageValue, 1), 10000);
   const limit = Math.min(Math.max(limitValue, 1), 100);
 
