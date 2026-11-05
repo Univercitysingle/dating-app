@@ -2,18 +2,28 @@ const SupportTicket = require('../models/SupportTicket');
 const TicketMessage = require('../models/TicketMessage');
 
 const getAllTickets = async (req, res) => {
-  const { page = 1, limit = 10, status } = req.query;
+  const { page: rawPage = '1', limit: rawLimit = '10', status } = req.query;
+  const validStatuses = SupportTicket.schema.path('status').enumValues;
+
+  // Never pass an object or operator supplied through query parameters into a
+  // MongoDB filter. Only the schema's explicit status values are accepted.
+  if (status !== undefined && (typeof status !== 'string' || !validStatuses.includes(status))) {
+    return res.status(400).json({ message: 'Invalid ticket status.' });
+  }
+
+  const pageValue = typeof rawPage === 'string' && /^\\d{1,6}$/.test(rawPage) ? Number(rawPage) : 1;
+  const limitValue = typeof rawLimit === 'string' && /^\\d{1,3}$/.test(rawLimit) ? Number(rawLimit) : 10;
+  const page = Math.min(Math.max(pageValue, 1), 10000);
+  const limit = Math.min(Math.max(limitValue, 1), 100);
 
   try {
     const query = {};
-    if (status) {
-      query.status = status;
-    }
+    if (status !== undefined) query.status = status;
 
     const tickets = await SupportTicket.find(query)
       .populate('userId', 'name email')
       .sort({ createdAt: 'desc' })
-      .limit(limit * 1)
+      .limit(limit)
       .skip((page - 1) * limit)
       .exec();
 
@@ -84,6 +94,10 @@ const addAdminMessageToTicket = async (req, res) => {
 const updateTicketStatus = async (req, res) => {
   const { ticketId } = req.params;
   const { status } = req.body;
+  const validStatuses = SupportTicket.schema.path('status').enumValues;
+  if (typeof status !== 'string' || !validStatuses.includes(status)) {
+    return res.status(400).json({ message: 'Invalid ticket status.' });
+  }
 
   try {
     const ticket = await SupportTicket.findById(ticketId);
