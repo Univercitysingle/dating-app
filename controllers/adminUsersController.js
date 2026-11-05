@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Report = require('../models/Report'); // Import the Report model
 const AuditLog = require('../models/AuditLog');
@@ -350,6 +351,10 @@ const Purchase = require('../models/Purchase');
 const getPurchases = async (req, res) => {
   try {
     const { status } = req.query;
+    const validStatuses = Purchase.schema.path('status').enumValues;
+    if (status !== undefined && (typeof status !== 'string' || (status !== 'all' && !validStatuses.includes(status)))) {
+      return res.status(400).json({ message: 'Invalid purchase status.' });
+    }
     let query = {};
     if (status && status !== 'all') {
       query.status = status;
@@ -375,6 +380,9 @@ const getPurchases = async (req, res) => {
 const approvePurchase = async (req, res) => {
   try {
     const purchaseId = req.params.purchaseId || req.params.id;
+    if (typeof purchaseId !== 'string' || !mongoose.Types.ObjectId.isValid(purchaseId)) {
+      return res.status(400).json({ message: 'Invalid purchase ID.' });
+    }
     const purchase = await Purchase.findById(purchaseId);
 
     if (!purchase || purchase.status !== 'pending') {
@@ -406,10 +414,12 @@ const approvePurchase = async (req, res) => {
 const rejectPurchase = async (req, res) => {
   try {
     const purchaseId = req.params.purchaseId || req.params.id;
-    const { reason } = req.body;
-
-    if (!reason) {
-      return res.status(400).json({ message: 'A reason for rejection is required.' });
+    const { reason } = req.body || {};
+    if (typeof purchaseId !== 'string' || !mongoose.Types.ObjectId.isValid(purchaseId)) {
+      return res.status(400).json({ message: 'Invalid purchase ID.' });
+    }
+    if (typeof reason !== 'string' || !reason.trim() || reason.length > 500) {
+      return res.status(400).json({ message: 'A rejection reason of 1-500 characters is required.' });
     }
 
     const purchase = await Purchase.findById(purchaseId);
