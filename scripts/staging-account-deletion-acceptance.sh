@@ -52,6 +52,16 @@ target_id="$(node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(
   exit 1
 }
 
+# Independently inspect the target through the superadmin endpoint. This extra
+# marker prevents accidentally selecting an ordinary staging user.
+status="$(curl --silent --show-error --output "$tmpdir/admin-before.json" --write-out '%{http_code}' \
+  --header "Authorization: Bearer $admin_token" --header 'Accept: application/json' \
+  "$WORKER_URL/api/admin/users/$target_id")"
+if [[ "$status" != "200" ]] || ! node -e 'const fs=require("fs");const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(String(x.email||"").toLowerCase()!==String(process.env.STAGING_DELETION_TEST_EMAIL||"").toLowerCase()||x.role!=="user"||x.name!=="Disposable Account Deletion Test"||x.plan!=="basic"||["deletion_pending","deleted"].includes(x.accountStatus))process.exit(1)' "$tmpdir/admin-before.json"; then
+  echo "::error::Target must be a basic-plan user named 'Disposable Account Deletion Test' and match the dedicated email secret. No deletion was attempted."
+  exit 1
+fi
+
 completed=false
 for attempt in $(seq 1 30); do
   status="$(curl --silent --show-error --output "$tmpdir/delete.json" --write-out '%{http_code}' \
