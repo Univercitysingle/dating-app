@@ -8,7 +8,7 @@ const bcrypt = require('bcryptjs');
 const login = async (req, res) => {
   const log = req.log;
   try {
-    const { token, email, password } = req.body;
+    const { token, email, password } = req.body || {};
 
     // Superadmin login check
     if (email && password) {
@@ -58,7 +58,7 @@ const login = async (req, res) => {
     if (token) {
       log.info("Firebase token login attempt");
 
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await admin.auth().verifyIdToken(token, true);
       const user = await findOrCreateUserFromToken(decodedToken);
 
       if (user) {
@@ -135,39 +135,44 @@ const login = async (req, res) => {
 const setInitialPassword = async (req, res) => {
   const log = req.log;
   try {
-    const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 6) {
-      log.warn(`Failed to set initial password for UID: ${req.user.uid}. Password too short.`);
-      return res.status(400).json({ error: "Password must be at least 6 characters long." });
+    if (!req.user || typeof req.user.uid !== 'string' || !req.user.uid) {
+      log.warn("Attempt to set initial password without authentication.");
+      return res.status(401).json({ error: "User not authenticated properly." });
     }
 
-    if (!req.user || !req.user.uid) {
-        log.warn("Attempt to set initial password without authentication.");
-        return res.status(401).json({ error: "User not authenticated properly." });
+    const { newPassword } = req.body || {};
+    if (typeof newPassword !== 'string' || newPassword.length < 6 || newPassword.length > 128) {
+      log.warn({ uid: req.user.uid }, "Rejected invalid initial password length or type");
+      return res.status(400).json({ error: "Password must be between 6 and 128 characters long." });
     }
 
     const User = require('../models/User');
-    const user = await User.findOne({ uid: req.user.uid });
+    const existingUser = await User.findOne({ uid: req.user.uid });
 
-    if (!user) {
-      log.warn(`Attempt to set initial password for non-existent user with UID: ${req.user.uid}.`);
+    if (!existingUser) {
+      log.warn({ uid: req.user.uid }, "Initial password requested for a missing user");
       return res.status(404).json({ error: "User not found." });
     }
 
-    if (user.mustSetPassword !== true) {
-      log.warn(`Attempt to set initial password for user with UID: ${req.user.uid} where mustSetPassword is not true.`);
+    if (existingUser.mustSetPassword !== true) {
+      log.warn({ uid: req.user.uid }, "Initial password setup is not permitted for this account");
       return res.status(400).json({ error: "Password already set or action not allowed." });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    user.mustSetPassword = false;
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    // Conditional update prevents two concurrent requests from setting/replacing
+    // the initial password after the one-time setup flag has been consumed.
+    const result = await User.updateOne(
+      { uid: req.user.uid, mustSetPassword: true },
+      { $set: { password: passwordHash, mustSetPassword: false } }
+    );
 
-    await user.save();
+    if (result.modifiedCount !== 1) {
+      return res.status(400).json({ error: "Password already set or action not allowed." });
+    }
 
     res.json({ message: "Password set successfully." });
-    log.info(`Initial password set for UID: ${user.uid}`);
-
+    log.info({ uid: req.user.uid }, "Initial password set successfully");
   } catch (error) {
     log.error({ err: error }, "Error setting initial password");
     res.status(500).json({ error: "An unexpected error occurred while setting password." });
