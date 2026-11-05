@@ -28,10 +28,29 @@ const escapeHtml = (str) => {
 };
 
 const createPurchase = async (req, res) => {
-    const { itemId } = req.body;
+    const { itemId } = req.body || {};
+    if (typeof itemId !== 'string' || !Object.prototype.hasOwnProperty.call(CATALOG_PRICES, itemId)) {
+        return res.status(400).json({ error: 'Invalid item ID.' });
+    }
+
+    const publicKey = process.env.WEBXPAY_PUBLIC_KEY;
+    const secretKey = process.env.WEBXPAY_SECRET_KEY;
+    const frontendUrl = process.env.FRONTEND_URL;
+    if (!publicKey || !secretKey || !frontendUrl) {
+        req.log.error('WebXPay is not fully configured. Please check environment variables.');
+        return res.status(503).json({ error: 'Payment gateway is not configured.' });
+    }
+    try {
+        const configuredFrontend = new URL(frontendUrl);
+        if (configuredFrontend.protocol !== 'https:' || configuredFrontend.username || configuredFrontend.password) {
+            return res.status(503).json({ error: 'Payment gateway return URL is invalid.' });
+        }
+    } catch (_) {
+        return res.status(503).json({ error: 'Payment gateway return URL is invalid.' });
+    }
     const userId = req.user.uid;
 
-    // Validate item exists in catalog
+    // Resolve price exclusively from the server-side catalog.
     const itemPrice = CATALOG_PRICES[itemId];
     if (!itemPrice) {
         return res.status(400).json({ error: 'Invalid item ID.' });
@@ -55,15 +74,6 @@ const createPurchase = async (req, res) => {
 
         const order_id = newPurchase._id.toString();
         const text = order_id + '|' + itemPrice;
-
-        const publicKey = process.env.WEBXPAY_PUBLIC_KEY;
-        const secretKey = process.env.WEBXPAY_SECRET_KEY;
-        const frontendUrl = process.env.FRONTEND_URL;
-
-        if (!publicKey || !secretKey || !frontendUrl) {
-            req.log.error('WebXPay is not fully configured. Please check environment variables.');
-            return res.status(500).json({ error: 'Payment gateway is not configured.' });
-        }
 
         let keyString = publicKey;
         if (keyString.startsWith('"') && keyString.endsWith('"')) {
@@ -132,6 +142,9 @@ const getPendingPurchases = async (req, res) => {
 
 const getPurchaseStatus = async (req, res) => {
     try {
+        if (typeof req.params.id !== 'string' || !require('mongoose').Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ error: 'Invalid purchase ID.' });
+        }
         const purchase = await Purchase.findById(req.params.id);
         if (!purchase) {
             return res.status(404).json({ error: 'Purchase not found' });
