@@ -47,7 +47,6 @@ jobs:
             ...(pkg.overrides || {}),
             '@grpc/grpc-js': '^1.13.6',
             '@tootallnate/once': '^2.0.1',
-            deepmerge: '^5.0.0',
             '@svgr/webpack': '^8.1.0',
             '@svgr/plugin-svgo': '^8.1.0',
             svgo: '^4.0.0',
