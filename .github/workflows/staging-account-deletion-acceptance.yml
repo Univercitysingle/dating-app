@@ -17,11 +17,11 @@ jobs:
     timeout-minutes: 10
     env:
       WORKER_URL: https://dating-app-api-staging.enadoctemp.workers.dev
-      FIREBASE_WEB_API_KEY: \${{ secrets.REACT_APP_FIREBASE_API_KEY }}
-      STAGING_DELETION_TEST_EMAIL: \${{ secrets.STAGING_DELETION_TEST_EMAIL }}
-      STAGING_DELETION_TEST_PASSWORD: \${{ secrets.STAGING_DELETION_TEST_PASSWORD }}
-      STAGING_DELETION_ADMIN_EMAIL: \${{ secrets.STAGING_DELETION_ADMIN_EMAIL }}
-      STAGING_DELETION_ADMIN_PASSWORD: \${{ secrets.STAGING_DELETION_ADMIN_PASSWORD }}
+      FIREBASE_WEB_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
+      STAGING_DELETION_TEST_EMAIL: ${{ secrets.STAGING_DELETION_TEST_EMAIL }}
+      STAGING_DELETION_TEST_PASSWORD: ${{ secrets.STAGING_DELETION_TEST_PASSWORD }}
+      STAGING_DELETION_ADMIN_EMAIL: ${{ secrets.STAGING_DELETION_ADMIN_EMAIL }}
+      STAGING_DELETION_ADMIN_PASSWORD: ${{ secrets.STAGING_DELETION_ADMIN_PASSWORD }}
     steps:
       - name: Check out migration branch only
         uses: actions/checkout@v4
@@ -38,12 +38,12 @@ jobs:
         run: |
           set -euo pipefail
           for name in FIREBASE_WEB_API_KEY STAGING_DELETION_TEST_EMAIL STAGING_DELETION_TEST_PASSWORD STAGING_DELETION_ADMIN_EMAIL STAGING_DELETION_ADMIN_PASSWORD; do
-            if [[ -z "\${!name}" ]]; then
+            if [[ -z "${!name}" ]]; then
               echo "::error::Missing required dedicated staging deletion secret: $name"
               exit 1
             fi
           done
-          if [[ "\${STAGING_DELETION_TEST_EMAIL,,}" == "\${STAGING_DELETION_ADMIN_EMAIL,,}" ]]; then
+          if [[ "${STAGING_DELETION_TEST_EMAIL,,}" == "${STAGING_DELETION_ADMIN_EMAIL,,}" ]]; then
             echo "::error::The deletion target and superadmin must be different accounts."
             exit 1
           fi
