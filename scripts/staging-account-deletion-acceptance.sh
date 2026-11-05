@@ -77,7 +77,7 @@ for attempt in $(seq 1 30); do
     echo "::error::Account deletion acceptance returned unexpected HTTP $status on attempt $attempt."
     exit 1
   fi
-  if [[ "$state" == *"manual_review_required"* || "$state" == *"awaiting_credentials"* || "$state" == *"retry_pending"* ]]; then
+  if [[ "$state" == *"manual_review_required"* || "$state" == *"awaiting_credentials"* ]]; then
     echo "::error::Account deletion requires manual review or external credentials. Acceptance stopped without bypassing the safety gate."
     exit 1
   fi
