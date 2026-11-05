@@ -3406,7 +3406,11 @@ export class MongoDBConnection {
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
         { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
       ]).toArray();
-      return { status: 200, body: purchases.map(p => ({ ...p, userId: p.user || null })) };
+      return { status: 200, body: purchases.map(p => {
+        const safeUser = p.user ? { ...p.user } : null;
+        if (safeUser && access.role !== "superadmin") stripPrivateContactFields(safeUser);
+        return { ...p, userId: safeUser };
+      }) };
     } catch {
       return { status: 503, body: { message: "Unable to load purchases" } };
     }
@@ -3496,7 +3500,15 @@ export class MongoDBConnection {
         ...purchases.map(p => ({ ...p, type: "Store Item", itemName: p.itemName, price: p.itemPrice })),
         ...subscriptions.map(s => ({ ...s, type: "Subscription", itemName: String(s.plan || "") + " Plan", price: ({ weekly: "800 LKR", monthly: "3000 LKR", yearly: "10000 LKR" })[s.plan] || "N/A" }))
       ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 500);
-      return { status: 200, body: result };
+      const safeResult = result.map(entry => {
+        const safeEntry = { ...entry };
+        if (safeEntry.user && access.role !== "superadmin") {
+          safeEntry.user = { ...safeEntry.user };
+          stripPrivateContactFields(safeEntry.user);
+        }
+        return safeEntry;
+      });
+      return { status: 200, body: safeResult };
     } catch {
       return { status: 503, body: { message: "Unable to load transactions" } };
     }
