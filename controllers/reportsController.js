@@ -2,13 +2,16 @@ const Report = require('../models/Report');
 const User = require('../models/User'); // To verify users exist
 
 const submitReport = async (req, res) => {
-  const reporterUid = req.user.uid; // From authMiddleware
-  const { reportedUserUid, reason, category } = req.body;
+  const reporterUid = req.user && req.user.uid; // From authMiddleware
+  const { reportedUserUid, reason, category } = req.body || {};
+  if (typeof reporterUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(reporterUid)) {
+    return res.status(401).json({ error: 'Authenticated user identity is invalid.' });
+  }
 
   if (typeof reportedUserUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(reportedUserUid)) {
     return res.status(400).json({ error: 'A valid reportedUserUid is required.' });
   }
-  if (typeof reason !== 'string' || !reason.trim() || reason.length > 2000) {
+  if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 2000) {
     return res.status(400).json({ error: 'Reason must be a non-empty string of at most 2000 characters.' });
   }
   if (typeof category !== 'string') {
@@ -40,7 +43,7 @@ const submitReport = async (req, res) => {
     const newReport = new Report({
       reporterUid,
       reportedUserUid,
-      reason,
+      reason: reason.trim(),
       category,
     });
 
