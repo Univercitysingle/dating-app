@@ -2455,6 +2455,28 @@ test("central account guard blocks active suspensions before internal operations
   assert.deepEqual(await response.json(), { error: "This account is unavailable." });
 });
 
+test("central account guard treats invalid suspension expiry as restricted", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return {
+        async findOne() {
+          return { accountStatus: "temporarily_suspended", suspendedUntil: "not-a-date" };
+        }
+      };
+    }
+  });
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ claims: { sub: "invalid-suspension-user", email_verified: true } })
+  }));
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "This account is unavailable." });
+});
+
 test("central account guard blocks unverified non-admin Firebase identities", async () => {
   const connection = new MongoDBConnection({}, {});
   const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
