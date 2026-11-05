@@ -238,15 +238,14 @@ const updateUserById = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const changes = Object.create(null);
-    for (const key in finalUpdates) {
-      if (originalUser[key] !== updatedUser[key]) {
-        changes[key] = {
+    const changes = Object.fromEntries(
+      Object.keys(finalUpdates)
+        .filter(key => originalUser[key] !== updatedUser[key])
+        .map(key => [key, {
           old: originalUser[key],
           new: updatedUser[key],
-        };
-      }
-    }
+        }])
+    );
 
     if (Object.keys(changes).length > 0) {
       const auditLog = new AuditLog({
