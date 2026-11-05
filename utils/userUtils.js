@@ -63,18 +63,26 @@ const sanitizeUser = (user, currentUser) => {
   // Ensure we have a plain object to work with, whether it's a Mongoose doc or a plain object.
   let userObject = (user && typeof user.toObject === 'function') ? user.toObject() : { ...user };
 
-  // Always convert photo URLs to full CDN paths
+  // Password hashes and internal authentication metadata must never be
+  // serialized by profile endpoints, including to the owner or superadmins.
+  delete userObject.password;
+
+  // Always convert photo URLs to full CDN paths.
   userObject = convertKeysToCdnUrls(userObject);
 
-  // If the viewer is the owner or a superadmin, return the full object
+  // Owners and superadmins may see the remaining account details.
   if (isSuperAdmin || isOwner) {
     return userObject;
   }
 
-  // For anyone else, remove sensitive fields
+  // Public profile responses must not expose contact, security, or moderation data.
   delete userObject.email;
   delete userObject.mobileNumber;
-  // any other fields to remove for public view
+  delete userObject.lastLoginIp;
+  delete userObject.lastLoginDevice;
+  delete userObject.mustSetPassword;
+  delete userObject.blocked;
+  delete userObject.suspendedUntil;
 
   return userObject;
 }
