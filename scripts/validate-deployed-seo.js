@@ -57,6 +57,8 @@ async function main() {
     ['content-security-policy', /default-src 'self'/i],
     ['content-security-policy', /object-src 'none'/i],
     ['content-security-policy', /frame-ancestors 'none'/i],
+    ['content-security-policy', /form-action 'self'/i],
+    ['content-security-policy', /style-src 'self'; style-src-attr 'unsafe-inline'/i],
     ['access-control-allow-origin', /^https:\/\/dating-app-staging\.pages\.dev$/i],
     ['cross-origin-resource-policy', /^same-origin$/i],
     ['cross-origin-opener-policy', /^same-origin-allow-popups$/i],
