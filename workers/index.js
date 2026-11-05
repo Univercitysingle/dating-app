@@ -64,7 +64,7 @@ async function createCdnAuthorizationToken(env, claims, key, method) {
     throw new Error("CDN authorization only permits PUT and DELETE");
   }
   const photoKey = new RegExp("^photos-" + claims.sub + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i");
-  const supportKey = /^support-[a-fA-F0-9]{24}-[0-9]{10,16}-[a-f0-9-]{36}\\.(?:jpg|jpeg|png|gif|webp|pdf)$/i;
+  const supportKey = /^support-[a-fA-F0-9]{24}-[0-9]{10,16}-[a-f0-9-]{36}\.(?:jpg|jpeg|png|gif|webp|pdf)$/i;
   if (!(photoKey.test(key) || (typeof key === "string" && supportKey.test(key)))) {
     throw new Error("CDN object key is not an allowed application upload key");
   }
