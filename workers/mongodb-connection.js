@@ -1,3 +1,22 @@
+export function isValidEmailAddress(value) {
+  if (typeof value !== "string") return false;
+  const email = value.trim();
+  if (!email || email.length > 254 || /\\s/.test(email)) return false;
+  const at = email.indexOf("@");
+  if (at <= 0 || at !== email.lastIndexOf("@") || at > 64) return false;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!domain.includes(".") || local.startsWith(".") || local.endsWith(".") ||
+      local.includes("..") || domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) {
+    return false;
+  }
+  return domain.split(".").every(label =>
+    label.length > 0 &&
+    label.length <= 63 &&
+    /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label)
+  );
+}
+
 const PRIVATE_CONTACT_FIELDS = new Set([
   "email", "emailaddress", "email_address", "emailid", "mail", "mobile", "mobilenumber",
   "mobile_number", "phone", "phonenumber", "phone_number", "contactnumber", "contact_number",
@@ -298,7 +317,9 @@ export class MongoDBConnection {
       try {
         const base = new URL(/^https:\/\//i.test(configured) ? configured : "https://" + configured);
         if (base.protocol === "https:" && !base.username && !base.password && !base.search && !base.hash) {
-          base.pathname = base.pathname.replace(/\/+$/, "") + "/" + encoded;
+          let basePath = base.pathname;
+          while (basePath.endsWith("/")) basePath = basePath.slice(0, -1);
+          base.pathname = basePath + "/" + encoded;
           return base.toString();
         }
       } catch {
@@ -2801,7 +2822,7 @@ export class MongoDBConnection {
   async createAdminUser(uid, payload = {}) {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
-    if (!payload || typeof payload.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email.trim())) {
+    if (!payload || !isValidEmailAddress(payload.email)) {
       return { status: 400, body: { message: "A valid email address is required" } };
     }
     const role = typeof payload.role === "string" ? payload.role : "user";
@@ -2861,7 +2882,7 @@ export class MongoDBConnection {
       }
       if (update.plan !== undefined && !["basic", "premium", "weekly", "monthly", "yearly"].includes(update.plan)) return { status: 400, body: { message: "Invalid plan" } };
       if (update.email !== undefined) {
-        if (typeof update.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(update.email.trim())) return { status: 400, body: { message: "Invalid email address" } };
+        if (!isValidEmailAddress(update.email)) return { status: 400, body: { message: "Invalid email address" } };
         update.email = update.email.trim().toLowerCase();
         const duplicate = await users.findOne({ email: update.email, _id: { $ne: targetId } }, { projection: { _id: 1 } });
         if (duplicate) return { status: 409, body: { message: "Email is already in use" } };
