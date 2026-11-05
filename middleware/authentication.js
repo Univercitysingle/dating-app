@@ -6,7 +6,7 @@ module.exports = async function (req, res, next) {
   try {
     const authHeader = req.headers.authorization;
     const bearerMatch = typeof authHeader === 'string'
-      ? authHeader.match(/^Bearer\\s+(\\S+)$/i)
+      ? authHeader.match(/^Bearer\s+(\S+)$/i)
       : null;
 
     if (!bearerMatch) {
@@ -19,7 +19,8 @@ module.exports = async function (req, res, next) {
       return res.status(401).json({ error: "Invalid auth header format: Token is missing" });
     }
 
-    // Check revocation as well as signature, issuer, audience, and expiry.\n    const decodedToken = await admin.auth().verifyIdToken(token, true);
+    // Check revocation as well as signature, issuer, audience, and expiry.
+    const decodedToken = await admin.auth().verifyIdToken(token, true);
     const dbUser = await findOrCreateUserFromToken(decodedToken);
 
     if (!dbUser) {
