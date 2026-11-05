@@ -7,8 +7,8 @@ const listReports = async (req, res) => {
     const { page: rawPage, limit: rawLimit, status, search } = req.query;
     const page = rawPage === undefined ? 1 : Number(rawPage);
     const limit = rawLimit === undefined ? 10 : Number(rawLimit);
-    if ((rawPage !== undefined && (typeof rawPage !== 'string' || !/^\\d{1,6}$/.test(rawPage))) ||
-        (rawLimit !== undefined && (typeof rawLimit !== 'string' || !/^\\d{1,3}$/.test(rawLimit))) ||
+    if ((rawPage !== undefined && (typeof rawPage !== 'string' || !/^\d{1,6}$/.test(rawPage))) ||
+        (rawLimit !== undefined && (typeof rawLimit !== 'string' || !/^\d{1,3}$/.test(rawLimit))) ||
         !Number.isSafeInteger(page) || page < 1 || page > 100000 ||
         !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       return res.status(400).json({ message: 'Invalid pagination. Page must be 1-100000 and limit must be 1-100.' });
