@@ -1,8 +1,7 @@
-jest.mock('../services/firebaseAdmin', () => ({
-  auth: jest.fn(() => ({
-    verifyIdToken: jest.fn(),
-  })),
-}));
+jest.mock('../services/firebaseAdmin', () => {
+  const auth = { verifyIdToken: jest.fn() };
+  return { auth: jest.fn(() => auth) };
+});
 
 jest.mock('../utils/userUtils', () => ({
   findOrCreateUserFromToken: jest.fn(),
