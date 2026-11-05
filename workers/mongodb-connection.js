@@ -3147,12 +3147,13 @@ export class MongoDBConnection {
       const now = new Date();
       let targetUid = null;
       let firebaseAuthAlreadyDeleted = false;
+      let alreadyAnonymized = false;
       const session = client.startSession();
       try {
         let targetFound = false;
         await session.withTransaction(async () => {
           const users = db.collection("users");
-          const target = await users.findOne({ _id: targetId }, { projection: { uid: 1, role: 1, deletionRequestedAt: 1, firebaseAuthDeletionStatus: 1 }, session });
+          const target = await users.findOne({ _id: targetId }, { projection: { uid: 1, role: 1, accountStatus: 1, deletionRequestedAt: 1, firebaseAuthDeletionStatus: 1, cdnAssetCleanupStatus: 1, anonymizationStatus: 1 }, session });
           if (!target) return;
           if (target.role === "superadmin") throw new Error("SUPERADMIN_DELETE_FORBIDDEN");
           // Repeated DELETE requests deliberately replay idempotent database cleanup.
@@ -3160,6 +3161,11 @@ export class MongoDBConnection {
           // repair partial cleanup after a transient failure.
           targetFound = true;
           targetUid = typeof target.uid === "string" ? target.uid : null;
+          if (target.accountStatus === "deleted" && target.anonymizationStatus === "completed") {
+            alreadyAnonymized = true;
+            firebaseAuthAlreadyDeleted = true;
+            return;
+          }
           firebaseAuthAlreadyDeleted = target.firebaseAuthDeletionStatus === "completed";
           await users.updateOne(
             { _id: targetId, role: { $ne: "superadmin" } },
@@ -3201,6 +3207,14 @@ export class MongoDBConnection {
           }
         });
         if (!targetFound) return { status: 404, body: { message: "User not found" } };
+        if (alreadyAnonymized) {
+          return { status: 200, body: {
+            message: "Account deletion and anonymization are already complete.",
+            deletionStatus: "completed", firebaseAuthDeletionStatus: "completed",
+            cdnAssetCleanupStatus: "completed", anonymizationStatus: "completed",
+            financialAndAuditRecordsRetained: true
+          } };
+        }
         if (!targetUid) {
           await db.collection("users").updateOne(
             { _id: targetId },
@@ -4731,6 +4745,7 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/user-delete") result = await this.deleteAdminUser(body.claims.sub, body.userId);
       else if (url.pathname === "/internal/admin/user-deletion-assets") result = await this.getAdminUserDeletionAssets(body.claims.sub, body.userId);
       else if (url.pathname === "/internal/admin/user-deletion-assets-finalize") result = await this.finalizeAdminUserDeletionAssets(body.claims.sub, body.userId, body.deletedKeys);
+      else if (url.pathname === "/internal/admin/user-deletion-anonymize") result = await this.finalizeAdminUserAnonymization(body.claims.sub, body.userId);
       else if (url.pathname === "/internal/admin/user-plan") result = await this.updateAdminUserPlan(body.claims.sub, body.userId, body.payload || {});
       else if (url.pathname === "/internal/admin/stats") result = await this.getAdminDashboardStats(body.claims.sub);
       else if (url.pathname === "/internal/admin/transactions") result = await this.getAdminTransactions(body.claims.sub);
