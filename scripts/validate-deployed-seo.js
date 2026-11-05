@@ -111,9 +111,9 @@ async function main() {
     }
     const routeHtml = await response.text();
     const expectedPath = route;
-    const routeTitle = (routeHtml.match(/<title>([\\s\\S]*?)<\\/title>/i) || [])[1] || '';
+    const routeTitle = (routeHtml.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || '';
     const routeDescription = metaValue(routeHtml, 'name', 'description');
-    const routeCanonicalTag = (routeHtml.match(/<link\\b[^>]*rel=["']canonical["'][^>]*>/i) || [])[0];
+    const routeCanonicalTag = (routeHtml.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) || [])[0];
     const routeCanonical = routeCanonicalTag ? attribute(routeCanonicalTag, 'href') : null;
     const routeOgUrl = metaValue(routeHtml, 'property', 'og:url');
     if (!routeTitle.trim() || !routeDescription || routeCanonical !== siteOrigin + expectedPath || routeOgUrl !== siteOrigin + expectedPath) {
