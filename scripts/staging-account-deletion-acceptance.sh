@@ -69,7 +69,7 @@ for attempt in $(seq 1 30); do
     --header 'Accept: application/json' "$WORKER_URL/api/admin/users/$target_id")"
   state="$(node -e 'const fs=require("fs");try{const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write([x.deletionStatus||"",x.firebaseAuthDeletionStatus||"",x.cdnAssetCleanupStatus||"",x.anonymizationStatus||""].join("|"))}catch{}' "$tmpdir/delete.json")"
 
-  if [[ "$status" == "200" && "$state" == *"completed|completed"* ]]; then
+  if [[ "$status" == "200" && "$state" == "completed|completed|completed|completed" ]]; then
     completed=true
     break
   fi
@@ -111,6 +111,10 @@ status="$(curl --silent --show-error --output "$tmpdir/relogin.json" --write-out
   "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$FIREBASE_WEB_API_KEY")"
 if [[ "$status" == "200" ]]; then
   echo "::error::Firebase still allowed sign-in for the deleted staging identity."
+  exit 1
+fi
+if [[ "$status" != "400" ]] || ! node -e 'const fs=require("fs");let x;try{x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"))}catch{process.exit(1)}const message=String(x?.error?.message||"");if(!["EMAIL_NOT_FOUND","INVALID_LOGIN_CREDENTIALS"].includes(message))process.exit(1)' "$tmpdir/relogin.json"; then
+  echo "::error::Firebase re-login failed for an unexpected reason; identity deletion was not confirmed."
   exit 1
 fi
 
