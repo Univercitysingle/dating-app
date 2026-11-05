@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "depcheck": "depcheck",
-    "test:worker": "node --test workers/*.test.js"
+    "test:worker": "node --test workers/*.test.js",
+    "validate:seo": "node scripts/validate-public-seo.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.574.0",
