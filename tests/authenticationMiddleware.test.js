@@ -60,6 +60,45 @@ describe('Firebase authentication middleware', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it('accepts only the fixed UID with the server-signed superadmin role claim', async () => {
+    const req = makeRequest('Bearer superadmin-token');
+    const res = makeResponse();
+    const next = jest.fn();
+    admin.auth().verifyIdToken.mockResolvedValue({
+      uid: 'superadmin_uid',
+      role: 'superadmin',
+    });
+
+    await authentication(req, res, next);
+
+    expect(req.user).toEqual(expect.objectContaining({
+      uid: 'superadmin_uid',
+      role: 'superadmin',
+      isPremium: true,
+    }));
+    expect(findOrCreateUserFromToken).not.toHaveBeenCalled();
+    expect(Subscription.findOne).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not grant superadmin access from the role claim on another UID', async () => {
+    const req = makeRequest('Bearer forged-role-token');
+    const res = makeResponse();
+    const next = jest.fn();
+    admin.auth().verifyIdToken.mockResolvedValue({
+      uid: 'ordinary-user',
+      role: 'superadmin',
+      email_verified: true,
+      email: 'ordinary@example.com',
+    });
+    findOrCreateUserFromToken.mockResolvedValue(null);
+
+    await authentication(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('rejects revoked Firebase tokens with HTTP 401', async () => {
     const req = makeRequest('Bearer revoked-token');
     const res = makeResponse();
