@@ -90,6 +90,10 @@ const performModerationAction = async (req, res) => {
     if (typeof reportId !== 'string' || !mongoose.Types.ObjectId.isValid(reportId)) return res.status(400).json({ message: 'Invalid report ID.' });
     if (typeof action !== 'string' || !['dismiss', 'suspend_user', 'ban_user'].includes(action)) return res.status(400).json({ message: 'Invalid action specified.' });
     if (adminNotes !== undefined && (typeof adminNotes !== 'string' || adminNotes.length > 2000)) return res.status(400).json({ message: 'Admin notes must be a string of at most 2000 characters.' });
+    const validatedDurationDays = Number(durationDays);
+    if (action === 'suspend_user' && ((typeof durationDays !== 'string' && typeof durationDays !== 'number') || !Number.isSafeInteger(validatedDurationDays) || validatedDurationDays < 1 || validatedDurationDays > 3650)) {
+      return res.status(400).json({ message: 'Suspension duration must be a whole number between 1 and 3650 days.' });
+    }
     const report = await Report.findById(reportId);
     if (!report) {
       return res.status(404).json({ message: 'Report not found.' });
@@ -108,11 +112,8 @@ const performModerationAction = async (req, res) => {
         break;
 
       case 'suspend_user':
-        if (!durationDays || isNaN(parseInt(durationDays, 10)) || durationDays <= 0) {
-          return res.status(400).json({ message: 'Valid duration in days is required for suspension.' });
-        }
         const suspensionEndDate = new Date();
-        suspensionEndDate.setDate(suspensionEndDate.getDate() + parseInt(durationDays, 10));
+        suspensionEndDate.setDate(suspensionEndDate.getDate() + validatedDurationDays);
 
         reportedUser.suspendedUntil = suspensionEndDate;
         reportedUser.isProfileVisible = false; // Also hide profile during suspension
