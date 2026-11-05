@@ -1202,7 +1202,7 @@ test("admin user deletion runs CDN cleanup after the account deletion route", as
           const body = JSON.parse(options.body || "{}");
           calls.push({ path, body });
           if (path === "/internal/admin/user-delete") {
-            return new Response(JSON.stringify({ message: "Account access disabled", deletionStatus: "deletion_pending" }), { status: 202 });
+            return new Response(JSON.stringify({ message: "Account access disabled", deletionStatus: "deletion_pending", firebaseAuthDeletionStatus: "completed" }), { status: 202 });
           }
           if (path === "/internal/admin/user-deletion-assets") {
             return new Response(JSON.stringify({
@@ -1212,6 +1212,9 @@ test("admin user deletion runs CDN cleanup after the account deletion route", as
           if (path === "/internal/admin/user-deletion-assets-finalize") {
             assert.deepEqual(body.deletedKeys, [photoKey]);
             return new Response(JSON.stringify({ cdnAssetCleanupStatus: "completed", deletedAssetCount: 1 }), { status: 200 });
+          }
+          if (path === "/internal/admin/user-deletion-anonymize") {
+            return new Response(JSON.stringify({ deletionStatus: "completed", anonymizationStatus: "completed" }), { status: 200 });
           }
           throw new Error("Unexpected internal route: " + path);
         }
@@ -1237,12 +1240,14 @@ test("admin user deletion runs CDN cleanup after the account deletion route", as
       "https://dating-app.test/api/admin/users/0123456789abcdef01234567",
       { method: "DELETE", headers: { authorization: "Bearer " + token } }
     ), env);
-    assert.equal(response.status, 202);
+    assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.cdnAssetCleanupStatus, "completed");
-    assert.deepEqual(calls.filter(call => call.path.startsWith("/internal/admin/user-deletion-assets")).map(call => call.path), [
+    assert.equal(result.anonymizationStatus, "completed");
+    assert.deepEqual(calls.filter(call => call.path.startsWith("/internal/admin/user-deletion-assets") || call.path === "/internal/admin/user-deletion-anonymize").map(call => call.path), [
       "/internal/admin/user-deletion-assets",
-      "/internal/admin/user-deletion-assets-finalize"
+      "/internal/admin/user-deletion-assets-finalize",
+      "/internal/admin/user-deletion-anonymize"
     ]);
     assert.equal(calls.filter(call => call.method === "DELETE").length, 1);
   } finally {
@@ -2422,6 +2427,64 @@ test("Firebase profile provisioning refuses accounts queued for deletion", async
   const result = await connection.findOrCreateUserFromClaims({ sub: "pending-user" });
   assert.equal(result.status, 403);
   assert.deepEqual(result.body, { error: "This account is unavailable." });
+});
+
+test("account anonymization requires Firebase and CDN cleanup and retains historical references", async () => {
+  const { ObjectId } = await import("mongodb");
+  const userId = new ObjectId();
+  const operations = [];
+  let record = {
+    _id: userId,
+    role: "user",
+    accountStatus: "deletion_pending",
+    firebaseAuthDeletionStatus: "completed",
+    cdnAssetCleanupStatus: "pending"
+  };
+  const users = {
+    async findOne(query) {
+      assert.equal(String(query._id), String(userId));
+      return { ...record };
+    },
+    async updateOne(query, update) {
+      operations.push({ query, update });
+      if (query.firebaseAuthDeletionStatus === "completed" &&
+          query.cdnAssetCleanupStatus === "completed") {
+        record = {
+          ...record,
+          ...update.$set,
+          accountStatus: update.$set.accountStatus
+        };
+        return { matchedCount: 1 };
+      }
+      return { matchedCount: 0 };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "users");
+    return users;
+  } });
+
+  const blocked = await connection.finalizeAdminUserAnonymization("superadmin", String(userId));
+  assert.equal(blocked.status, 409);
+  assert.equal(operations.length, 0);
+
+  record.cdnAssetCleanupStatus = "completed";
+  const result = await connection.finalizeAdminUserAnonymization("superadmin", String(userId));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.anonymizationStatus, "completed");
+  const update = operations[0].update;
+  assert.equal(update.$set.accountStatus, "deleted");
+  assert.equal(update.$set.anonymizationStatus, "completed");
+  assert.equal(update.$set.email, "deleted+" + String(userId) + "@account.invalid");
+  assert.equal(update.$set.name, "Deleted user");
+  assert.ok(update.$unset.password !== undefined);
+  assert.ok(update.$unset.mobileNumber !== undefined);
+  assert.ok(update.$unset.location !== undefined);
+  assert.equal(update.$set.role, "user");
+  assert.equal(record._id, userId);
 });
 
 test("admin account deletion transactionally revokes access and retains financial history", async () => {
