@@ -13,7 +13,6 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
-import Register from './pages/Register';
 import Profile from './pages/Profile';
 import Chat from './pages/Chat';
 import Onboarding from './pages/Onboarding';
@@ -181,7 +180,7 @@ function App() {
           />
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/register" element={<Login initialSignUp />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route
               path="/set-initial-password"
