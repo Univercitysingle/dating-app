@@ -78,9 +78,12 @@ jobs:
           test -n "$WEBXPAY_PUBLIC_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_PUBLIC_KEY"; exit 1; }
           test -n "$WEBXPAY_SECRET_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_SECRET_KEY"; exit 1; }
 
-      - name: Install Worker dependencies
+      - name: Resolve and install Worker dependencies
         working-directory: workers
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=high
 
       - name: Validate dedicated account-deletion acceptance script syntax and safety marker
         shell: bash
