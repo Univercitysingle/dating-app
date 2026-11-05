@@ -17,6 +17,7 @@ Disallow: /manage-subscription
 Disallow: /support
 Disallow: /store
 Disallow: /dark-fantasy
+Disallow: /debug-swipe
 Disallow: /api/
 
 Sitemap: https://dating-app-staging.pages.dev/sitemap.xml
