@@ -95,5 +95,15 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6",
+    "@tootallnate/once": "^2.0.1",
+    "deepmerge": "^4.3.1",
+    "nth-check": "^2.1.1",
+    "resolve-url-loader": "^5.0.0",
+    "serialize-javascript": "^7.1.3",
+    "underscore": "^1.13.8",
+    "uuid": "^11.1.1"
   }
 }
