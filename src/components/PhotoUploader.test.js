@@ -1,4 +1,7 @@
-import { convertPhotoToWebP } from './PhotoUploader';
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import PhotoUploader, { convertPhotoToWebP } from './PhotoUploader';
+import apiClient from '../api/apiClient';
 
 jest.mock('../api/apiClient', () => ({
   __esModule: true,
@@ -68,10 +71,6 @@ describe('convertPhotoToWebP', () => {
 
 describe('PhotoUploader authenticated API handoff', () => {
   test('posts the selected image through the API client and returns the CDN response', async () => {
-    const React = require('react');
-    const { fireEvent, render, screen, waitFor } = require('@testing-library/react');
-    const apiClient = require('../api/apiClient').default;
-    const PhotoUploader = require('./PhotoUploader').default;
     const onUploadComplete = jest.fn();
     const uploadResponse = {
       fileUrl: 'https://dateme.enadoctemp.workers.dev/photos-synthetic-user-123.webp'
@@ -84,7 +83,7 @@ describe('PhotoUploader authenticated API handoff', () => {
     const file = new File(['synthetic-image-data'], 'registration-photo.jpg', {
       type: 'image/jpeg'
     });
-    fireEvent.change(screen.getByLabelText('Upload Photo'), {
+    fireEvent.change(screen.getByLabelText(/upload photo/i), {
       target: { files: [file] }
     });
 
