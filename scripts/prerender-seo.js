@@ -7,18 +7,17 @@ const siteOrigin = (process.env.SEO_SITE_ORIGIN || 'https://dating-app-staging.p
 const htmlPath = path.join(buildDir, 'index.html');
 
 function replaceMeta(html, attribute, key, value) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp('<meta\\b(?=[^>]*\\b' + attribute + '="' + escaped + '")[^>]*>', 'i');
+  const pattern = new RegExp('<meta\\b(?=[^>]*\\b' + attribute + '="' + key + '")[^>]*>', 'i');
   const tag = '<meta ' + attribute + '="' + key + '" content="' + value.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" />';
   if (pattern.test(html)) return html.replace(pattern, tag);
-  return html.replace('</head>', '  ' + tag + '\\n  </head>');
+  return html.replace('</head>', '  ' + tag + '\n  </head>');
 }
 
 function replaceCanonical(html, url) {
-  const pattern = /<link\\b(?=[^>]*\\brel="canonical")[^>]*>/i;
+  const pattern = /<link\b(?=[^>]*\brel="canonical")[^>]*>/i;
   const tag = '<link rel="canonical" href="' + url + '" />';
   if (pattern.test(html)) return html.replace(pattern, tag);
-  return html.replace('</head>', '  ' + tag + '\\n  </head>');
+  return html.replace('</head>', '  ' + tag + '\n  </head>');
 }
 
 if (!fs.existsSync(htmlPath)) throw new Error('Build output index.html is missing. Run the frontend build first.');
@@ -27,7 +26,7 @@ const template = fs.readFileSync(htmlPath, 'utf8');
 for (const [route, metadata] of Object.entries(routes)) {
   if (route === '/') continue;
   const canonicalUrl = siteOrigin + route;
-  let html = template.replace(/<title>[\\s\\S]*?<\\/title>/i, '<title>' + metadata.title + '</title>');
+  let html = template.replace(/<title>[\s\S]*?<\/title>/i, '<title>' + metadata.title + '</title>');
   html = replaceMeta(html, 'name', 'description', metadata.description);
   html = replaceMeta(html, 'name', 'robots', 'index, follow, max-image-preview:large');
   html = replaceMeta(html, 'property', 'og:title', metadata.title);
