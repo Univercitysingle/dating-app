@@ -49,12 +49,10 @@ const listUsers = async (req, res) => {
       query.role = role;
     }
 
+    const allowedSortFields = new Set(['createdAt', 'name', 'email', 'role', 'lastActiveAt', 'isProfileVisible', 'plan']);
     const sortOptions = {};
-    if (sortBy) {
-      sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-    } else {
-      sortOptions.createdAt = -1; // Default sort
-    }
+    const safeSortBy = typeof sortBy === 'string' && allowedSortFields.has(sortBy) ? sortBy : 'createdAt';
+    sortOptions[safeSortBy] = safeSortBy === 'createdAt' && !sortBy ? -1 : (sortOrder === 'desc' ? -1 : 1);
 
     const users = await User.find(query)
       .select('-password')
@@ -240,7 +238,7 @@ const updateUserById = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const changes = {};
+    const changes = Object.create(null);
     for (const key in finalUpdates) {
       if (originalUser[key] !== updatedUser[key]) {
         changes[key] = {
