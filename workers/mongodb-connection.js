@@ -2816,18 +2816,17 @@ export class MongoDBConnection {
           const target = await users.findOne({ _id: targetId }, { projection: { uid: 1, role: 1, deletionRequestedAt: 1 }, session });
           if (!target) return;
           if (target.role === "superadmin") throw new Error("SUPERADMIN_DELETE_FORBIDDEN");
-          if (target.deletionRequestedAt) {
-            targetFound = true;
-            return;
-          }
+          // Repeated DELETE requests deliberately replay idempotent database cleanup.
+          // Preserve the original request metadata while allowing a later retry to
+          // repair partial cleanup after a transient failure.
           targetFound = true;
           await users.updateOne(
             { _id: targetId, role: { $ne: "superadmin" } },
             { $set: {
               accountStatus: "deletion_pending",
               plan: "basic",
-              deletionRequestedAt: now,
-              deletionRequestedBy: uid,
+              deletionRequestedAt: target.deletionRequestedAt || now,
+              deletionRequestedBy: target.deletionRequestedBy || uid,
               isProfileVisible: false,
               isProfileVisibleByAdmin: false,
               updatedAt: now
