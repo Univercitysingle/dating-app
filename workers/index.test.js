@@ -3,11 +3,30 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
 import worker, { RateLimiter, MongoDBConnection, requestCdnObject } from "./index.js";
-import { deleteFirebaseAuthIdentity } from "./mongodb-connection.js";
+import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
 }
+
+test("Firebase Realtime Database URL validation requires an actual Firebase hostname", () => {
+  assert.equal(isFirebaseDatabaseUrl("https://test-project-default-rtdb.firebaseio.com"), true);
+  assert.equal(isFirebaseDatabaseUrl("https://test-project.firebasedatabase.app"), true);
+  assert.equal(isFirebaseDatabaseUrl("https://evilfirebaseio.com"), false);
+  assert.equal(isFirebaseDatabaseUrl("https://firebaseio.com.attacker.example"), false);
+  assert.equal(isFirebaseDatabaseUrl("http://test-project.firebaseio.com"), false);
+  assert.equal(isFirebaseDatabaseUrl("https://user:pass@test-project.firebaseio.com"), false);
+});
+
+test("admin email validation rejects malformed and oversized values", () => {
+  assert.equal(isValidEmailAddress("admin@example.com"), true);
+  assert.equal(isValidEmailAddress(" first.last+tag@example.co.uk "), true);
+  assert.equal(isValidEmailAddress("not-an-email"), false);
+  assert.equal(isValidEmailAddress("user@@example.com"), false);
+  assert.equal(isValidEmailAddress("user@-example.com"), false);
+  assert.equal(isValidEmailAddress("user@example..com"), false);
+  assert.equal(isValidEmailAddress("x".repeat(250) + "@example.com"), false);
+});
 
 test("superadmin login issues a Firebase custom token with root-level role claim", async () => {
   const { privateKey } = generateKeyPairSync("rsa", {
