@@ -86,6 +86,18 @@ async function main() {
   for (const route of privatePaths) {
     if (!lines.includes('Disallow: ' + route)) throw new Error('Deployed robots.txt does not disallow ' + route);
   }
+  for (const route of ['/login', '/register']) {
+    if (lines.includes('Disallow: ' + route)) throw new Error('Deployed robots.txt must allow crawlers to read the noindex header on ' + route);
+    const response = await fetch(new URL(route, siteOrigin), {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+      headers: { 'user-agent': 'dating-app-staging-seo-validator/1.0' },
+    });
+    const robotsHeader = response.headers.get('x-robots-tag') || '';
+    if (!response.ok || !/noindex/i.test(robotsHeader) || !/nofollow/i.test(robotsHeader)) {
+      throw new Error('Deployed ' + route + ' must return X-Robots-Tag noindex, nofollow. Received: ' + (robotsHeader || 'missing'));
+    }
+  }
 
   for (const route of allowedPaths.slice(1)) {
     const response = await fetch(new URL(route, siteOrigin), {
