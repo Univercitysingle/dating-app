@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -90,6 +91,77 @@ function PublicHomeRoute() {
   return user ? <Navigate to="/discover" replace /> : <LandingPage />;
 }
 
+const PUBLIC_ROUTE_SEO = {
+  '/': {
+    title: 'Hart2Hart | Online Dating, Meaningful Connections and Chat',
+    description: 'Discover profiles, connect through mutual interest and start meaningful conversations on Hart2Hart, an online dating platform for adults aged 18 and over.',
+  },
+  '/faq': {
+    title: 'Frequently Asked Questions | Hart2Hart',
+    description: 'Find answers about Hart2Hart accounts, profile discovery, messaging, subscriptions, privacy and how to use the dating platform safely.',
+  },
+  '/safety': {
+    title: 'Online Dating Safety Tips | Hart2Hart',
+    description: 'Learn practical online dating safety tips for protecting your privacy, recognizing suspicious behaviour and building safer connections on Hart2Hart.',
+  },
+  '/terms': {
+    title: 'Terms of Service | Hart2Hart',
+    description: 'Read the Hart2Hart Terms of Service, including account responsibilities, acceptable use, subscriptions and the rules governing our online dating platform.',
+  },
+  '/cookies': {
+    title: 'Cookie Policy | Hart2Hart',
+    description: 'Understand how Hart2Hart uses cookies and similar technologies for essential site functionality, security, preferences and service improvement.',
+  },
+  '/privacy-settings': {
+    title: 'Privacy Settings | Hart2Hart',
+    description: 'Review privacy choices and learn how to manage the use and sharing of information associated with your Hart2Hart account.',
+  },
+};
+
+function RouteSeoMetadata() {
+  const { pathname } = useLocation();
+
+  React.useEffect(() => {
+    const route = PUBLIC_ROUTE_SEO[pathname];
+    const isPublic = Boolean(route);
+    const metadata = route || {
+      title: 'Private Account Area | Hart2Hart',
+      description: 'This Hart2Hart page is available to account holders.',
+    };
+    const canonicalLink = document.querySelector('link[rel="canonical"]');
+    const canonicalOrigin = canonicalLink
+      ? new URL(canonicalLink.href).origin
+      : window.location.origin;
+    const canonicalUrl = canonicalOrigin + pathname;
+
+    document.title = metadata.title;
+
+    const setMeta = (selector, attribute, key, value) => {
+      let element = document.head.querySelector(selector);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attribute, key);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', value);
+    };
+
+    setMeta('meta[name="description"]', 'name', 'description', metadata.description);
+    setMeta('meta[name="robots"]', 'name', 'robots', isPublic
+      ? 'index, follow, max-image-preview:large'
+      : 'noindex, nofollow, noarchive');
+    setMeta('meta[property="og:title"]', 'property', 'og:title', metadata.title);
+    setMeta('meta[property="og:description"]', 'property', 'og:description', metadata.description);
+    setMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
+    setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', metadata.title);
+    setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', metadata.description);
+
+    if (canonicalLink) canonicalLink.href = canonicalUrl;
+  }, [pathname]);
+
+  return null;
+}
+
 function AdminRoute({ children }) {
   const { user, isLoading } = useAuth();
 
@@ -117,6 +189,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <RouteSeoMetadata />
           <SocketProvider>
             <IncomingCallMonitor />
             <ToastContainer
