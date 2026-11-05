@@ -5,18 +5,21 @@ const Subscription = require('../models/Subscription');
 module.exports = async function (req, res, next) {
   try {
     const authHeader = req.headers.authorization;
+    const bearerMatch = typeof authHeader === 'string'
+      ? authHeader.match(/^Bearer\\s+(\\S+)$/i)
+      : null;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!bearerMatch) {
       return res.status(401).json({ error: "No auth token provided or malformed header" });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = bearerMatch[1];
 
-    if (!token || token === 'null' || token === 'undefined') {
+    if (token === 'null' || token === 'undefined') {
       return res.status(401).json({ error: "Invalid auth header format: Token is missing" });
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    // Check revocation as well as signature, issuer, audience, and expiry.\n    const decodedToken = await admin.auth().verifyIdToken(token, true);
     const dbUser = await findOrCreateUserFromToken(decodedToken);
 
     if (!dbUser) {
