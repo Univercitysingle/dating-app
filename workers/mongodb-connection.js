@@ -1,7 +1,7 @@
 export function isValidEmailAddress(value) {
   if (typeof value !== "string") return false;
   const email = value.trim();
-  if (!email || email.length > 254 || /\\s/.test(email)) return false;
+  if (!email || email.length > 254 || /\s/.test(email)) return false;
   const at = email.indexOf("@");
   if (at <= 0 || at !== email.lastIndexOf("@") || at > 64) return false;
   const local = email.slice(0, at);
