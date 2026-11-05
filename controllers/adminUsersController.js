@@ -32,10 +32,30 @@ const getDashboardStats = async (req, res) => {
 // List all users with pagination, search, and filtering
 const listUsers = async (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
+    const { page: rawPage, limit: rawLimit, search, role, sortBy, sortOrder } = req.query;
+    const page = rawPage === undefined ? 1 : Number(rawPage);
+    const limit = rawLimit === undefined ? 10 : Number(rawLimit);
+    if ((rawPage !== undefined && (typeof rawPage !== 'string' || !/^\\d{1,6}$/.test(rawPage))) ||
+        (rawLimit !== undefined && (typeof rawLimit !== 'string' || !/^\\d{1,3}$/.test(rawLimit))) ||
+        !Number.isSafeInteger(page) || page < 1 || page > 100000 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      return res.status(400).json({ message: 'Invalid pagination. Page must be 1-100000 and limit must be 1-100.' });
+    }
+    if (search !== undefined && (typeof search !== 'string' || search.length > 100)) {
+      return res.status(400).json({ message: 'Search must be a string of at most 100 characters.' });
+    }
+    const validRoles = User.schema.path('role').enumValues;
+    if (role !== undefined && (typeof role !== 'string' || !validRoles.includes(role))) {
+      return res.status(400).json({ message: 'Invalid user role.' });
+    }
+    const allowedSortFields = new Set(['createdAt', 'name', 'email', 'role', 'lastActiveAt', 'isProfileVisible', 'plan']);
+    if (sortBy !== undefined && (typeof sortBy !== 'string' || !allowedSortFields.has(sortBy))) {
+      return res.status(400).json({ message: 'Invalid sort field.' });
+    }
+    if (sortOrder !== undefined && (typeof sortOrder !== 'string' || !['asc', 'desc'].includes(sortOrder))) {
+      return res.status(400).json({ message: 'Invalid sort order.' });
+    }
     const skip = (page - 1) * limit;
-    const { search, role, sortBy, sortOrder } = req.query;
 
     let query = {};
 
