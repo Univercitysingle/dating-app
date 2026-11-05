@@ -2892,7 +2892,7 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne(
         { _id: targetId },
-        { projection: { uid: 1, photos: 1 } }
+        { projection: { uid: 1, photos: 1, cdnAssetCleanupDeletedKeys: 1 } }
       );
       if (!user) return { status: 404, body: { message: "User not found" } };
       const uidValue = typeof user.uid === "string" ? user.uid : "";
@@ -2943,6 +2943,8 @@ export class MongoDBConnection {
       }
       const uniquePhotoKeys = [...new Set(photoKeys)];
       const uniqueSupportKeys = [...new Set(supportKeys)];
+      const expectedKeySet = new Set([...uniquePhotoKeys, ...uniqueSupportKeys]);
+      const completedKeys = [...new Set((Array.isArray(user.cdnAssetCleanupDeletedKeys) ? user.cdnAssetCleanupDeletedKeys : []).filter(key => typeof key === "string" && expectedKeySet.has(key)))];
       await db.collection("users").updateOne(
         { _id: targetId, accountStatus: "deletion_pending" },
         { $set: {
@@ -2957,6 +2959,7 @@ export class MongoDBConnection {
           uid: uidValue,
           photoKeys: uniquePhotoKeys,
           supportKeys: uniqueSupportKeys,
+          completedKeys,
           unresolvedAssetCount,
           total: uniquePhotoKeys.length + uniqueSupportKeys.length
         }
@@ -2970,7 +2973,7 @@ export class MongoDBConnection {
     const access = await this.requireAdmin(uid, true);
     if (access.status !== 200) return access;
     if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId) ||
-        !Array.isArray(deletedKeys) || deletedKeys.length > 1000 ||
+        !Array.isArray(deletedKeys) || deletedKeys.length > 40 ||
         deletedKeys.some(key => typeof key !== "string" || key.length > 256)) {
       return { status: 400, body: { message: "Invalid storage cleanup confirmation" } };
     }
@@ -2980,17 +2983,50 @@ export class MongoDBConnection {
       if (expected.body.unresolvedAssetCount > 0) {
         return { status: 409, body: { message: "Some account assets require manual review" } };
       }
-      const expectedKeys = [...expected.body.photoKeys, ...expected.body.supportKeys].sort();
-      const confirmedKeys = [...new Set(deletedKeys)].sort();
-      if (expectedKeys.length !== confirmedKeys.length ||
-          expectedKeys.some((key, index) => key !== confirmedKeys[index])) {
-        return { status: 409, body: { message: "Storage cleanup confirmation does not match account assets" } };
+      const expectedKeys = [...expected.body.photoKeys, ...expected.body.supportKeys];
+      const expectedSet = new Set(expectedKeys);
+      const batchKeys = [...new Set(deletedKeys)];
+      if (batchKeys.some(key => !expectedSet.has(key))) {
+        return { status: 409, body: { message: "Storage cleanup confirmation contains an unknown asset" } };
       }
+
       const { ObjectId } = await import("mongodb");
       const targetId = new ObjectId(userId);
       const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
       const now = new Date();
-      const userUpdate = await db.collection("users").updateOne(
+      const progressUpdate = await users.updateOne(
+        { _id: targetId, accountStatus: "deletion_pending" },
+        {
+          $addToSet: { cdnAssetCleanupDeletedKeys: { $each: batchKeys } },
+          $set: { cdnAssetCleanupStatus: "in_progress", cdnAssetCleanupLastAttemptAt: now, updatedAt: now }
+        }
+      );
+      if (!progressUpdate.matchedCount) {
+        return { status: 409, body: { message: "Account is not pending deletion" } };
+      }
+
+      const progress = await users.findOne(
+        { _id: targetId },
+        { projection: { cdnAssetCleanupDeletedKeys: 1 } }
+      );
+      const persisted = new Set(
+        (Array.isArray(progress?.cdnAssetCleanupDeletedKeys) ? progress.cdnAssetCleanupDeletedKeys : [])
+          .filter(key => typeof key === "string" && expectedSet.has(key))
+      );
+      const allAssetsConfirmed = expectedKeys.every(key => persisted.has(key));
+      if (!allAssetsConfirmed) {
+        return {
+          status: 202,
+          body: {
+            cdnAssetCleanupStatus: "in_progress",
+            confirmedAssetCount: persisted.size,
+            totalAssetCount: expectedKeys.length
+          }
+        };
+      }
+
+      const userUpdate = await users.updateOne(
         { _id: targetId, accountStatus: "deletion_pending" },
         { $set: {
           photos: [],
@@ -3007,7 +3043,14 @@ export class MongoDBConnection {
         { senderId: targetId, attachments: { $exists: true } },
         { $unset: { attachments: "" }, $set: { updatedAt: now } }
       );
-      return { status: 200, body: { cdnAssetCleanupStatus: "completed", deletedAssetCount: confirmedKeys.length } };
+      return {
+        status: 200,
+        body: {
+          cdnAssetCleanupStatus: "completed",
+          deletedAssetCount: persisted.size,
+          totalAssetCount: expectedKeys.length
+        }
+      };
     } catch {
       return { status: 503, body: { message: "Unable to finalize account storage cleanup" } };
     }
