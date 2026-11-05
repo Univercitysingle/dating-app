@@ -1330,6 +1330,7 @@ export default {
                   typeof assetsResult.uid !== "string" ||
                   !Array.isArray(assetsResult.photoKeys) ||
                   !Array.isArray(assetsResult.supportKeys) ||
+                  !Array.isArray(assetsResult.completedKeys) ||
                   !Number.isInteger(assetsResult.unresolvedAssetCount)) {
                 return json({ ...result, cdnAssetCleanupStatus: "retry_pending" }, 202);
               }
@@ -1343,10 +1344,11 @@ export default {
 
               const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
               const deletedKeys = [];
+              const completedKeySet = new Set(assetsResult.completedKeys);
               const cleanupItems = [
                 ...assetsResult.photoKeys.map(key => ({ key, claims: { ...claims, sub: assetsResult.uid } })),
                 ...assetsResult.supportKeys.map(key => ({ key, claims }))
-              ];
+              ].filter(item => !completedKeySet.has(item.key)).slice(0, 40);
               for (const item of cleanupItems) {
                 const cdnResponse = await requestCdnObject(
                   env, item.key, "DELETE", { Origin: frontendOrigin }, undefined, item.claims
