@@ -16,10 +16,10 @@ import { useAuth } from '../context/AuthContext';
 import logger from '../utils/logger';
 import Footer from '../components/Footer';
 
-function Login() {
+function Login({ initialSignUp = false }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(initialSignUp);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
