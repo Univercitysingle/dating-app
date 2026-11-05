@@ -99,6 +99,8 @@ test("GET /favicon.ico returns an empty response instead of an unmigrated-route 
   const response = await worker.fetch(request("/favicon.ico"), {});
   assert.equal(response.status, 204);
   assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
+  assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains");
+  assert.match(response.headers.get("cache-control"), /no-store/);
   assert.equal(await response.text(), "");
 });
 
@@ -107,11 +109,14 @@ test("API JSON responses explicitly disable browser and intermediary caching", a
   assert.equal(response.headers.get("cache-control"), "no-store, no-cache, must-revalidate, max-age=0");
 });
 
-test("API robots policy is explicit and cacheable without exposing application data", async () => {
+test("API robots policy is explicit, non-cacheable, and protected by HSTS", async () => {
   const response = await worker.fetch(request("/robots.txt"), {});
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
-  assert.equal(response.headers.get("cache-control"), "public, max-age=3600");
+  assert.equal(response.headers.get("cache-control"), "no-store, no-cache, must-revalidate, max-age=0");
+  assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains");
+  assert.equal(response.headers.get("pragma"), "no-cache");
+  assert.equal(response.headers.get("expires"), "0");
   assert.equal(await response.text(), "User-agent: *\\nDisallow: /\\n");
 });
 
