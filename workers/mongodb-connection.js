@@ -2877,6 +2877,128 @@ export class MongoDBConnection {
     }
   }
 
+  async getAdminUserDeletionAssets(uid, userId) {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) {
+      return { status: 400, body: { message: "Invalid user ID" } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const targetId = new ObjectId(userId);
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne(
+        { _id: targetId },
+        { projection: { uid: 1, photos: 1 } }
+      );
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const uidValue = typeof user.uid === "string" ? user.uid : "";
+      const photoKeys = [];
+      let unresolvedAssetCount = 0;
+      for (const photo of Array.isArray(user.photos) ? user.photos : []) {
+        const photoUrl = typeof photo === "string" ? photo : photo?.url;
+        if (typeof photoUrl !== "string") {
+          unresolvedAssetCount++;
+          continue;
+        }
+        let key = "";
+        try {
+          const parsed = new URL(photoUrl);
+          key = decodeURIComponent(parsed.pathname.split("/").pop() || "");
+        } catch {
+          unresolvedAssetCount++;
+          continue;
+        }
+        const validUid = /^[A-Za-z0-9_-]{1,128}$/.test(uidValue);
+        const ownedPattern = validUid
+          ? new RegExp("^photos-" + uidValue + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i")
+          : null;
+        if (!ownedPattern || !ownedPattern.test(key)) unresolvedAssetCount++;
+        else photoKeys.push(key);
+      }
+
+      const tickets = await db.collection("supporttickets").find(
+        { userId: targetId }, { projection: { _id: 1 } }
+      ).toArray();
+      const ticketIds = tickets.map(ticket => ticket._id);
+      const supportKeys = [];
+      if (ticketIds.length) {
+        const messages = await db.collection("ticketmessages").find(
+          { ticketId: { $in: ticketIds }, senderId: targetId },
+          { projection: { ticketId: 1, attachments: 1 } }
+        ).toArray();
+        for (const message of messages) {
+          for (const attachment of Array.isArray(message.attachments) ? message.attachments : []) {
+            const key = attachment?.key;
+            const ticketId = String(message.ticketId || "");
+            const keyPattern = new RegExp("^support-" + ticketId +
+              "-[0-9]{10,16}-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\\.(?:jpg|jpeg|png|gif|webp|pdf)$", "i");
+            if (typeof key !== "string" || !keyPattern.test(key)) unresolvedAssetCount++;
+            else supportKeys.push(key);
+          }
+        }
+      }
+      const uniquePhotoKeys = [...new Set(photoKeys)];
+      const uniqueSupportKeys = [...new Set(supportKeys)];
+      return {
+        status: 200,
+        body: {
+          uid: uidValue,
+          photoKeys: uniquePhotoKeys,
+          supportKeys: uniqueSupportKeys,
+          unresolvedAssetCount,
+          total: uniquePhotoKeys.length + uniqueSupportKeys.length
+        }
+      };
+    } catch {
+      return { status: 503, body: { message: "Unable to inspect account storage assets" } };
+    }
+  }
+
+  async finalizeAdminUserDeletionAssets(uid, userId, deletedKeys) {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId) ||
+        !Array.isArray(deletedKeys) || deletedKeys.length > 1000 ||
+        deletedKeys.some(key => typeof key !== "string" || key.length > 256)) {
+      return { status: 400, body: { message: "Invalid storage cleanup confirmation" } };
+    }
+    try {
+      const expected = await this.getAdminUserDeletionAssets(uid, userId);
+      if (expected.status !== 200) return expected;
+      if (expected.body.unresolvedAssetCount > 0) {
+        return { status: 409, body: { message: "Some account assets require manual review" } };
+      }
+      const expectedKeys = [...expected.body.photoKeys, ...expected.body.supportKeys].sort();
+      const confirmedKeys = [...new Set(deletedKeys)].sort();
+      if (expectedKeys.length !== confirmedKeys.length ||
+          expectedKeys.some((key, index) => key !== confirmedKeys[index])) {
+        return { status: 409, body: { message: "Storage cleanup confirmation does not match account assets" } };
+      }
+      const { ObjectId } = await import("mongodb");
+      const targetId = new ObjectId(userId);
+      const db = this.getDatabase(await this.getClient());
+      const now = new Date();
+      await db.collection("users").updateOne(
+        { _id: targetId, accountStatus: "deletion_pending" },
+        { $set: {
+          photos: [],
+          totalPhotoSize: 0,
+          cdnAssetCleanupStatus: "completed",
+          cdnAssetCleanupCompletedAt: now,
+          updatedAt: now
+        } }
+      );
+      await db.collection("ticketmessages").updateMany(
+        { senderId: targetId, attachments: { $exists: true } },
+        { $unset: { attachments: "" }, $set: { updatedAt: now } }
+      );
+      return { status: 200, body: { cdnAssetCleanupStatus: "completed", deletedAssetCount: confirmedKeys.length } };
+    } catch {
+      return { status: 503, body: { message: "Unable to finalize account storage cleanup" } };
+    }
+  }
+
   async deleteAdminUser(uid, userId) {
     const access = await this.requireAdmin(uid, true);
     if (access.status !== 200) return access;
