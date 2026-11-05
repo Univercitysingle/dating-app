@@ -2,7 +2,7 @@ const siteOrigin = (process.env.SEO_SITE_ORIGIN || 'https://dating-app-staging.p
 const allowedPaths = ['/', '/faq', '/safety', '/terms', '/cookies', '/privacy-settings'];
 const privatePaths = [
   '/discover', '/likes', '/conversations', '/matches', '/chat/',
-  '/profile', '/admin', '/login', '/register', '/onboarding',
+  '/profile', '/admin', '/onboarding',
   '/set-initial-password', '/unauthorized', '/premium',
   '/manage-subscription', '/support', '/store', '/dark-fantasy',
   '/debug-swipe', '/api/',
