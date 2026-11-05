@@ -117,7 +117,7 @@ test("API robots policy is explicit, non-cacheable, and protected by HSTS", asyn
   assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000; includeSubDomains");
   assert.equal(response.headers.get("pragma"), "no-cache");
   assert.equal(response.headers.get("expires"), "0");
-  assert.equal(await response.text(), "User-agent: *\\nDisallow: /\\n");
+  assert.equal(await response.text(), "User-agent: *\nDisallow: /\n");
 });
 
 test("API sitemap path returns a real not-found response instead of a 501 server error", async () => {
