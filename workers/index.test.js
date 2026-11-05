@@ -98,6 +98,7 @@ test("API JSON responses include a same-origin resource policy", async () => {
 test("GET /favicon.ico returns an empty response instead of an unmigrated-route error", async () => {
   const response = await worker.fetch(request("/favicon.ico"), {});
   assert.equal(response.status, 204);
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
   assert.equal(await response.text(), "");
 });
 
@@ -366,6 +367,7 @@ test("GET /api/auth/test preserves the legacy non-sensitive diagnostic route", a
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
   assert.equal(await response.text(), "Auth test route is working");
 });
 
