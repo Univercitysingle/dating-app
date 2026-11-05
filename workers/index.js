@@ -44,7 +44,7 @@ export function isFirebaseDatabaseUrl(value) {
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
-  "cache-control": "no-store",
+  "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "no-referrer",
@@ -365,6 +365,25 @@ export default {
     }
     if (url.pathname === "/favicon.ico" && request.method === "GET") {
       return new Response(null, { status: 204, headers: { "cache-control": "public, max-age=86400", "cross-origin-resource-policy": "same-origin" } });
+    }
+
+    // Search crawlers should not index this API origin. Return an explicit
+    // public robots policy instead of falling through to the legacy 501 route.
+    if (url.pathname === "/robots.txt") {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
+      return new Response(request.method === "HEAD" ? null : "User-agent: *\\nDisallow: /\\n", {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=3600",
+          "x-content-type-options": "nosniff",
+          "cross-origin-resource-policy": "same-origin"
+        }
+      });
+    }
+    if (url.pathname === "/sitemap.xml") {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Method not allowed" }, 405);
+      return json({ error: "Not found" }, 404);
     }
 
     // Serve profile photos only through the dedicated CDN/private-storage proxy.
