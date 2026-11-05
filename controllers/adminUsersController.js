@@ -182,6 +182,9 @@ const createUser = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
     let user = await User.findById(userId).select('-password').lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -198,6 +201,9 @@ const getUserById = async (req, res) => {
 const updateUserById = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
 
     // First, check if the user being updated is a superadmin
     const userToUpdate = await User.findById(userId).lean();
@@ -210,10 +216,14 @@ const updateUserById = async (req, res) => {
 
     const updates = req.body;
     const requestingUserRole = req.user.role; // Populated by populateUser and checked by requireRole
+    const superadminOnlyFields = new Set(['plan', 'faceVerified', 'isVerified', 'mustSetPassword']);
+    if (requestingUserRole !== 'superadmin' && Object.keys(updates).some(key => superadminOnlyFields.has(key))) {
+      return res.status(403).json({ message: 'Only a superadmin can modify subscription, verification, or password-setup fields.' });
+    }
 
     // Fields that can be updated. Admins might have restrictions on role changes.
     const allowedUpdates = [
-      'name', 'email', 'age', 'gender', 'preference', 'bio', 'photos',
+      'name', 'email', 'age', 'gender', 'preference', 'bio',
       'interests', 'profilePrompts', 'audioBioUrl', 'videoBioUrl',
       'personalityQuizResults', 'socialMediaLinks', 'education',
       'relationshipGoals', 'isProfileVisible', 'plan', 'faceVerified', 'isVerified',
@@ -299,6 +309,9 @@ const updateUserById = async (req, res) => {
 const deleteUserById = async (req, res) => {
   try {
     const { userId } = req.params;
+    if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
 
     const userToDelete = await User.findById(userId).lean();
     if (!userToDelete) {
@@ -324,6 +337,9 @@ const updateUserSubscription = async (req, res) => {
   try {
     const { userId } = req.params;
     const { plan } = req.body;
+    if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
 
     // Validate plan
     const validPlans = User.schema.path('plan').enumValues;
