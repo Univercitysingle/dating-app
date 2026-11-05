@@ -4581,6 +4581,7 @@ export class MongoDBConnection {
       "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
       "/internal/admin/transactions", "/internal/admin/analytics", "/internal/admin/user-create",
       "/internal/admin/user-update", "/internal/admin/user-delete", "/internal/admin/user-plan",
+      "/internal/admin/user-deletion-assets", "/internal/admin/user-deletion-assets-finalize",
       "/internal/admin/payment-logs", "/internal/admin/login-history", "/internal/admin/audit-logs",
       "/internal/admin/purchases", "/internal/admin/purchase-action"
     ].includes(url.pathname)) {
@@ -4592,6 +4593,8 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/user-create") result = await this.createAdminUser(body.claims.sub, body.payload || {});
       else if (url.pathname === "/internal/admin/user-update") result = await this.updateAdminUser(body.claims.sub, body.userId, body.payload || {});
       else if (url.pathname === "/internal/admin/user-delete") result = await this.deleteAdminUser(body.claims.sub, body.userId);
+      else if (url.pathname === "/internal/admin/user-deletion-assets") result = await this.getAdminUserDeletionAssets(body.claims.sub, body.userId);
+      else if (url.pathname === "/internal/admin/user-deletion-assets-finalize") result = await this.finalizeAdminUserDeletionAssets(body.claims.sub, body.userId, body.deletedKeys);
       else if (url.pathname === "/internal/admin/user-plan") result = await this.updateAdminUserPlan(body.claims.sub, body.userId, body.payload || {});
       else if (url.pathname === "/internal/admin/stats") result = await this.getAdminDashboardStats(body.claims.sub);
       else if (url.pathname === "/internal/admin/transactions") result = await this.getAdminTransactions(body.claims.sub);
