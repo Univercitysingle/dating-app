@@ -1192,6 +1192,7 @@ test("admin user deletion runs CDN cleanup after the account deletion route", as
   const env = {
     FIREBASE_PROJECT_ID: "test-project",
     JWT_SECRET: "test-cdn-jwt-secret-that-is-long-enough-32",
+    CDN_HOSTNAME: "https://dateme.enadoctemp.workers.dev/",
     FRONTEND_URL: "https://dating-app-staging.pages.dev",
     MONGODB_CONNECTION: {
       idFromName: name => name,
