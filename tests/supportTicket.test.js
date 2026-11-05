@@ -118,6 +118,26 @@ describe('Support Ticket Flow', () => {
     expect(response.body.tickets.length).toBe(1);
   });
 
+  it('rejects MongoDB operator objects in the admin ticket status filter', async () => {
+    const response = await request(app)
+      .get('/admin/tickets')
+      .query({ status: { $ne: 'Closed' } });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe('Invalid ticket status.');
+  });
+
+  it('rejects MongoDB operator objects when an admin updates ticket status', async () => {
+    const response = await request(app)
+      .put(`/admin/tickets/${ticket._id}/status`)
+      .send({ status: { $ne: 'Closed' } });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe('Invalid ticket status.');
+    const unchangedTicket = await SupportTicket.findById(ticket._id);
+    expect(unchangedTicket.status).toBe('Open');
+  });
+
   it('should add an admin message to a ticket', async () => {
     const response = await request(app)
       .post(`/admin/tickets/${ticket._id}/messages`)
