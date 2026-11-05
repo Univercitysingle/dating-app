@@ -70,7 +70,14 @@ const sanitizeUser = (user, currentUser) => {
   // Always convert photo URLs to full CDN paths.
   userObject = convertKeysToCdnUrls(userObject);
 
-  // Owners and superadmins may see the remaining account details.
+  // Contact details are restricted to superadmins, including on an owner's own profile.
+  if (!isSuperAdmin) {
+    delete userObject.email;
+    delete userObject.mobileNumber;
+  }
+
+  // Superadmins may see the remaining account details; owners may see their own
+  // non-contact account fields, while public viewers receive a reduced profile.
   if (isSuperAdmin || isOwner) {
     return userObject;
   }
