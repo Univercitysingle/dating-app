@@ -28,7 +28,7 @@ const listReports = async (req, res) => {
     }
 
     if (search) {
-      const escapedSearch = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\      const escapedSearch = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');');
       const searchRegex = new RegExp(escapedSearch, 'i');
       const users = await User.find({
         $or: [{ name: searchRegex }, { email: searchRegex }],
