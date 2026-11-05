@@ -1400,7 +1400,7 @@ export default {
                 cdnAssetCleanupStatus,
                 anonymizationStatus: "awaiting_prerequisites",
                 deletedAssetCount: finalizeResult?.deletedAssetCount ?? deletedKeys.length
-              }, response.status);
+              }, 202);
             } catch {
               return json({ ...result, cdnAssetCleanupStatus: "retry_pending" }, 202);
             }
