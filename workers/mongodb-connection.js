@@ -125,7 +125,7 @@ function isAccountRestricted(user, now = new Date()) {
   return Boolean(user.suspendedUntil && new Date(user.suspendedUntil) > now);
 }
 
-async function deleteFirebaseAuthIdentity(env, uid) {
+export async function deleteFirebaseAuthIdentity(env, uid) {
   const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
   let serviceAccount = null;
   try {
