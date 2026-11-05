@@ -221,3 +221,11 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Run OWASP ZAP passive baseline against deployed Pages
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: https://dating-app-staging.pages.dev
+          fail_action: false
+          allow_issue_writing: false
+          artifact_name: zap-pages-after-deploy
