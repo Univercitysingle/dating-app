@@ -54,6 +54,12 @@ async function main() {
     ['strict-transport-security', /max-age=31536000/i],
     ['permissions-policy', /camera=\(self\)/i],
     ['permissions-policy', /microphone=\(self\)/i],
+    ['content-security-policy', /default-src 'self'/i],
+    ['content-security-policy', /object-src 'none'/i],
+    ['content-security-policy', /frame-ancestors 'none'/i],
+    ['access-control-allow-origin', /^https:\/\/dating-app-staging\.pages\.dev$/i],
+    ['cross-origin-resource-policy', /^same-origin$/i],
+    ['cross-origin-opener-policy', /^same-origin-allow-popups$/i],
   ];
   for (const [name, pattern] of requiredHeaders) {
     const value = homepageResponse.headers.get(name) || '';
