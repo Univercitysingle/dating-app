@@ -3562,8 +3562,9 @@ export class MongoDBConnection {
       const userIds = tickets.map(ticket => ticket.userId).filter(Boolean);
       const { ObjectId } = await import("mongodb");
       const normalizedIds = userIds.map(value => typeof value === "string" && /^[a-fA-F0-9]{24}$/.test(value) ? new ObjectId(value) : value);
+      const userProjection = access.role === "superadmin" ? { name: 1, email: 1 } : { name: 1 };
       const users = normalizedIds.length ? await db.collection("users").find(
-        { _id: { $in: normalizedIds } }, { projection: { name: 1, email: 1 } }
+        { _id: { $in: normalizedIds } }, { projection: userProjection }
       ).toArray() : [];
       const userMap = new Map(users.map(user => [String(user._id), user]));
       return { status: 200, body: {
@@ -3584,8 +3585,9 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId) });
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      const userProjection = access.role === "superadmin" ? { name: 1, email: 1 } : { name: 1 };
       const [user, messages] = await Promise.all([
-        db.collection("users").findOne({ _id: ticket.userId }, { projection: { name: 1, email: 1 } }),
+        db.collection("users").findOne({ _id: ticket.userId }, { projection: userProjection }),
         db.collection("ticketmessages").find({ ticketId: new ObjectId(ticketId) }).sort({ createdAt: 1 }).toArray()
       ]);
       const senderIds = messages.map(message => message.senderId).filter(Boolean);
