@@ -109,8 +109,14 @@ const createUser = async (req, res) => {
     }
     // Further validation for email format, password strength, role validity can be added
     const validRoles = User.schema.path('role').enumValues;
-    if (role && !validRoles.includes(role)) {
-        return res.status(400).json({ message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+    if (role !== undefined && (typeof role !== 'string' || !validRoles.includes(role))) {
+      return res.status(400).json({ message: 'Invalid role.' });
+    }
+
+    // Admins may create regular users, contributors, or admins, but only a
+    // superadmin may create another superadmin. This mirrors updateUserById.
+    if (role === 'superadmin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ message: 'Only a superadmin can create a superadmin account.' });
     }
 
     // Check if user with this email or UID already exists
