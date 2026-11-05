@@ -9,7 +9,7 @@ import {
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ThemeProvider } from './context/ThemeContext';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer } from 'react-toastify/unstyled';
 import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
