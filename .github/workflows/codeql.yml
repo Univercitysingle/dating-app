@@ -1,0 +1,40 @@
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches:
+      - migrate-to-serverless
+  pull_request:
+    branches:
+      - migrate-to-serverless
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze JavaScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out migration branch only
+        uses: actions/checkout@v4
+        with:
+          ref: migrate-to-serverless
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          build-mode: none
+          queries: security-extended
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
