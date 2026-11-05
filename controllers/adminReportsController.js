@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Report = require('../models/Report');
 const User = require('../models/User');
 
@@ -83,10 +84,12 @@ const listReports = async (req, res) => {
 const performModerationAction = async (req, res) => {
   const { reportId } = req.params;
   // New payload can include duration for suspension, etc.
-  const { action, adminNotes, durationDays } = req.body;
-  const adminUserId = req.user._id;
+  const { action, adminNotes, durationDays } = req.body || {};
 
   try {
+    if (typeof reportId !== 'string' || !mongoose.Types.ObjectId.isValid(reportId)) return res.status(400).json({ message: 'Invalid report ID.' });
+    if (typeof action !== 'string' || !['dismiss', 'suspend_user', 'ban_user'].includes(action)) return res.status(400).json({ message: 'Invalid action specified.' });
+    if (adminNotes !== undefined && (typeof adminNotes !== 'string' || adminNotes.length > 2000)) return res.status(400).json({ message: 'Admin notes must be a string of at most 2000 characters.' });
     const report = await Report.findById(reportId);
     if (!report) {
       return res.status(404).json({ message: 'Report not found.' });
@@ -97,7 +100,7 @@ const performModerationAction = async (req, res) => {
       return res.status(404).json({ message: 'Reported user not found.' });
     }
 
-    report.adminNotes = adminNotes || report.adminNotes;
+    if (adminNotes !== undefined) report.adminNotes = adminNotes;
 
     switch (action) {
       case 'dismiss':
