@@ -126,6 +126,9 @@ function isAccountRestricted(user, now = new Date()) {
 }
 
 export async function deleteFirebaseAuthIdentity(env, uid) {
+  if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
+    return { completed: false, configured: false, reason: "invalid_firebase_uid" };
+  }
   const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
   let serviceAccount = null;
   try {
@@ -197,7 +200,7 @@ export async function deleteFirebaseAuthIdentity(env, uid) {
     if (deleteResponse.ok) return { completed: true, configured: true };
     const errorBody = await deleteResponse.json().catch(() => null);
     const errorCode = String(errorBody?.error?.message || "");
-    if (/USER_NOT_FOUND|USER_DISABLED/i.test(errorCode)) return { completed: true, configured: true };
+    if (/USER_NOT_FOUND/i.test(errorCode)) return { completed: true, configured: true };
     return { completed: false, configured: true, reason: "firebase_identity_delete_failed" };
   } catch {
     return { completed: false, configured: true, reason: "firebase_identity_delete_unavailable" };
