@@ -23,7 +23,13 @@ const findOrCreateUserFromToken = async (decodedToken) => {
     return user;
   }
 
-  // If user not found by UID, try to find by email and link the account
+  // Never link a Firebase identity to an existing account using an unverified email.
+  // A verified UID match above remains valid because Firebase authenticated that UID.
+  if (decodedToken.email_verified !== true) {
+    return null;
+  }
+
+  // If user not found by UID, link only through a verified email address.
   if (decodedToken.email) {
     user = await User.findOne({ email: decodedToken.email });
 
@@ -34,10 +40,7 @@ const findOrCreateUserFromToken = async (decodedToken) => {
     }
   }
 
-  // If no user found by email, create a new one, but only if the email is verified.
-  if (!decodedToken.email_verified) {
-    return null;
-  }
+  // New accounts are provisioned only from verified Firebase email identities.
 
   const newUser = new User({
     uid: decodedToken.uid,
