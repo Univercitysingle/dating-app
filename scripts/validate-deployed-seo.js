@@ -116,10 +116,26 @@ async function main() {
     const routeCanonicalTag = (routeHtml.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i) || [])[0];
     const routeCanonical = routeCanonicalTag ? attribute(routeCanonicalTag, 'href') : null;
     const routeOgUrl = metaValue(routeHtml, 'property', 'og:url');
-    if (!routeTitle.trim() || !routeDescription || routeCanonical !== siteOrigin + expectedPath || routeOgUrl !== siteOrigin + expectedPath) {
+    const routeOgTitle = metaValue(routeHtml, 'property', 'og:title');
+    const routeOgDescription = metaValue(routeHtml, 'property', 'og:description');
+    const routeTwitterTitle = metaValue(routeHtml, 'name', 'twitter:title');
+    const routeTwitterDescription = metaValue(routeHtml, 'name', 'twitter:description');
+    const routeRobots = metaValue(routeHtml, 'name', 'robots');
+    const expectedUrl = siteOrigin + expectedPath;
+    if (!routeTitle.trim() || !routeDescription || routeCanonical !== expectedUrl || routeOgUrl !== expectedUrl) {
       throw new Error('Public route ' + route + ' is missing route-specific title, description, canonical URL or Open Graph URL.');
     }
-    if (routeTitle === title) throw new Error('Public route ' + route + ' is still serving homepage title metadata.');
+    if (routeTitle.trim() === title) throw new Error('Public route ' + route + ' is still serving homepage title metadata.');
+    if (routeDescription === description) throw new Error('Public route ' + route + ' is still serving the homepage description.');
+    if (routeOgTitle !== routeTitle.trim() || routeOgDescription !== routeDescription) {
+      throw new Error('Public route ' + route + ' has inconsistent Open Graph title or description.');
+    }
+    if (routeTwitterTitle !== routeTitle.trim() || routeTwitterDescription !== routeDescription) {
+      throw new Error('Public route ' + route + ' has inconsistent Twitter title or description.');
+    }
+    if (!routeRobots || !/index,\\s*follow/i.test(routeRobots)) {
+      throw new Error('Public route ' + route + ' must be indexable and followable.');
+    }
   }
 
   console.log('Deployed SEO validation passed: homepage metadata and JSON-LD, canonical URL, exact sitemap, ' + privatePaths.length + ' crawler exclusions, and ' + expected.length + ' public routes.');
