@@ -8,14 +8,21 @@ const listReports = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 10;
     const skip = (page - 1) * limit;
     const { status, search } = req.query;
+    const validStatuses = Report.schema.path('status').enumValues;
+    if (status !== undefined && (typeof status !== 'string' || !validStatuses.includes(status))) {
+      return res.status(400).json({ message: 'Invalid report status.' });
+    }
+    if (search !== undefined && (typeof search !== 'string' || search.length > 100)) {
+      return res.status(400).json({ message: 'Search must be a string of at most 100 characters.' });
+    }
 
     let query = {};
-    if (status) {
+    if (status !== undefined) {
       query.status = status;
     }
 
     if (search) {
-      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedSearch = search.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
       const searchRegex = new RegExp(escapedSearch, 'i');
       const users = await User.find({
         $or: [{ name: searchRegex }, { email: searchRegex }],
@@ -102,14 +109,7 @@ const performModerationAction = async (req, res) => {
         reportedUser.isProfileVisible = false; // Also hide profile during suspension
         await reportedUser.save();
         report.status = 'resolved_user_suspended';
-        req.log.info({
-            message: 'User suspended',
-            userId: reportedUser.uid,
-            adminId: req.user.uid,
-            reason: report.reason,
-            durationDays: durationDays,
-            reportId: reportId
-        });
+        req.log.info('Moderation action completed: user suspended.');
         break;
 
       case 'ban_user':
@@ -122,13 +122,7 @@ const performModerationAction = async (req, res) => {
         reportedUser.suspendedUntil = new Date('9999-12-31');
         await reportedUser.save();
         report.status = 'resolved_user_banned';
-        req.log.info({
-            message: 'User banned',
-            userId: reportedUser.uid,
-            adminId: req.user.uid,
-            reason: report.reason,
-            reportId: reportId
-        });
+        req.log.info('Moderation action completed: user banned.');
         break;
 
       default:
@@ -140,7 +134,7 @@ const performModerationAction = async (req, res) => {
     res.json({ message: `Action '${action}' performed successfully.`, report });
 
   } catch (error) {
-    console.error(`Error performing action on report ${reportId}:`, error);
+    console.error('Error performing moderation action.');
     res.status(500).json({ message: 'Error performing moderation action', error: error.message });
   }
 };
