@@ -18,6 +18,11 @@ const submitReport = async (req, res) => {
     return res.status(400).json({ error: 'A valid report category is required.' });
   }
 
+    const validCategories = Report.schema.path('category').enumValues;
+    if (!validCategories.includes(category)) {
+        return res.status(400).json({ error: `Invalid category. Must be one of: ${validCategories.join(', ')}` });
+    }
+
   if (reporterUid === reportedUserUid) {
     return res.status(400).json({ error: 'Cannot report yourself.' });
   }
@@ -33,11 +38,6 @@ const submitReport = async (req, res) => {
     }
     if (!reportedUserExists) {
       return res.status(404).json({ error: 'Reported user not found.' });
-    }
-
-    const validCategories = Report.schema.path('category').enumValues;
-    if (!validCategories.includes(category)) {
-        return res.status(400).json({ error: `Invalid category. Must be one of: ${validCategories.join(', ')}` });
     }
 
     const newReport = new Report({
