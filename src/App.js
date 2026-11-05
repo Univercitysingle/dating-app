@@ -43,7 +43,6 @@ import SafetyTipsPage from './pages/legal/SafetyTipsPage';
 import TermsPage from './pages/legal/TermsPage';
 import CookiePolicyPage from './pages/legal/CookiePolicyPage';
 import PrivacySettingsPage from './pages/legal/PrivacySettingsPage';
-import DebugSwipeCardPage from './pages/DebugSwipeCardPage';
 import IncomingCallMonitor from './components/IncomingCallMonitor';
 import LoadingState from './components/LoadingState';
 
@@ -197,10 +196,6 @@ function App() {
             {/* Default route */}
             <Route path="/" element={<PublicHomeRoute />} />
             <Route path="*" element={<Navigate to="/discover" />} />
-
-            {/* --- JULES'S TEMPORARY DEBUG ROUTE --- */}
-            <Route path="/debug-swipe" element={<DebugSwipeCardPage />} />
-            {/* --- END DEBUG ROUTE --- */}
 
           </Routes>
         </SocketProvider>
