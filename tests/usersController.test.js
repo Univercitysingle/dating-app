@@ -98,7 +98,50 @@ describe('Users Controller', () => {
     });
   });
 
-  describe('deletePhoto', () => {
+
+    it('rejects photo order payloads containing assets not owned by the user', async () => {
+      const req = httpMocks.createRequest({
+        method: 'PUT',
+        url: '/api/users/photos/order',
+        body: {
+          photos: [{ url: 'photo2.jpg' }, { url: 'photos-another-user-secret.webp' }],
+        },
+        user,
+        log: mockLog,
+      });
+      const res = httpMocks.createResponse();
+
+      await updatePhotoOrder(req, res);
+
+      expect(res.statusCode).toBe(400);
+      const storedUser = await User.findOne({ uid: user.uid });
+      expect(storedUser.photos.map(photo => photo.url)).toEqual(['photo1.jpg', 'photo2.jpg']);
+    });
+
+    it('allows reordering existing photos without accepting client metadata changes', async () => {
+      const req = httpMocks.createRequest({
+        method: 'PUT',
+        url: '/api/users/photos/order',
+        body: {
+          photos: [
+            { url: 'photo2.jpg', size: 999999, order: 0 },
+            { url: 'photo1.jpg', size: 1, order: 1 },
+          ],
+        },
+        user,
+        log: mockLog,
+      });
+      const res = httpMocks.createResponse();
+
+      await updatePhotoOrder(req, res);
+
+      expect(res.statusCode).toBe(200);
+      const storedUser = await User.findOne({ uid: user.uid });
+      expect(storedUser.photos.map(photo => photo.url)).toEqual(['photo2.jpg', 'photo1.jpg']);
+      expect(storedUser.photos.map(photo => photo.size)).toEqual([undefined, undefined]);
+    });
+
+    describe('deletePhoto', () => {
     it('should return the full photo URL after deleting a photo', async () => {
         const req = httpMocks.createRequest({
             method: 'DELETE',
