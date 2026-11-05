@@ -2603,26 +2603,29 @@ test("Firebase identity deletion remains pending when admin credentials are unav
 });
 
 
-test("account deletion storage inventory only returns owned photo and support attachment keys", async () => {
+test("account CDN cleanup resumes in bounded batches and finalizes only after every owned asset is confirmed", async () => {
   const { ObjectId } = await import("mongodb");
   const userId = new ObjectId();
   const ticketId = new ObjectId();
   const photoKey = "photos-deleting-user-1730000000000.webp";
   const supportKey = "support-" + String(ticketId) + "-1730000000000-123e4567-e89b-42d3-a456-426614174000.pdf";
   const operations = [];
+  const completed = new Set();
+  let photos = [{ url: "https://dateme.enadoctemp.workers.dev/" + photoKey, size: 123 }];
+  let attachments = [{ key: supportKey, url: "https://dateme.enadoctemp.workers.dev/" + supportKey }];
   const db = {
     collection(name) {
       if (name === "users") return {
         async findOne() {
           return {
-            _id: userId,
-            uid: "deleting-user",
-            accountStatus: "deletion_pending",
-            photos: [{ url: "https://dateme.enadoctemp.workers.dev/" + photoKey, size: 123 }]
+            _id: userId, uid: "deleting-user", accountStatus: "deletion_pending",
+            photos, cdnAssetCleanupDeletedKeys: [...completed]
           };
         },
         async updateOne(query, update) {
           operations.push({ name, method: "updateOne", query, update });
+          for (const key of update.$addToSet?.cdnAssetCleanupDeletedKeys?.$each || []) completed.add(key);
+          if (update.$set?.cdnAssetCleanupStatus === "completed") photos = [];
           return { matchedCount: 1 };
         }
       };
@@ -2635,12 +2638,11 @@ test("account deletion storage inventory only returns owned photo and support at
       if (name === "ticketmessages") return {
         find(query) {
           assert.equal(String(query.senderId), String(userId));
-          return { async toArray() {
-            return [{ ticketId, attachments: [{ key: supportKey, url: "https://dateme.enadoctemp.workers.dev/" + supportKey }] }];
-          } };
+          return { async toArray() { return [{ ticketId, attachments }]; } };
         },
         async updateMany(query, update) {
           operations.push({ name, method: "updateMany", query, update });
+          attachments = [];
           return { modifiedCount: 1 };
         }
       };
@@ -2656,15 +2658,29 @@ test("account deletion storage inventory only returns owned photo and support at
   assert.equal(inventory.status, 200);
   assert.deepEqual(inventory.body.photoKeys, [photoKey]);
   assert.deepEqual(inventory.body.supportKeys, [supportKey]);
+  assert.deepEqual(inventory.body.completedKeys, []);
   assert.equal(inventory.body.unresolvedAssetCount, 0);
 
-  const finalized = await connection.finalizeAdminUserDeletionAssets(
-    "superadmin_uid", String(userId), [photoKey, supportKey]
+  const firstBatch = await connection.finalizeAdminUserDeletionAssets(
+    "superadmin_uid", String(userId), [photoKey]
   );
-  assert.equal(finalized.status, 200);
-  assert.equal(finalized.body.cdnAssetCleanupStatus, "completed");
-  assert.ok(operations.some(op => op.name === "users" && op.method === "updateOne" &&
-    op.update.$set.cdnAssetCleanupStatus === "completed" && op.update.$set.photos.length === 0));
+  assert.equal(firstBatch.status, 202);
+  assert.equal(firstBatch.body.cdnAssetCleanupStatus, "in_progress");
+  assert.equal(firstBatch.body.confirmedAssetCount, 1);
+  assert.equal(photos.length, 1);
+  assert.equal(attachments.length, 1);
+
+  const resumedInventory = await connection.getAdminUserDeletionAssets("superadmin_uid", String(userId));
+  assert.deepEqual(resumedInventory.body.completedKeys, [photoKey]);
+
+  const secondBatch = await connection.finalizeAdminUserDeletionAssets(
+    "superadmin_uid", String(userId), [supportKey]
+  );
+  assert.equal(secondBatch.status, 200);
+  assert.equal(secondBatch.body.cdnAssetCleanupStatus, "completed");
+  assert.equal(secondBatch.body.deletedAssetCount, 2);
+  assert.equal(photos.length, 0);
+  assert.equal(attachments.length, 0);
   assert.ok(operations.some(op => op.name === "ticketmessages" && op.method === "updateMany" &&
     op.update.$unset.attachments === ""));
 });
