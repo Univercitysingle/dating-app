@@ -9,46 +9,57 @@ const html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
 
 const siteOrigin = 'https://dating-app-staging.pages.dev';
 const allowedPaths = ['/', '/faq', '/safety', '/terms', '/cookies', '/privacy-settings'];
-const allowedUrls = new Set(allowedPaths.map((route) => new URL(route, siteOrigin).href));
-const sitemapUrls = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1].trim());
+const allowedUrls = new Set(allowedPaths.map(function (route) {
+  return new URL(route, siteOrigin).href;
+}));
+const sitemapUrls = Array.from(sitemap.matchAll(/<loc>(.*?)<\/loc>/g), function (match) {
+  return match[1].trim();
+});
 
 if (sitemapUrls.length === 0) throw new Error('Sitemap contains no URLs.');
 if (new Set(sitemapUrls).size !== sitemapUrls.length) throw new Error('Sitemap contains duplicate URLs.');
-for (const url of sitemapUrls) {
-  if (!allowedUrls.has(url)) throw new Error(\`Unexpected or non-public sitemap URL: \${url}\`);
-}
-for (const url of allowedUrls) {
-  if (!sitemapUrls.includes(url)) throw new Error(\`Required public URL is missing from sitemap: \${url}\`);
-}
+sitemapUrls.forEach(function (url) {
+  if (!allowedUrls.has(url)) throw new Error('Unexpected or non-public sitemap URL: ' + url);
+});
+allowedUrls.forEach(function (url) {
+  if (!sitemapUrls.includes(url)) throw new Error('Required public URL is missing from sitemap: ' + url);
+});
 
 function getAttribute(tag, attribute) {
-  return tag.match(new RegExp(\`\\\\b\${attribute}=["']([^"']*)["']\`, 'i'))?.[1] || null;
+  const pattern = new RegExp('\\\\b' + attribute + '=["\\x27]([^"\\x27]*)["\\x27]', 'i');
+  const match = tag.match(pattern);
+  return match ? match[1] : null;
 }
-const metaTags = [...html.matchAll(/<meta\\b[^>]*>/gi)].map((match) => match[0]);
+const metaTags = Array.from(html.matchAll(/<meta\\b[^>]*>/gi), function (match) {
+  return match[0];
+});
 function getMeta(attribute, value) {
-  const tag = metaTags.find((item) => getAttribute(item, attribute) === value);
+  const tag = metaTags.find(function (item) {
+    return getAttribute(item, attribute) === value;
+  });
   return tag ? getAttribute(tag, 'content') : null;
 }
 function assertPresent(value, label) {
-  if (!value || !value.trim()) throw new Error(\`Missing or empty SEO metadata: \${label}\`);
+  if (!value || !value.trim()) throw new Error('Missing or empty SEO metadata: ' + label);
 }
 
-const title = html.match(/<title>(.*?)<\\/title>/i)?.[1]?.trim();
+const titleMatch = html.match(/<title>(.*?)<\\/title>/i);
+const title = titleMatch ? titleMatch[1].trim() : null;
 assertPresent(title, 'title');
 if (title.length < 20 || title.length > 70) {
-  throw new Error(\`Title should be between 20 and 70 characters (currently \${title.length}).\`);
+  throw new Error('Title should be between 20 and 70 characters (currently ' + title.length + ').');
 }
 const description = getMeta('name', 'description');
 assertPresent(description, 'meta description');
 if (description.length < 70 || description.length > 170) {
-  throw new Error(\`Meta description should be between 70 and 170 characters (currently \${description.length}).\`);
+  throw new Error('Meta description should be between 70 and 170 characters (currently ' + description.length + ').');
 }
 
-const canonicalTag = html.match(/<link\\b[^>]*rel=["']canonical["'][^>]*>/i)?.[0];
-const canonical = canonicalTag ? getAttribute(canonicalTag, 'href') : null;
-if (canonical !== \`\${siteOrigin}/\`) throw new Error(\`Unexpected canonical URL: \${canonical || 'missing'}\`);
+const canonicalMatch = html.match(/<link\\b[^>]*rel=["\\x27]canonical["\\x27][^>]*>/i);
+const canonical = canonicalMatch ? getAttribute(canonicalMatch[0], 'href') : null;
+if (canonical !== siteOrigin + '/') throw new Error('Unexpected canonical URL: ' + (canonical || 'missing'));
 
-for (const [attribute, key] of [
+[
   ['property', 'og:title'],
   ['property', 'og:description'],
   ['property', 'og:image'],
@@ -57,29 +68,29 @@ for (const [attribute, key] of [
   ['name', 'twitter:title'],
   ['name', 'twitter:description'],
   ['name', 'twitter:image'],
-]) {
-  assertPresent(getMeta(attribute, key), key);
-}
-if (getMeta('property', 'og:url') !== \`\${siteOrigin}/\`) {
+].forEach(function (item) {
+  assertPresent(getMeta(item[0], item[1]), item[1]);
+});
+if (getMeta('property', 'og:url') !== siteOrigin + '/') {
   throw new Error('Open Graph URL must match the staging homepage.');
 }
 
-const jsonLdMatch = html.match(/<script\\b[^>]*type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/i);
+const jsonLdMatch = html.match(/<script\\b[^>]*type=["\\x27]application\\/ld\\+json["\\x27][^>]*>([\\s\\S]*?)<\\/script>/i);
 if (!jsonLdMatch) throw new Error('Homepage JSON-LD structured data is missing.');
 let structuredData;
 try {
   structuredData = JSON.parse(jsonLdMatch[1]);
 } catch (error) {
-  throw new Error(\`Homepage JSON-LD is invalid JSON: \${error.message}\`);
+  throw new Error('Homepage JSON-LD is invalid JSON: ' + error.message);
 }
 if (structuredData['@context'] !== 'https://schema.org' || !Array.isArray(structuredData['@graph'])) {
   throw new Error('Homepage JSON-LD must use schema.org and an @graph array.');
 }
-for (const requiredType of ['Organization', 'WebSite', 'SoftwareApplication']) {
-  if (!structuredData['@graph'].some((item) => item['@type'] === requiredType)) {
-    throw new Error(\`Homepage JSON-LD is missing required type: \${requiredType}\`);
+['Organization', 'WebSite', 'SoftwareApplication'].forEach(function (requiredType) {
+  if (!structuredData['@graph'].some(function (item) { return item['@type'] === requiredType; })) {
+    throw new Error('Homepage JSON-LD is missing required type: ' + requiredType);
   }
-}
+});
 
 const privatePaths = [
   '/discover', '/likes', '/conversations', '/matches', '/chat/',
@@ -88,19 +99,21 @@ const privatePaths = [
   '/manage-subscription', '/support', '/store', '/dark-fantasy',
   '/debug-swipe', '/api/',
 ];
-const robotLines = robots.split(/\\r?\\n/).map((line) => line.trim());
-for (const route of privatePaths) {
-  if (!robotLines.includes(\`Disallow: \${route}\`)) throw new Error(\`robots.txt must disallow \${route}\`);
-}
+const robotLines = robots.split(/\\r?\\n/).map(function (line) { return line.trim(); });
+privatePaths.forEach(function (route) {
+  if (!robotLines.includes('Disallow: ' + route)) {
+    throw new Error('robots.txt must disallow ' + route);
+  }
+});
 
-for (const route of allowedPaths) {
+allowedPaths.forEach(function (route) {
   const registered = route === '/'
     ? app.includes('path="/"')
-    : app.includes(\`path="\${route}"\`);
-  if (!registered) throw new Error(\`Sitemap URL has no matching application route: \${route}\`);
-}
+    : app.includes('path="' + route + '"');
+  if (!registered) throw new Error('Sitemap URL has no matching application route: ' + route);
+});
 if (app.includes('DebugSwipeCardPage') || app.includes('/debug-swipe')) {
   throw new Error('Temporary /debug-swipe route must not be registered in the application.');
 }
 
-console.log(\`Public SEO validation passed: \${sitemapUrls.length} public URLs, metadata and JSON-LD, \${privatePaths.length} crawler exclusions, matching public routes, and no public debug route.\`);
+console.log('Public SEO validation passed: ' + sitemapUrls.length + ' public URLs, metadata and JSON-LD, ' + privatePaths.length + ' crawler exclusions, matching public routes, and no public debug route.');
