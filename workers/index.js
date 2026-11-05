@@ -1594,7 +1594,7 @@ export default {
           if (!Array.isArray(data?.products)) return [];
           return data.products.map(product => {
             const handle = String(product?.handle || "").trim();
-            const title = String(product?.title || "").replace(/<[^>]*>|[<>]/g, "").trim().slice(0, 180);
+            const title = String(product?.title || "").replaceAll("<", "").replaceAll(">", "").trim().slice(0, 180);
             if (!handle || !title || !/^[a-z0-9-]+$/i.test(handle)) return null;
             const imageCandidate = product?.images?.[0]?.src || product?.image?.src || "";
             let image = "";
