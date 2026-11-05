@@ -109,6 +109,17 @@ async function main() {
     if (!(response.headers.get('content-type') || '').toLowerCase().includes('text/html')) {
       throw new Error('Public route ' + route + ' did not return HTML.');
     }
+    const routeHtml = await response.text();
+    const expectedPath = route;
+    const routeTitle = (routeHtml.match(/<title>([\\s\\S]*?)<\\/title>/i) || [])[1] || '';
+    const routeDescription = metaValue(routeHtml, 'name', 'description');
+    const routeCanonicalTag = (routeHtml.match(/<link\\b[^>]*rel=["']canonical["'][^>]*>/i) || [])[0];
+    const routeCanonical = routeCanonicalTag ? attribute(routeCanonicalTag, 'href') : null;
+    const routeOgUrl = metaValue(routeHtml, 'property', 'og:url');
+    if (!routeTitle.trim() || !routeDescription || routeCanonical !== siteOrigin + expectedPath || routeOgUrl !== siteOrigin + expectedPath) {
+      throw new Error('Public route ' + route + ' is missing route-specific title, description, canonical URL or Open Graph URL.');
+    }
+    if (routeTitle === title) throw new Error('Public route ' + route + ' is still serving homepage title metadata.');
   }
 
   console.log('Deployed SEO validation passed: homepage metadata and JSON-LD, canonical URL, exact sitemap, ' + privatePaths.length + ' crawler exclusions, and ' + expected.length + ' public routes.');
