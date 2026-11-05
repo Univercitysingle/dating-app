@@ -67,6 +67,8 @@ jobs:
             echo "No lockfile changes were needed."
           else
             git commit -m "Update dependency lockfiles with non-breaking security fixes"
+            # Drop generated build/install residue after the validated lockfile commit.
+            git reset --hard HEAD
             # Rebase over any concurrent migration-branch commits before pushing.
             git fetch origin migrate-to-serverless
             git rebase origin/migrate-to-serverless
