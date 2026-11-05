@@ -51,7 +51,7 @@ function Login({ initialSignUp = false }) {
   useEffect(() => {
     setError('');
     setSuccessMessage('');
-  }, [isSignUp, showPhone, showReset]);
+  }, [showPhone, showReset]);
 
   const handleFirebaseEmailAuth = async () => {
     // This function now only handles the Firebase logic
@@ -441,7 +441,11 @@ function Login({ initialSignUp = false }) {
               {isSignUp ? 'Already have an account?' : 'New user?'}{' '}
               <button
                 className="text-indigo-400 hover:text-indigo-300 hover:underline"
-                onClick={() => setIsSignUp((s) => !s)}
+                onClick={() => {
+                  setError('');
+                  setSuccessMessage('');
+                  setIsSignUp((s) => !s);
+                }}
                 disabled={isLoading}
               >
                 {isSignUp ? 'Login' : 'Sign Up'}
