@@ -112,14 +112,6 @@ jobs:
           fi
           echo "worker_url=$WORKER_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Synchronize CDN proxy JWT secret
-        shell: bash
-        run: |
-          set -euo pipefail
-          # The standalone dateme Worker is deployed separately, but its JWT verifier
-          # must use the same secret as the API signer. Update only the secret, not its source.
-          printf '%s' "$JWT_SECRET" | npx --yes wrangler@4 secret put JWT_SECRET --name dateme
-
       - name: Configure API-to-CDN authentication secret
         shell: bash
         run: printf '%s' "$JWT_SECRET" | npx --yes wrangler@4 secret put JWT_SECRET --config wrangler.jsonc --env staging
