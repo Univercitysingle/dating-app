@@ -1,5 +1,6 @@
 const adminUsersController = require('../controllers/adminUsersController');
 const adminReportsController = require('../controllers/adminReportsController');
+const User = require('../models/User');
 
 const makeResponse = () => ({
   status: jest.fn().mockReturnThis(),
@@ -7,6 +8,20 @@ const makeResponse = () => ({
 });
 
 describe('Admin endpoint input validation', () => {
+  it('prevents an admin from creating a superadmin account', async () => {
+    const res = makeResponse();
+    await adminUsersController.createUser({
+      user: { role: 'admin' },
+      body: { email: 'new-admin@example.com', role: 'superadmin' },
+    }, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Only a superadmin can create a superadmin account.',
+    });
+    expect(User.findOne).not.toHaveBeenCalled();
+  });
+
   it('rejects MongoDB operator objects in user role filters', async () => {
     const res = makeResponse();
     await adminUsersController.listUsers({ query: { role: { $ne: 'user' } } }, res);
