@@ -90,6 +90,44 @@ describe('Support Ticket Flow', () => {
     await TicketMessage.deleteMany({});
   });
 
+  it('rejects malformed ticket IDs before querying ticket ownership', async () => {
+    const response = await request(app).get('/tickets/not-an-object-id');
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe('Invalid ticket ID.');
+  });
+
+  it('rejects malformed ticket IDs on admin detail and status routes', async () => {
+    const detail = await request(app).get('/admin/tickets/not-an-object-id');
+    const status = await request(app)
+      .put('/admin/tickets/not-an-object-id/status')
+      .send({ status: 'Closed' });
+
+    expect(detail.status).toBe(400);
+    expect(status.status).toBe(400);
+    expect(detail.body.message).toBe('Invalid ticket ID.');
+    expect(status.body.message).toBe('Invalid ticket ID.');
+  });
+
+  it('rejects invalid and oversized support messages', async () => {
+    const empty = await request(app)
+      .post(`/tickets/${ticket._id}/messages`)
+      .send({ message: '   ' });
+    const oversized = await request(app)
+      .post(`/admin/tickets/${ticket._id}/messages`)
+      .send({ message: 'x'.repeat(5001) });
+
+    expect(empty.status).toBe(400);
+    expect(oversized.status).toBe(400);
+  });
+
+  it('rejects invalid ticket creation fields', async () => {
+    const response = await request(app)
+      .post('/tickets')
+      .send({ subject: { $ne: '' }, message: 'Initial message' });
+
+    expect(response.status).toBe(400);
+  });
+
   it('should create a new support ticket', async () => {
     const response = await request(app)
       .post('/tickets')
