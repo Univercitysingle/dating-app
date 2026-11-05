@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const { randomInt } = require('crypto');
 const User = require('../models/User'); // Assuming the User model is in this path
 
 const genders = ['male', 'female', 'non-binary'];
@@ -41,7 +42,7 @@ async function createTestUsers() {
         name: `Test User ${i + 1}`,
         email: `testuser${userNum}@example.com`,
         uid: `test-uid-${userNum}`, // Fake UID for discovery filtering
-        age: Math.floor(Math.random() * 20) + 20, // Age between 20 and 39
+        age: randomInt(20, 40), // Age between 20 and 39
         gender: getRandomElement(genders),
         preference: getRandomElement(preferences),
         bio: `This is the bio for Test User ${i + 1}. Just looking for a connection.`,
