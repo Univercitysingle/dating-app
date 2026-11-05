@@ -125,6 +125,85 @@ function isAccountRestricted(user, now = new Date()) {
   return Boolean(user.suspendedUntil && new Date(user.suspendedUntil) > now);
 }
 
+async function deleteFirebaseAuthIdentity(env, uid) {
+  const projectId = String(env.FIREBASE_PROJECT_ID || "").trim();
+  let serviceAccount = null;
+  try {
+    if (env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+      serviceAccount = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    } else if (env.FIREBASE_CREDENTIALS_BASE64) {
+      const { Buffer } = await import("node:buffer");
+      serviceAccount = JSON.parse(Buffer.from(env.FIREBASE_CREDENTIALS_BASE64, "base64").toString("utf8"));
+    } else if (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
+      serviceAccount = {
+        client_email: env.FIREBASE_CLIENT_EMAIL,
+        private_key: String(env.FIREBASE_PRIVATE_KEY).replace(/\\n/g, "\n")
+      };
+    }
+  } catch {
+    return { completed: false, configured: true, reason: "firebase_credentials_invalid" };
+  }
+  if (!projectId || !serviceAccount ||
+      typeof serviceAccount.client_email !== "string" ||
+      typeof serviceAccount.private_key !== "string" ||
+      !serviceAccount.private_key.includes("PRIVATE KEY")) {
+    return { completed: false, configured: false, reason: "firebase_admin_credentials_unavailable" };
+  }
+
+  try {
+    const { Buffer } = await import("node:buffer");
+    const { createSign } = await import("node:crypto");
+    const now = Math.floor(Date.now() / 1000);
+    const encode = value => Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+    const header = encode({ alg: "RS256", typ: "JWT" });
+    const claims = encode({
+      iss: serviceAccount.client_email,
+      sub: serviceAccount.client_email,
+      aud: "https://oauth2.googleapis.com/token",
+      scope: "https://www.googleapis.com/auth/identitytoolkit",
+      iat: now,
+      exp: now + 3600
+    });
+    const unsigned = header + "." + claims;
+    const signer = createSign("RSA-SHA256");
+    signer.update(unsigned);
+    signer.end();
+    const assertion = unsigned + "." + signer.sign(serviceAccount.private_key, "base64url");
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion
+      })
+    });
+    if (!tokenResponse.ok) return { completed: false, configured: true, reason: "firebase_oauth_token_failed" };
+    const tokenBody = await tokenResponse.json().catch(() => null);
+    if (!tokenBody || typeof tokenBody.access_token !== "string" || !tokenBody.access_token) {
+      return { completed: false, configured: true, reason: "firebase_oauth_token_invalid" };
+    }
+
+    const deleteResponse = await fetch(
+      "https://identitytoolkit.googleapis.com/v1/projects/" + encodeURIComponent(projectId) + "/accounts:delete",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer " + tokenBody.access_token,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ localId: uid })
+      }
+    );
+    if (deleteResponse.ok) return { completed: true, configured: true };
+    const errorBody = await deleteResponse.json().catch(() => null);
+    const errorCode = String(errorBody?.error?.message || "");
+    if (/USER_NOT_FOUND|USER_DISABLED/i.test(errorCode)) return { completed: true, configured: true };
+    return { completed: false, configured: true, reason: "firebase_identity_delete_failed" };
+  } catch {
+    return { completed: false, configured: true, reason: "firebase_identity_delete_unavailable" };
+  }
+}
+
 function withTimeout(promise, timeoutMs, operation) {
   let timer;
   return Promise.race([
@@ -2808,6 +2887,7 @@ export class MongoDBConnection {
       const db = this.getDatabase(client);
       const targetId = new ObjectId(userId);
       const now = new Date();
+      let targetUid = null;
       const session = client.startSession();
       try {
         let targetFound = false;
@@ -2820,6 +2900,7 @@ export class MongoDBConnection {
           // Preserve the original request metadata while allowing a later retry to
           // repair partial cleanup after a transient failure.
           targetFound = true;
+          targetUid = typeof target.uid === "string" ? target.uid : null;
           await users.updateOne(
             { _id: targetId, role: { $ne: "superadmin" } },
             { $set: {
@@ -2860,11 +2941,50 @@ export class MongoDBConnection {
           }
         });
         if (!targetFound) return { status: 404, body: { message: "User not found" } };
+        if (!targetUid) {
+          await db.collection("users").updateOne(
+            { _id: targetId },
+            { $set: { firebaseAuthDeletionStatus: "manual_review_required", updatedAt: new Date() } }
+          );
+          return {
+            status: 202,
+            body: {
+              message: "Account access is disabled. Firebase identity cleanup requires manual review.",
+              deletionStatus: "deletion_pending",
+              firebaseAuthDeletionStatus: "manual_review_required",
+              financialAndAuditRecordsRetained: true
+            }
+          };
+        }
+
+        const firebaseDeletion = await deleteFirebaseAuthIdentity(this.env, targetUid);
+        await db.collection("users").updateOne(
+          { _id: targetId },
+          { $set: {
+            firebaseAuthDeletionStatus: firebaseDeletion.completed ? "completed" :
+              (firebaseDeletion.configured ? "retry_pending" : "awaiting_credentials"),
+            firebaseAuthDeletedAt: firebaseDeletion.completed ? new Date() : null,
+            firebaseAuthDeletionLastAttemptAt: new Date(),
+            updatedAt: new Date()
+          } }
+        );
+        if (!firebaseDeletion.completed) {
+          return {
+            status: 202,
+            body: {
+              message: "Account access is disabled. External identity cleanup remains pending.",
+              deletionStatus: "deletion_pending",
+              firebaseAuthDeletionStatus: firebaseDeletion.configured ? "retry_pending" : "awaiting_credentials",
+              financialAndAuditRecordsRetained: true
+            }
+          };
+        }
         return {
           status: 200,
           body: {
-            message: "Account access disabled and deletion queued.",
+            message: "Account access disabled and Firebase identity revoked. Storage cleanup remains pending.",
             deletionStatus: "deletion_pending",
+            firebaseAuthDeletionStatus: "completed",
             financialAndAuditRecordsRetained: true
           }
         };
