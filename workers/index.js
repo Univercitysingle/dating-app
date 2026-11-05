@@ -21,6 +21,27 @@ function darkFantasyRegionGate(request, env) {
   return null;
 }
 
+export function isFirebaseDatabaseUrl(value) {
+  if (typeof value !== "string" || value.length > 512) return false;
+  try {
+    const parsed = new URL(value);
+    const hostname = parsed.hostname.toLowerCase();
+    const allowedHost = hostname === "firebaseio.com" ||
+      hostname.endsWith(".firebaseio.com") ||
+      hostname === "firebasedatabase.app" ||
+      hostname.endsWith(".firebasedatabase.app");
+    return parsed.protocol === "https:" &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash &&
+      (parsed.pathname === "/" || parsed.pathname === "") &&
+      allowedHost;
+  } catch {
+    return false;
+  }
+}
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -1573,7 +1594,7 @@ export default {
           if (!Array.isArray(data?.products)) return [];
           return data.products.map(product => {
             const handle = String(product?.handle || "").trim();
-            const title = String(product?.title || "").replace(/<[^>]*>/g, "").trim().slice(0, 180);
+            const title = String(product?.title || "").replace(/<[^>]*>|[<>]/g, "").trim().slice(0, 180);
             if (!handle || !title || !/^[a-z0-9-]+$/i.test(handle)) return null;
             const imageCandidate = product?.images?.[0]?.src || product?.image?.src || "";
             let image = "";
@@ -2152,11 +2173,10 @@ export default {
           });
         } else if (realtimeSyncEnabled) {
           try {
-            const configured = new URL(databaseUrl);
-            if (configured.protocol !== "https:" ||
-                (!configured.hostname.endsWith("firebasedatabase.app") && !configured.hostname.endsWith("firebaseio.com"))) {
+            if (!isFirebaseDatabaseUrl(databaseUrl)) {
               throw new Error("Invalid Firebase Realtime Database URL");
             }
+            const configured = new URL(databaseUrl);
             databaseBase = configured.toString().replace(/\/+$/, "");
           } catch {
             console.error("Firebase Realtime Database chat sync URL is invalid", {
