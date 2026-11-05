@@ -10,6 +10,7 @@ const makeResponse = () => ({
 describe('Admin endpoint input validation', () => {
   it('prevents an admin from creating a superadmin account', async () => {
     const res = makeResponse();
+    const findOneSpy = jest.spyOn(User, 'findOne');
     await adminUsersController.createUser({
       user: { role: 'admin' },
       body: { email: 'new-admin@example.com', role: 'superadmin' },
@@ -19,7 +20,8 @@ describe('Admin endpoint input validation', () => {
     expect(res.json).toHaveBeenCalledWith({
       message: 'Only a superadmin can create a superadmin account.',
     });
-    expect(User.findOne).not.toHaveBeenCalled();
+    expect(findOneSpy).not.toHaveBeenCalled();
+    findOneSpy.mockRestore();
   });
 
   it('rejects MongoDB operator objects in user role filters', async () => {
