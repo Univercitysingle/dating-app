@@ -167,6 +167,9 @@ jobs:
       - name: Run frontend regression tests
         run: npm run test:frontend -- --runInBand --watchAll=false
 
+      - name: Validate public sitemap and crawler exclusions
+        run: npm run validate:seo
+
       - name: Build frontend with Firebase configuration
         run: npm run build
 
