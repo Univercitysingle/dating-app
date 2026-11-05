@@ -41,7 +41,25 @@ function assertPresent(value, label) {
 }
 
 async function main() {
-  const html = await get('/', 'text/html');
+  const homepageResponse = await fetch(new URL('/', siteOrigin), {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(15000),
+    headers: { 'user-agent': 'dating-app-staging-security-validator/1.0' },
+  });
+  if (!homepageResponse.ok) throw new Error('Homepage returned HTTP ' + homepageResponse.status);
+  const requiredHeaders = [
+    ['x-content-type-options', /^nosniff$/i],
+    ['x-frame-options', /^deny$/i],
+    ['referrer-policy', /^strict-origin-when-cross-origin$/i],
+    ['strict-transport-security', /max-age=31536000/i],
+    ['permissions-policy', /camera=\\(self\\)/i],
+    ['permissions-policy', /microphone=\\(self\\)/i],
+  ];
+  for (const [name, pattern] of requiredHeaders) {
+    const value = homepageResponse.headers.get(name) || '';
+    if (!pattern.test(value)) throw new Error('Missing or incorrect deployed security header ' + name + ': ' + (value || 'missing'));
+  }
+  const html = await homepageResponse.text();
   const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? titleMatch[1].trim() : null;
   assertPresent(title, 'title');
