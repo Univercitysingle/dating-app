@@ -2844,7 +2844,9 @@ export class MongoDBConnection {
       };
       const result = await users.insertOne(user);
       delete user.password;
-      return { status: 201, body: { ...user, _id: result.insertedId } };
+      const safeUser = { ...user, _id: result.insertedId };
+      if (access.role !== "superadmin") stripPrivateContactFields(safeUser);
+      return { status: 201, body: safeUser };
     } catch {
       return { status: 503, body: { message: "Unable to create user" } };
     }
@@ -2906,7 +2908,9 @@ export class MongoDBConnection {
         { _id: targetId }, { $set: update }, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } }
       );
       if (!result) return { status: 404, body: { message: "User not found" } };
-      return { status: 200, body: result };
+      const safeResult = { ...result };
+      if (access.role !== "superadmin") stripPrivateContactFields(safeResult);
+      return { status: 200, body: safeResult };
     } catch {
       return { status: 503, body: { message: "Unable to update user" } };
     }
