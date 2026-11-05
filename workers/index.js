@@ -1279,6 +1279,64 @@ export default {
             })
           });
           const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+          if (request.method === "DELETE" && (response.status === 200 || response.status === 202)) {
+            try {
+              const assetsResponse = await connection.fetch("https://internal.invalid/internal/admin/user-deletion-assets", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ claims, userId: parts[0] })
+              });
+              const assetsResult = await assetsResponse.json().catch(() => null);
+              if (!assetsResponse.ok || !assetsResult ||
+                  typeof assetsResult.uid !== "string" ||
+                  !Array.isArray(assetsResult.photoKeys) ||
+                  !Array.isArray(assetsResult.supportKeys) ||
+                  !Number.isInteger(assetsResult.unresolvedAssetCount)) {
+                return json({ ...result, cdnAssetCleanupStatus: "retry_pending" }, 202);
+              }
+              if (assetsResult.unresolvedAssetCount > 0) {
+                return json({
+                  ...result,
+                  cdnAssetCleanupStatus: "manual_review_required",
+                  unresolvedAssetCount: assetsResult.unresolvedAssetCount
+                }, 202);
+              }
+
+              const frontendOrigin = env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin;
+              const deletedKeys = [];
+              const cleanupItems = [
+                ...assetsResult.photoKeys.map(key => ({ key, claims: { ...claims, sub: assetsResult.uid } })),
+                ...assetsResult.supportKeys.map(key => ({ key, claims }))
+              ];
+              for (const item of cleanupItems) {
+                const cdnResponse = await requestCdnObject(
+                  env, item.key, "DELETE", { Origin: frontendOrigin }, undefined, item.claims
+                );
+                if (!cdnResponse.ok && cdnResponse.status !== 404) {
+                  return json({ ...result, cdnAssetCleanupStatus: "retry_pending" }, 202);
+                }
+                deletedKeys.push(item.key);
+              }
+
+              const finalizeResponse = await connection.fetch("https://internal.invalid/internal/admin/user-deletion-assets-finalize", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ claims, userId: parts[0], deletedKeys })
+              });
+              const finalizeResult = await finalizeResponse.json().catch(() => null);
+              if (!finalizeResponse.ok) {
+                return json({
+                  ...result,
+                  cdnAssetCleanupStatus: finalizeResponse.status === 409 ? "manual_review_required" : "retry_pending"
+                }, 202);
+              }
+              return json({
+                ...result,
+                cdnAssetCleanupStatus: finalizeResult?.cdnAssetCleanupStatus || "completed",
+                deletedAssetCount: finalizeResult?.deletedAssetCount ?? deletedKeys.length
+              }, response.status);
+            } catch {
+              return json({ ...result, cdnAssetCleanupStatus: "retry_pending" }, 202);
+            }
+          }
           return json(result, response.status);
         } catch (error) {
           if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
