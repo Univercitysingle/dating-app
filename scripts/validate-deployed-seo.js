@@ -52,8 +52,8 @@ async function main() {
     ['x-frame-options', /^deny$/i],
     ['referrer-policy', /^strict-origin-when-cross-origin$/i],
     ['strict-transport-security', /max-age=31536000/i],
-    ['permissions-policy', /camera=\\(self\\)/i],
-    ['permissions-policy', /microphone=\\(self\\)/i],
+    ['permissions-policy', /camera=\(self\)/i],
+    ['permissions-policy', /microphone=\(self\)/i],
   ];
   for (const [name, pattern] of requiredHeaders) {
     const value = homepageResponse.headers.get(name) || '';
