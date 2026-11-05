@@ -21,6 +21,24 @@ module.exports = async function (req, res, next) {
 
     // Check revocation as well as signature, issuer, audience, and expiry.
     const decodedToken = await admin.auth().verifyIdToken(token, true);
+
+    // The superadmin custom token is minted only after the server validates
+    // SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD(_HASH) in the login handler.
+    // Firebase signs the resulting ID token, so require both the fixed UID and
+    // the server-assigned role claim. Never trust a client-supplied role field.
+    if (decodedToken.uid === 'superadmin_uid' && decodedToken.role === 'superadmin') {
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email || process.env.SUPER_ADMIN_EMAIL,
+        name: 'Super Admin',
+        role: 'superadmin',
+        isPremium: true,
+        isOnboardingComplete: true,
+      };
+      req.log.info({ userId: decodedToken.uid }, "Authenticated superadmin custom token");
+      return next();
+    }
+
     const dbUser = await findOrCreateUserFromToken(decodedToken);
 
     if (!dbUser) {
