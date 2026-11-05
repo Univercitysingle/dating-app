@@ -5,6 +5,8 @@ const root = path.resolve(__dirname, '..');
 const sitemap = fs.readFileSync(path.join(root, 'public/sitemap.xml'), 'utf8');
 const robots = fs.readFileSync(path.join(root, 'public/robots.txt'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'src/App.js'), 'utf8');
+const routeSeoConfig = require(path.join(root, 'src/config/seoRoutes.js'));
+const prerender = fs.readFileSync(path.join(root, 'scripts/prerender-seo.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
 
 const siteOrigin = 'https://dating-app-staging.pages.dev';
@@ -84,19 +86,16 @@ for (const requiredType of ['Organization', 'WebSite', 'SoftwareApplication']) {
   }
 }
 
-const routeSeoStart = app.indexOf('const PUBLIC_ROUTE_SEO = {');
-const routeSeoEnd = app.indexOf('\n};', routeSeoStart);
-if (routeSeoStart === -1 || routeSeoEnd === -1) {
-  throw new Error('Route-specific SEO metadata map is missing from App.js.');
-}
-const routeSeo = app.slice(routeSeoStart, routeSeoEnd);
 for (const route of allowedPaths) {
-  if (!routeSeo.includes("'" + route + "'")) {
+  if (!Object.prototype.hasOwnProperty.call(routeSeoConfig, route)) {
     throw new Error('Route-specific SEO metadata is missing for ' + route);
   }
 }
 if (!app.includes('noindex, nofollow, noarchive') || !app.includes('canonicalLink.href = canonicalUrl')) {
   throw new Error('Route metadata must set private-page noindex and route-specific canonical URLs.');
+}
+if (!prerender.includes('Generated static SEO HTML') || !JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).scripts.build.includes('scripts/prerender-seo.js')) {
+  throw new Error('Build must generate static route-specific SEO HTML.');
 }
 
 const privatePaths = [
