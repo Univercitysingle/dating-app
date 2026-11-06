@@ -266,7 +266,7 @@ test("Likes responses expose only sanitized public profile fields", async () => 
   };
   const users = {
     async findOne({ uid }) {
-      return uid === "current-user" ? { uid, role: "user", plan: "basic" } : null;
+      return uid === "current-user" ? { uid, role: "user", plan: "premium" } : null;
     },
     find(query) {
       assert.deepEqual(query, { uid: { $in: ["liked-user"] } });
