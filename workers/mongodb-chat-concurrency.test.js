@@ -56,7 +56,7 @@ test("simultaneous identical chat sends persist once and return the same message
   const db = {
     collection(name) {
       if (name === "users") return users;
-      if (name === "matches") return { async findOne() { return { _id: "matched-pair" }; } };
+      if (name === "matches") return { async findOne() { return { _id: "matched-pair", status: "matched" }; } };
       if (name === "chatmessages") return messages;
       assert.fail("Unexpected collection: " + name);
     }
