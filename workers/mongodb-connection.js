@@ -752,6 +752,27 @@ export class MongoDBConnection {
     }
   }
 
+  async unmatchUsers(currentUid, targetUid) {
+    if (typeof currentUid !== "string" || !currentUid || currentUid.length > 128 ||
+        typeof targetUid !== "string" || !targetUid || targetUid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    if (currentUid === targetUid) return { status: 400, body: { error: "Cannot unmatch yourself." } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user1Uid = currentUid < targetUid ? currentUid : targetUid;
+      const user2Uid = currentUid < targetUid ? targetUid : currentUid;
+      const result = await db.collection("matches").updateOne(
+        { user1Uid, user2Uid, status: "matched" },
+        { $set: { status: "unmatched", unmatchedBy: currentUid, unmatchedAt: new Date(), updatedAt: new Date() }, $unset: { likedBy: "" } }
+      );
+      if (!result.matchedCount) return { status: 404, body: { error: "An active match with this person was not found." } };
+      return { status: 200, body: { success: true, message: "Match ended successfully." } };
+    } catch {
+      return { status: 503, body: { error: "Unable to unmatch this conversation right now." } };
+    }
+  }
+
   async updateBlockedUser(currentUid, targetUid, action) {
     if (typeof currentUid !== "string" || !currentUid || currentUid.length > 128 ||
         typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
@@ -4517,13 +4538,16 @@ export class MongoDBConnection {
       // New conversations require a mutual match, as on Tinder and Bumble.
       // Existing legacy conversations remain usable after migration, provided
       // at least one message already exists between these exact participants.
-      const mutualMatch = await db.collection("matches").findOne({
+      const matchRecord = await db.collection("matches").findOne({
         $or: [
           { user1Uid: uid, user2Uid: receiverUid },
           { user1Uid: receiverUid, user2Uid: uid }
-        ],
-        status: "matched"
-      }, { projection: { _id: 1 } });
+        ]
+      }, { projection: { _id: 1, status: 1 } });
+      if (matchRecord && matchRecord.status !== "matched") {
+        return { status: 403, body: { error: "This conversation has ended." } };
+      }
+      const mutualMatch = matchRecord?.status === "matched";
       if (!mutualMatch) {
         const existingConversation = await messages.findOne({
           roomId,
@@ -4786,6 +4810,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.updatePhotoOrder(body.claims.sub, body.photos);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/unmatch") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.targetUid !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.unmatchUsers(body.claims.sub, body.targetUid);
       return json(result.body, result.status);
     }
 
