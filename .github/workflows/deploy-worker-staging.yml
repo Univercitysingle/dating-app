@@ -348,7 +348,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for PATH_TO_CHECK in "/api/purchase/status/0123456789abcdef01234567" "/api/subscription/status/0123456789abcdef01234567" "/api/admin/reports"; do
+          for PATH_TO_CHECK in "/api/purchase/status/0123456789abcdef01234567" "/api/subscription/status/0123456789abcdef01234567" "/api/admin/reports" "/api/verification" "/api/admin/photo-verifications"; do
             STATUS="$(curl --silent --show-error --output /tmp/route-response.json --write-out '%{http_code}' "$WORKER_URL$PATH_TO_CHECK")"
             test "$STATUS" = "401" || { echo "Expected anonymous request to $PATH_TO_CHECK to return 401; received $STATUS"; cat /tmp/route-response.json; exit 1; }
           done
