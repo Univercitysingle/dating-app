@@ -2348,7 +2348,7 @@ test("chat message creation persists a normalized message and returns its MongoD
     collection(name) {
       if (name === "users") return users;
       if (name === "chatmessages") return messages;
-      if (name === "matches") return { async findOne() { return { _id: "matched-pair" }; } };
+      if (name === "matches") return { async findOne() { return { _id: "matched-pair", status: "matched" }; } };
       assert.fail("Unexpected collection: " + name);
     }
   };
@@ -2394,7 +2394,7 @@ test("chat message retries with the same client ID return the existing persisted
     },
     async insertOne() { insertCount++; return { insertedId: id }; }
   };
-  const db = { collection(name) { return name === "users" ? users : name === "matches" ? { async findOne() { return { _id: "matched-pair" }; } } : messages; } };
+  const db = { collection(name) { return name === "users" ? users : name === "matches" ? { async findOne() { return { _id: "matched-pair", status: "matched" }; } } : messages; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
@@ -2624,7 +2624,7 @@ test("concurrent chat send retry resolves duplicate-key race to the original mes
       throw error;
     }
   };
-  const db = { collection(name) { return name === "users" ? users : name === "matches" ? { async findOne() { return { _id: "matched-pair" }; } } : messages; } };
+  const db = { collection(name) { return name === "users" ? users : name === "matches" ? { async findOne() { return { _id: "matched-pair", status: "matched" }; } } : messages; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
