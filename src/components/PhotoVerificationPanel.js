@@ -155,7 +155,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
       {status.status === 'rejected' ? (
         <p className="text-sm text-red-600">Your previous request was not approved. {status.reviewReason || 'You can submit a new recording.'}</p>
       ) : null}
-      {status.status !== 'verified' && status.status !== 'approved' && status.status !== 'pending_review' && (
+      {!isVerified && status.status !== 'verified' && status.status !== 'approved' && status.status !== 'pending_review' && (
         <>
           <p className="text-sm mb-3">For privacy, camera access starts only when you press the button. We do not use automated face recognition or claim automated liveness detection.</p>
           <video ref={videoRef} src={previewUrl || undefined} controls playsInline muted className="w-full max-w-sm rounded-xl bg-black aspect-video" />
