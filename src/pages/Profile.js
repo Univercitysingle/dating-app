@@ -552,7 +552,7 @@ function Profile() {
 
                       {isOwnProfile && <NotificationPreferencesPanel />}
 
-                      {isOwnProfile && <PhotoVerificationPanel />}
+                      {isOwnProfile && <PhotoVerificationPanel isVerified={profile.isVerified === true} />}
 
                       <div className="profile-settings-group">
                           <h3>Preferences &amp; help</h3>
