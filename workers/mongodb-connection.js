@@ -1277,10 +1277,18 @@ export class MongoDBConnection {
         isProfileVisible: true,
         blocked: { $ne: uid }
       };
-      // Apply the viewer's selected gender preference. Legacy and "everyone"
-      // values intentionally leave gender unrestricted.
-      if (["Male", "Female", "Other"].includes(currentUser.preference)) {
-        baseMatchQuery.gender = currentUser.preference;
+      // The active Discover filter takes precedence over the saved profile
+      // preference. This is required for Tinder/Bumble-style "Show me" controls
+      // to take effect immediately without rewriting the user's profile.
+      const allowedPreferences = ["Male", "Female", "Other", "everyone", "Everyone"];
+      if (filters.preference !== undefined && !allowedPreferences.includes(filters.preference)) {
+        return { status: 400, body: { error: "Invalid gender preference filter" } };
+      }
+      const selectedPreference = filters.preference !== undefined
+        ? filters.preference
+        : currentUser.preference;
+      if (["Male", "Female", "Other"].includes(selectedPreference)) {
+        baseMatchQuery.gender = selectedPreference;
       }
       // Respect the candidate's own discovery preference as well. A candidate
       // who selected a specific gender should not be shown to an incompatible
