@@ -2101,13 +2101,31 @@ export class MongoDBConnection {
         { uid }, { projection: { _id: 1, plan: 1, role: 1, blocked: 1 } }
       );
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
-      const matches = await db.collection("matches").find({ user2Uid: uid, status: "pending" }).toArray();
-      if (matches.length === 0) return { status: 200, body: [] };
-      const likedUids = [...new Set(matches.map(match => match.user1Uid).filter(value => typeof value === "string" && value.length > 0))];
-      if (likedUids.length === 0) return { status: 200, body: [] };
+      // Match documents are normally directional (user1 = liker, user2 = target),
+      // but legacy /matches/like writes canonical UID ordering. Query both sides
+      // and derive the incoming liker from likedBy so either representation works.
+      const matches = await db.collection("matches").find({
+        $or: [{ user1Uid: uid }, { user2Uid: uid }],
+        status: "pending"
+      }).toArray();
+      const incomingMatches = matches.flatMap(match => {
+        const likedBy = Array.isArray(match.likedBy) ? match.likedBy : null;
+        let likedUid = null;
+        if (likedBy) {
+          if (!likedBy.includes(uid)) {
+            likedUid = likedBy.find(value => typeof value === "string" && value !== uid) || null;
+          }
+        } else if (match.user2Uid === uid && typeof match.user1Uid === "string") {
+          // Backward compatibility for historical directional records without likedBy.
+          likedUid = match.user1Uid;
+        }
+        return likedUid ? [{ likedUid, match }] : [];
+      });
+      if (incomingMatches.length === 0) return { status: 200, body: [] };
+      const likedUids = [...new Set(incomingMatches.map(item => item.likedUid))];
       const users = await db.collection("users").find({ uid: { $in: likedUids } }).toArray();
       const usersByUid = new Map(users.map(user => [user.uid, user]));
-      const matchByUid = new Map(matches.map(match => [match.user1Uid, match]));
+      const matchByUid = new Map(incomingMatches.map(item => [item.likedUid, item.match]));
       const isBlurred = currentUser.plan !== "premium";
       const result = [];
       for (const likedUid of likedUids) {
