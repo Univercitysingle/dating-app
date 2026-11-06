@@ -94,7 +94,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
               label="Show me"
               value={preference}
               onChange={(event) => setPreference(event.target.value)}
-              options={[["everyone", "Everyone"], ["Female", "Women"], ["Male", "Men"]]}
+              options={[["everyone", "Everyone"], ["Female", "Women"], ["Male", "Men"], ["Other", "Other gender identities"]]}
               hint="You can change this any time."
             />
           </section>
