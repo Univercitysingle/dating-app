@@ -24,6 +24,7 @@ import AdminUserListPage from './pages/admin/AdminUserListPage';
 import AdminUserEditPage from './pages/admin/AdminUserEditPage';
 import AdminUserProfileViewPage from './pages/admin/AdminUserProfileViewPage';
 import AdminReportsPage from './pages/admin/AdminReportsPage';
+import AdminPhotoVerificationsPage from './pages/admin/AdminPhotoVerificationsPage';
 import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import AdminTransactionsPage from './pages/admin/AdminTransactionsPage';
@@ -234,6 +235,7 @@ function App() {
               <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
               <Route path="users/:userId/profile" element={<AdminUserProfileViewPage />} />
               <Route path="reports" element={<AdminReportsPage />} />
+              <Route path="verifications" element={<AdminPhotoVerificationsPage />} />
               <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
               <Route path="analytics" element={<AdminAnalyticsPage />} />
               <Route path="transactions" element={<AdminTransactionsPage />} />
