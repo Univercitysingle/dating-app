@@ -105,7 +105,7 @@ const SwipeDeck = () => {
   const [newMatchInfo, setNewMatchInfo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
 
   const fetchUsersToSwipe = useCallback(async (filters = {}) => {
@@ -207,10 +207,21 @@ const SwipeDeck = () => {
     }
   };
 
-  const handleApplyFilters = (filters) => {
-    setActiveFilters(filters);
-    fetchUsersToSwipe(filters);
-    setShowFilters(false);
+  const handleApplyFilters = async (filters) => {
+    const { preference = user?.preference || 'everyone', ...discoveryFilters } = filters;
+    try {
+      if (preference !== (user?.preference || 'everyone')) {
+        const updatedProfile = await apiClient.put('/users/me', { preference });
+        if (typeof setUser === 'function') {
+          setUser(previous => ({ ...previous, ...updatedProfile, preference }));
+        }
+      }
+      setActiveFilters({ ...discoveryFilters, preference });
+      fetchUsersToSwipe(discoveryFilters);
+      setShowFilters(false);
+    } catch (err) {
+      setSwipeError(getUserFriendlyError(err, 'We could not save your discovery preference. Please try again.'));
+    }
   };
 
   const activeFilterCount = Object.entries(activeFilters).filter(([key, value]) => {
@@ -369,7 +380,7 @@ const SwipeDeck = () => {
                   if (event.key === 'Escape') setShowFilters(false);
                 }}
               >
-                <Filter onApply={handleApplyFilters} onClose={() => setShowFilters(false)} />
+                <Filter initialFilters={{ preference: user?.preference || 'everyone' }} onApply={handleApplyFilters} onClose={() => setShowFilters(false)} />
             </div>
         )}
     </div>
