@@ -3114,3 +3114,19 @@ test("photo verification evidence is restricted to superadmins", async () => {
   assert.equal(evidence.status, 403);
   assert.equal(review.status, 403);
 });
+
+test("users can withdraw a pending photo verification and delete its encrypted evidence", async () => {
+  let filter;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "photoVerifications");
+      return { deleteMany: async query => { filter = query; return { deletedCount: 1 }; } };
+    }
+  });
+  const result = await connection.withdrawPhotoVerification("user-1");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.withdrawn, true);
+  assert.deepEqual(filter, { uid: "user-1", status: "pending_review" });
+});
