@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/apiClient';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+import { resolvePhotoUrl } from '../utils/media';
 import LoadingState from '../components/LoadingState';
 import { getUserFriendlyError } from '../utils/apiErrors';
 
@@ -9,8 +9,6 @@ const LikesPage = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const navigate = useNavigate();
-    const { user: currentUser } = useAuth();
 
     const fetchLikes = useCallback(async () => {
         setLoading(true);
@@ -29,15 +27,6 @@ const LikesPage = () => {
             setLoading(false);
         }
     }, []);
-
-    const handleChat = (targetUid) => {
-        if (!currentUser?.uid) {
-            setError('Your account details are still loading. Please try again in a moment.');
-            return;
-        }
-        const chatId = [currentUser.uid, targetUid].sort().join('-');
-        navigate(`/chat/${chatId}`);
-    };
 
     useEffect(() => {
         fetchLikes();
@@ -61,16 +50,31 @@ const LikesPage = () => {
                             key={user._id || user.uid}
                             className="like-card flex items-center justify-between gap-4 rounded-2xl p-4 sm:p-5"
                         >
-                            <div className="min-w-0">
-                                <p className="truncate font-semibold text-gray-900">{user.name}</p>
-                                <p className="text-gray-600 text-sm">{user.bio}</p>
+                            <div className="flex min-w-0 flex-1 items-center gap-4">
+                                <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-100">
+                                    {user.photos?.[0]?.url ? (
+                                        <img
+                                            src={resolvePhotoUrl(user.photos[0].url)}
+                                            alt=""
+                                            loading="lazy"
+                                            className={`h-full w-full object-cover ${user.isBlurred ? 'blur-md scale-110' : ''}`}
+                                        />
+                                    ) : (
+                                        <div className="flex h-full items-center justify-center text-2xl text-gray-400" aria-hidden="true">♡</div>
+                                    )}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="truncate font-semibold text-gray-900">{user.name}{user.age ? `, ${user.age}` : ''}</p>
+                                    <p className="line-clamp-2 text-gray-600 text-sm">{user.bio || 'Someone would love to connect with you.'}</p>
+                                    {user.isBlurred && <p className="mt-1 text-xs font-medium text-gray-500">Upgrade to reveal who likes you</p>}
+                                </div>
                             </div>
-                            <button
-                                onClick={() => handleChat(user.uid)}
+                            <Link
+                                to={`/profile/${encodeURIComponent(user.uid)}`}
                                 className="app-primary-button flex-shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white"
                             >
-                                Chat
-                            </button>
+                                View profile
+                            </Link>
                         </li>
                     ))}
                 </ul>
