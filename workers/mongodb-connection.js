@@ -3187,7 +3187,7 @@ export class MongoDBConnection {
       const user = await users.findOne(
         { _id: targetId },
         { projection: {
-          role: 1, accountStatus: 1, firebaseAuthDeletionStatus: 1,
+          uid: 1, role: 1, accountStatus: 1, firebaseAuthDeletionStatus: 1,
           cdnAssetCleanupStatus: 1, anonymizationStatus: 1
         } }
       );
@@ -3212,6 +3212,10 @@ export class MongoDBConnection {
         };
       }
 
+      // Biometric evidence must be purged before completing account anonymization.
+      if (typeof user.uid === "string" && user.uid) {
+        await db.collection("photoVerifications").deleteMany({ uid: user.uid });
+      }
       const now = new Date();
       const result = await users.updateOne(
         {
