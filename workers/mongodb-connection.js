@@ -3767,6 +3767,9 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const filter = {};
       let matchingAdmins = null;
+      if (kind === "audit" && !(typeof search === "string" && search.trim())) {
+        filter.adminId = { $exists: true };
+      }
       if (typeof search === "string" && search.trim()) {
         const needle = search.trim().slice(0, 100);
         const escaped = needle.split("").map(ch => "\\.^$*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
