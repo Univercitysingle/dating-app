@@ -1277,7 +1277,8 @@ export class MongoDBConnection {
         isProfileVisible: true,
         blocked: { $ne: uid }
       };
-      if (currentUser.preference && currentUser.preference !== "everyone") baseMatchQuery.gender = currentUser.preference;
+      // Only apply recognized preferences. Legacy or missing values safely fall back to everyone.
+      if (["Male", "Female"].includes(currentUser.preference)) baseMatchQuery.gender = currentUser.preference;
       for (const key of ["sexualOrientation", "familyStatus", "relationshipGoals"]) {
         if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery[key] = filters[key];
       }
@@ -2623,8 +2624,8 @@ export class MongoDBConnection {
       if (isAccountRestricted(current)) return { status: 403, body: { error: "Account is suspended or banned." } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
       const allowedFields = onboardingComplete
-        ? ["sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "familyStatus", "siblings", "location", "lifestyle", "mobileNumber", "badges", "lastActiveAt"]
-        : ["name", "birthday", "gender", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "mobileNumber", "photos", "badges", "lastActiveAt", "isOnboardingComplete"];
+        ? ["preference", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "familyStatus", "siblings", "location", "lifestyle", "mobileNumber", "badges", "lastActiveAt"]
+        : ["name", "birthday", "gender", "preference", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "location", "lifestyle", "mobileNumber", "photos", "badges", "lastActiveAt", "isOnboardingComplete"];
       const nestedAllowed = {
         lifestyle: ["drinking", "smoking", "exercise", "diet", "lookingFor"],
         socialMediaLinks: ["instagram", "spotify", "tiktok"],
@@ -2675,6 +2676,9 @@ export class MongoDBConnection {
           for (const prop of nestedAllowed[key]) if (update[key][prop] !== undefined) nestedValue[prop] = update[key][prop];
           if (Object.keys(nestedValue).length) sanitizedUpdate[key] = nestedValue;
         } else sanitizedUpdate[key] = update[key];
+      }
+      if (Object.hasOwn(sanitizedUpdate, "preference") && !["Male", "Female", "everyone"].includes(sanitizedUpdate.preference)) {
+        return { status: 400, body: { error: "Choose Male, Female, or Everyone for discovery preferences." } };
       }
       if (sanitizedUpdate.mobileNumber) {
         const mobile = sanitizedUpdate.mobileNumber;
