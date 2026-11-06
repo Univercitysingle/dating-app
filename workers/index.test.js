@@ -804,6 +804,68 @@ test("discovery validates filters before querying MongoDB", async () => {
   assert.deepEqual(invalid.body, { error: "Invalid discovery filter" });
 });
 
+test("profile updates persist only supported discovery preferences", async () => {
+  let update;
+  const current = { _id: "current-id", uid: "current", isOnboardingComplete: true, preference: "everyone" };
+  const users = {
+    findOne: async () => current,
+    updateOne: async (_query, value) => { update = value; return { matchedCount: 1 }; }
+  };
+  const subscriptions = { findOne: async () => null };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({ collection: name => name === "users" ? users : subscriptions })
+  });
+
+  const valid = await connection.updateCurrentUserProfile("current", { preference: "Female" });
+  assert.equal(valid.status, 200);
+  assert.equal(update.$set.preference, "Female");
+
+  update = null;
+  const invalid = await connection.updateCurrentUserProfile("current", { preference: "anyone" });
+  assert.equal(invalid.status, 400);
+  assert.equal(update, null);
+});
+
+test("discovery applies the saved gender preference and everyone remains unfiltered", async () => {
+  let femalePipeline;
+  const createConnection = preference => {
+    const users = {
+      findOne: async () => ({ uid: "current", preference, location: { coordinates: [0, 0] } }),
+      aggregate: pipeline => {
+        if (preference === "Female") femalePipeline = pipeline;
+        return { toArray: async () => [] };
+      }
+    };
+    const matches = { createIndex: async () => "index-created" };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({
+      db: () => ({ collection: name => name === "users" ? users : matches })
+    });
+    return connection;
+  };
+
+  const female = await createConnection("Female").discoverUsers("current", {});
+  assert.equal(female.status, 200);
+  const femaleMatch = femalePipeline.find(stage => stage.$match)?.$match;
+  assert.equal(femaleMatch.gender, "Female");
+
+  let everyonePipeline;
+  const everyoneUsers = {
+    findOne: async () => ({ uid: "current", preference: "everyone", location: { coordinates: [0, 0] } }),
+    aggregate: pipeline => { everyonePipeline = pipeline; return { toArray: async () => [] }; }
+  };
+  const matches = { createIndex: async () => "index-created" };
+  const everyoneConnection = new MongoDBConnection({}, {});
+  everyoneConnection.getClient = async () => ({
+    db: () => ({ collection: name => name === "users" ? everyoneUsers : matches })
+  });
+  const everyone = await everyoneConnection.discoverUsers("current", {});
+  assert.equal(everyone.status, 200);
+  const everyoneMatch = everyonePipeline.find(stage => stage.$match)?.$match;
+  assert.equal(Object.hasOwn(everyoneMatch, "gender"), false);
+});
+
 test("discovery returns ordered public profiles with super-like metadata", async () => {
   const current = { uid: "current", preference: "everyone", location: { coordinates: [0, 0] } };
   const candidate = { _id: "candidate-id", uid: "candidate", name: "Candidate", email: "private@example.com", password: "secret", lastLoginIp: "192.0.2.1", photos: [{ url: "photos/a.jpg" }] };
