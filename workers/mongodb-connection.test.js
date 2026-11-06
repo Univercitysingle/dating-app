@@ -2315,6 +2315,7 @@ test("chat message creation persists a normalized message and returns its MongoD
     collection(name) {
       if (name === "users") return users;
       if (name === "chatmessages") return messages;
+      if (name === "matches") return { async findOne() { return { _id: "matched-pair" }; } };
       assert.fail("Unexpected collection: " + name);
     }
   };
@@ -2360,7 +2361,7 @@ test("chat message retries with the same client ID return the existing persisted
     },
     async insertOne() { insertCount++; return { insertedId: id }; }
   };
-  const db = { collection(name) { return name === "users" ? users : messages; } };
+  const db = { collection(name) { return name === "users" ? users : name === "matches" ? { async findOne() { return { _id: "matched-pair" }; } } : messages; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
@@ -2382,6 +2383,71 @@ test("chat message retries with the same client ID return the existing persisted
   });
   assert.equal(reusedKey.status, 409);
   assert.equal(insertCount, 0);
+});
+
+test("unmatched users cannot initiate a new chat", async () => {
+  let insertCount = 0;
+  const users = {
+    async findOne({ uid }) { return { uid, blocked: [] }; }
+  };
+  const matches = {
+    async findOne() { return null; }
+  };
+  const messages = {
+    async findOne() { return null; },
+    async insertOne() { insertCount++; return { insertedId: "unexpected" }; }
+  };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    if (name === "chatmessages") return messages;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createChatMessage("alice", {
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    messageContent: "Hello Bob"
+  });
+
+  assert.equal(result.status, 403);
+  assert.match(result.body.error, /after you match/i);
+  assert.equal(insertCount, 0);
+});
+
+test("existing legacy conversations remain usable without a current match record", async () => {
+  let insertCount = 0;
+  const users = {
+    async findOne({ uid }) { return { uid, blocked: [] }; }
+  };
+  const matches = {
+    async findOne() { return null; }
+  };
+  const messages = {
+    async findOne() { return { _id: "existing-message" }; },
+    async insertOne() { insertCount++; return { insertedId: "new-message" }; }
+  };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    if (name === "chatmessages") return messages;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createChatMessage("alice", {
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    messageContent: "Continuing our conversation"
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(insertCount, 1);
 });
 
 test("chat message creation rejects malformed client message IDs", async () => {
@@ -2525,7 +2591,7 @@ test("concurrent chat send retry resolves duplicate-key race to the original mes
       throw error;
     }
   };
-  const db = { collection(name) { return name === "users" ? users : messages; } };
+  const db = { collection(name) { return name === "users" ? users : name === "matches" ? { async findOne() { return { _id: "matched-pair" }; } } : messages; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
