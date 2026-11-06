@@ -252,6 +252,58 @@ test("Likes responses expose only sanitized public profile fields", async () => 
   assert.equal(profile.isBlurred, true);
 });
 
+test("Likes finds incoming likes when a legacy match stores canonical UID ordering", async () => {
+  const likedUser = {
+    uid: "liked-user",
+    name: "Liked Profile",
+    plan: "basic",
+    photos: [],
+    blocked: [],
+    location: { city: "Abu Dhabi" }
+  };
+  const users = {
+    async findOne({ uid }) {
+      return uid === "current-user" ? { uid, role: "user", plan: "premium", blocked: [] } : null;
+    },
+    find(query) {
+      assert.deepEqual(query, { uid: { $in: ["liked-user"] } });
+      return { async toArray() { return [likedUser]; } };
+    }
+  };
+  const matches = {
+    find(query) {
+      assert.deepEqual(query, {
+        $or: [{ user1Uid: "current-user" }, { user2Uid: "current-user" }],
+        status: "pending"
+      });
+      return { async toArray() {
+        return [{
+          user1Uid: "current-user",
+          user2Uid: "liked-user",
+          likedBy: ["liked-user"],
+          status: "pending",
+          superLike: false
+        }];
+      } };
+    }
+  };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getLikes("current-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  assert.equal(result.body[0].uid, "liked-user");
+  assert.equal(result.body[0].likeType, "like");
+  assert.equal(result.body[0].isBlurred, false);
+});
+
 test("superadmin Likes retains contact fields without exposing unrestricted profile records", async () => {
   const likedUser = {
     uid: "liked-user",
