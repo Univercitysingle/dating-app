@@ -65,6 +65,15 @@ const AdminLayout = () => {
                 {!isSidebarMinimized && 'User Management'}
               </Link>
             </li>
+            {user.role === 'superadmin' && <li>
+              <Link
+                to="/admin/verifications"
+                className="flex items-center px-3 py-2 rounded-md hover:bg-gray-700"
+              >
+                <span className="mr-4">📷</span>
+                {!isSidebarMinimized && 'Photo Verification'}
+              </Link>
+            </li>}
             <li>
               <Link
                 to="/admin/reports"
