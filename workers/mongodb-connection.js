@@ -4647,15 +4647,19 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found." } };
       if (user.isVerified === true) return { status: 409, body: { error: "Your profile is already verified." } };
       const verifications = db.collection("photoVerifications");
+      if (typeof verifications.createIndex === "function") {
+        await verifications.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: "photo_verification_ttl" });
+      }
       const pending = await verifications.findOne({ uid, status: "pending_review" }, { projection: { _id: 1 } });
       if (pending) return { status: 409, body: { error: "You already have a verification waiting for review." } };
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.videoBase64)) return { status: 400, body: { error: "Invalid video encoding." } };
       const binary = Uint8Array.from(atob(payload.videoBase64), char => char.charCodeAt(0));
-      if (binary.byteLength > 3_300_000) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
+      if (binary.byteLength > 3_145_728) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
       const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
       const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, binary);
-      const base64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+      const base64 = bytes => { const view = new Uint8Array(bytes); let binary = ""; for (let offset = 0; offset < view.length; offset += 0x8000) binary += String.fromCharCode(...view.subarray(offset, offset + 0x8000)); return btoa(binary); };
       const now = new Date();
       const document = {
         uid, status: "pending_review", challenge: payload.challenge, mimeType: payload.mimeType,
@@ -4723,7 +4727,10 @@ export class MongoDBConnection {
       const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"]);
       const fromBase64 = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
       const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(record.iv) }, key, fromBase64(record.encryptedVideo));
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(clear)));
+      const clearBytes = new Uint8Array(clear);
+      let binary = "";
+      for (let offset = 0; offset < clearBytes.length; offset += 0x8000) binary += String.fromCharCode(...clearBytes.subarray(offset, offset + 0x8000));
+      const base64 = btoa(binary);
       const user = await db.collection("users").findOne({ uid: record.uid }, { projection: { uid: 1, name: 1, photos: 1, age: 1 } });
       return { status: 200, body: { id: String(record._id), uid: record.uid, challenge: record.challenge, mimeType: record.mimeType, videoBase64: base64, user } };
     } catch {
