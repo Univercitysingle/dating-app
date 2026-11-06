@@ -20,8 +20,9 @@ describe('shared photo URL resolver', () => {
     expect(resolveWorkerPhotoUrl(`https://legacy.example.test/${PHOTO_KEY}`)).toBe(CDN_URL);
   });
 
-  test('returns a placeholder when no photo is available', () => {
+  test('returns a self-contained data URI placeholder when no photo is available', () => {
     expect(resolvePhotoUrl('')).toBe(PLACEHOLDER_IMAGE);
+    expect(PLACEHOLDER_IMAGE).toMatch(/^data:image\/svg\+xml,/);
   });
 
   test('does not rewrite unrelated external image URLs', () => {
