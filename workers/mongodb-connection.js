@@ -4628,6 +4628,140 @@ export class MongoDBConnection {
   }
 
 
+  async submitPhotoVerification(uid, payload) {
+    if (typeof uid !== "string" || !uid || !payload || payload.consent !== true ||
+        typeof payload.videoBase64 !== "string" || payload.videoBase64.length < 1000 ||
+        payload.videoBase64.length > 4_500_000 ||
+        !["video/webm", "video/mp4"].includes(payload.mimeType) ||
+        !["turn_left", "turn_right", "smile", "look_up"].includes(payload.challenge)) {
+      return { status: 400, body: { error: "A valid consented selfie video and challenge are required." } };
+    }
+    const secret = String(this.env.VERIFICATION_ENCRYPTION_KEY || "");
+    if (!/^[a-f0-9]{64}$/i.test(secret)) {
+      return { status: 503, body: { error: "Photo verification is not configured securely. Please contact support." } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const user = await users.findOne({ uid }, { projection: { uid: 1, isVerified: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found." } };
+      if (user.isVerified === true) return { status: 409, body: { error: "Your profile is already verified." } };
+      const verifications = db.collection("photoVerifications");
+      const pending = await verifications.findOne({ uid, status: "pending_review" }, { projection: { _id: 1 } });
+      if (pending) return { status: 409, body: { error: "You already have a verification waiting for review." } };
+      const binary = Uint8Array.from(atob(payload.videoBase64), char => char.charCodeAt(0));
+      if (binary.byteLength > 3_300_000) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
+      const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
+      const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, binary);
+      const base64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+      const now = new Date();
+      const document = {
+        uid, status: "pending_review", challenge: payload.challenge, mimeType: payload.mimeType,
+        encryptedVideo: base64(ciphertext), iv: base64(iv), encryption: "AES-256-GCM",
+        consentedAt: now, createdAt: now, expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+      };
+      const result = await verifications.insertOne(document);
+      return { status: 201, body: { success: true, verificationId: String(result.insertedId), status: document.status } };
+    } catch (error) {
+      console.error("Photo verification submission failed", { message: String(error?.message || error).slice(0, 180) });
+      return { status: 503, body: { error: "Could not submit photo verification." } };
+    }
+  }
+
+  async getPhotoVerificationStatus(uid) {
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const record = await db.collection("photoVerifications").findOne(
+        { uid }, { sort: { createdAt: -1 }, projection: { status: 1, createdAt: 1, reviewedAt: 1, reviewReason: 1 } }
+      );
+      return { status: 200, body: record ? {
+        status: record.status, submittedAt: record.createdAt, reviewedAt: record.reviewedAt || null,
+        reviewReason: record.reviewReason || null
+      } : { status: "not_submitted" } };
+    } catch {
+      return { status: 503, body: { error: "Verification status is unavailable." } };
+    }
+  }
+
+  async listPhotoVerificationsForAdmin(uid) {
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const admin = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!admin || admin.role !== "superadmin") return { status: 403, body: { error: "Superadmin access is required." } };
+      const records = await db.collection("photoVerifications").find(
+        { status: "pending_review" },
+        { projection: { encryptedVideo: 0, iv: 0 } }
+      ).sort({ createdAt: 1 }).limit(50).toArray();
+      const uids = [...new Set(records.map(item => item.uid))];
+      const users = uids.length ? await db.collection("users").find(
+        { uid: { $in: uids } }, { projection: { uid: 1, name: 1, photos: 1, age: 1, isVerified: 1 } }
+      ).toArray() : [];
+      const byUid = new Map(users.map(user => [user.uid, user]));
+      return { status: 200, body: records.map(item => ({
+        id: String(item._id), uid: item.uid, challenge: item.challenge, mimeType: item.mimeType,
+        createdAt: item.createdAt, user: byUid.get(item.uid) || null
+      })) };
+    } catch {
+      return { status: 503, body: { error: "Verification queue is unavailable." } };
+    }
+  }
+
+  async getPhotoVerificationEvidenceForAdmin(uid, verificationId) {
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const admin = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!admin || admin.role !== "superadmin") return { status: 403, body: { error: "Superadmin access is required." } };
+      const { ObjectId } = await import("mongodb");
+      if (!/^[a-f0-9]{24}$/i.test(String(verificationId))) return { status: 400, body: { error: "Invalid verification ID." } };
+      const record = await db.collection("photoVerifications").findOne({ _id: new ObjectId(verificationId), status: "pending_review" });
+      if (!record) return { status: 404, body: { error: "Pending verification not found." } };
+      const secret = String(this.env.VERIFICATION_ENCRYPTION_KEY || "");
+      if (!/^[a-f0-9]{64}$/i.test(secret)) return { status: 503, body: { error: "Verification decryption is not configured." } };
+      const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
+      const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"]);
+      const fromBase64 = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
+      const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(record.iv) }, key, fromBase64(record.encryptedVideo));
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(clear)));
+      const user = await db.collection("users").findOne({ uid: record.uid }, { projection: { uid: 1, name: 1, photos: 1, age: 1 } });
+      return { status: 200, body: { id: String(record._id), uid: record.uid, challenge: record.challenge, mimeType: record.mimeType, videoBase64: base64, user } };
+    } catch {
+      return { status: 503, body: { error: "Verification evidence could not be decrypted." } };
+    }
+  }
+
+  async reviewPhotoVerification(uid, verificationId, payload) {
+    if (!["approve", "reject"].includes(payload?.action)) return { status: 400, body: { error: "Choose approve or reject." } };
+    const reason = typeof payload.reason === "string" ? payload.reason.trim().slice(0, 500) : "";
+    if (payload.action === "reject" && reason.length < 5) return { status: 400, body: { error: "A rejection reason of at least 5 characters is required." } };
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const admin = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!admin || admin.role !== "superadmin") return { status: 403, body: { error: "Superadmin access is required." } };
+      const { ObjectId } = await import("mongodb");
+      if (!/^[a-f0-9]{24}$/i.test(String(verificationId))) return { status: 400, body: { error: "Invalid verification ID." } };
+      const collection = db.collection("photoVerifications");
+      const record = await collection.findOne({ _id: new ObjectId(verificationId), status: "pending_review" }, { projection: { uid: 1 } });
+      if (!record) return { status: 404, body: { error: "Pending verification not found or already reviewed." } };
+      const now = new Date();
+      const result = await collection.updateOne(
+        { _id: new ObjectId(verificationId), status: "pending_review" },
+        { $set: { status: payload.action === "approve" ? "approved" : "rejected", reviewedAt: now, reviewedBy: uid, reviewReason: reason }, $unset: { encryptedVideo: "", iv: "" } }
+      );
+      if (!result.modifiedCount) return { status: 409, body: { error: "This verification was already reviewed." } };
+      if (payload.action === "approve") {
+        await db.collection("users").updateOne(
+          { uid: record.uid },
+          { $set: { isVerified: true, faceVerified: true, verifiedAt: now, updatedAt: now } }
+        );
+      }
+      return { status: 200, body: { success: true, status: payload.action === "approve" ? "approved" : "rejected" } };
+    } catch {
+      return { status: 503, body: { error: "Could not update verification review." } };
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
@@ -4781,6 +4915,27 @@ export class MongoDBConnection {
         result = await this.markChatRead(body.claims.sub, body.payload);
       } else {
         result = await this.deleteChatMessage(body.claims.sub, body.messageId);
+      }
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/photo-verification/submit" ||
+        url.pathname === "/internal/photo-verification/status" ||
+        url.pathname === "/internal/admin/photo-verifications" ||
+        url.pathname.startsWith("/internal/admin/photo-verification/")) {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      const uid = body.claims.sub;
+      let result;
+      if (url.pathname === "/internal/photo-verification/submit") result = await this.submitPhotoVerification(uid, body.payload);
+      else if (url.pathname === "/internal/photo-verification/status") result = await this.getPhotoVerificationStatus(uid);
+      else if (url.pathname === "/internal/admin/photo-verifications") result = await this.listPhotoVerificationsForAdmin(uid);
+      else {
+        const match = url.pathname.match(/^\/internal\/admin\/photo-verification\/([a-f0-9]{24})(?:\/(evidence|action))?$/i);
+        if (!match) return json({ error: "Not found" }, 404);
+        result = match[2] === "evidence"
+          ? await this.getPhotoVerificationEvidenceForAdmin(uid, match[1])
+          : await this.reviewPhotoVerification(uid, match[1], body.payload || {});
       }
       return json(result.body, result.status);
     }
