@@ -4,7 +4,7 @@ const DEFAULTS = {
   minAge: 18,
   maxAge: 100,
   maxDistance: 100,
-  relationshipType: '',
+  lookingFor: '',
   sexualOrientation: '',
   preference: 'everyone',
 };
@@ -22,18 +22,18 @@ const SelectField = ({ id, label, value, onChange, options, hint }) => (
 );
 
 const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
-  const [minAge, setMinAge] = useState(DEFAULTS.minAge);
-  const [maxAge, setMaxAge] = useState(DEFAULTS.maxAge);
-  const [maxDistance, setMaxDistance] = useState(DEFAULTS.maxDistance);
-  const [relationshipType, setRelationshipType] = useState(DEFAULTS.relationshipType);
-  const [sexualOrientation, setSexualOrientation] = useState(DEFAULTS.sexualOrientation);
+  const [minAge, setMinAge] = useState(initialFilters.minAge ?? DEFAULTS.minAge);
+  const [maxAge, setMaxAge] = useState(initialFilters.maxAge ?? DEFAULTS.maxAge);
+  const [maxDistance, setMaxDistance] = useState(initialFilters.maxDistance ?? DEFAULTS.maxDistance);
+  const [lookingFor, setLookingFor] = useState(initialFilters.lookingFor || DEFAULTS.lookingFor);
+  const [sexualOrientation, setSexualOrientation] = useState(initialFilters.sexualOrientation || DEFAULTS.sexualOrientation);
   const [preference, setPreference] = useState(initialFilters.preference || DEFAULTS.preference);
 
   const resetFilters = () => {
     setMinAge(DEFAULTS.minAge);
     setMaxAge(DEFAULTS.maxAge);
     setMaxDistance(DEFAULTS.maxDistance);
-    setRelationshipType(DEFAULTS.relationshipType);
+    setLookingFor(DEFAULTS.lookingFor);
     setSexualOrientation(DEFAULTS.sexualOrientation);
     setPreference(DEFAULTS.preference);
   };
@@ -44,10 +44,10 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
       minAge,
       maxAge,
       maxDistance: Number(maxDistance),
-      relationshipType,
+      lookingFor,
       preference,
     };
-    if (relationshipType === 'Casual (FWB)' && sexualOrientation) {
+    if (lookingFor === 'Casual (FWB)' && sexualOrientation) {
       filters.sexualOrientation = sexualOrientation;
     }
     onApply(filters);
@@ -66,7 +66,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const activeCount = [
     minAge !== DEFAULTS.minAge || maxAge !== DEFAULTS.maxAge,
     maxDistance !== DEFAULTS.maxDistance,
-    Boolean(relationshipType),
+    Boolean(lookingFor),
     Boolean(sexualOrientation),
     preference !== DEFAULTS.preference,
   ].filter(Boolean).length;
@@ -136,10 +136,10 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
               <span>Connection</span>
             </div>
             <SelectField
-              id="relationshipType"
+              id="lookingFor"
               label="I'm looking for"
-              value={relationshipType}
-              onChange={(event) => setRelationshipType(event.target.value)}
+              value={lookingFor}
+              onChange={(event) => setLookingFor(event.target.value)}
               options={[
                 ['', 'Open to anything'],
                 ['Relationship', 'A relationship'],
@@ -148,7 +148,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
                 ["Don't know yet", 'Still figuring it out'],
               ]}
             />
-            {relationshipType === 'Casual (FWB)' && (
+            {lookingFor === 'Casual (FWB)' && (
               <SelectField
                 id="sexualOrientation"
                 label="Orientation"
