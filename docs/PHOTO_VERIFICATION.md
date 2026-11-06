@@ -22,7 +22,7 @@ Set it as a Worker secret for the staging environment:
 npx wrangler secret put VERIFICATION_ENCRYPTION_KEY --env staging
 ```
 
-If the Worker configuration uses a named staging deployment rather than a Wrangler environment, select the `dating-app-api-staging` Worker in the Cloudflare dashboard and add `VERIFICATION_ENCRYPTION_KEY` as an encrypted secret there. Do not commit the key or place it in a Pages environment variable.
+Alternatively, add `VERIFICATION_ENCRYPTION_KEY` as a GitHub Actions repository or environment secret. The staging Worker deployment workflow will validate its 64-character hexadecimal format and configure it as a Cloudflare Worker secret. If the GitHub secret is absent, the workflow preserves any existing Worker secret and photo verification submissions remain disabled until configured. You can also set it directly on the `dating-app-api-staging` Worker in Cloudflare. Do not commit the key or place it in a Pages environment variable.
 
 The API fails closed and does not accept evidence unless the secret is exactly 64 hexadecimal characters. Back up the key securely: losing it makes any still-pending encrypted evidence undecryptable. Rotating it requires draining or decrypting existing pending records before changing the key.
 
