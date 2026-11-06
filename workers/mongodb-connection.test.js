@@ -3070,3 +3070,47 @@ test("ordinary Worker admin update responses do not expose contact details", asy
     assert.equal(Object.hasOwn(result.body, field), false, field + " must be hidden from ordinary admins");
   }
 });
+
+test("photo verification requires explicit consent and a valid recording", async () => {
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  let databaseAccessed = false;
+  connection.getClient = async () => { databaseAccessed = true; return {}; };
+  const missingConsent = await connection.submitPhotoVerification("user-1", {
+    videoBase64: "A".repeat(1200), mimeType: "video/webm", challenge: "smile", consent: false
+  });
+  assert.equal(missingConsent.status, 400);
+  assert.equal(databaseAccessed, false);
+  const invalidChallenge = await connection.submitPhotoVerification("user-1", {
+    videoBase64: "A".repeat(1200), mimeType: "video/webm", challenge: "approve_me", consent: true
+  });
+  assert.equal(invalidChallenge.status, 400);
+  assert.equal(databaseAccessed, false);
+});
+
+test("photo verification submission fails closed when encryption key is not configured", async () => {
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  const result = await connection.submitPhotoVerification("user-1", {
+    videoBase64: "A".repeat(1200), mimeType: "video/webm", challenge: "smile", consent: true
+  });
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /not configured securely/i);
+});
+
+test("photo verification evidence is restricted to superadmins", async () => {
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return { findOne: async () => ({ role: "admin" }) };
+    }
+  });
+  const queue = await connection.listPhotoVerificationsForAdmin("admin-1");
+  const evidence = await connection.getPhotoVerificationEvidenceForAdmin("admin-1", "0123456789abcdef01234567");
+  const review = await connection.reviewPhotoVerification("admin-1", "0123456789abcdef01234567", { action: "approve" });
+  assert.equal(queue.status, 403);
+  assert.equal(evidence.status, 403);
+  assert.equal(review.status, 403);
+});
