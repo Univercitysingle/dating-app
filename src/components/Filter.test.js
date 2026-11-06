@@ -22,9 +22,23 @@ describe('Filter component', () => {
       maxAge: 100,
       maxDistance: 100,
       relationshipType: '',
+      preference: 'everyone',
     });
   });
 
+
+  it('offers men, women, and everyone as discovery preferences', () => {
+    const onApply = jest.fn();
+    render(<Filter onApply={onApply} />);
+    fireEvent.change(screen.getByLabelText('Show me'), { target: { value: 'Female' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply Filters/ }));
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ preference: 'Female' }));
+  });
+
+  it('loads the saved discovery preference when the filter opens', () => {
+    render(<Filter initialFilters={{ preference: 'Male' }} onApply={() => {}} />);
+    expect(screen.getByLabelText('Show me')).toHaveValue('Male');
+  });
 
   it('omits family status and lifestyle sections', () => {
     render(<Filter onApply={() => {}} />);
