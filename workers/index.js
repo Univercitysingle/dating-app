@@ -1632,7 +1632,7 @@ export default {
       const evidenceMatch = url.pathname.match(/^\/api\/admin\/photo-verifications\/([a-f0-9]{24})\/evidence$/i);
       const actionMatch = url.pathname.match(/^\/api\/admin\/photo-verifications\/([a-f0-9]{24})\/action$/i);
       const detailMatch = url.pathname.match(/^\/api\/admin\/photo-verifications\/([a-f0-9]{24})$/i);
-      if ((isOwn && !["GET", "POST"].includes(request.method)) ||
+      if ((isOwn && !["GET", "POST", "DELETE"].includes(request.method)) ||
           (isQueue && request.method !== "GET") ||
           (evidenceMatch && request.method !== "GET") ||
           (actionMatch && request.method !== "POST") ||
@@ -1658,7 +1658,7 @@ export default {
         let internalPath;
         let body = { claims };
         if (isOwn) {
-          internalPath = request.method === "POST" ? "/internal/photo-verification/submit" : "/internal/photo-verification/status";
+          internalPath = request.method === "POST" ? "/internal/photo-verification/submit" : request.method === "DELETE" ? "/internal/photo-verification/withdraw" : "/internal/photo-verification/status";
           if (payload) body.payload = payload;
         } else if (isQueue) {
           internalPath = "/internal/admin/photo-verifications";
