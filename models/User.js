@@ -5,7 +5,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique:true },
   name: { type: String },
   birthday: { type: Date },
-  gender: { type: String },
+  gender: { type: String, enum: ["Male", "Female", "Other"] },
+  preference: { type: String, enum: ["Male", "Female", "everyone"], default: "everyone" },
   mobileNumber: { type: String },
   sexualOrientation: {
     type: String,
