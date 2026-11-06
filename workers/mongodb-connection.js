@@ -3766,14 +3766,15 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const filter = {};
+      let matchingAdmins = null;
       if (typeof search === "string" && search.trim()) {
         const needle = search.trim().slice(0, 100);
         const escaped = needle.split("").map(ch => "\\.^$*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
         const userQuery = { $or: [{ name: { $regex: escaped, $options: "i" } }, { email: { $regex: escaped, $options: "i" } }] };
         if (kind === "audit") userQuery.role = { $in: ["admin", "superadmin"] };
-        const users = await db.collection("users").find(userQuery, { projection: { _id: 1 } }).limit(500).toArray();
-        if (!users.length) return { status: 200, body: [] };
-        const userIds = users.map(user => user._id);
+        matchingAdmins = await db.collection("users").find(userQuery, { projection: { _id: 1, uid: 1, name: 1, email: 1, role: 1 } }).limit(500).toArray();
+        if (!matchingAdmins.length) return { status: 200, body: [] };
+        const userIds = matchingAdmins.map(user => user._id);
         if (kind === "audit") filter.adminId = { $in: userIds };
         else filter.userId = { $in: userIds };
       }
@@ -3787,11 +3788,40 @@ export class MongoDBConnection {
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
         { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
       ]).toArray();
-      return { status: 200, body: entries.map(entry => {
-        if (kind === "payment") return { ...entry, userId: entry.user || null };
-        if (kind === "audit") return { ...entry, adminId: entry.user || null };
-        return { ...entry, userId: entry.user || null };
-      }) };
+      if (kind !== "audit") {
+        return { status: 200, body: entries.map(entry => kind === "payment"
+          ? { ...entry, userId: entry.user || null }
+          : { ...entry, userId: entry.user || null }) };
+      }
+
+      // Moderation records use actorUid/targetUid, while older admin events
+      // use adminId/targetId. Read both formats so moderation decisions are
+      // visible in the existing admin audit history.
+      const moderationFilter = { eventType: "moderation_action" };
+      if (matchingAdmins) moderationFilter.actorUid = { $in: matchingAdmins.map(user => user.uid).filter(Boolean) };
+      const moderation = await db.collection("auditlogs").find(moderationFilter)
+        .sort({ createdAt: -1 }).limit(500).toArray();
+      const relatedUids = [...new Set(moderation.flatMap(item => [item.actorUid, item.targetUid]).filter(Boolean))];
+      const relatedUsers = relatedUids.length
+        ? await db.collection("users").find({ uid: { $in: relatedUids } }, {
+            projection: { uid: 1, name: 1, role: 1 }
+          }).toArray()
+        : [];
+      const usersByUid = new Map(relatedUsers.map(user => [user.uid, user]));
+      const moderationRows = moderation.map(item => ({
+        ...item,
+        adminId: usersByUid.get(item.actorUid) || null,
+        action: item.action || item.eventType,
+        targetType: "user",
+        targetId: item.targetUid || "",
+        timestamp: item.timestamp || item.createdAt
+      }));
+      return {
+        status: 200,
+        body: [...entries.map(entry => ({ ...entry, adminId: entry.user || null })), ...moderationRows]
+          .sort((a, b) => new Date(b.timestamp || b.createdAt || 0) - new Date(a.timestamp || a.createdAt || 0))
+          .slice(0, 500)
+      };
     } catch {
       return { status: 503, body: { message: "Unable to load administrative logs" } };
     }
