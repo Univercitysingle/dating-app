@@ -14,6 +14,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
   const [consent, setConsent] = useState(false);
   const [recording, setRecording] = useState(false);
   const [videoBlob, setVideoBlob] = useState(null);
+  const [videoMimeType, setVideoMimeType] = useState('video/webm');
   const [previewUrl, setPreviewUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +49,11 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
     const selected = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
     setChallenge(selected);
     try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Your browser does not support secure video recording. Please use a recent Chrome, Edge, Firefox or Safari browser.');
+      }
+      const requestedMimeType = ['video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find(type => MediaRecorder.isTypeSupported(type));
+      if (!requestedMimeType) throw new Error('Your browser does not support a compatible video recording format.');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false
@@ -57,14 +63,14 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-        ? 'video/webm;codecs=vp8' : 'video/webm';
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 450000 });
+      const recorder = new MediaRecorder(stream, { mimeType: requestedMimeType, videoBitsPerSecond: 450000 });
+      const finalMimeType = recorder.mimeType || requestedMimeType;
+      setVideoMimeType(finalMimeType.split(';')[0]);
       recorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = event => { if (event.data?.size) chunksRef.current.push(event.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: finalMimeType });
         if (blob.size > 3 * 1024 * 1024) setError('The recording is larger than 3 MB. Please try again in better lighting.');
         else if (blob.size > 1000) { setVideoBlob(blob); setPreviewUrl(URL.createObjectURL(blob)); }
         else setError('The recording was too short. Please try again.');
@@ -81,7 +87,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
       setRecording(false);
       setError(err.name === 'NotAllowedError'
         ? 'Camera permission was denied. Allow camera access and try again.'
-        : 'Unable to start your camera. Please use a secure browser connection and try again.');
+        : (err.message || 'Unable to start your camera. Please use a secure browser connection and try again.'));
     }
   };
 
@@ -98,7 +104,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
       });
       const result = await apiClient.post('/verification', {
         videoBase64: base64,
-        mimeType: 'video/webm',
+        mimeType: videoMimeType,
         challenge: challenge.value,
         consent: true
       }, { timeout: 60000 });
