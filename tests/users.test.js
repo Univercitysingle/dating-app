@@ -77,7 +77,7 @@ describe('Admin Users Controller', () => {
         method: 'DELETE',
         url: `/api/admin/users/${superadmin._id}`,
         params: {
-          userId: superadmin._id,
+          userId: String(superadmin._id),
         },
         user: { role: 'superadmin' },
       });
