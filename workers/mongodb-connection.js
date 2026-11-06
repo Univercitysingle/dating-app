@@ -4679,6 +4679,16 @@ export class MongoDBConnection {
     }
   }
 
+  async withdrawPhotoVerification(uid) {
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const result = await db.collection("photoVerifications").deleteMany({ uid, status: "pending_review" });
+      return { status: 200, body: { success: true, withdrawn: result.deletedCount > 0 } };
+    } catch {
+      return { status: 503, body: { error: "Could not withdraw the verification request." } };
+    }
+  }
+
   async getPhotoVerificationStatus(uid) {
     try {
       const db = this.getDatabase(await this.getClient());
@@ -4939,6 +4949,7 @@ export class MongoDBConnection {
 
     if (url.pathname === "/internal/photo-verification/submit" ||
         url.pathname === "/internal/photo-verification/status" ||
+        url.pathname === "/internal/photo-verification/withdraw" ||
         url.pathname === "/internal/admin/photo-verifications" ||
         url.pathname.startsWith("/internal/admin/photo-verification/")) {
       const body = await request.json().catch(() => null);
@@ -4947,6 +4958,7 @@ export class MongoDBConnection {
       let result;
       if (url.pathname === "/internal/photo-verification/submit") result = await this.submitPhotoVerification(uid, body.payload);
       else if (url.pathname === "/internal/photo-verification/status") result = await this.getPhotoVerificationStatus(uid);
+      else if (url.pathname === "/internal/photo-verification/withdraw") result = await this.withdrawPhotoVerification(uid);
       else if (url.pathname === "/internal/admin/photo-verifications") result = await this.listPhotoVerificationsForAdmin(uid);
       else {
         const match = url.pathname.match(/^\/internal\/admin\/photo-verification\/([a-f0-9]{24})(?:\/(evidence|action))?$/i);
