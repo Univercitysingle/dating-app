@@ -1662,7 +1662,9 @@ test("chat message creation requires both participants and refuses blocked conve
   const db = {
     collection(name) {
       if (name === "users") return { async findOne(filter) { return usersByUid[filter.uid] || null; } };
-      return { async insertOne(doc) { stored.push({ ...doc, _id: new ObjectId("abcdef0123456789abcdef03") }); return { insertedId: stored[0]._id }; } };
+      if (name === "matches") return { async findOne() { return { _id: "matched-pair" }; } };
+      if (name === "chatmessages") return { async insertOne(doc) { stored.push({ ...doc, _id: new ObjectId("abcdef0123456789abcdef03") }); return { insertedId: stored[0]._id }; } };
+      assert.fail("Unexpected collection: " + name);
     }
   };
   const connection = new MongoDBConnection({}, {});
