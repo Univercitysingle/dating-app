@@ -41,7 +41,7 @@ test("blocking a user records the block and terminates the pair's active match",
   });
   assert.deepEqual(matchUpdate.query, { user1Uid: "current-user", user2Uid: "target-user" });
   assert.equal(matchUpdate.update.$set.status, "unmatched");
-  assert.ok(matchUpdate.update.$unset.likedBy);
+  assert.equal(matchUpdate.update.$unset.likedBy, "");
 });
 
 test("blocking or unmatching oneself is rejected before database access", async () => {
