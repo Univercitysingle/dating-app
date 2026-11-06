@@ -45,6 +45,62 @@ test("discovery applies selected gender, reciprocal preferences, and looking-for
   assert.equal(capturedMatch["lifestyle.lookingFor"], "Casual (FWB)");
 });
 
+test("Discover honours the active Show me filter over the saved profile preference", async () => {
+  let capturedMatch;
+  const users = {
+    findOne: async ({ uid }) => ({
+      uid,
+      gender: "Female",
+      preference: "Female",
+      blocked: [],
+      location: { coordinates: [0, 0] }
+    }),
+    aggregate: (pipeline) => {
+      capturedMatch = pipeline[0].$match;
+      return { toArray: async () => [] };
+    }
+  };
+  const matches = { createIndex: async () => "index-created" };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "matches") return matches;
+      assert.fail(`Unexpected collection: ${name}`);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers("current-user", { preference: "Male" });
+
+  assert.equal(result.status, 200);
+  assert.equal(capturedMatch.gender, "Male");
+  assert.deepEqual(capturedMatch.$and, [{
+    $or: [
+      { preference: { $in: ["everyone", "Everyone", "Female"] } },
+      { preference: { $exists: false } },
+      { preference: null }
+    ]
+  }]);
+});
+
+test("Discover rejects unsupported gender preference filter values", async () => {
+  let databaseAccessed = false;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => {
+    databaseAccessed = true;
+    throw new Error("Database should not be accessed");
+  };
+
+  const result = await connection.discoverUsers("current-user", { preference: { $ne: "Female" } });
+
+  assert.equal(result.status, 400);
+  assert.equal(databaseAccessed, false);
+});
+
 test("discovery supports the Other gender preference", async () => {
   let capturedMatch;
   const users = {
