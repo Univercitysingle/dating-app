@@ -96,6 +96,7 @@ const Onboarding = () => {
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState(null);
   const [gender, setGender] = useState('');
+  const [preference, setPreference] = useState('everyone');
   const [personalityType, setPersonalityType] = useState('');
   const [photo, setPhoto] = useState(null);
   const [location, setLocation] = useState(null);
@@ -167,6 +168,7 @@ const Onboarding = () => {
         name: name.trim(),
         birthday,
         gender,
+        preference,
         photos: [{ url: photo, order: 0 }],
         location,
         personalityType,
@@ -254,6 +256,13 @@ const Onboarding = () => {
                   <div className="mt-2 grid grid-cols-3 gap-2">
                     {['Male', 'Female', 'Other'].map(value => <ChoiceCard key={value} selected={gender === value} onClick={() => setGender(value)}>{value}</ChoiceCard>)}
                   </div>
+                </div>
+                <div>
+                  <span className={labelClass}>Who would you like to see?</span>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {[["everyone", "Everyone"], ["Female", "Women"], ["Male", "Men"]].map(([value, label]) => <ChoiceCard key={value} selected={preference === value} onClick={() => setPreference(value)}>{label}</ChoiceCard>)}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">You can change this later in your Discover preferences.</p>
                 </div>
               </div>
             )}
