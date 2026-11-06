@@ -305,7 +305,57 @@ test("Likes responses expose only sanitized public profile fields", async () => 
   assert.deepEqual(profile.profilePrompts, [{ question: "About me", answer: "Public answer" }]);
   assert.equal(profile.bio, "Public biography");
   assert.equal(profile.likeType, "superlike");
-  assert.equal(profile.isBlurred, true);
+  assert.equal(profile.isBlurred, false);
+});
+
+test("Basic Likes responses contain no liker identity or profile media", async () => {
+  const users = {
+    async findOne({ uid }) {
+      return uid === "current-user" ? { uid, role: "user", plan: "basic", blocked: [] } : null;
+    },
+    find(query) {
+      assert.deepEqual(query, { uid: { $in: ["liked-user"] } });
+      return { async toArray() {
+        return [{
+          uid: "liked-user", name: "Private Name", bio: "Private bio",
+          photos: [{ url: "photos-liked-user-secret.webp" }], blocked: []
+        }];
+      } };
+    }
+  };
+  const matches = {
+    find(query) {
+      assert.deepEqual(query, {
+        $or: [{ user1Uid: "current-user" }, { user2Uid: "current-user" }],
+        status: "pending"
+      });
+      return { async toArray() {
+        return [{
+          _id: "507f1f77bcf86cd799439011",
+          user1Uid: "liked-user",
+          user2Uid: "current-user",
+          likedBy: ["liked-user"],
+          status: "pending"
+        }];
+      } };
+    }
+  };
+  const db = { collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getLikes("current-user");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, [{
+    likeId: "507f1f77bcf86cd799439011",
+    likeType: "like",
+    isBlurred: true
+  }]);
 });
 
 test("Likes finds incoming likes when a legacy match stores canonical UID ordering", async () => {
