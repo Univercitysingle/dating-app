@@ -1277,8 +1277,23 @@ export class MongoDBConnection {
         isProfileVisible: true,
         blocked: { $ne: uid }
       };
-      // Only apply recognized preferences. Legacy or missing values safely fall back to everyone.
-      if (["Male", "Female"].includes(currentUser.preference)) baseMatchQuery.gender = currentUser.preference;
+      // Apply the viewer's selected gender preference. Legacy and "everyone"
+      // values intentionally leave gender unrestricted.
+      if (["Male", "Female", "Other"].includes(currentUser.preference)) {
+        baseMatchQuery.gender = currentUser.preference;
+      }
+      // Respect the candidate's own discovery preference as well. A candidate
+      // who selected a specific gender should not be shown to an incompatible
+      // viewer. Missing legacy preferences continue to behave as "everyone".
+      if (["Male", "Female", "Other"].includes(currentUser.gender)) {
+        baseMatchQuery.$and = [{
+          $or: [
+            { preference: { $in: ["everyone", "Everyone", currentUser.gender] } },
+            { preference: { $exists: false } },
+            { preference: null }
+          ]
+        }];
+      }
       for (const key of ["sexualOrientation", "familyStatus", "relationshipGoals"]) {
         if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery[key] = filters[key];
       }
