@@ -91,6 +91,21 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
     }
   };
 
+  const withdraw = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await apiClient.delete('/verification');
+      setStatus({ status: 'not_submitted' });
+      setVideoBlob(null);
+      setConsent(false);
+    } catch (err) {
+      setError(err.message || 'Could not withdraw your verification request.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async () => {
     if (!videoBlob || !challenge || !consent) return;
     setBusy(true);
@@ -130,7 +145,12 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
         <p className="text-sm text-green-700 dark:text-green-400">Your profile is verified.</p>
       ) : null}
       {status.status === 'pending_review' ? (
-        <p className="text-sm text-amber-700 dark:text-amber-400">Your selfie video is waiting for a manual review.</p>
+        <div>
+          <p className="text-sm text-amber-700 dark:text-amber-400">Your selfie video is waiting for a manual review.</p>
+          <button type="button" onClick={withdraw} disabled={busy} className="mt-3 rounded-full border border-red-300 px-4 py-2 text-sm text-red-700 disabled:opacity-50">
+            {busy ? 'Withdrawing…' : 'Withdraw request and delete video'}
+          </button>
+        </div>
       ) : null}
       {status.status === 'rejected' ? (
         <p className="text-sm text-red-600">Your previous request was not approved. {status.reviewReason || 'You can submit a new recording.'}</p>
