@@ -2418,6 +2418,32 @@ test("chat message retries with the same client ID return the existing persisted
   assert.equal(insertCount, 0);
 });
 
+test("unmatched conversations cannot continue through legacy message fallback", async () => {
+  let legacyMessageLookup = false;
+  let insertCount = 0;
+  const users = { async findOne({ uid }) { return { uid, blocked: [] }; } };
+  const matches = { async findOne() { return { _id: "match-id", status: "unmatched" }; } };
+  const messages = {
+    async findOne() { legacyMessageLookup = true; return { _id: "old-message" }; },
+    async insertOne() { insertCount++; return { insertedId: "new-message" }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    if (name === "chatmessages") return messages;
+    assert.fail("Unexpected collection: " + name);
+  } });
+  const result = await connection.createChatMessage("alice", {
+    roomId: "alice-bob", receiverUid: "bob", messageContent: "Can we keep talking?"
+  });
+  assert.equal(result.status, 403);
+  assert.match(result.body.error, /conversation has ended/i);
+  assert.equal(legacyMessageLookup, false);
+  assert.equal(insertCount, 0);
+});
+
 test("unmatched users cannot initiate a new chat", async () => {
   let insertCount = 0;
   const users = {
