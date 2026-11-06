@@ -8,7 +8,7 @@ const CHALLENGES = [
   { value: 'look_up', label: 'Look slightly upward, then look directly at the camera.' }
 ];
 
-const PhotoVerificationPanel = () => {
+const PhotoVerificationPanel = ({ isVerified = false }) => {
   const [status, setStatus] = useState({ status: 'loading' });
   const [challenge, setChallenge] = useState(null);
   const [consent, setConsent] = useState(false);
@@ -120,7 +120,7 @@ const PhotoVerificationPanel = () => {
         The video is encrypted and removed after review or after seven days.
       </p>
       {status.status === 'loading' ? <p>Loading verification status…</p> : null}
-      {status.status === 'verified' || status.status === 'approved' ? (
+      {isVerified || status.status === 'verified' || status.status === 'approved' ? (
         <p className="text-sm text-green-700 dark:text-green-400">Your profile is verified.</p>
       ) : null}
       {status.status === 'pending_review' ? (
