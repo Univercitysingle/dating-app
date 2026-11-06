@@ -1250,6 +1250,10 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !filters || typeof filters !== "object" || Array.isArray(filters)) {
       return { status: 400, body: { error: "Invalid discovery request" } };
     }
+    const allowedPreferences = ["Male", "Female", "Other", "everyone", "Everyone"];
+    if (filters.preference !== undefined && !allowedPreferences.includes(filters.preference)) {
+      return { status: 400, body: { error: "Invalid gender preference filter" } };
+    }
     let phase = "connect-to-mongodb";
     try {
       const db = this.getDatabase(await this.getClient());
@@ -1280,10 +1284,6 @@ export class MongoDBConnection {
       // The active Discover filter takes precedence over the saved profile
       // preference. This is required for Tinder/Bumble-style "Show me" controls
       // to take effect immediately without rewriting the user's profile.
-      const allowedPreferences = ["Male", "Female", "Other", "everyone", "Everyone"];
-      if (filters.preference !== undefined && !allowedPreferences.includes(filters.preference)) {
-        return { status: 400, body: { error: "Invalid gender preference filter" } };
-      }
       const selectedPreference = filters.preference !== undefined
         ? filters.preference
         : currentUser.preference;
