@@ -14,6 +14,7 @@ import { collectPendingDeliveryMessages, getVisibleChatMessageIds } from '../uti
 function Chat() {
   const [input, setInput] = useState('');
   const [error, setError] = useState(null);
+  const [isUnmatching, setIsUnmatching] = useState(false);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const [otherUser, setOtherUser] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -46,6 +47,21 @@ function Chat() {
   const otherUserUid = messages.find(message => message.senderUid === user?.uid)?.receiverUid ||
     messages.find(message => message.receiverUid === user?.uid)?.senderUid || null;
   const otherProfilePath = otherUser?.uid || otherUserUid ? `/profile/${encodeURIComponent(otherUser?.uid || otherUserUid)}` : '/profile';
+
+  const handleUnmatch = async () => {
+    const targetUid = otherUser?.uid || otherUserUid;
+    if (!targetUid || isUnmatching) return;
+    if (!window.confirm('Unmatch this person? You will no longer be able to message each other. This does not block them.')) return;
+    setIsUnmatching(true);
+    try {
+      await apiClient.post(`/users/unmatch/${encodeURIComponent(targetUid)}`);
+      setError('You unmatched this person. This conversation has ended.');
+      window.setTimeout(() => { window.location.assign('/conversations'); }, 900);
+    } catch (requestError) {
+      setError(requestError?.response?.data?.error || 'Could not unmatch this person. Please try again.');
+      setIsUnmatching(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -484,7 +500,10 @@ function Chat() {
             <p className="chat-participant-status text-xs">{otherUser ? 'Your conversation' : 'Profile details loading'}</p>
           </div>
         </Link>
-        <div id={`chat-call-actions-${chatId}`} className="chat-header-actions flex flex-shrink-0 items-center gap-1.5" aria-label="Voice and video call actions" />
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <button type="button" onClick={handleUnmatch} disabled={!otherUserUid && !otherUser?.uid || isUnmatching} className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950" title="End this match without blocking">{isUnmatching ? 'Ending…' : 'Unmatch'}</button>
+          <div id={`chat-call-actions-${chatId}`} className="chat-header-actions flex flex-shrink-0 items-center gap-1.5" aria-label="Voice and video call actions" />
+        </div>
       </header>
       {error && <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800" role="alert">{error}</div>}
       {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
