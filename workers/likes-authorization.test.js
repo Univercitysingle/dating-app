@@ -49,7 +49,7 @@ test("likes omit hidden profiles and either side of a blocked relationship", asy
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.map(profile => profile.uid), ["visible-uid"]);
   assert.deepEqual(calls.find(call => call.collection === "matches").filter, {
-    user2Uid: uid,
+    $or: [{ user1Uid: uid }, { user2Uid: uid }],
     status: "pending"
   });
   assert.ok(calls.find(call => call.collection === "users" && call.options)?.options.projection.blocked);
