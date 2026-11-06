@@ -3,6 +3,85 @@ import test from "node:test";
 import { MongoDBConnection } from "./mongodb-connection.js";
 import Worker from "./index.js";
 
+test("discovery applies selected gender, reciprocal preferences, and looking-for filters", async () => {
+  let capturedMatch;
+  const users = {
+    findOne: async ({ uid }) => ({
+      uid,
+      gender: "Male",
+      preference: "Female",
+      blocked: [],
+      location: { coordinates: [0, 0] }
+    }),
+    aggregate: (pipeline) => {
+      capturedMatch = pipeline[0].$match;
+      return { toArray: async () => [] };
+    }
+  };
+  const matches = { createIndex: async () => "index-created" };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "matches") return matches;
+      assert.fail(`Unexpected collection: ${name}`);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers("current-user", { lookingFor: "Casual (FWB)" });
+
+  assert.equal(result.status, 200);
+  assert.equal(capturedMatch.gender, "Female");
+  assert.deepEqual(capturedMatch.$and, [{
+    $or: [
+      { preference: { $in: ["everyone", "Everyone", "Male"] } },
+      { preference: { $exists: false } },
+      { preference: null }
+    ]
+  }]);
+  assert.equal(capturedMatch["lifestyle.lookingFor"], "Casual (FWB)");
+});
+
+test("discovery supports the Other gender preference", async () => {
+  let capturedMatch;
+  const users = {
+    findOne: async ({ uid }) => ({
+      uid,
+      gender: "Other",
+      preference: "Other",
+      blocked: [],
+      location: { coordinates: [0, 0] }
+    }),
+    aggregate: (pipeline) => {
+      capturedMatch = pipeline[0].$match;
+      return { toArray: async () => [] };
+    }
+  };
+  const matches = { createIndex: async () => "index-created" };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "matches") return matches;
+      assert.fail(`Unexpected collection: ${name}`);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers("current-user", {});
+
+  assert.equal(result.status, 200);
+  assert.equal(capturedMatch.gender, "Other");
+  assert.deepEqual(capturedMatch.$and[0].$or[0], {
+    preference: { $in: ["everyone", "Everyone", "Other"] }
+  });
+});
+
 test("discovery combines boosted and regular candidates with safe array defaults", async () => {
   let capturedPipeline;
   const users = {
