@@ -1625,6 +1625,63 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/verification" || url.pathname === "/api/admin/photo-verifications" ||
+        /^\/api\/admin\/photo-verifications\/[a-f0-9]{24}(?:\/(?:evidence|action))?$/i.test(url.pathname)) {
+      const isOwn = url.pathname === "/api/verification";
+      const isQueue = url.pathname === "/api/admin/photo-verifications";
+      const evidenceMatch = url.pathname.match(/^\/api\/admin\/photo-verifications\/([a-f0-9]{24})\/evidence$/i);
+      const actionMatch = url.pathname.match(/^\/api\/admin\/photo-verifications\/([a-f0-9]{24})\/action$/i);
+      const detailMatch = url.pathname.match(/^\/api\/admin\/photo-verifications\/([a-f0-9]{24})$/i);
+      if ((isOwn && !["GET", "POST"].includes(request.method)) ||
+          (isQueue && request.method !== "GET") ||
+          (evidenceMatch && request.method !== "GET") ||
+          (actionMatch && request.method !== "POST") ||
+          (detailMatch && request.method !== "GET")) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Verification service unavailable" }, 503);
+      const payload = request.method === "POST" ? await request.json().catch(() => null) : null;
+      if (request.method === "POST" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+        return json({ error: "Invalid verification request" }, 400);
+      }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (isOwn && request.method === "POST" && env.RATE_LIMITER) {
+          const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName("photo-verification:" + claims.sub));
+          const limited = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "photo-verification", limit: 2, windowMs: 24 * 60 * 60 * 1000 })
+          });
+          if (!limited.ok) return json({ error: "Verification rate limit service unavailable" }, 503);
+          const quota = await limited.json();
+          if (!quota.allowed) return json({ error: "You have reached the daily verification submission limit." }, 429);
+        }
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        let internalPath;
+        let body = { claims };
+        if (isOwn) {
+          internalPath = request.method === "POST" ? "/internal/photo-verification/submit" : "/internal/photo-verification/status";
+          if (payload) body.payload = payload;
+        } else if (isQueue) {
+          internalPath = "/internal/admin/photo-verifications";
+        } else if (evidenceMatch) {
+          internalPath = "/internal/admin/photo-verification/" + evidenceMatch[1] + "/evidence";
+        } else if (actionMatch) {
+          internalPath = "/internal/admin/photo-verification/" + actionMatch[1] + "/action";
+          body.payload = payload;
+        } else {
+          internalPath = "/internal/admin/photo-verification/" + detailMatch[1];
+        }
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+        });
+        const result = await response.json().catch(() => ({ error: "Verification service unavailable" }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Verification service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/dark-fantasy/catalog") {
       const regionBlock = darkFantasyRegionGate(request, env);
       if (regionBlock) return regionBlock;
