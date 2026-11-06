@@ -1,5 +1,5 @@
 const DEFAULT_CDN_HOSTNAME = 'https://dateme.enadoctemp.workers.dev';
-const PLACEHOLDER_IMAGE = 'https://placehold.co/100x100';
+const PLACEHOLDER_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%23e5e7eb'/%3E%3Ccircle cx='50' cy='36' r='18' fill='%239ca3af'/%3E%3Cpath d='M15 92c3-20 17-30 35-30s32 10 35 30' fill='%239ca3af'/%3E%3C/svg%3E";
 
 const PHOTO_KEY_PATTERN =
   /^photos-[A-Za-z0-9_-]{1,128}-[A-Za-z0-9_-]{1,64}\.(?:jpg|jpeg|png|gif|webp)$/i;
