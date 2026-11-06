@@ -69,7 +69,7 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing GitHub secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing GitHub secret CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$MONGODB_URI" || { echo "Missing GitHub secret MONGODB_URI"; exit 1; }
-      [[ "$VERIFICATION_ENCRYPTION_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "::error::Missing or invalid GitHub secret VERIFICATION_ENCRYPTION_KEY. Set exactly 64 hexadecimal characters."; exit 1; }
+          [[ "$VERIFICATION_ENCRYPTION_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo "::error::Missing or invalid GitHub secret VERIFICATION_ENCRYPTION_KEY. Set exactly 64 hexadecimal characters."; exit 1; }
           test -n "$FIREBASE_PROJECT_ID" || { echo "Missing FIREBASE_PROJECT_ID configuration"; exit 1; }
           # FIREBASE_DATABASE_URL may already be configured directly on the staging Worker.
           # Do not block deployment or overwrite that known-good runtime secret when this
