@@ -897,7 +897,7 @@ test("discovery returns ordered public profiles with super-like metadata", async
 });
 
 test("likes query returns pending likers with privacy filtering and premium blur metadata", async () => {
-  const current = { _id: "current-id", uid: "current", plan: "basic" };
+  const current = { _id: "current-id", uid: "current", plan: "premium" };
   const liker = {
     _id: "liker-id", uid: "liker", name: "Liker", email: "private@example.com",
     mobileNumber: "+971501234567", password: "never-return", lastLoginIp: "192.0.2.1",
@@ -917,7 +917,7 @@ test("likes query returns pending likers with privacy filtering and premium blur
   assert.equal(result.status, 200);
   assert.equal(result.body.length, 1);
   assert.equal(result.body[0].likeType, "superlike");
-  assert.equal(result.body[0].isBlurred, true);
+  assert.equal(result.body[0].isBlurred, false);
   assert.equal(result.body[0].email, undefined);
   assert.equal(result.body[0].mobileNumber, undefined);
   assert.equal(result.body[0].password, undefined);
