@@ -14,6 +14,7 @@ const PhotoVerificationPanel = () => {
   const [consent, setConsent] = useState(false);
   const [recording, setRecording] = useState(false);
   const [videoBlob, setVideoBlob] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const videoRef = useRef(null);
@@ -26,8 +27,9 @@ const PhotoVerificationPanel = () => {
     return () => {
       if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
       streamRef.current?.getTracks().forEach(track => track.stop());
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, []);
+  }, [previewUrl]);
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -38,6 +40,8 @@ const PhotoVerificationPanel = () => {
   const startCapture = async () => {
     setError('');
     setVideoBlob(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl('');
     const selected = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
     setChallenge(selected);
     try {
@@ -59,7 +63,7 @@ const PhotoVerificationPanel = () => {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'video/webm' });
         if (blob.size > 3 * 1024 * 1024) setError('The recording is larger than 3 MB. Please try again in better lighting.');
-        else if (blob.size > 1000) setVideoBlob(blob);
+        else if (blob.size > 1000) { setVideoBlob(blob); setPreviewUrl(URL.createObjectURL(blob)); }
         else setError('The recording was too short. Please try again.');
         stopCamera();
         setRecording(false);
@@ -125,7 +129,7 @@ const PhotoVerificationPanel = () => {
       {status.status !== 'verified' && status.status !== 'approved' && status.status !== 'pending_review' && (
         <>
           <p className="text-sm mb-3">For privacy, camera access starts only when you press the button. We do not use automated face recognition or claim automated liveness detection.</p>
-          <video ref={videoRef} muted playsInline className="w-full max-w-sm rounded-xl bg-black aspect-video" />
+          <video ref={videoRef} src={previewUrl || undefined} controls playsInline muted className="w-full max-w-sm rounded-xl bg-black aspect-video" />
           {challenge && <p className="my-3 font-medium">Your random challenge: {challenge.label}</p>}
           <div className="flex flex-wrap gap-3 my-3">
             <button type="button" onClick={startCapture} disabled={recording || busy} className="rounded-full bg-primary px-5 py-2 text-white disabled:opacity-50">
