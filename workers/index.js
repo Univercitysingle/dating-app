@@ -289,6 +289,28 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+async function enforceAccountRateLimit(env, scope, uid, limit, windowMs, message) {
+  if (!env.RATE_LIMITER) return json({ error: "Abuse protection is unavailable. Please retry later." }, 503);
+  try {
+    const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName(scope + ":" + uid));
+    const response = await limiter.fetch("https://rate-limiter.internal/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: scope, limit, windowMs })
+    });
+    if (!response.ok) return json({ error: "Abuse protection is temporarily unavailable." }, 503);
+    const result = await response.json();
+    if (result.allowed) return null;
+    const retryAfter = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000));
+    return new Response(JSON.stringify({ error: message }), {
+      status: 429,
+      headers: { ...JSON_HEADERS, "retry-after": String(retryAfter) }
+    });
+  } catch {
+    return json({ error: "Abuse protection is temporarily unavailable." }, 503);
+  }
+}
+
 export class RateLimiter {
   constructor(state) { this.state = state; }
 
@@ -1143,6 +1165,8 @@ export default {
       if (!targetUid || targetUid.length > 128) return json({ error: "Invalid user ID" }, 400);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const limited = await enforceAccountRateLimit(env, "unmatch-user", claims.sub, 20, 60 * 60 * 1000, "Unmatch action limit reached. Please retry later.");
+        if (limited) return limited;
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/unmatch", {
@@ -1169,6 +1193,8 @@ export default {
       if (!targetUid || targetUid.length > 128) return json({ error: "Invalid user ID" }, 400);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const limited = await enforceAccountRateLimit(env, blockMatch[1] + "-user", claims.sub, 20, 60 * 60 * 1000, "Block action limit reached. Please retry later.");
+        if (limited) return limited;
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/block", {
@@ -1590,25 +1616,10 @@ export default {
       }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        // Account-scoped quota is independent of the general edge/IP quota.
-        if (env.RATE_LIMITER) {
-          const limiterId = env.RATE_LIMITER.idFromName("report-user:" + claims.sub);
-          const limiter = env.RATE_LIMITER.get(limiterId);
-          const rateResponse = await limiter.fetch("https://rate-limiter.internal/check", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ key: "report", limit: 3, windowMs: 60 * 60 * 1000 })
-          });
-          if (!rateResponse.ok) return json({ error: "Report rate limit service unavailable" }, 503);
-          const rate = await rateResponse.json();
-          if (!rate.allowed) {
-            const retryAfter = Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000));
-            return new Response(JSON.stringify({ error: "Report limit reached. Please retry later." }), {
-              status: 429,
-              headers: { ...JSON_HEADERS, "retry-after": String(retryAfter) }
-            });
-          }
-        }
+        // Require both edge and account-level controls. Reporting remains protected
+        // even if the Durable Object binding is accidentally omitted at deploy time.
+        const limited = await enforceAccountRateLimit(env, "report-user", claims.sub, 3, 60 * 60 * 1000, "Report limit reached. Please retry later.");
+        if (limited) return limited;
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/create-report", {
