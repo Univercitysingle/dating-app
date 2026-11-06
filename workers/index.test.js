@@ -344,6 +344,19 @@ test("MongoDB Durable Object exposes no general-purpose HTTP operation", async (
   assert.equal(response.status, 404);
 });
 
+test("report, block, and unmatch routes require Firebase authentication", async () => {
+  const env = { FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {} };
+  const report = await worker.fetch(new Request("https://dating-app.test/api/reports", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reportedUserUid: "target", category: "spam", reason: "This is spam." })
+  }), env);
+  const block = await worker.fetch(new Request("https://dating-app.test/api/users/block/target", { method: "POST" }), env);
+  const unmatch = await worker.fetch(new Request("https://dating-app.test/api/users/unmatch/target", { method: "POST" }), env);
+  assert.equal(report.status, 401);
+  assert.equal(block.status, 401);
+  assert.equal(unmatch.status, 401);
+});
+
 test("initial password setup rejects anonymous requests and unsupported methods", async () => {
   const anonymous = await worker.fetch(new Request("https://dating-app.test/api/auth/set-initial-password", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ newPassword: "long-enough" })
