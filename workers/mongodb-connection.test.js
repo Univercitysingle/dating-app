@@ -219,7 +219,10 @@ test("Likes responses expose only sanitized public profile fields", async () => 
   };
   const matches = {
     find(query) {
-      assert.deepEqual(query, { user2Uid: "current-user", status: "pending" });
+      assert.deepEqual(query, {
+        $or: [{ user1Uid: "current-user" }, { user2Uid: "current-user" }],
+        status: "pending"
+      });
       return { async toArray() { return [{ user1Uid: "liked-user", superLike: true }]; } };
     }
   };
