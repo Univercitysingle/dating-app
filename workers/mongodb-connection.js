@@ -2134,7 +2134,7 @@ export class MongoDBConnection {
       const users = await db.collection("users").find({ uid: { $in: likedUids } }).toArray();
       const usersByUid = new Map(users.map(user => [user.uid, user]));
       const matchByUid = new Map(incomingMatches.map(item => [item.likedUid, item.match]));
-      const isBlurred = currentUser.plan !== "premium";
+      const isBlurred = currentUser.role !== "superadmin" && currentUser.plan !== "premium";
       const result = [];
       for (const likedUid of likedUids) {
         const user = usersByUid.get(likedUid);
@@ -2142,6 +2142,17 @@ export class MongoDBConnection {
         const viewerBlockedTarget = Array.isArray(currentUser.blocked) && currentUser.blocked.includes(likedUid);
         const targetBlockedViewer = Array.isArray(user.blocked) && user.blocked.includes(uid);
         if (user.isProfileVisible === false || viewerBlockedTarget || targetBlockedViewer) continue;
+        const match = matchByUid.get(likedUid);
+        // Basic accounts receive an anonymous teaser only. Never send identity,
+        // profile text, photos, or CDN object URLs and rely on client-side blur.
+        if (isBlurred) {
+          result.push({
+            likeId: match?._id === undefined ? undefined : String(match._id),
+            likeType: match && match.superLike ? "superlike" : "like",
+            isBlurred: true
+          });
+          continue;
+        }
         const profile = { ...user };
         delete profile.password;
         delete profile.lastLoginIp;
@@ -2163,7 +2174,6 @@ export class MongoDBConnection {
             return { ...photo, url: this.getMediaUrl(photo.url) };
           });
         }
-        const match = matchByUid.get(likedUid);
         const responseProfile = sanitizePublicProfile(profile);
         // Superadmins may inspect profile contact details, but still receive
         // the same public-field allowlist rather than unrestricted DB records.
