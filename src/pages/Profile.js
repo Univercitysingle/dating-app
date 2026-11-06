@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useTheme } from '../context/ThemeContext';
 import apiClient from '../api/apiClient';
+import PhotoVerificationPanel from '../components/PhotoVerificationPanel';
 
 // Import all necessary components
 import InterestsDisplay from '../components/InterestsDisplay';
@@ -550,6 +551,8 @@ function Profile() {
                       )}
 
                       {isOwnProfile && <NotificationPreferencesPanel />}
+
+                      {isOwnProfile && <PhotoVerificationPanel />}
 
                       <div className="profile-settings-group">
                           <h3>Preferences &amp; help</h3>
