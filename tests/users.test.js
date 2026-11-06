@@ -55,7 +55,7 @@ describe('Admin Users Controller', () => {
         method: 'PUT',
         url: `/api/admin/users/${superadmin._id}`,
         params: {
-          userId: superadmin._id,
+          userId: String(superadmin._id),
         },
         body: {
           name: 'New Superadmin Name',
@@ -103,7 +103,7 @@ describe('Admin Users Controller', () => {
 
       const responseData = res._getJSONData();
       expect(res.statusCode).toBe(200);
-      const testUser = responseData.users.find(u => u.email === 'user@test.com');
+      const testUser = responseData.users.find(u => u.name === 'Test User');
       expect(testUser.photos[0].url).toContain('https://');
     });
   });
