@@ -105,6 +105,11 @@ function Profile() {
   const [activeTab, setActiveTab] = useState('profile');
   const [mobileCountryCode, setMobileCountryCode] = useState('+971');
   const [mobileNationalNumber, setMobileNationalNumber] = useState('');
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState('harassment_or_bullying');
+  const [reportReason, setReportReason] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [isBlockingUser, setIsBlockingUser] = useState(false);
 
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
@@ -262,6 +267,48 @@ function Profile() {
       navigate('/matches');
     } catch (error) {
       console.error('Error declining:', error);
+    }
+  };
+
+  const handleReportSubmit = async (event) => {
+    event.preventDefault();
+    if (!profile?.uid || isSubmittingReport) return;
+    const reason = reportReason.trim();
+    if (reason.length < 10 || reason.length > 2000) {
+      toast.error('Please provide at least 10 characters describing the concern.');
+      return;
+    }
+    setIsSubmittingReport(true);
+    try {
+      await apiClient.post('/reports', {
+        reportedUserUid: profile.uid,
+        category: reportCategory,
+        reason
+      });
+      toast.success('Thank you. Your report has been sent to our safety team.');
+      setIsReportOpen(false);
+      setReportReason('');
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 409) toast.info('You have already reported this profile recently.');
+      else toast.error(getUserFriendlyError(error, 'We could not submit your report. Please try again.'));
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!profile?.uid || isBlockingUser) return;
+    if (!window.confirm('Block this person? They will no longer be able to contact you or appear in your discovery results.')) return;
+    setIsBlockingUser(true);
+    try {
+      await apiClient.post(`/users/block/${encodeURIComponent(profile.uid)}`);
+      toast.success('This person has been blocked.');
+      navigate('/discover', { replace: true });
+    } catch (error) {
+      toast.error(getUserFriendlyError(error, 'We could not block this person. Please try again.'));
+    } finally {
+      setIsBlockingUser(false);
     }
   };
 
@@ -553,12 +600,16 @@ function Profile() {
                 </div>
             </div>
 
-            <div className="flex justify-end items-center mb-6">
+            <div className="flex flex-wrap justify-end items-center gap-3 mb-6">
                 {!isOwnProfile && (
-                    <div className="flex space-x-4">
-                        <button onClick={handleLikeBack} className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Accept</button>
-                        <button onClick={handleDecline} className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600">Decline</button>
-                    </div>
+                    <>
+                      <div className="flex space-x-3">
+                        <button type="button" onClick={handleLikeBack} className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">Like back</button>
+                        <button type="button" onClick={handleDecline} className="px-6 py-2 border border-neutral-300 text-neutral-700 dark:text-neutral-200 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800">Pass</button>
+                      </div>
+                      <button type="button" onClick={() => setIsReportOpen(true)} className="px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-full text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800">Report</button>
+                      <button type="button" onClick={handleBlockUser} disabled={isBlockingUser} className="px-4 py-2 border border-red-300 text-red-700 dark:text-red-300 dark:border-red-800 rounded-full text-sm hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-60">{isBlockingUser ? 'Blocking…' : 'Block'}</button>
+                    </>
                 )}
               {isOwnProfile && (
                 <div className="relative">
@@ -604,6 +655,38 @@ function Profile() {
                 </div>
               )}
             </div>
+
+            {isReportOpen && !isOwnProfile && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsReportOpen(false); }}>
+                  <form onSubmit={handleReportSubmit} className="w-full max-w-lg rounded-2xl bg-white dark:bg-neutral-900 p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="report-profile-title">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h2 id="report-profile-title" className="text-xl font-semibold text-neutral-900 dark:text-white">Report this profile</h2>
+                        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Reports are reviewed by our safety team. Reporting does not automatically suspend an account.</p>
+                      </div>
+                      <button type="button" onClick={() => setIsReportOpen(false)} className="rounded-full p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800" aria-label="Close report form">✕</button>
+                    </div>
+                    <label htmlFor="report-category" className="mt-5 block text-sm font-medium text-neutral-800 dark:text-neutral-200">Reason</label>
+                    <select id="report-category" value={reportCategory} onChange={(event) => setReportCategory(event.target.value)} className="mt-2 w-full rounded-xl border border-neutral-300 bg-white p-3 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white">
+                      <option value="spam">Spam</option>
+                      <option value="inappropriate_profile_content">Inappropriate profile content</option>
+                      <option value="harassment_or_bullying">Harassment or bullying</option>
+                      <option value="hateful_conduct">Hateful conduct</option>
+                      <option value="impersonation">Impersonation</option>
+                      <option value="underage_user">Underage user</option>
+                      <option value="scam_or_fraud">Scam or fraud</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <label htmlFor="report-reason" className="mt-4 block text-sm font-medium text-neutral-800 dark:text-neutral-200">What happened?</label>
+                    <textarea id="report-reason" value={reportReason} onChange={(event) => setReportReason(event.target.value)} minLength={10} maxLength={2000} required rows={5} className="mt-2 w-full resize-y rounded-xl border border-neutral-300 bg-white p-3 text-neutral-900 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white" placeholder="Describe the behaviour or content that concerns you." />
+                    <p className="mt-1 text-right text-xs text-neutral-500">{reportReason.length}/2000</p>
+                    <div className="mt-5 flex justify-end gap-3">
+                      <button type="button" onClick={() => setIsReportOpen(false)} className="rounded-full border border-neutral-300 px-5 py-2 text-sm dark:border-neutral-700">Cancel</button>
+                      <button type="submit" disabled={isSubmittingReport || reportReason.trim().length < 10} className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSubmittingReport ? 'Sending…' : 'Submit report'}</button>
+                    </div>
+                  </form>
+                </div>
+            )}
 
             {isEditingPhotos && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
