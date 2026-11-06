@@ -45,7 +45,7 @@ const LikesPage = () => {
             <div className="mb-6"><p className="page-eyebrow">A LITTLE SPARK</p><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Who likes you</h1><p className="mt-2 text-sm text-gray-500">See who is interested and start a conversation.</p></div>
             {users.length > 0 ? (
                 <ul className="space-y-4">
-                    {users.map(user => (
+                    {users.map((user, index) => (
                         <li
                             key={user.likeId || user._id || user.uid || index}
                             className="like-card flex items-center justify-between gap-4 rounded-2xl p-4 sm:p-5"
