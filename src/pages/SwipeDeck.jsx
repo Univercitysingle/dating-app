@@ -6,8 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Filter from '../components/Filter';
 import { getUserFriendlyError } from '../utils/apiErrors';
+import { resolvePhotoUrl } from '../utils/media';
 
-const MatchModal = ({ matchInfo, onContinue, onChat }) => (
+const MatchModal = ({ matchInfo, currentUserPhoto, onContinue, onChat }) => (
     <div className="absolute inset-0 bg-neutral-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-center items-center z-50 transition-opacity duration-300">
         <div className="text-center">
             <h2 className="text-5xl font-bold text-white mb-2 animate-pulse">
@@ -18,10 +19,12 @@ const MatchModal = ({ matchInfo, onContinue, onChat }) => (
             </p>
         </div>
         <div className="flex items-center my-8">
-            {/* Placeholder for user's own image */}
-            <div className="w-32 h-32 rounded-full bg-neutral-400 border-4 border-white transform -rotate-12"></div>
-            {/* Placeholder for matched user's image */}
-            <div className="w-32 h-32 rounded-full bg-neutral-500 border-4 border-white transform rotate-12 -ml-8"></div>
+            <div className="w-32 h-32 overflow-hidden rounded-full bg-neutral-700 border-4 border-white transform -rotate-12">
+              {currentUserPhoto ? <img src={resolvePhotoUrl(currentUserPhoto)} alt="Your profile" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-3xl text-white" aria-label="Your profile photo unavailable">♡</div>}
+            </div>
+            <div className="w-32 h-32 overflow-hidden rounded-full bg-neutral-700 border-4 border-white transform rotate-12 -ml-8">
+              {Array.isArray(matchInfo.photos) && matchInfo.photos[0] ? <img src={resolvePhotoUrl(typeof matchInfo.photos[0] === 'string' ? matchInfo.photos[0] : matchInfo.photos[0].url)} alt={matchInfo.name ? `${matchInfo.name}'s profile` : 'Matched profile'} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-3xl text-white" aria-label="Matched profile photo unavailable">♡</div>}
+            </div>
         </div>
         <div className="flex flex-col items-center">
              <button
@@ -125,8 +128,26 @@ const SwipeDeck = () => {
   }, []);
 
   useEffect(() => {
-    fetchUsersToSwipe();
-  }, [fetchUsersToSwipe]);
+    if (!user?.uid) {
+      fetchUsersToSwipe();
+      return;
+    }
+    const storageKey = `hart2hart:discover-filters:${user.uid}`;
+    let restored = {};
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) restored = parsed;
+    } catch (storageError) {
+      console.warn('Could not restore discovery preferences from this browser.', storageError);
+    }
+    const filters = {
+      ...restored,
+      preference: user.preference || restored.preference || 'everyone',
+    };
+    setActiveFilters(filters);
+    fetchUsersToSwipe(filters);
+  }, [fetchUsersToSwipe, user?.uid, user?.preference]);
 
   useEffect(() => {
     if (swipeError) {
@@ -216,7 +237,15 @@ const SwipeDeck = () => {
           setUser(previous => ({ ...previous, ...updatedProfile, preference }));
         }
       }
-      setActiveFilters({ ...discoveryFilters, preference });
+      const nextFilters = { ...discoveryFilters, preference };
+      setActiveFilters(nextFilters);
+      if (user?.uid) {
+        try {
+          window.localStorage.setItem(`hart2hart:discover-filters:${user.uid}`, JSON.stringify(nextFilters));
+        } catch (storageError) {
+          console.warn('Could not persist discovery filters in this browser.', storageError);
+        }
+      }
       fetchUsersToSwipe(discoveryFilters);
       setShowFilters(false);
     } catch (err) {
@@ -366,6 +395,7 @@ const SwipeDeck = () => {
         {newMatchInfo && (
             <MatchModal
                 matchInfo={newMatchInfo}
+                currentUserPhoto={Array.isArray(user?.photos) && user.photos[0] ? (typeof user.photos[0] === 'string' ? user.photos[0] : user.photos[0].url) : ''}
                 onContinue={() => setNewMatchInfo(null)}
                 onChat={() => navigate(`/chat/${[user?.uid, newMatchInfo.uid].sort().join('-')}`)}
             />
@@ -381,7 +411,7 @@ const SwipeDeck = () => {
                   if (event.key === 'Escape') setShowFilters(false);
                 }}
               >
-                <Filter initialFilters={{ preference: user?.preference || 'everyone' }} onApply={handleApplyFilters} onClose={() => setShowFilters(false)} />
+                <Filter initialFilters={{ ...activeFilters, preference: user?.preference || activeFilters.preference || 'everyone' }} onApply={handleApplyFilters} onClose={() => setShowFilters(false)} />
             </div>
         )}
     </div>
