@@ -4647,8 +4647,9 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
-      const user = await users.findOne({ uid }, { projection: { uid: 1, isVerified: 1 } });
+      const user = await users.findOne({ uid }, { projection: { uid: 1, isVerified: 1, photos: 1 } });
       if (!user) return { status: 404, body: { error: "User not found." } };
+      if (!Array.isArray(user.photos) || user.photos.length === 0) return { status: 400, body: { error: "Add at least one profile photo before requesting verification." } };
       if (user.isVerified === true) return { status: 409, body: { error: "Your profile is already verified." } };
       const verifications = db.collection("photoVerifications");
       if (typeof verifications.createIndex === "function") {
@@ -4662,7 +4663,7 @@ export class MongoDBConnection {
       const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
       const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
       const iv = crypto.getRandomValues(new Uint8Array(12));
-      const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, binary);
+      const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(uid) }, key, binary);
       const base64 = bytes => { const view = new Uint8Array(bytes); let binary = ""; for (let offset = 0; offset < view.length; offset += 0x8000) binary += String.fromCharCode(...view.subarray(offset, offset + 0x8000)); return btoa(binary); };
       const now = new Date();
       const document = {
@@ -4730,7 +4731,7 @@ export class MongoDBConnection {
       const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
       const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"]);
       const fromBase64 = value => Uint8Array.from(atob(value), char => char.charCodeAt(0));
-      const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(record.iv) }, key, fromBase64(record.encryptedVideo));
+      const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64(record.iv), additionalData: new TextEncoder().encode(record.uid) }, key, fromBase64(record.encryptedVideo));
       const clearBytes = new Uint8Array(clear);
       let binary = "";
       for (let offset = 0; offset < clearBytes.length; offset += 0x8000) binary += String.fromCharCode(...clearBytes.subarray(offset, offset + 0x8000));
@@ -4755,6 +4756,12 @@ export class MongoDBConnection {
       const collection = db.collection("photoVerifications");
       const record = await collection.findOne({ _id: new ObjectId(verificationId), status: "pending_review" }, { projection: { uid: 1 } });
       if (!record) return { status: 404, body: { error: "Pending verification not found or already reviewed." } };
+      if (payload.action === "approve") {
+        const targetUser = await db.collection("users").findOne({ uid: record.uid }, { projection: { photos: 1 } });
+        if (!Array.isArray(targetUser?.photos) || targetUser.photos.length === 0) {
+          return { status: 409, body: { error: "The user must have at least one profile photo before verification can be approved." } };
+        }
+      }
       const now = new Date();
       const result = await collection.updateOne(
         { _id: new ObjectId(verificationId), status: "pending_review" },
