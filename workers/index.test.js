@@ -908,7 +908,7 @@ test("likes query returns pending likers with privacy filtering and premium blur
     find: () => ({ toArray: async () => [liker] })
   };
   const matches = { find: (query) => {
-    assert.deepEqual(query, { user2Uid: "current", status: "pending" });
+    assert.deepEqual(query, { $or: [{ user1Uid: "current" }, { user2Uid: "current" }], status: "pending" });
     return { toArray: async () => [{ user1Uid: "liker", user2Uid: "current", status: "pending", superLike: true }] };
   }};
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
