@@ -4514,6 +4514,29 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "Messaging is unavailable for this conversation" } };
       }
 
+      // New conversations require a mutual match, as on Tinder and Bumble.
+      // Existing legacy conversations remain usable after migration, provided
+      // at least one message already exists between these exact participants.
+      const mutualMatch = await db.collection("matches").findOne({
+        $or: [
+          { user1Uid: uid, user2Uid: receiverUid },
+          { user1Uid: receiverUid, user2Uid: uid }
+        ],
+        status: "matched"
+      }, { projection: { _id: 1 } });
+      if (!mutualMatch) {
+        const existingConversation = await messages.findOne({
+          roomId,
+          $or: [
+            { senderUid: uid, receiverUid },
+            { senderUid: receiverUid, receiverUid: uid }
+          ]
+        }, { projection: { _id: 1 } });
+        if (!existingConversation) {
+          return { status: 403, body: { error: "You can message this person after you match." } };
+        }
+      }
+
       if (clientMessageId) {
         // The unique partial index makes retries safe even if the original request
         // committed but its HTTP response was lost, including concurrent retries.
