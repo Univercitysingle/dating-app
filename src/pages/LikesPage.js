@@ -47,7 +47,7 @@ const LikesPage = () => {
                 <ul className="space-y-4">
                     {users.map(user => (
                         <li
-                            key={user._id || user.uid}
+                            key={user.likeId || user._id || user.uid || index}
                             className="like-card flex items-center justify-between gap-4 rounded-2xl p-4 sm:p-5"
                         >
                             <div className="flex min-w-0 flex-1 items-center gap-4">
