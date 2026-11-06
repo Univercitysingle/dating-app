@@ -22,7 +22,7 @@ test("likes omit hidden profiles and either side of a blocked relationship", asy
           async findOne(filter, options) {
             calls.push({ collection: name, filter, options });
             if (filter.uid === uid) {
-              return { uid, plan: "basic", role: "user", blocked: ["viewer-blocked-uid"] };
+              return { uid, plan: "premium", role: "user", blocked: ["viewer-blocked-uid"] };
             }
             return null;
           },
