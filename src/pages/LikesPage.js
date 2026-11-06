@@ -64,16 +64,18 @@ const LikesPage = () => {
                                     )}
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="truncate font-semibold text-gray-900">{user.name}{user.age ? `, ${user.age}` : ''}</p>
-                                    <p className="line-clamp-2 text-gray-600 text-sm">{user.bio || 'Someone would love to connect with you.'}</p>
-                                    {user.isBlurred && <p className="mt-1 text-xs font-medium text-gray-500">Upgrade to reveal who likes you</p>}
+                                    <p className="truncate font-semibold text-gray-900">
+                                        {user.isBlurred ? 'Someone likes you' : `${user.name}${user.age ? `, ${user.age}` : ''}`}
+                                    </p>
+                                    {!user.isBlurred && <p className="line-clamp-2 text-gray-600 text-sm">{user.bio || 'Someone would love to connect with you.'}</p>}
+                                    {user.isBlurred && <p className="mt-1 text-xs font-medium text-gray-500">Unlock Premium to reveal this profile</p>}
                                 </div>
                             </div>
                             <Link
-                                to={`/profile/${encodeURIComponent(user.uid)}`}
+                                to={user.isBlurred ? '/premium' : `/profile/${encodeURIComponent(user.uid)}`}
                                 className="app-primary-button flex-shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white"
                             >
-                                View profile
+                                {user.isBlurred ? 'Unlock likes' : 'View profile'}
                             </Link>
                         </li>
                     ))}
