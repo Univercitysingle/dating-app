@@ -223,7 +223,7 @@ test("Likes responses expose only sanitized public profile fields", async () => 
         $or: [{ user1Uid: "current-user" }, { user2Uid: "current-user" }],
         status: "pending"
       });
-      return { async toArray() { return [{ user1Uid: "liked-user", superLike: true }]; } };
+      return { async toArray() { return [{ user1Uid: "liked-user", user2Uid: "current-user", superLike: true }]; } };
     }
   };
   const db = { collection(name) {
