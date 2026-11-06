@@ -6,6 +6,7 @@ const DEFAULTS = {
   maxDistance: 100,
   relationshipType: '',
   sexualOrientation: '',
+  preference: 'everyone',
 };
 
 const SelectField = ({ id, label, value, onChange, options, hint }) => (
@@ -20,12 +21,13 @@ const SelectField = ({ id, label, value, onChange, options, hint }) => (
   </div>
 );
 
-const Filter = ({ onApply, onClose = () => {} }) => {
+const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [minAge, setMinAge] = useState(DEFAULTS.minAge);
   const [maxAge, setMaxAge] = useState(DEFAULTS.maxAge);
   const [maxDistance, setMaxDistance] = useState(DEFAULTS.maxDistance);
   const [relationshipType, setRelationshipType] = useState(DEFAULTS.relationshipType);
   const [sexualOrientation, setSexualOrientation] = useState(DEFAULTS.sexualOrientation);
+  const [preference, setPreference] = useState(initialFilters.preference || DEFAULTS.preference);
 
   const resetFilters = () => {
     setMinAge(DEFAULTS.minAge);
@@ -33,6 +35,7 @@ const Filter = ({ onApply, onClose = () => {} }) => {
     setMaxDistance(DEFAULTS.maxDistance);
     setRelationshipType(DEFAULTS.relationshipType);
     setSexualOrientation(DEFAULTS.sexualOrientation);
+    setPreference(DEFAULTS.preference);
   };
 
   const handleApply = (event) => {
@@ -42,6 +45,7 @@ const Filter = ({ onApply, onClose = () => {} }) => {
       maxAge,
       maxDistance: Number(maxDistance),
       relationshipType,
+      preference,
     };
     if (relationshipType === 'Casual (FWB)' && sexualOrientation) {
       filters.sexualOrientation = sexualOrientation;
@@ -64,6 +68,7 @@ const Filter = ({ onApply, onClose = () => {} }) => {
     maxDistance !== DEFAULTS.maxDistance,
     Boolean(relationshipType),
     Boolean(sexualOrientation),
+    preference !== DEFAULTS.preference,
   ].filter(Boolean).length;
 
   return (
@@ -79,6 +84,21 @@ const Filter = ({ onApply, onClose = () => {} }) => {
 
       <form onSubmit={handleApply}>
         <div className="discover-filter-content">
+          <section className="filter-section" aria-labelledby="who-to-see-title">
+            <div className="filter-section-heading">
+              <h3 id="who-to-see-title">Who would you like to see?</h3>
+              <span>Show me</span>
+            </div>
+            <SelectField
+              id="preference"
+              label="Show me"
+              value={preference}
+              onChange={(event) => setPreference(event.target.value)}
+              options={[["everyone", "Everyone"], ["Female", "Women"], ["Male", "Men"]]}
+              hint="You can change this any time."
+            />
+          </section>
+
           <section className="filter-section" aria-labelledby="age-distance-title">
             <div className="filter-section-heading">
               <h3 id="age-distance-title">The basics</h3>
