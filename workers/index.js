@@ -289,7 +289,7 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
-async function enforceAccountRateLimit(env, scope, uid, limit, windowMs, message) {
+export async function enforceAccountRateLimit(env, scope, uid, limit, windowMs, message) {
   if (!env.RATE_LIMITER) return json({ error: "Abuse protection is unavailable. Please retry later." }, 503);
   try {
     const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName(scope + ":" + uid));
@@ -1584,6 +1584,10 @@ export default {
       }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (reportAction) {
+          const limited = await enforceAccountRateLimit(env, "admin-moderation", claims.sub, 30, 15 * 60 * 1000, "Moderation action limit reached. Please retry later.");
+          if (limited) return limited;
+        }
         if (!env.MONGODB_CONNECTION) return json({ message: "Report administration service unavailable." }, 503);
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
