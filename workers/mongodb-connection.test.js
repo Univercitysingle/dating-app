@@ -1128,6 +1128,39 @@ test("temporarily suspended users cannot change profile fields", async () => {
 });
 
 
+test("unmatching ends the active match without blocking either participant", async () => {
+  let capturedFilter;
+  let capturedUpdate;
+  const matches = {
+    async updateOne(filter, update) {
+      capturedFilter = filter;
+      capturedUpdate = update;
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "matches");
+    return matches;
+  } });
+  const result = await connection.unmatchUsers("z-user", "a-user");
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedFilter, { user1Uid: "a-user", user2Uid: "z-user", status: "matched" });
+  assert.equal(capturedUpdate.$set.status, "unmatched");
+  assert.equal(capturedUpdate.$set.unmatchedBy, "z-user");
+  assert.ok(capturedUpdate.$set.unmatchedAt instanceof Date);
+  assert.deepEqual(capturedUpdate.$unset, { likedBy: "" });
+});
+
+test("unmatch rejects self-targeting and missing active matches", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection() { return { async updateOne() { return { matchedCount: 0 }; } }; } });
+  assert.equal((await connection.unmatchUsers("same", "same")).status, 400);
+  assert.equal((await connection.unmatchUsers("viewer", "other")).status, 404);
+});
+
 test("blocking unmatches the pair and unblocking removes only the block entry", async () => {
   const userUpdates = [];
   const matchUpdates = [];
