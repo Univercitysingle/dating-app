@@ -27,8 +27,11 @@ const PhotoVerificationPanel = () => {
     return () => {
       if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
       streamRef.current?.getTracks().forEach(track => track.stop());
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
 
   const stopCamera = () => {
