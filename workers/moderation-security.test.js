@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MongoDBConnection } from "./mongodb-connection.js";
+import { enforceAccountRateLimit } from "./index.js";
 
 function makeConnection(db) {
   const connection = new MongoDBConnection({}, {});
@@ -122,4 +123,44 @@ test("admin audit history includes moderation events stored with actorUid and ta
   assert.equal(result.body[0].targetType, "user");
   assert.equal(result.body[0].targetId, "reported-user");
   assert.equal(result.body[0].timestamp, moderationEvent.createdAt);
+});
+
+test("account-scoped moderation limits fail closed when the limiter binding is missing", async () => {
+  const response = await enforceAccountRateLimit({}, "report-user", "reporter", 3, 3600000, "Report limit reached.");
+  assert.equal(response.status, 503);
+});
+
+test("account-scoped moderation limits return 429 and Retry-After when exhausted", async () => {
+  const env = {
+    RATE_LIMITER: {
+      idFromName(name) { assert.equal(name, "block-user:reporter"); return "limiter-id"; },
+      get(id) {
+        assert.equal(id, "limiter-id");
+        return { async fetch() {
+          return new Response(JSON.stringify({ allowed: false, resetAt: Date.now() + 30000 }), { status: 200 });
+        } };
+      }
+    }
+  };
+  const response = await enforceAccountRateLimit(env, "block-user", "reporter", 20, 3600000, "Block limit reached.");
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "30");
+  assert.deepEqual(await response.json(), { error: "Block limit reached." });
+});
+
+test("account-scoped moderation limits fail closed when the limiter service errors", async () => {
+  const env = { RATE_LIMITER: {
+    idFromName() { return "limiter-id"; },
+    get() { return { async fetch() { throw new Error("storage unavailable"); } }; }
+  } };
+  const response = await enforceAccountRateLimit(env, "unmatch-user", "reporter", 20, 3600000, "Unmatch limit reached.");
+  assert.equal(response.status, 503);
+});
+
+test("regular users cannot read admin moderation audit history", async () => {
+  const db = { collection() { assert.fail("Database query must not run for a non-admin"); } };
+  const connection = makeConnection(db);
+  connection.requireAdmin = async () => ({ status: 403, body: { message: "Forbidden" } });
+  const result = await connection.getAdminLogs("ordinary-user", "audit");
+  assert.equal(result.status, 403);
 });
