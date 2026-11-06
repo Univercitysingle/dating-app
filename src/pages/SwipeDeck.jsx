@@ -228,6 +228,7 @@ const SwipeDeck = () => {
     if (key === 'minAge') return Number(value) !== 18;
     if (key === 'maxAge') return Number(value) !== 100;
     if (key === 'maxDistance') return Number(value) !== 100;
+    if (key === 'preference') return value !== 'everyone';
     return Boolean(value);
   }).length;
 
