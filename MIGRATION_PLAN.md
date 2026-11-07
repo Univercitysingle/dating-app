@@ -85,3 +85,8 @@ Keep Firebase Realtime Database listeners for realtime updates. The Worker API v
 - Worker unit tests with mocked database bindings do not prove provider integration, storage, or payment correctness.
 - The staging workflow deploys only the isolated staging Worker. No production DNS or routing changes should be made by this migration workflow.
 - All changes remain on migrate-to-serverless. Do not merge to main or create additional branches as part of this work.
+
+
+## Documentation refresh (2026-11-07)
+
+The product and engineering documentation set is now organised under docs/product, docs/architecture, docs/features, docs/operations, docs/governance and docs/security. The root README links to the maintained catalogue. Use docs/architecture/SYSTEM_ARCHITECTURE.md for the current target architecture and this file for historical migration sequencing. Historical phase notes and dates below are retained as migration history, not necessarily current deployment state. Verify current Worker routes, bindings and workflows before acting on older instructions.
