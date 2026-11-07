@@ -35,6 +35,7 @@ const AdminSupportTicketListPage = () => {
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
   const [category, setCategory] = useState('');
+  const [sla, setSla] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -47,6 +48,7 @@ const AdminSupportTicketListPage = () => {
       if (status) params.set('status', status);
       if (priority) params.set('priority', priority);
       if (category) params.set('category', category);
+      if (sla) params.set('sla', sla);
       if (search) params.set('search', search);
       const response = await apiClient.get('/admin/support-tickets?' + params.toString());
       setTickets(Array.isArray(response?.tickets) ? response.tickets : []);
@@ -57,7 +59,7 @@ const AdminSupportTicketListPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [page, status, priority, category, search]);
+  }, [page, status, priority, category, sla, search]);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
@@ -78,6 +80,7 @@ const AdminSupportTicketListPage = () => {
     setStatus('');
     setPriority('');
     setCategory('');
+    setSla('');
     setPage(1);
   };
 
@@ -98,7 +101,7 @@ const AdminSupportTicketListPage = () => {
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px_150px_170px_auto_auto]">
+        <form onSubmit={handleSearch} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_160px_135px_150px_150px_auto_auto]">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search tickets</span>
             <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Ticket number, subject or customer" maxLength={100} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
@@ -125,11 +128,17 @@ const AdminSupportTicketListPage = () => {
               <option value="">All categories</option><option>Account</option><option>Payments</option><option>Profile</option><option>Verification</option><option>Safety</option><option>Technical</option><option>Other</option>
             </select>
           </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">SLA</span>
+            <select value={sla} onChange={event => { setPage(1); setSla(event.target.value); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">All SLA states</option><option value="overdue">Overdue</option><option value="due-soon">Due within 24 hours</option>
+            </select>
+          </label>
           <div className="flex items-end">
             <button type="submit" className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 md:w-auto">Search</button>
           </div>
           <div className="flex items-end">
-            <button type="button" onClick={clearFilters} disabled={!search && !searchInput && !status && !priority && !category} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 md:w-auto">Clear</button>
+            <button type="button" onClick={clearFilters} disabled={!search && !searchInput && !status && !priority && !category && !sla} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 md:w-auto">Clear</button>
           </div>
         </form>
       </section>
