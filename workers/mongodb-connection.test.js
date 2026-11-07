@@ -75,7 +75,10 @@ test("support ticket message edits and deletes are audited soft operations", asy
   const db = {
     collection(name) {
       if (name === "users") return { findOne: async () => ({ _id: actorId }) };
-      if (name === "supporttickets") return { findOne: async () => ({ _id: ticketId, userId: actorId }) };
+      if (name === "supporttickets") return {
+        findOne: async () => ({ _id: ticketId, userId: actorId }),
+        updateOne: async () => ({ matchedCount: 1 })
+      };
       if (name === "ticketmessages") return {
         findOne: async () => stored,
         updateOne: async (_query, update) => { stored = { ...stored, ...update.$set }; if (update.$unset) delete stored.attachments; return { matchedCount: 1 }; }
