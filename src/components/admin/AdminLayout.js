@@ -94,6 +94,15 @@ const AdminLayout = () => {
             </li>
             <li>
               <Link
+                to="/admin/purchases"
+                className="flex items-center px-3 py-2 rounded-md hover:bg-gray-700"
+              >
+                <span className="mr-4">🧾</span>
+                {!isSidebarMinimized && 'Payment Review'}
+              </Link>
+            </li>
+            <li>
+              <Link
                 to="/admin/transactions"
                 className="flex items-center px-3 py-2 rounded-md hover:bg-gray-700"
               >
