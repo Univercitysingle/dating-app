@@ -72,6 +72,29 @@ const SupportTicketDetailPage = () => {
     }
   };
 
+  const handleEditMessage = async (msg) => {
+    const nextMessage = window.prompt('Edit your message', msg.message || '');
+    if (nextMessage === null || !nextMessage.trim() || nextMessage.trim() === msg.message) return;
+    try {
+      await apiClient.patch('/support-tickets/' + ticketId + '/messages/' + msg._id, { message: nextMessage.trim() });
+      await fetchTicketDetails();
+      setActionError(null);
+    } catch (err) {
+      setActionError(getUserFriendlyError(err, 'Your message could not be edited.'));
+    }
+  };
+
+  const handleDeleteMessage = async (msg) => {
+    if (!window.confirm('Delete this message? It will be replaced with a deleted-message notice.')) return;
+    try {
+      await apiClient.delete('/support-tickets/' + ticketId + '/messages/' + msg._id);
+      await fetchTicketDetails();
+      setActionError(null);
+    } catch (err) {
+      setActionError(getUserFriendlyError(err, 'Your message could not be deleted.'));
+    }
+  };
+
   const handleSubmitFeedback = async (event) => {
     event.preventDefault();
     if (!feedbackRating || isSubmittingFeedback || ticket?.status !== 'Closed' || ticket?.customerFeedback) return;
@@ -156,8 +179,13 @@ const SupportTicketDetailPage = () => {
             <div key={msg._id} className={`flex ${msg.isFromAdmin ? 'justify-start' : 'justify-end'}`}>
               <div className={`p-4 rounded-lg max-w-lg ${msg.isFromAdmin ? 'bg-gray-200' : 'bg-primary text-white'}`}>
                 <p className="font-bold">{msg.isFromAdmin ? 'Admin' : 'You'}</p>
-                <p>{msg.message}</p>
-                {Array.isArray(msg.attachments) && msg.attachments.length > 0 && <div className="mt-3 space-y-2">
+                <p>{msg.deletedAt ? 'This message was deleted.' : msg.message}</p>
+                {msg.editedAt && !msg.deletedAt && <span className="mt-1 block text-xs opacity-70">Edited</span>}
+                {!msg.isFromAdmin && !msg.deletedAt && <div className="mt-2 flex gap-3 text-xs">
+                  <button type="button" onClick={() => handleEditMessage(msg)} className="underline">Edit</button>
+                  <button type="button" onClick={() => handleDeleteMessage(msg)} className="underline">Delete</button>
+                </div>}
+                {!msg.deletedAt && Array.isArray(msg.attachments) && msg.attachments.length > 0 && <div className="mt-3 space-y-2">
                   {msg.attachments.map((file) => <a key={file.key} href={file.url} target="_blank" rel="noreferrer" className="block underline break-all text-sm">
                     {file.type && file.type.startsWith('image/') ? 'Image: ' : 'File: '}{file.name}
                   </a>)}
