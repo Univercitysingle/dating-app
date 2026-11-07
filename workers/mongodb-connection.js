@@ -2127,13 +2127,19 @@ export class MongoDBConnection {
           );
           const changedUser = await db.collection("users").updateOne(
             { _id: subscription.userId },
-            {
-              $set: { plan: "premium", trialExpires: null, updatedAt: now },
-              ...(subscription.checkoutReservationId ? { $unset: { pendingSubscriptionCheckout: "" } } : {})
-            },
+            { $set: { plan: "premium", trialExpires: null, updatedAt: now } },
             { session }
           );
           if (!changedUser.matchedCount) throw new Error("PAYMENT_USER_MISSING");
+          // Clear only the reservation created for this order. A delayed callback
+          // must never remove a newer checkout's reservation after stale-lock recovery.
+          if (subscription.checkoutReservationId) {
+            await db.collection("users").updateOne(
+              { _id: subscription.userId, "pendingSubscriptionCheckout.reservationId": subscription.checkoutReservationId },
+              { $unset: { pendingSubscriptionCheckout: "" } },
+              { session }
+            );
+          }
         }
         outcome = { status: 200, body: { success: true, message: "Payment verified and processed successfully." } };
       });
