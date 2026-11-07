@@ -1770,6 +1770,60 @@ test("concurrent subscription checkout loses safely when the per-user reservatio
   assert.match(result.body.error, /already pending/i);
 });
 
+test("failed subscription checkout can be cancelled and releases only its own reservation", async () => {
+  const { ObjectId } = await import("mongodb");
+  const user = { _id: new ObjectId(), uid: "user-1" };
+  const orderId = "0123456789abcdef01234567";
+  const reservationId = "checkout-reservation";
+  const subscription = { _id: new ObjectId(orderId), userId: user._id, status: "pending", checkoutReservationId: reservationId };
+  let subscriptionUpdate;
+  let userUpdate;
+  const subscriptions = {
+    async findOne() { return subscription; },
+    async updateOne(filter, update) {
+      subscriptionUpdate = { filter, update };
+      subscription.status = "cancelled";
+      return { modifiedCount: 1 };
+    }
+  };
+  const users = {
+    async findOne() { return user; },
+    async updateOne(filter, update) {
+      userUpdate = { filter, update };
+      return { modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : subscriptions; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.abandonPendingSubscription("user-1", orderId);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "cancelled");
+  assert.equal(subscriptionUpdate.filter.status, "pending");
+  assert.equal(subscriptionUpdate.update.$set.cancellationReason, "checkout_start_failed");
+  assert.equal(userUpdate.filter["pendingSubscriptionCheckout.reservationId"], reservationId);
+  assert.ok(userUpdate.update.$unset.pendingSubscriptionCheckout);
+});
+
+test("subscription checkout cancellation refuses to cancel a settled payment", async () => {
+  const { ObjectId } = await import("mongodb");
+  const user = { _id: new ObjectId(), uid: "user-1" };
+  const subscription = { _id: new ObjectId("0123456789abcdef01234567"), userId: user._id, status: "active" };
+  const db = { collection(name) {
+    return name === "users"
+      ? { async findOne() { return user; } }
+      : { async findOne() { return subscription; }, async updateOne() { assert.fail("Settled payment must not be cancelled"); } };
+  } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.abandonPendingSubscription("user-1", "0123456789abcdef01234567");
+  assert.equal(result.status, 409);
+  assert.equal(result.body.status, "active");
+});
+
 test("pending WebXPay subscription checkout blocks a second checkout and expires stale attempts", async () => {
   const user = { _id: "user-object-id", uid: "user-1" };
   const pending = { _id: "pending-order" };
