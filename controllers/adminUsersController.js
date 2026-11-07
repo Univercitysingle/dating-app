@@ -399,67 +399,6 @@ const getPurchases = async (req, res) => {
   }
 };
 
-const approvePurchase = async (req, res) => {
-  try {
-    const purchaseId = req.params.purchaseId || req.params.id;
-    if (typeof purchaseId !== 'string' || !mongoose.Types.ObjectId.isValid(purchaseId)) {
-      return res.status(400).json({ message: 'Invalid purchase ID.' });
-    }
-    const purchase = await Purchase.findOneAndUpdate(
-      { _id: purchaseId, status: 'pending' },
-      { $set: { status: 'completed' } },
-      { new: true }
-    );
-
-    if (!purchase) {
-      return res.status(404).json({ message: 'Pending purchase not found' });
-    }
-
-    if (purchase.itemId === 'super-like-5') {
-      await User.updateOne({ _id: purchase.userId }, { $inc: { purchasedSuperLikes: 5 } });
-    } else if (purchase.itemId === 'undo-swipes-5') {
-      await User.updateOne({ _id: purchase.userId }, { $inc: { purchasedUndoSwipes: 5 } });
-    } else if (purchase.itemId === 'profile-boost-1') {
-      await User.updateOne(
-        { _id: purchase.userId },
-        { $set: { boostExpiresAt: new Date(Date.now() + 60 * 60 * 1000) } }
-      );
-    }
-
-    res.json({ message: 'Purchase approved successfully' });
-  } catch (error) {
-    console.error('Error approving purchase:', error);
-    res.status(500).json({ message: 'Error approving purchase', error: error.message });
-  }
-};
-
-const rejectPurchase = async (req, res) => {
-  try {
-    const purchaseId = req.params.purchaseId || req.params.id;
-    const { reason } = req.body || {};
-    if (typeof purchaseId !== 'string' || !mongoose.Types.ObjectId.isValid(purchaseId)) {
-      return res.status(400).json({ message: 'Invalid purchase ID.' });
-    }
-    if (typeof reason !== 'string' || !reason.trim() || reason.length > 500) {
-      return res.status(400).json({ message: 'A rejection reason of 1-500 characters is required.' });
-    }
-
-    const purchase = await Purchase.findOneAndUpdate(
-      { _id: purchaseId, status: 'pending' },
-      { $set: { status: 'rejected', rejectionReason: reason.trim() } },
-      { new: true }
-    );
-
-    if (!purchase) {
-      return res.status(404).json({ message: 'Pending purchase not found' });
-    }
-
-    res.json({ message: 'Purchase rejected successfully' });
-  } catch (error) {
-    console.error('Error rejecting purchase:', error);
-    res.status(500).json({ message: 'Error rejecting purchase', error: error.message });
-  }
-};
 
 module.exports = {
   getDashboardStats,
@@ -470,6 +409,4 @@ module.exports = {
   deleteUserById,
   updateUserSubscription,
   getPurchases,
-  approvePurchase,
-  rejectPurchase,
 };
