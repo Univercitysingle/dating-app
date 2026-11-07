@@ -25,6 +25,8 @@ const AdminSupportTicketListPage = () => {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [priority, setPriority] = useState('');
+  const [category, setCategory] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -35,6 +37,8 @@ const AdminSupportTicketListPage = () => {
     try {
       const params = new URLSearchParams({ page: String(page), limit: '10' });
       if (status) params.set('status', status);
+      if (priority) params.set('priority', priority);
+      if (category) params.set('category', category);
       if (search) params.set('search', search);
       const response = await apiClient.get('/admin/support-tickets?' + params.toString());
       setTickets(Array.isArray(response?.tickets) ? response.tickets : []);
@@ -45,7 +49,7 @@ const AdminSupportTicketListPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [page, status, search]);
+  }, [page, status, priority, category, search]);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
@@ -64,6 +68,8 @@ const AdminSupportTicketListPage = () => {
     setSearchInput('');
     setSearch('');
     setStatus('');
+    setPriority('');
+    setCategory('');
     setPage(1);
   };
 
@@ -84,7 +90,7 @@ const AdminSupportTicketListPage = () => {
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto_auto]">
+        <form onSubmit={handleSearch} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px_150px_170px_auto_auto]">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search tickets</span>
             <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Ticket number, subject or customer" maxLength={100} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
@@ -99,11 +105,23 @@ const AdminSupportTicketListPage = () => {
               <option value="Closed">Closed</option>
             </select>
           </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Priority</span>
+            <select value={priority} onChange={event => { setPage(1); setPriority(event.target.value); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">All priorities</option><option>Urgent</option><option>High</option><option>Normal</option><option>Low</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Category</span>
+            <select value={category} onChange={event => { setPage(1); setCategory(event.target.value); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">All categories</option><option>Account</option><option>Payments</option><option>Profile</option><option>Verification</option><option>Safety</option><option>Technical</option><option>Other</option>
+            </select>
+          </label>
           <div className="flex items-end">
             <button type="submit" className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 md:w-auto">Search</button>
           </div>
           <div className="flex items-end">
-            <button type="button" onClick={clearFilters} disabled={!search && !searchInput && !status} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 md:w-auto">Clear</button>
+            <button type="button" onClick={clearFilters} disabled={!search && !searchInput && !status && !priority && !category} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 md:w-auto">Clear</button>
           </div>
         </form>
       </section>
@@ -117,10 +135,10 @@ const AdminSupportTicketListPage = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
-            <thead><tr><th>Ticket</th><th>Customer</th><th>Subject</th><th>Status</th><th>Last updated</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th>Ticket</th><th>Customer</th><th>Subject</th><th>Status</th><th>Priority</th><th>Category</th><th>Last updated</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan="6" className="py-12 text-center"><span className="inline-flex items-center gap-3 text-sm text-slate-500"><span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />Loading support inbox…</span></td></tr>
+                <tr><td colSpan="8" className="py-12 text-center"><span className="inline-flex items-center gap-3 text-sm text-slate-500"><span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />Loading support inbox…</span></td></tr>
               ) : error ? (
                 <tr><td colSpan="6" className="py-10 text-center text-sm text-slate-500">The queue could not be loaded. Use the retry action above.</td></tr>
               ) : tickets.length === 0 ? (
@@ -131,6 +149,8 @@ const AdminSupportTicketListPage = () => {
                   <td><span className="font-medium text-slate-800">{ticket.userId?.name || 'Unknown user'}</span>{ticket.userId?.email && <span className="mt-0.5 block text-xs text-slate-400">{ticket.userId.email}</span>}</td>
                   <td><span className="block max-w-[280px] truncate font-medium text-slate-700" title={ticket.subject}>{ticket.subject || 'No subject'}</span></td>
                   <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusStyle(ticket.status)}`}>{ticket.status || 'Unknown'}</span></td>
+                  <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ticket.priority === 'Urgent' ? 'bg-rose-100 text-rose-800' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600'}`}>{ticket.priority || 'Normal'}</span></td>
+                  <td><span className="text-xs text-slate-600">{ticket.category || 'Other'}</span></td>
                   <td><span className="whitespace-nowrap text-xs text-slate-500">{formatDate(ticket.updatedAt)}</span></td>
                   <td className="text-right"><Link to={`/admin/support-tickets/${ticket._id}`} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50">Open <span aria-hidden="true">→</span></Link></td>
                 </tr>
