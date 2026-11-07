@@ -26,6 +26,7 @@ const AdminSupportTicketDetailPage = () => {
   const [newCategory, setNewCategory] = useState('Other');
   const [staff, setStaff] = useState([]);
   const [assignedToUid, setAssignedToUid] = useState('');
+  const [resolutionSummary, setResolutionSummary] = useState('');
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [attachments, setAttachments] = useState([]);
 
@@ -42,6 +43,7 @@ const AdminSupportTicketDetailPage = () => {
       setNewCategory(response.ticket?.category || 'Other');
       setStaff(Array.isArray(response.staff) ? response.staff : []);
       setAssignedToUid(response.ticket?.assignedToUid || '');
+      setResolutionSummary(response.ticket?.resolutionSummary || '');
     } catch (err) {
       setError(err.data?.message || err.message || 'Unable to load this support ticket.');
     } finally {
@@ -115,6 +117,13 @@ const AdminSupportTicketDetailPage = () => {
     if (newPriority !== (ticket?.priority || 'Normal')) changes.priority = newPriority;
     if (newCategory !== (ticket?.category || 'Other')) changes.category = newCategory;
     if (assignedToUid !== (ticket?.assignedToUid || '')) changes.assignedToUid = assignedToUid || null;
+    if (newStatus === 'Closed' && resolutionSummary.trim() !== (ticket?.resolutionSummary || '')) {
+      changes.resolutionSummary = resolutionSummary.trim();
+    }
+    if (newStatus === 'Closed' && !resolutionSummary.trim()) {
+      setError('Add a resolution summary before closing this ticket.');
+      return;
+    }
     if (!Object.keys(changes).length) return;
     setIsSavingStatus(true);
     setError(null);
@@ -179,12 +188,22 @@ const AdminSupportTicketDetailPage = () => {
                   <option value="">Unassigned</option>{staff.map(person => <option key={person.uid} value={person.uid}>{person.name} ({person.role})</option>)}
                 </select>
               </label>
-              <button type="button" onClick={handleUpdateStatus} disabled={isSavingStatus || (newStatus === ticket.status && newPriority === (ticket.priority || 'Normal') && newCategory === (ticket.category || 'Other') && assignedToUid === (ticket.assignedToUid || ''))} className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">{isSavingStatus ? 'Saving…' : 'Save changes'}</button>
+              {newStatus === 'Closed' && <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Resolution summary <span className="text-rose-600">*</span></span>
+                <textarea rows="4" maxLength={2000} value={resolutionSummary} onChange={event => setResolutionSummary(event.target.value)} placeholder="Summarize the issue, action taken, and outcome for the customer." className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-5" />
+                <span className="mt-1 block text-[11px] text-slate-500">Required to close. Up to 2,000 characters.</span>
+              </label>}
+              <button type="button" onClick={handleUpdateStatus} disabled={isSavingStatus || (newStatus === ticket.status && newPriority === (ticket.priority || 'Normal') && newCategory === (ticket.category || 'Other') && assignedToUid === (ticket.assignedToUid || '') && (newStatus !== 'Closed' || resolutionSummary.trim() === (ticket.resolutionSummary || '')))} className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">{isSavingStatus ? 'Saving…' : ticket.status === 'Closed' && newStatus !== 'Closed' ? 'Reopen ticket' : newStatus === 'Closed' && ticket.status !== 'Closed' ? 'Close ticket' : 'Save changes'}</button>
             </div>
             <p className="mt-2 text-xs text-slate-500"><span className="font-semibold">SLA deadline:</span> {ticket.slaDueAt ? formatDate(ticket.slaDueAt) : 'Set when ticket is updated'}{ticket.slaDueAt && new Date(ticket.slaDueAt).getTime() < Date.now() && ticket.status !== 'Closed' && <span className="ml-1 font-bold text-rose-700">Overdue</span>}<br />Metadata changes do not send a customer message.</p>
           </div>
         </div>
       </section>
+
+      {ticket.status === 'Closed' && ticket.resolutionSummary && <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+        <h2 className="text-sm font-bold text-emerald-900">Resolution summary</h2>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-900">{ticket.resolutionSummary}</p>
+        {ticket.resolvedAt && <p className="mt-2 text-xs text-emerald-700">Resolved {formatDate(ticket.resolvedAt)}</p>}
+      </section>}
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
