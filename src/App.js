@@ -28,6 +28,7 @@ import AdminPhotoVerificationsPage from './pages/admin/AdminPhotoVerificationsPa
 import AdminReportDetailPage from './pages/admin/AdminReportDetailPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import AdminTransactionsPage from './pages/admin/AdminTransactionsPage';
+import AdminStorePurchasesPage from './pages/admin/AdminStorePurchasesPage';
 import AdminSupportTicketListPage from './pages/admin/AdminSupportTicketListPage';
 import AdminSupportTicketDetailPage from './pages/admin/AdminSupportTicketDetailPage';
 import SwipeDeck from './pages/SwipeDeck';
@@ -239,6 +240,7 @@ function App() {
               <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
               <Route path="analytics" element={<AdminAnalyticsPage />} />
               <Route path="transactions" element={<AdminTransactionsPage />} />
+              <Route path="purchases" element={<AdminStorePurchasesPage />} />
               <Route path="support-tickets" element={<AdminSupportTicketListPage />} />
               <Route path="support-tickets/:ticketId" element={<AdminSupportTicketDetailPage />} />
             </Route>
