@@ -3586,6 +3586,98 @@ test("admin private notes are stored as internal and do not move the customer-fa
   assert.ok(updates[0].$set.updatedAt instanceof Date);
 });
 
+test("admin must provide a resolution summary before closing a support ticket", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ticketId = "507f1f77bcf86cd799439031";
+  const ticketObjectId = new ObjectId(ticketId);
+  const updates = [];
+  const audits = [];
+  const current = { _id: ticketObjectId, status: "In Progress", priority: "Normal", slaDueAt: new Date() };
+  const tickets = {
+    findOne: async () => current,
+    findOneAndUpdate: async (query, update) => {
+      updates.push(update);
+      return { value: { ...current, ...update.$set } };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "supporttickets") return tickets;
+      if (name === "auditlogs") return { insertOne: async entry => { audits.push(entry); } };
+      if (name === "users") return { findOne: async () => ({ _id: new ObjectId("507f1f77bcf86cd799439032") }) };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const missing = await connection.updateAdminSupportStatus("admin-uid", ticketId, { status: "Closed" });
+  assert.equal(missing.status, 400);
+  assert.match(missing.body.message, /resolution summary/i);
+  assert.equal(updates.length, 0);
+
+  const closed = await connection.updateAdminSupportStatus("admin-uid", ticketId, {
+    status: "Closed",
+    resolutionSummary: "Payment was reconciled and the missing receipt was sent."
+  });
+  assert.equal(closed.status, 200);
+  assert.equal(updates[0].$set.status, "Closed");
+  assert.equal(updates[0].$set.resolutionSummary, "Payment was reconciled and the missing receipt was sent.");
+  assert.ok(updates[0].$set.resolvedAt instanceof Date);
+  assert.equal(updates[0].$set.resolvedByUid, "admin-uid");
+  assert.equal(audits.length, 1);
+  assert.ok(audits[0].changes.some(change => change.field === "resolutionSummary"));
+});
+
+test("customer reply reopens a closed support ticket and resets its SLA", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ticketId = "507f1f77bcf86cd799439041";
+  const ticketObjectId = new ObjectId(ticketId);
+  const userId = new ObjectId("507f1f77bcf86cd799439042");
+  const updates = [];
+  const audits = [];
+  const ticket = {
+    _id: ticketObjectId, userId, status: "Closed", priority: "High",
+    resolutionSummary: "The original issue was resolved."
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ _id: userId }) };
+      if (name === "supporttickets") return {
+        findOne: async () => ticket,
+        updateOne: async (query, update) => { updates.push(update); return { modifiedCount: 1 }; }
+      };
+      if (name === "ticketmessages") return {
+        insertOne: async message => ({ insertedId: new ObjectId("507f1f77bcf86cd799439043") })
+      };
+      if (name === "auditlogs") return {
+        insertOne: async entry => { audits.push(entry); }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.addSupportTicketMessage("customer-uid", ticketId, {
+    message: "The issue has happened again. Please reopen this."
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(updates[0].$set.status, "Open");
+  assert.equal(updates[0].$set.resolutionSummary, null);
+  assert.equal(updates[0].$set.resolvedAt, null);
+  assert.equal(updates[0].$set.resolvedByUid, null);
+  assert.ok(updates[0].$set.slaDueAt instanceof Date);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].actorType, "customer");
+  assert.ok(audits[0].changes.some(change => change.field === "status" && change.to === "Open"));
+});
+
 test("customer ticket detail never returns private admin notes", async () => {
   const { ObjectId } = await import("mongodb");
   const ticketId = "507f1f77bcf86cd799439021";
