@@ -3862,6 +3862,16 @@ export class MongoDBConnection {
       if (!allowedStatuses.includes(params.status)) return { status: 400, body: { message: "Invalid ticket status" } };
       query.status = params.status;
     }
+    const allowedPriorities = ["Urgent", "High", "Normal", "Low"];
+    const allowedCategories = ["Account", "Payments", "Profile", "Verification", "Safety", "Technical", "Other"];
+    if (typeof params.priority === "string" && params.priority) {
+      if (!allowedPriorities.includes(params.priority)) return { status: 400, body: { message: "Invalid ticket priority" } };
+      query.priority = params.priority;
+    }
+    if (typeof params.category === "string" && params.category) {
+      if (!allowedCategories.includes(params.category)) return { status: 400, body: { message: "Invalid ticket category" } };
+      query.category = params.category;
+    }
     const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
     try {
       const db = this.getDatabase(await this.getClient());
@@ -3973,13 +3983,29 @@ export class MongoDBConnection {
     if (access.status !== 200) return access;
     if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId)) return { status: 400, body: { message: "Invalid ticket ID" } };
     const allowedStatuses = ["Open", "In Progress", "Waiting for Customer", "Closed"];
-    if (!payload || !allowedStatuses.includes(payload.status)) return { status: 400, body: { message: "Invalid ticket status" } };
+    const allowedPriorities = ["Urgent", "High", "Normal", "Low"];
+    const allowedCategories = ["Account", "Payments", "Profile", "Verification", "Safety", "Technical", "Other"];
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { status: 400, body: { message: "Invalid ticket update" } };
+    const changes = {};
+    if (Object.prototype.hasOwnProperty.call(payload, "status")) {
+      if (!allowedStatuses.includes(payload.status)) return { status: 400, body: { message: "Invalid ticket status" } };
+      changes.status = payload.status;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "priority")) {
+      if (!allowedPriorities.includes(payload.priority)) return { status: 400, body: { message: "Invalid ticket priority" } };
+      changes.priority = payload.priority;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "category")) {
+      if (!allowedCategories.includes(payload.category)) return { status: 400, body: { message: "Invalid ticket category" } };
+      changes.category = payload.category;
+    }
+    if (!Object.keys(changes).length) return { status: 400, body: { message: "At least one ticket field must be updated" } };
     try {
       const { ObjectId } = await import("mongodb");
       const db = this.getDatabase(await this.getClient());
       const result = await db.collection("supporttickets").findOneAndUpdate(
         { _id: new ObjectId(ticketId) },
-        { $set: { status: payload.status, updatedAt: new Date() } },
+        { $set: { ...changes, updatedAt: new Date() } },
         { returnDocument: "after" }
       );
       if (!result) return { status: 404, body: { message: "Ticket not found" } };
