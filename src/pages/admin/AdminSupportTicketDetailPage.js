@@ -14,6 +14,7 @@ const AdminSupportTicketDetailPage = () => {
   const { ticketId } = useParams();
   const [ticket, setTicket] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
@@ -35,6 +36,7 @@ const AdminSupportTicketDetailPage = () => {
       const response = await apiClient.get('/admin/support-tickets/' + ticketId);
       setTicket(response.ticket);
       setMessages(Array.isArray(response.messages) ? response.messages : []);
+      setHistory(Array.isArray(response.history) ? response.history : []);
       setNewStatus(response.ticket?.status || 'Open');
       setNewPriority(response.ticket?.priority || 'Normal');
       setNewCategory(response.ticket?.category || 'Other');
@@ -97,6 +99,7 @@ const AdminSupportTicketDetailPage = () => {
         const refreshed = await apiClient.get('/admin/support-tickets/' + ticketId);
         setTicket(refreshed.ticket);
         setMessages(Array.isArray(refreshed.messages) ? refreshed.messages : []);
+        setHistory(Array.isArray(refreshed.history) ? refreshed.history : []);
         setNewStatus(refreshed.ticket?.status || 'Waiting for Customer');
       }
     } catch (err) {
@@ -180,6 +183,23 @@ const AdminSupportTicketDetailPage = () => {
             </div>
             <p className="mt-2 text-xs text-slate-500"><span className="font-semibold">SLA deadline:</span> {ticket.slaDueAt ? formatDate(ticket.slaDueAt) : 'Set when ticket is updated'}{ticket.slaDueAt && new Date(ticket.slaDueAt).getTime() < Date.now() && ticket.status !== 'Closed' && <span className="ml-1 font-bold text-rose-700">Overdue</span>}<br />Metadata changes do not send a customer message.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="font-bold text-slate-900">Ticket audit history</h2>
+          <p className="mt-1 text-xs text-slate-500">Administrative changes, newest first.</p>
+        </div>
+        <div className="divide-y divide-slate-100 px-5">
+          {history.length === 0 ? <p className="py-4 text-sm text-slate-500">No administrative changes recorded yet.</p> : history.map((entry, index) => (
+            <div key={entry._id || index} className="py-3">
+              <p className="text-xs text-slate-500">{formatDate(entry.createdAt)}</p>
+              <ul className="mt-1 space-y-1">{(Array.isArray(entry.changes) ? entry.changes : []).map((change, changeIndex) => (
+                <li key={changeIndex} className="text-sm text-slate-700"><strong>{change.field}</strong>: {change.from === null ? 'Not set' : String(change.from)} <span aria-hidden="true">→</span> {change.to === null ? 'Unassigned' : String(change.to)}</li>
+              ))}</ul>
+            </div>
+          ))}
         </div>
       </section>
 
