@@ -56,15 +56,21 @@ function ConversationsPage() {
     if (!currentUser) return undefined;
     fetchConversations();
 
-    const poll = () => {
-      if (document.visibilityState === 'visible') fetchConversations({ silent: true });
+    const onConversationsUpdated = (event) => {
+      if (mountedRef.current && Array.isArray(event.detail)) {
+        const nextConversations = [...event.detail].sort((left, right) => {
+          const leftTime = new Date(left.lastMessage?.timestamp || 0).getTime() || 0;
+          const rightTime = new Date(right.lastMessage?.timestamp || 0).getTime() || 0;
+          if (rightTime !== leftTime) return rightTime - leftTime;
+          return String(right.lastMessage?._id || '').localeCompare(String(left.lastMessage?._id || ''));
+        });
+        setConversations(nextConversations);
+      }
     };
-    const interval = window.setInterval(poll, 5000);
-    document.addEventListener('visibilitychange', poll);
+    window.addEventListener('dating-app-conversations-updated', onConversationsUpdated);
     return () => {
       mountedRef.current = false;
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', poll);
+      window.removeEventListener('dating-app-conversations-updated', onConversationsUpdated);
     };
   }, [currentUser?.uid, fetchConversations]);
 
