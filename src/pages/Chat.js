@@ -453,6 +453,31 @@ function Chat() {
     }
   };
 
+  const handleEditMessage = async (message) => {
+    if (!message?._id || !/^[a-fA-F0-9]{24}$/.test(String(message._id)) || message.deletedAt) return;
+    const nextContent = window.prompt('Edit your message', message.messageContent || '');
+    if (nextContent === null || !nextContent.trim() || nextContent.trim() === message.messageContent) return;
+    try {
+      const updated = await apiClient.patch('/chat/messages/' + encodeURIComponent(message._id), { messageContent: nextContent.trim() });
+      addMessage({ ...message, ...updated, _id: String(updated._id || message._id), roomId: chatId });
+      setError(null);
+    } catch (requestError) {
+      setError(requestError?.data?.error || requestError?.message || 'Could not edit this message.');
+    }
+  };
+
+  const handleDeleteMessage = async (message) => {
+    if (!message?._id || !/^[a-fA-F0-9]{24}$/.test(String(message._id)) || message.deletedAt) return;
+    if (!window.confirm('Delete this message? The conversation will show a deleted-message placeholder.')) return;
+    try {
+      await apiClient.delete('/chat/messages/' + encodeURIComponent(message._id));
+      addMessage({ ...message, messageContent: 'This message was deleted.', deletedAt: new Date().toISOString() });
+      setError(null);
+    } catch (requestError) {
+      setError(requestError?.data?.error || requestError?.message || 'Could not delete this message.');
+    }
+  };
+
   const handleInputChange = (e) => {
     const value = e.target.value;
     setInput(value);
@@ -536,6 +561,8 @@ function Chat() {
                 message={msg}
                 currentUser={user}
                 otherUser={otherUser}
+                onEdit={handleEditMessage}
+                onDelete={handleDeleteMessage}
               />
             </div>
           ))}
