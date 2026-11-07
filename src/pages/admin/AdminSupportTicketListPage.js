@@ -18,6 +18,14 @@ const formatDate = (value) => {
     : 'Not available';
 };
 
+const slaState = (ticket) => {
+  if (!ticket.slaDueAt) return 'Not set';
+  const due = new Date(ticket.slaDueAt);
+  if (Number.isNaN(due.getTime())) return 'Not set';
+  if (ticket.status !== 'Closed' && due.getTime() < Date.now()) return 'Overdue';
+  return formatDate(ticket.slaDueAt);
+};
+
 const AdminSupportTicketListPage = () => {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,12 +143,12 @@ const AdminSupportTicketListPage = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
-            <thead><tr><th>Ticket</th><th>Customer</th><th>Subject</th><th>Status</th><th>Priority</th><th>Category</th><th>Last updated</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th>Ticket</th><th>Customer</th><th>Subject</th><th>Status</th><th>Priority</th><th>Category</th><th>Assignment</th><th>SLA</th><th>Last updated</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan="8" className="py-12 text-center"><span className="inline-flex items-center gap-3 text-sm text-slate-500"><span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />Loading support inbox…</span></td></tr>
+                <tr><td colSpan="10" className="py-12 text-center"><span className="inline-flex items-center gap-3 text-sm text-slate-500"><span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />Loading support inbox…</span></td></tr>
               ) : error ? (
-                <tr><td colSpan="6" className="py-10 text-center text-sm text-slate-500">The queue could not be loaded. Use the retry action above.</td></tr>
+                <tr><td colSpan="10" className="py-10 text-center text-sm text-slate-500">The queue could not be loaded. Use the retry action above.</td></tr>
               ) : tickets.length === 0 ? (
                 <tr><td colSpan="6" className="px-5 py-14 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-xl text-emerald-600">✓</div><p className="mt-3 font-semibold text-slate-800">No matching tickets</p><p className="mt-1 text-sm text-slate-500">Try another search or clear the filters.</p></td></tr>
               ) : tickets.map((ticket) => (
@@ -151,6 +159,8 @@ const AdminSupportTicketListPage = () => {
                   <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusStyle(ticket.status)}`}>{ticket.status || 'Unknown'}</span></td>
                   <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ticket.priority === 'Urgent' ? 'bg-rose-100 text-rose-800' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600'}`}>{ticket.priority || 'Normal'}</span></td>
                   <td><span className="text-xs text-slate-600">{ticket.category || 'Other'}</span></td>
+                  <td><span className="text-xs text-slate-600">{ticket.assignedToUid ? 'Assigned' : 'Unassigned'}</span></td>
+                  <td><span className={`whitespace-nowrap text-xs font-semibold ${slaState(ticket) === 'Overdue' ? 'text-rose-700' : 'text-slate-500'}`}>{slaState(ticket)}</span></td>
                   <td><span className="whitespace-nowrap text-xs text-slate-500">{formatDate(ticket.updatedAt)}</span></td>
                   <td className="text-right"><Link to={`/admin/support-tickets/${ticket._id}`} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50">Open <span aria-hidden="true">→</span></Link></td>
                 </tr>
