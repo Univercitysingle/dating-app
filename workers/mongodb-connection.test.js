@@ -1382,6 +1382,40 @@ test("Dark Fantasy API remains unavailable by default without feature approval f
 });
 
 
+test("successful profile boost payment grants exactly 30 minutes of visibility", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "0123456789abcdef01234567";
+  const userId = new ObjectId("abcdef0123456789abcdef01");
+  const purchase = { _id: new ObjectId(orderId), userId, itemId: "profile-boost-1", status: "pending" };
+  const purchases = {
+    async findOne() { return purchase; },
+    async updateOne(query, update) { Object.assign(purchase, update.$set || {}); return { modifiedCount: 1 }; }
+  };
+  const subscriptions = { async findOne() { assert.fail("A store purchase must not be treated as a subscription"); } };
+  let userUpdate;
+  const users = {
+    async updateOne(query, update) { userUpdate = update; return { matchedCount: 1 }; }
+  };
+  const db = { collection(name) {
+    if (name === "purchases") return purchases;
+    if (name === "subscriptions") return subscriptions;
+    if (name === "users") return users;
+    assert.fail("Unexpected collection " + name);
+  } };
+  const session = { async withTransaction(callback) { return callback(); }, async endSession() {} };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+  const before = Date.now();
+  const result = await connection.settleWebXPay(orderId, "00", "provider-reference");
+  const after = Date.now();
+  assert.equal(result.status, 200);
+  assert.equal(purchase.status, "completed");
+  assert.ok(userUpdate.$set.boostExpiresAt instanceof Date);
+  assert.ok(userUpdate.$set.boostExpiresAt.getTime() >= before + 30 * 60 * 1000);
+  assert.ok(userUpdate.$set.boostExpiresAt.getTime() <= after + 30 * 60 * 1000);
+});
+
 test("successful Dark Fantasy payment settlement grants a separate 30-day entitlement", async () => {
   const { ObjectId } = await import("mongodb");
   const orderId = "0123456789abcdef01234567";
