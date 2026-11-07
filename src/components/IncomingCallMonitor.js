@@ -239,7 +239,7 @@ export default function IncomingCallMonitor() {
       try {
         const [notifications, conversations] = await Promise.all([
           apiClient.get('/notifications').catch(() => []),
-          apiClient.get('/chat/conversations').catch(() => [])
+          apiClient.get('/chat/conversations').catch(() => null)
         ]);
         if (!mounted) return;
 
