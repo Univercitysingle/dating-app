@@ -56,7 +56,9 @@ const SupportTicketDetailPage = () => {
         message: newMessage || 'Attachments added.',
         attachments: uploaded
       });
-      setMessages([...messages, response]);
+      const refreshed = await apiClient.get(`/support-tickets/${ticketId}`);
+      setTicket(refreshed.ticket);
+      setMessages(Array.isArray(refreshed.messages) ? refreshed.messages : []);
       setNewMessage('');
       setAttachments([]);
     } catch (err) {
@@ -95,6 +97,11 @@ const SupportTicketDetailPage = () => {
           </span>
         </div>
 
+        {ticket.status === 'Closed' && <div role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          This ticket is closed. Sending a new reply will reopen it and notify the support team.
+          {ticket.resolutionSummary && <p className="mt-2"><strong>Previous resolution:</strong> {ticket.resolutionSummary}</p>}
+        </div>}
+
         <div className="border-t border-gray-200 mt-4 pt-4 space-y-4">
           {messages.map((msg) => (
             <div key={msg._id} className={`flex ${msg.isFromAdmin ? 'justify-start' : 'justify-end'}`}>
@@ -130,7 +137,7 @@ const SupportTicketDetailPage = () => {
               disabled={isSending}
               className="mt-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-60"
             >
-              {isSending ? "Sending..." : "Send"}
+              {isSending ? "Sending..." : ticket.status === 'Closed' ? "Reply and reopen ticket" : "Send"}
             </button>
           </form>
         </div>
