@@ -3075,3 +3075,32 @@ test("late successful WebXPay callback flags a cancelled subscription for refund
   assert.equal(subscription.refundReason, "late_success_after_cancelled_checkout");
   assert.equal(userUpdates, 0);
 });
+
+
+test("admin purchase list accepts refund_required as a filter and returns only flagged records", async () => {
+  const connection = new MongoDBConnection({}, {});
+  let match;
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({
+    db: () => ({
+      collection: () => ({
+        aggregate(pipeline) {
+          match = pipeline[0].$match;
+          return { toArray: async () => [{ _id: "purchase-1", status: "refund_required" }] };
+        }
+      })
+    })
+  });
+
+  const result = await connection.getAdminPurchases("admin-uid", "refund_required");
+  assert.equal(result.status, 200);
+  assert.deepEqual(match, { status: "refund_required" });
+  assert.equal(result.body[0].status, "refund_required");
+});
+
+test("admin purchase list rejects unknown status filters", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  const result = await connection.getAdminPurchases("admin-uid", "unrecognized");
+  assert.equal(result.status, 400);
+});
