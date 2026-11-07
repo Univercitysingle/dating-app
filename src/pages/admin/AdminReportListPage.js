@@ -75,7 +75,7 @@ const AdminReportListPage = () => {
       }
       await apiClient.post(`/admin/reports/${reportId}/action`, payload);
       alert(`Action '${action}' successful.`);
-      fetchReports(currentPage, filterStatus);
+      fetchReports(currentPage, filterStatus, searchQuery);
     } catch (err) {
       alert(`Error: ${err.message}`);
     }
