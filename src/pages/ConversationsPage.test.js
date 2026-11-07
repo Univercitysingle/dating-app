@@ -88,4 +88,5 @@ describe('ConversationsPage inbox synchronization', () => {
       jest.advanceTimersByTime(60000);
     });
     expect(apiClient.get).toHaveBeenCalledTimes(1);
-  });});
+  });
+});
