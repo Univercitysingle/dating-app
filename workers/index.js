@@ -274,7 +274,7 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
   ).join("\n");
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Redirecting to secure payment</title></head><body>' +
     '<p>Redirecting to WebXPay securely…</p>' +
-    '<form action="https://stagingxpay.info/index.php?route=checkout/billing" id="webxpay-form" method="post">' +
+    '<form action="https://stagingxpay.info/index.php?route=checkout/billing" id="webxpay-form" data-order-id="' + escapeHtml(order.orderId) + '" method="post">' +
     inputs + '</form><script nonce="' + nonce + '">document.getElementById("webxpay-form").submit();</script></body></html>';
   return new Response(html, {
     status: 200,
@@ -1956,6 +1956,29 @@ export default {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
         return json({ error: "Subscription service unavailable" }, 503);
+      }
+    }
+
+    if (url.pathname === "/api/subscription/abandon") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Subscription service unavailable" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload.orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(payload.orderId)) {
+          return json({ error: "Invalid checkout request." }, 400);
+        }
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
+        const response = await connection.fetch("https://internal.invalid/internal/subscription-abandon", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, orderId: payload.orderId })
+        });
+        const body = await response.json().catch(() => ({ error: "Subscription checkout recovery unavailable." }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Subscription checkout recovery unavailable." }, 503);
       }
     }
 
