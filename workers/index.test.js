@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm } from "./index.js";
 import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
@@ -1526,6 +1526,29 @@ test("scheduled handler only runs in staging and delegates to the MongoDB Durabl
   await worker.scheduled({ cron: "0 * * * *" }, { MIGRATION_STAGE: "production" }, { waitUntil() { assert.fail("production job must not run before cutover"); } });
 });
 
+
+test("WebXPay checkout form includes the documented CMS and encryption mechanism fields", async () => {
+  const { publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 1024,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const response = buildWebXPayCheckoutForm({
+    orderId: "0123456789abcdef01234567",
+    price: 800,
+    user: { name: "Test User", email: "test@example.com", contactNumber: "+94771234567" }
+  }, {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    WEBXPAY_SECRET_KEY: "test-secret",
+    FRONTEND_URL: "https://dating-app-staging.pages.dev"
+  }, "/premium", "Monthly Subscription");
+  const html = await response.text();
+  assert.match(html, /name="cms" value="PHP"/);
+  assert.match(html, /name="enc_method" value="JCs3J\+6oSz4V0LgE0zi\/Bg=="/);
+  assert.match(html, /name="secret_key" value="test-secret"/);
+  assert.match(html, /name="payment" value="[A-Za-z0-9+/=]+"/);
+  assert.doesNotMatch(html, /name="items"/);
+});
 
 test("WebXPay callback verifies the signed response before asking MongoDB to settle", async () => {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", {
