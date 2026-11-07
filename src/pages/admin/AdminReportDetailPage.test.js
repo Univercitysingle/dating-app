@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import AdminReportDetailPage from './AdminReportDetailPage';
@@ -36,7 +37,7 @@ describe('AdminReportDetailPage', () => {
   });
 
   test('renders the populated reporter and reported user objects', async () => {
-    render(<AdminReportDetailPage />);
+    render(<MemoryRouter><AdminReportDetailPage /></MemoryRouter>);
 
     expect(await screen.findByText('Reported Member')).toBeInTheDocument();
     expect(screen.getByText('Reporter Member')).toBeInTheDocument();
