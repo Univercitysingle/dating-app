@@ -3550,6 +3550,29 @@ test("admin support inbox searches safely and returns total pagination metadata"
   assert.equal(capturedUserQuery.$or.some(item => Object.hasOwn(item, "email")), false);
 });
 
+test("admin support inbox applies overdue SLA filtering server-side", async () => {
+  let capturedQuery;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "supporttickets") return {
+      find(query) {
+        capturedQuery = query;
+        return { sort() { return this; }, skip() { return this; }, limit() { return this; }, toArray: async () => [] };
+      },
+      countDocuments: async () => 0
+    };
+    assert.fail("Unexpected collection: " + name);
+  } });
+  const result = await connection.getAdminSupportTickets("admin-uid", { sla: "overdue" });
+  assert.equal(result.status, 200);
+  assert.ok(capturedQuery.$and.some(clause => clause.slaDueAt?.$lt instanceof Date));
+  assert.ok(capturedQuery.$and.some(clause => clause.status?.$ne === "Closed"));
+  const invalid = await connection.getAdminSupportTickets("admin-uid", { sla: "unknown" });
+  assert.equal(invalid.status, 400);
+});
+
 test("admin private notes are stored as internal and do not move the customer-facing status", async () => {
   const { ObjectId } = await import("mongodb");
   const ticketId = "507f1f77bcf86cd799439011";
