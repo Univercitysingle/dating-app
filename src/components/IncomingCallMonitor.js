@@ -186,6 +186,7 @@ export default function IncomingCallMonitor() {
       if (callInFlight) return;
       callInFlight = true;
       try {
+        if (document.visibilityState !== 'visible') return;
         const result = await apiClient.get('/calls/incoming');
         if (!mounted) return;
         const call = result?.call;
@@ -233,7 +234,7 @@ export default function IncomingCallMonitor() {
     };
 
     const checkActivity = async () => {
-      if (activityInFlight) return;
+      if (activityInFlight || document.visibilityState !== 'visible') return;
       activityInFlight = true;
       try {
         const [notifications, conversations] = await Promise.all([
@@ -271,6 +272,7 @@ export default function IncomingCallMonitor() {
         }
 
         if (Array.isArray(conversations)) {
+          window.dispatchEvent(new CustomEvent('dating-app-conversations-updated', { detail: conversations }));
           const currentIds = new Set();
           conversations.forEach(conversation => {
             const message = conversation.lastMessage;
@@ -303,8 +305,17 @@ export default function IncomingCallMonitor() {
       checkCall();
       checkActivity();
     });
-    callTimer = window.setInterval(checkCall, 2500);
-    activityTimer = window.setInterval(checkActivity, 10000);
+    // Keep call detection responsive without issuing a request every 2.5 seconds.
+    // Inbox and notification refreshes share one 30-second activity cycle.
+    callTimer = window.setInterval(checkCall, 10000);
+    activityTimer = window.setInterval(checkActivity, 30000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkCall();
+        checkActivity();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       mounted = false;
@@ -314,6 +325,7 @@ export default function IncomingCallMonitor() {
       window.removeEventListener('pointerdown', unlockOnFirstGesture);
       window.removeEventListener('keydown', unlockOnFirstGesture);
       window.removeEventListener('dating-app-notification-preferences-updated', onPreferencesUpdated);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       const context = audioRef.current.context;
       if (context && context.state !== 'closed') context.close().catch(() => {});
       audioRef.current.context = null;
