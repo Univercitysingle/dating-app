@@ -2703,7 +2703,8 @@ export class MongoDBConnection {
       await db.collection("ticketmessages").updateOne(messageQuery, {
         $set: { message: payload.message.trim(), editedAt: now, editedByUid: uid, updatedAt: now }
       });
-      return { status: 200, body: { ...message, message: payload.message.trim(), editedAt: now, editedByUid: uid } };
+      await db.collection("supporttickets").updateOne({ _id: ticketObjectId }, { $set: { updatedAt: now } });
+      return { status: 200, body: { ...message, message: payload.message.trim(), editedAt: now, updatedAt: now, editedByUid: uid } };
     } catch { return { status: 503, body: { message: "Unable to edit support message." } }; }
   }
 
@@ -2735,12 +2736,14 @@ export class MongoDBConnection {
       const now = new Date();
       await db.collection("auditlogs").insertOne({
         eventType: "support_ticket_message_deleted", actorUid: uid, actorType: adminAction ? "admin" : "customer",
-        ticketId: ticketObjectId, messageId: messageObjectId, previousMessage: message.message, createdAt: now
+        ticketId: ticketObjectId, messageId: messageObjectId, previousMessage: message.message,
+        attachments: Array.isArray(message.attachments) ? message.attachments : [], createdAt: now
       });
       await db.collection("ticketmessages").updateOne(messageQuery, {
         $set: { message: "This message was deleted.", deletedAt: now, deletedByUid: uid, updatedAt: now },
         $unset: { attachments: "" }
       });
+      await db.collection("supporttickets").updateOne({ _id: ticketObjectId }, { $set: { updatedAt: now } });
       return { status: 200, body: { success: true, messageId } };
     } catch { return { status: 503, body: { message: "Unable to delete support message." } }; }
   }
