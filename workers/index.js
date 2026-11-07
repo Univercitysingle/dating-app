@@ -21,7 +21,7 @@ function darkFantasyRegionGate(request, env) {
   return null;
 }
 
-export function getMongoShardName(request, env = {}) {
+// This only selects a connection Durable Object. Authentication is still verified\n// by each API route before any protected operation is executed.\nexport function getMongoShardName(request, env = {}) {
   const authorization = request?.headers?.get("authorization") || "";
   const token = authorization.match(/^Bearer\s+([A-Za-z0-9._-]+)$/i)?.[1];
   if (!token) return "mongo-primary";
@@ -696,7 +696,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Swipe service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/undo-swipe", {
           method: "POST", headers: { "content-type": "application/json" },
