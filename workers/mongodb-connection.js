@@ -2668,6 +2668,75 @@ export class MongoDBConnection {
     }
   }
 
+  async updateSupportTicketMessage(uid, ticketId, messageId, payload = {}, adminAction = false) {
+    if (![ticketId, messageId].every(value => typeof value === "string" && /^[a-fA-F0-9]{24}$/.test(value)) ||
+        typeof payload.message !== "string" || !payload.message.trim() || payload.message.trim().length > 5000) {
+      return { status: 400, body: { message: "A valid message between 1 and 5000 characters is required." } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const actor = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!actor) return { status: 404, body: { message: "User not found" } };
+      const ticketObjectId = new ObjectId(ticketId);
+      const ticketQuery = adminAction ? { _id: ticketObjectId } : { _id: ticketObjectId, userId: actor._id };
+      const ticket = await db.collection("supporttickets").findOne(ticketQuery);
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      const messageObjectId = new ObjectId(messageId);
+      const messageQuery = { _id: messageObjectId, ticketId: ticketObjectId, deletedAt: { $exists: false } };
+      if (!adminAction) Object.assign(messageQuery, { senderId: actor._id, isFromAdmin: { $ne: true }, isInternalNote: { $ne: true } });
+      const message = await db.collection("ticketmessages").findOne(messageQuery);
+      if (!message) return { status: 404, body: { message: "Message not found" } };
+      if (!adminAction && Date.now() - new Date(message.createdAt).getTime() > 15 * 60 * 1000) {
+        return { status: 403, body: { message: "Messages can only be edited within 15 minutes of sending." } };
+      }
+      const now = new Date();
+      await db.collection("auditlogs").insertOne({
+        eventType: "support_ticket_message_edited", actorUid: uid, actorType: adminAction ? "admin" : "customer",
+        ticketId: ticketObjectId, messageId: messageObjectId, previousMessage: message.message,
+        updatedMessage: payload.message.trim(), createdAt: now
+      });
+      await db.collection("ticketmessages").updateOne(messageQuery, {
+        $set: { message: payload.message.trim(), editedAt: now, editedByUid: uid, updatedAt: now }
+      });
+      return { status: 200, body: { ...message, message: payload.message.trim(), editedAt: now, editedByUid: uid } };
+    } catch { return { status: 503, body: { message: "Unable to edit support message." } }; }
+  }
+
+  async deleteSupportTicketMessage(uid, ticketId, messageId, adminAction = false) {
+    if (![ticketId, messageId].every(value => typeof value === "string" && /^[a-fA-F0-9]{24}$/.test(value))) {
+      return { status: 400, body: { message: "Invalid ticket or message ID." } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const actor = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!actor) return { status: 404, body: { message: "User not found" } };
+      const ticketObjectId = new ObjectId(ticketId);
+      const ticketQuery = adminAction ? { _id: ticketObjectId } : { _id: ticketObjectId, userId: actor._id };
+      const ticket = await db.collection("supporttickets").findOne(ticketQuery);
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      const messageObjectId = new ObjectId(messageId);
+      const messageQuery = { _id: messageObjectId, ticketId: ticketObjectId, deletedAt: { $exists: false } };
+      if (!adminAction) Object.assign(messageQuery, { senderId: actor._id, isFromAdmin: { $ne: true }, isInternalNote: { $ne: true } });
+      const message = await db.collection("ticketmessages").findOne(messageQuery);
+      if (!message) return { status: 404, body: { message: "Message not found" } };
+      if (!adminAction && Date.now() - new Date(message.createdAt).getTime() > 60 * 60 * 1000) {
+        return { status: 403, body: { message: "Messages can only be deleted within one hour of sending." } };
+      }
+      const now = new Date();
+      await db.collection("auditlogs").insertOne({
+        eventType: "support_ticket_message_deleted", actorUid: uid, actorType: adminAction ? "admin" : "customer",
+        ticketId: ticketObjectId, messageId: messageObjectId, previousMessage: message.message, createdAt: now
+      });
+      await db.collection("ticketmessages").updateOne(messageQuery, {
+        $set: { message: "This message was deleted.", deletedAt: now, deletedByUid: uid, updatedAt: now },
+        $unset: { attachments: "" }
+      });
+      return { status: 200, body: { success: true, messageId } };
+    } catch { return { status: 503, body: { message: "Unable to delete support message." } }; }
+  }
+
   async submitSupportTicketFeedback(uid, ticketId, payload) {
     if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId) ||
         !payload || !Number.isInteger(payload.rating) || payload.rating < 1 || payload.rating > 5 ||
