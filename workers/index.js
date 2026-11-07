@@ -85,6 +85,15 @@ const JSON_HEADERS = {
   "cross-origin-resource-policy": "same-origin"
 };
 
+export function buildAnalyticsCsv(signups) {
+  if (!Array.isArray(signups)) return null;
+  const csvCell = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+  return [
+    ["date", "new_signups"].join(","),
+    ...signups.map(item => [csvCell(item?._id || ""), String(Number(item?.count) || 0)].join(","))
+  ].join("\n");
+}
+
 function getCdnObjectUrl(env, key, route = "root") {
   const configured = String(env.CDN_HOSTNAME || "").trim();
   if (!configured) throw new Error("CDN_HOSTNAME is not configured");
@@ -1383,20 +1392,18 @@ export default {
           body: JSON.stringify({ claims, ticketId, payload, params: Object.fromEntries(url.searchParams.entries()) })
         });
         const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
-        if (url.pathname === "/api/admin/analytics/export" && response.ok && Array.isArray(result.signupsPerDay)) {
-          const csvCell = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
-          const rows = [
-            ["date", "new_signups"].join(","),
-            ...result.signupsPerDay.map(item => [csvCell(item._id || ""), String(Number(item.count) || 0)].join(","))
-          ];
-          return new Response(rows.join("\n"), {
-            status: 200,
-            headers: {
-              ...JSON_HEADERS,
-              "content-type": "text/csv; charset=utf-8",
-              "content-disposition": 'attachment; filename="analytics_export.csv"'
-            }
-          });
+        if (url.pathname === "/api/admin/analytics/export" && response.ok) {
+          const csv = buildAnalyticsCsv(result.signupsPerDay);
+          if (csv !== null) {
+            return new Response(csv, {
+              status: 200,
+              headers: {
+                ...JSON_HEADERS,
+                "content-type": "text/csv; charset=utf-8",
+                "content-disposition": 'attachment; filename="analytics_export.csv"'
+              }
+            });
+          }
         }
         return json(result, response.status);
       } catch (error) {
