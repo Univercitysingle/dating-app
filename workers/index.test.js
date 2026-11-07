@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload } from "./index.js";
 import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
@@ -3261,4 +3261,16 @@ test("analytics CSV export safely quotes dates and normalizes signup counts", ()
 
   assert.equal(csv, 'date,new_signups\n"2026-11-07",2\n"2026-11-08,""late""",3\n"2026-11-09",0');
   assert.equal(buildAnalyticsCsv(null), null);
+});
+
+
+test("admin purchase approval accepts an omitted body while reject and refund require JSON objects", () => {
+  assert.deepEqual(normalizeAdminPurchaseActionPayload("approve", null), {});
+  assert.deepEqual(normalizeAdminPurchaseActionPayload("approve", undefined), {});
+  assert.deepEqual(normalizeAdminPurchaseActionPayload("approve", {}), {});
+  assert.equal(normalizeAdminPurchaseActionPayload("reject", null), null);
+  assert.equal(normalizeAdminPurchaseActionPayload("reject", []), null);
+  assert.deepEqual(normalizeAdminPurchaseActionPayload("reject", { reason: "Duplicate request" }), { reason: "Duplicate request" });
+  assert.equal(normalizeAdminPurchaseActionPayload("record-refund", null), null);
+  assert.deepEqual(normalizeAdminPurchaseActionPayload("record-refund", { refundReference: "WX-123" }), { refundReference: "WX-123" });
 });
