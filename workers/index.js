@@ -310,14 +310,21 @@ function verifyWebXPayCallback(payment, signature, configuredPublicKey) {
   if (typeof payment !== "string" || typeof signature !== "string" ||
       !/^[A-Za-z0-9+/]+={0,2}$/.test(payment) ||
       !/^[A-Za-z0-9+/]+={0,2}$/.test(signature)) return null;
-  const paymentBytes = Buffer.from(payment, "base64");
-  const signatureBytes = Buffer.from(signature, "base64");
-  if (!paymentBytes.length || !signatureBytes.length) return null;
-  const verifiedBytes = publicDecrypt({
-    key: createPublicKey(normalizeWebXPayPublicKey(configuredPublicKey)),
+  const encodedPayment = Buffer.from(payment, "base64");
+  const encodedSignature = Buffer.from(signature, "base64");
+  if (!encodedPayment.length || !encodedSignature.length) return null;
+  const publicKey = createPublicKey(normalizeWebXPayPublicKey(configuredPublicKey));
+  // WEBXPAY signs both callback values with its private key. Decode and
+  // public-decrypt each value before comparing their plaintext payloads.
+  const paymentBytes = publicDecrypt({
+    key: publicKey,
     padding: constants.RSA_PKCS1_PADDING
-  }, signatureBytes);
-  if (verifiedBytes.length !== paymentBytes.length || !timingSafeEqual(verifiedBytes, paymentBytes)) return null;
+  }, encodedPayment);
+  const signatureBytes = publicDecrypt({
+    key: publicKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, encodedSignature);
+  if (signatureBytes.length !== paymentBytes.length || !timingSafeEqual(signatureBytes, paymentBytes)) return null;
   return paymentBytes.toString("utf8");
 }
 
