@@ -3016,3 +3016,62 @@ test("account CDN cleanup resumes in bounded batches and finalizes only after ev
   assert.ok(operations.some(op => op.name === "ticketmessages" && op.method === "updateMany" &&
     op.update.$unset.attachments === ""));
 });
+
+
+test("late successful WebXPay callback flags a declined purchase for refund review without granting benefits", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "3123456789abcdef01234567";
+  const purchase = { _id: new ObjectId(orderId), userId: new ObjectId("abcdef0123456789abcdef04"), status: "rejected", itemId: "super-like-5" };
+  let userUpdates = 0;
+  const purchases = {
+    async findOne(filter) { return String(filter._id) === orderId ? purchase : null; },
+    async updateOne(filter, update) {
+      if (purchase.status !== filter.status) return { modifiedCount: 0 };
+      Object.assign(purchase, update.$set || {});
+      return { modifiedCount: 1 };
+    }
+  };
+  const subscriptions = { async findOne() { return null; } };
+  const users = { async updateOne() { userUpdates += 1; return { matchedCount: 1, modifiedCount: 1 }; } };
+  const db = { collection(name) { return name === "purchases" ? purchases : name === "subscriptions" ? subscriptions : users; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db, startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} }) });
+
+  const result = await connection.settleWebXPay(orderId, "00", "TLATE123");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.refundReviewRequired, true);
+  assert.equal(purchase.status, "refund_required");
+  assert.equal(purchase.paymentReference, "TLATE123");
+  assert.equal(purchase.refundReason, "late_success_after_cancelled_checkout");
+  assert.equal(userUpdates, 0);
+});
+
+test("late successful WebXPay callback flags a cancelled subscription for refund review without activating it", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "4123456789abcdef01234567";
+  const subscription = { _id: new ObjectId(orderId), userId: new ObjectId("abcdef0123456789abcdef05"), status: "cancelled", plan: "monthly", cancellationReason: "checkout_start_failed" };
+  let userUpdates = 0;
+  const purchases = { async findOne() { return null; } };
+  const subscriptions = {
+    async findOne(filter) { return String(filter._id) === orderId ? subscription : null; },
+    async updateOne(filter, update) {
+      if (subscription.status !== filter.status) return { modifiedCount: 0 };
+      Object.assign(subscription, update.$set || {});
+      return { modifiedCount: 1 };
+    }
+  };
+  const users = { async updateOne() { userUpdates += 1; return { matchedCount: 1, modifiedCount: 1 }; } };
+  const db = { collection(name) { return name === "purchases" ? purchases : name === "subscriptions" ? subscriptions : users; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db, startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} }) });
+
+  const result = await connection.settleWebXPay(orderId, "00", "TLATE456");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.refundReviewRequired, true);
+  assert.equal(subscription.status, "refund_required");
+  assert.equal(subscription.paymentReference, "TLATE456");
+  assert.equal(subscription.refundReason, "late_success_after_cancelled_checkout");
+  assert.equal(userUpdates, 0);
+});
