@@ -458,7 +458,6 @@ function Chat() {
     setInput(value);
     if (!otherUser?.uid) return;
 
-    const wasTyping = Boolean(typingTimeoutRef.current);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (value.trim()) {
       const now = Date.now();
