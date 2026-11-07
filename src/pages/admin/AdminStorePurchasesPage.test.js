@@ -2,6 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import apiClient from '../../api/apiClient';
 import AdminStorePurchasesPage from './AdminStorePurchasesPage';
+import { useAuth } from '../../context/AuthContext';
+
+jest.mock('../../context/AuthContext', () => ({ useAuth: jest.fn() }));
 
 jest.mock('../../api/apiClient', () => ({
   __esModule: true,
@@ -14,6 +17,7 @@ jest.mock('../../api/apiClient', () => ({
 describe('AdminStorePurchasesPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    useAuth.mockReturnValue({ user: { role: 'superadmin' } });
     apiClient.get.mockResolvedValue([]);
   });
 
@@ -97,3 +101,21 @@ describe('AdminStorePurchasesPage', () => {
     prompt.mockRestore();
   });
 });
+
+
+  test('does not expose refund recording to ordinary administrators', async () => {
+    useAuth.mockReturnValue({ user: { role: 'admin' } });
+    apiClient.get.mockResolvedValue([{
+      _id: '507f1f77bcf86cd799439013',
+      transactionType: 'purchase',
+      itemName: 'Test item',
+      status: 'refund_required',
+      createdAt: '2026-11-07T09:00:00.000Z',
+      userId: { name: 'Synthetic Test User' }
+    }]);
+
+    render(<AdminStorePurchasesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View' }));
+
+    expect(screen.queryByRole('button', { name: 'Record completed refund' })).not.toBeInTheDocument();
+  });
