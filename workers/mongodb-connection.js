@@ -3918,9 +3918,10 @@ export class MongoDBConnection {
       const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId) });
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
       const userProjection = access.role === "superadmin" ? { name: 1, email: 1 } : { name: 1 };
-      const [user, messages] = await Promise.all([
+      const [user, messages, staff] = await Promise.all([
         db.collection("users").findOne({ _id: ticket.userId }, { projection: userProjection }),
-        db.collection("ticketmessages").find({ ticketId: new ObjectId(ticketId) }).sort({ createdAt: 1 }).toArray()
+        db.collection("ticketmessages").find({ ticketId: new ObjectId(ticketId) }).sort({ createdAt: 1 }).toArray(),
+        db.collection("users").find({ role: { $in: ["admin", "superadmin"] } }, { projection: { uid: 1, name: 1, role: 1 } }).limit(100).toArray()
       ]);
       const senderIds = messages.map(message => message.senderId).filter(Boolean);
       const senders = senderIds.length ? await db.collection("users").find(
@@ -3929,6 +3930,7 @@ export class MongoDBConnection {
       const senderMap = new Map(senders.map(sender => [String(sender._id), sender]));
       return { status: 200, body: {
         ticket: { ...ticket, userId: user || null },
+        staff: staff.filter(item => typeof item.uid === "string").map(({ uid, name, role }) => ({ uid, name: name || "Administrator", role })),
         messages: messages.map(message => ({ ...message, senderId: senderMap.get(String(message.senderId)) || null }))
       } };
     } catch {
@@ -3985,6 +3987,7 @@ export class MongoDBConnection {
     const allowedStatuses = ["Open", "In Progress", "Waiting for Customer", "Closed"];
     const allowedPriorities = ["Urgent", "High", "Normal", "Low"];
     const allowedCategories = ["Account", "Payments", "Profile", "Verification", "Safety", "Technical", "Other"];
+    const slaHours = { Urgent: 1, High: 4, Normal: 24, Low: 72 };
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return { status: 400, body: { message: "Invalid ticket update" } };
     const changes = {};
     if (Object.prototype.hasOwnProperty.call(payload, "status")) {
@@ -3999,17 +4002,46 @@ export class MongoDBConnection {
       if (!allowedCategories.includes(payload.category)) return { status: 400, body: { message: "Invalid ticket category" } };
       changes.category = payload.category;
     }
+    if (Object.prototype.hasOwnProperty.call(payload, "assignedToUid")) {
+      if (payload.assignedToUid !== null && (typeof payload.assignedToUid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(payload.assignedToUid))) {
+        return { status: 400, body: { message: "Invalid staff assignment" } };
+      }
+      changes.assignedToUid = payload.assignedToUid;
+    }
     if (!Object.keys(changes).length) return { status: 400, body: { message: "At least one ticket field must be updated" } };
     try {
       const { ObjectId } = await import("mongodb");
       const db = this.getDatabase(await this.getClient());
-      const result = await db.collection("supporttickets").findOneAndUpdate(
-        { _id: new ObjectId(ticketId) },
-        { $set: { ...changes, updatedAt: new Date() } },
+      const tickets = db.collection("supporttickets");
+      const ticketObjectId = new ObjectId(ticketId);
+      const current = await tickets.findOne({ _id: ticketObjectId });
+      if (!current) return { status: 404, body: { message: "Ticket not found" } };
+      if (Object.prototype.hasOwnProperty.call(changes, "assignedToUid") && changes.assignedToUid !== null) {
+        const assignee = await db.collection("users").findOne(
+          { uid: changes.assignedToUid, role: { $in: ["admin", "superadmin"] } }, { projection: { _id: 1 } }
+        );
+        if (!assignee) return { status: 400, body: { message: "Selected assignee is not an active administrator" } };
+      }
+      const now = new Date();
+      const nextPriority = changes.priority || current.priority || "Normal";
+      if (!current.slaDueAt || Object.prototype.hasOwnProperty.call(changes, "priority")) {
+        changes.slaDueAt = new Date(now.getTime() + slaHours[nextPriority] * 60 * 60 * 1000);
+      }
+      const auditChanges = Object.entries(changes).filter(([key]) => key !== "slaDueAt").map(([field, value]) => ({
+        field, from: current[field] ?? null, to: value
+      })).filter(item => JSON.stringify(item.from) !== JSON.stringify(item.to));
+      const result = await tickets.findOneAndUpdate(
+        { _id: ticketObjectId },
+        { $set: { ...changes, updatedAt: now } },
         { returnDocument: "after" }
       );
-      if (!result) return { status: 404, body: { message: "Ticket not found" } };
-      return { status: 200, body: result };
+      const updated = result?.value || result;
+      if (!updated) return { status: 404, body: { message: "Ticket not found" } };
+      if (auditChanges.length) await db.collection("auditlogs").insertOne({
+        eventType: "support_ticket_updated", actorUid: uid, ticketId: ticketObjectId,
+        changes: auditChanges, createdAt: now
+      });
+      return { status: 200, body: updated };
     } catch {
       return { status: 503, body: { message: "Unable to update support ticket" } };
     }
