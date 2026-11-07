@@ -67,6 +67,8 @@ const AdminStorePurchasesPage = () => {
         return 'bg-green-200 text-green-800';
       case 'rejected':
         return 'bg-red-200 text-red-800';
+      case 'refund_required':
+        return 'bg-orange-200 text-orange-900';
       default:
         return 'bg-gray-200 text-gray-800';
     }
@@ -101,6 +103,7 @@ const AdminStorePurchasesPage = () => {
             <FilterButton status="pending">Pending</FilterButton>
             <FilterButton status="completed">Completed</FilterButton>
             <FilterButton status="rejected">Rejected</FilterButton>
+            <FilterButton status="refund_required">Refund review</FilterButton>
           </div>
 
           {error && <p className="text-red-500">{error}</p>}
@@ -166,6 +169,15 @@ const AdminStorePurchasesPage = () => {
             <div className="my-4">
               <img src={selectedPurchase.bankSlipUrl} alt="Bank slip" className="max-h-96 w-full object-contain" />
             </div>
+            {selectedPurchase.status === 'refund_required' && (
+              <div className="my-4 p-3 bg-orange-100 text-orange-900 rounded">
+                <strong>Payment requires refund review.</strong>
+                <p>Do not approve or reject this transaction. Confirm the payment with WebXPay and process any refund through the merchant portal.</p>
+                {selectedPurchase.refundReason && <p><strong>Reason:</strong> {selectedPurchase.refundReason}</p>}
+                {selectedPurchase.paymentReference && <p><strong>Payment reference:</strong> {selectedPurchase.paymentReference}</p>}
+                {selectedPurchase.paidLateAt && <p><strong>Payment received:</strong> {new Date(selectedPurchase.paidLateAt).toLocaleString()}</p>}
+              </div>
+            )}
             {selectedPurchase.status === 'rejected' && selectedPurchase.rejectionReason && (
               <div className="my-4 p-2 bg-red-100 text-red-700 rounded">
                   <strong>Rejection Reason:</strong> {selectedPurchase.rejectionReason}
