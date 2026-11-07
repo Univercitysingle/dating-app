@@ -2602,11 +2602,16 @@ export class MongoDBConnection {
       const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
       if (!user) return { status: 404, body: { message: "User not found" } };
       const now = new Date();
+      // Start the default Normal-priority SLA when the customer opens the
+      // ticket, rather than waiting for an administrator to edit metadata.
       const ticket = {
         userId: user._id,
         ticketNumber: crypto.randomUUID(),
         subject: payload.subject.trim(),
         status: "Open",
+        priority: "Normal",
+        category: "Other",
+        slaDueAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
         createdAt: now,
         updatedAt: now
       };
@@ -3899,8 +3904,18 @@ export class MongoDBConnection {
         { _id: { $in: normalizedIds } }, { projection: userProjection }
       ).toArray() : [];
       const userMap = new Map(users.map(user => [String(user._id), user]));
+      const assignedUids = [...new Set(tickets.map(ticket => ticket.assignedToUid).filter(value => typeof value === "string" && value))];
+      const assignedStaff = assignedUids.length ? await db.collection("users").find(
+        { uid: { $in: assignedUids }, role: { $in: ["admin", "superadmin"] } },
+        { projection: { uid: 1, name: 1 } }
+      ).toArray() : [];
+      const staffNameMap = new Map(assignedStaff.map(person => [person.uid, person.name || "Administrator"]));
       return { status: 200, body: {
-        tickets: tickets.map(ticket => ({ ...ticket, userId: userMap.get(String(ticket.userId)) || null })),
+        tickets: tickets.map(ticket => ({
+          ...ticket,
+          userId: userMap.get(String(ticket.userId)) || null,
+          assignedToName: ticket.assignedToUid ? (staffNameMap.get(ticket.assignedToUid) || "Administrator") : null
+        })),
         total, totalPages: Math.ceil(total / limit), currentPage: page, limit
       } };
     } catch {
