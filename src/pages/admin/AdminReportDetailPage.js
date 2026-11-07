@@ -122,6 +122,7 @@ const AdminReportDetailPage = () => {
               <option value="dismiss">Dismiss Report</option>
               <option value="suspend_user">Suspend User</option>
               <option value="ban_user">Ban User</option>
+              <option value="restore_user">Restore User</option>
             </select>
           </div>
           {action === 'suspend_user' && (
