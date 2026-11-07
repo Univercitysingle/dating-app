@@ -182,8 +182,8 @@ const SupportTicketDetailPage = () => {
                 <p>{msg.deletedAt ? 'This message was deleted.' : msg.message}</p>
                 {msg.editedAt && !msg.deletedAt && <span className="mt-1 block text-xs opacity-70">Edited</span>}
                 {!msg.isFromAdmin && !msg.deletedAt && <div className="mt-2 flex gap-3 text-xs">
-                  <button type="button" onClick={() => handleEditMessage(msg)} className="underline">Edit</button>
-                  <button type="button" onClick={() => handleDeleteMessage(msg)} className="underline">Delete</button>
+                  {Date.now() - new Date(msg.createdAt).getTime() <= 15 * 60 * 1000 && <button type="button" onClick={() => handleEditMessage(msg)} className="underline">Edit</button>}
+                  {Date.now() - new Date(msg.createdAt).getTime() <= 60 * 60 * 1000 && <button type="button" onClick={() => handleDeleteMessage(msg)} className="underline">Delete</button>}
                 </div>}
                 {!msg.deletedAt && Array.isArray(msg.attachments) && msg.attachments.length > 0 && <div className="mt-3 space-y-2">
                   {msg.attachments.map((file) => <a key={file.key} href={file.url} target="_blank" rel="noreferrer" className="block underline break-all text-sm">
