@@ -2002,34 +2002,42 @@ export default {
     if (url.pathname === "/api/webxpay/response") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       if (!env.WEBXPAY_PUBLIC_KEY) return json({ error: "Payment gateway is not configured." }, 503);
+      const callback = await readWebXPayCallback(request).catch(() => null);
+      if (!callback || typeof callback.payment !== "string" || typeof callback.signature !== "string") {
+        return json({ error: "Payment or signature missing." }, 400);
+      }
+
+      // Keep cryptographic failures distinct from settlement infrastructure
+      // failures. WebXPay can retry a 5xx callback after MongoDB recovers.
+      let decoded;
       try {
-        const callback = await readWebXPayCallback(request);
-        if (!callback || typeof callback.payment !== "string" || typeof callback.signature !== "string") {
-          return json({ error: "Payment or signature missing." }, 400);
-        }
-        const decoded = verifyWebXPayCallback(callback.payment, callback.signature, env.WEBXPAY_PUBLIC_KEY);
-        if (!decoded) return json({ error: "Signature verification failed." }, 400);
-        const fields = decoded.split("|").map(value => value.trim());
-        // WebXPay's documented redirect response is:
-        // order_id|order_reference|transaction_datetime|status_code|comment|gateway_id
-        // Do not search other fields for a status-like value: doing so can turn a
-        // malformed response into an approval.
-        if (fields.length !== 6 || !/^[a-fA-F0-9]{24}$/.test(fields[0]) ||
-            !fields[1] || fields[1].length > 128 ||
-            !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fields[2]) || !Number.isFinite(Date.parse(fields[2])) ||
-            !["0", "00", "15"].includes(fields[3]) ||
-            !fields[5] || fields[5].length > 32) {
-          return json({ error: "Invalid payment response." }, 400);
-        }
-        const statusCode = fields[3];
-        if (!env.MONGODB_CONNECTION) return json({ error: "Payment settlement unavailable" }, 503);
+        decoded = verifyWebXPayCallback(callback.payment, callback.signature, env.WEBXPAY_PUBLIC_KEY);
+      } catch {
+        return json({ error: "Signature verification failed." }, 400);
+      }
+      if (!decoded) return json({ error: "Signature verification failed." }, 400);
+
+      const fields = decoded.split("|").map(value => value.trim());
+      // WebXPay's documented redirect response is:
+      // order_id|order_reference|transaction_datetime|status_code|comment|gateway_id
+      // Do not search other fields for a status-like value: doing so can turn a
+      // malformed response into an approval.
+      if (fields.length !== 6 || !/^[a-fA-F0-9]{24}$/.test(fields[0]) ||
+          !fields[1] || fields[1].length > 128 ||
+          !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fields[2]) || !Number.isFinite(Date.parse(fields[2])) ||
+          !["0", "00", "15"].includes(fields[3]) ||
+          !fields[5] || fields[5].length > 32) {
+        return json({ error: "Invalid payment response." }, 400);
+      }
+      if (!env.MONGODB_CONNECTION) return json({ error: "Payment settlement unavailable" }, 503);
+      try {
         const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/webxpay-settle", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({
             orderId: fields[0],
-            statusCode,
+            statusCode: fields[3],
             reference: fields[1],
             transactionDate: fields[2],
             gatewayComment: fields[4].slice(0, 256),
@@ -2039,7 +2047,7 @@ export default {
         const body = await response.json().catch(() => ({ error: "Payment settlement unavailable" }));
         return json(body, response.status);
       } catch {
-        return json({ error: "Invalid payment signature or callback." }, 400);
+        return json({ error: "Payment settlement temporarily unavailable. Please retry the callback." }, 503);
       }
     }
 
