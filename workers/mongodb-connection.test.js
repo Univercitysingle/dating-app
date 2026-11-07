@@ -3471,6 +3471,40 @@ test("admin analytics counts unique active subscribers rather than subscription 
 });
 
 
+test("new support tickets receive a default priority, category, and SLA deadline", async () => {
+  let insertedTicket;
+  const userId = { id: "customer-id" };
+  const db = {
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ _id: userId }) };
+      if (name === "supporttickets") return {
+        insertOne: async ticket => {
+          insertedTicket = ticket;
+          return { insertedId: { id: "ticket-id" } };
+        }
+      };
+      if (name === "ticketmessages") return {
+        insertOne: async message => ({ insertedId: { id: "message-id" } })
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createSupportTicket("customer-uid", {
+    subject: "Payment receipt missing",
+    message: "Please check my purchase."
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(insertedTicket.priority, "Normal");
+  assert.equal(insertedTicket.category, "Other");
+  assert.ok(insertedTicket.slaDueAt instanceof Date);
+  assert.equal(insertedTicket.slaDueAt.getTime() - insertedTicket.createdAt.getTime(), 24 * 60 * 60 * 1000);
+});
+
 test("admin support inbox searches safely and returns total pagination metadata", async () => {
   let capturedTicketQuery;
   let capturedUserQuery;
