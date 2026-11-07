@@ -2669,6 +2669,10 @@ export class MongoDBConnection {
   }
 
   async updateSupportTicketMessage(uid, ticketId, messageId, payload = {}, adminAction = false) {
+    if (adminAction) {
+      const access = await this.requireAdmin(uid);
+      if (access.status !== 200) return access;
+    }
     if (![ticketId, messageId].every(value => typeof value === "string" && /^[a-fA-F0-9]{24}$/.test(value)) ||
         typeof payload.message !== "string" || !payload.message.trim() || payload.message.trim().length > 5000) {
       return { status: 400, body: { message: "A valid message between 1 and 5000 characters is required." } };
@@ -2704,6 +2708,10 @@ export class MongoDBConnection {
   }
 
   async deleteSupportTicketMessage(uid, ticketId, messageId, adminAction = false) {
+    if (adminAction) {
+      const access = await this.requireAdmin(uid);
+      if (access.status !== 200) return access;
+    }
     if (![ticketId, messageId].every(value => typeof value === "string" && /^[a-fA-F0-9]{24}$/.test(value))) {
       return { status: 400, body: { message: "Invalid ticket or message ID." } };
     }
