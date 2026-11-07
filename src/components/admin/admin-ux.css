@@ -1,0 +1,122 @@
+/* Shared admin experience polish. Scoped to the admin workspace only. */
+#admin-main.admin-ux {
+  color: #172033;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+#admin-main.admin-ux > div { min-width: 0; }
+#admin-main.admin-ux h1,
+#admin-main.admin-ux h2,
+#admin-main.admin-ux h3,
+#admin-main.admin-ux h4 { letter-spacing: -0.025em; }
+#admin-main.admin-ux button,
+#admin-main.admin-ux a,
+#admin-main.admin-ux input,
+#admin-main.admin-ux select,
+#admin-main.admin-ux textarea { -webkit-tap-highlight-color: transparent; }
+#admin-main.admin-ux button,
+#admin-main.admin-ux a { transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease; }
+#admin-main.admin-ux button:focus-visible,
+#admin-main.admin-ux a:focus-visible,
+#admin-main.admin-ux input:focus-visible,
+#admin-main.admin-ux select:focus-visible,
+#admin-main.admin-ux textarea:focus-visible {
+  outline: 3px solid rgba(99,102,241,.28);
+  outline-offset: 2px;
+}
+#admin-main.admin-ux input:not([type=checkbox]):not([type=radio]):not([type=file]),
+#admin-main.admin-ux select,
+#admin-main.admin-ux textarea {
+  min-height: 42px;
+  border: 1px solid #dbe2ed;
+  border-radius: 11px;
+  background-color: #fff;
+  color: #172033;
+  padding: .625rem .8rem;
+  font-size: .875rem;
+  line-height: 1.4;
+  box-shadow: 0 1px 2px rgba(15,23,42,.025);
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+#admin-main.admin-ux textarea { min-height: 104px; resize: vertical; }
+#admin-main.admin-ux input::placeholder,
+#admin-main.admin-ux textarea::placeholder { color: #9aa5b5; }
+#admin-main.admin-ux input:not([type=checkbox]):not([type=radio]):not([type=file]):hover,
+#admin-main.admin-ux select:hover,
+#admin-main.admin-ux textarea:hover { border-color: #b9c4d5; }
+#admin-main.admin-ux input:not([type=checkbox]):not([type=radio]):not([type=file]):focus,
+#admin-main.admin-ux select:focus,
+#admin-main.admin-ux textarea:focus {
+  border-color: #818cf8;
+  outline: 0;
+  box-shadow: 0 0 0 4px rgba(99,102,241,.11);
+}
+#admin-main.admin-ux input[type=checkbox],
+#admin-main.admin-ux input[type=radio] { accent-color: #4f46e5; width: 16px; height: 16px; }
+#admin-main.admin-ux label { color: #475569; font-size: .82rem; font-weight: 600; }
+#admin-main.admin-ux button:disabled { cursor: not-allowed; opacity: .55; transform: none; box-shadow: none; }
+#admin-main.admin-ux table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .875rem; }
+#admin-main.admin-ux thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .075em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5eaf2;
+  padding: .9rem 1rem;
+  white-space: nowrap;
+}
+#admin-main.admin-ux tbody td {
+  padding: .9rem 1rem;
+  border-bottom: 1px solid #edf0f5;
+  color: #475569;
+  vertical-align: middle;
+}
+#admin-main.admin-ux tbody tr { background: #fff; transition: background-color .16s ease; }
+#admin-main.admin-ux tbody tr:hover { background: #f8faff; }
+#admin-main.admin-ux tbody tr:last-child td { border-bottom: 0; }
+#admin-main.admin-ux table a { color: #4f46e5; font-weight: 600; text-decoration: none; }
+#admin-main.admin-ux table a:hover { color: #3730a3; text-decoration: underline; }
+#admin-main.admin-ux hr { border-color: #e8edf4; }
+#admin-main.admin-ux [role=alert] { border-radius: 14px; line-height: 1.55; }
+#admin-main.admin-ux .overflow-x-auto {
+  border: 1px solid #e7ebf2;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15,23,42,.025);
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+#admin-main.admin-ux .overflow-x-auto table { min-width: 680px; }
+#admin-main.admin-ux .rounded-lg.border,
+#admin-main.admin-ux .rounded-xl.border,
+#admin-main.admin-ux .rounded-2xl.border {
+  border-color: #e5eaf2;
+}
+#admin-main.admin-ux .shadow,
+#admin-main.admin-ux .shadow-md,
+#admin-main.admin-ux .shadow-lg { box-shadow: 0 8px 28px rgba(15,23,42,.07); }
+#admin-main.admin-ux :where(.bg-white, .dark\\:bg-neutral-800) { overflow-wrap: anywhere; }
+#admin-main.admin-ux .react-datepicker-wrapper { width: 100%; }
+#admin-main.admin-ux .react-datepicker__input-container input { width: 100%; }
+#admin-main.admin-ux .recharts-responsive-container,
+#admin-main.admin-ux canvas { max-width: 100%; }
+#admin-main.admin-ux img { max-width: 100%; }
+@media (max-width: 640px) {
+  #admin-main.admin-ux { padding-left: 1rem; padding-right: 1rem; padding-top: 1.25rem; padding-bottom: 1.5rem; }
+  #admin-main.admin-ux table { font-size: .8rem; }
+  #admin-main.admin-ux thead th,
+  #admin-main.admin-ux tbody td { padding: .75rem .7rem; }
+  #admin-main.admin-ux .overflow-x-auto { margin-left: -2px; margin-right: -2px; }
+  #admin-main.admin-ux :where(.flex.items-center.justify-between) { gap: .75rem; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #admin-main.admin-ux *,
+  #admin-main.admin-ux *::before,
+  #admin-main.admin-ux *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
