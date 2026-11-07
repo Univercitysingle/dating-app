@@ -75,6 +75,12 @@ export function isFirebaseDatabaseUrl(value) {
   }
 }
 
+export function normalizeAdminPurchaseActionPayload(action, payload) {
+  if (action === "approve" && (payload === null || payload === undefined)) return {};
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  return payload;
+}
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -1412,9 +1418,12 @@ export default {
         try {
           const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
           if (!env.MONGODB_CONNECTION) return json({ message: "Administration service unavailable" }, 503);
-          const payload = isAction ? await request.json().catch(() => null) : null;
-          if (isAction && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
-            return json({ message: "A valid request body is required" }, 400);
+          const parsedPayload = isAction ? await request.json().catch(() => null) : null;
+          const payload = isAction ? normalizeAdminPurchaseActionPayload(parts[1], parsedPayload) : null;
+          if (isAction && payload === null) {
+            return json({ message: parts[1] === "reject"
+              ? "A valid request body with a rejection reason is required"
+              : "A valid request body is required" }, 400);
           }
           const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
           const connection = env.MONGODB_CONNECTION.get(id);
