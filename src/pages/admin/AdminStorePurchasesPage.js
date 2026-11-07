@@ -113,7 +113,7 @@ const AdminStorePurchasesPage = () => {
                 <thead>
                   <tr>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User</th>
-                    <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Item</th>
+                    <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type / Item</th>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Submitted At</th>
@@ -132,10 +132,10 @@ const AdminStorePurchasesPage = () => {
                           <p className="text-gray-900 whitespace-no-wrap">{purchase.userId ? purchase.userId.name : 'Unknown User'}</p>
                         </td>
                         <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                          <p className="text-gray-900 whitespace-no-wrap capitalize">{purchase.itemName}</p>
+                          <p className="text-gray-900 whitespace-no-wrap">{purchase.transactionType === 'subscription' ? 'Subscription' : 'Store purchase'}</p><p className="text-gray-700 whitespace-no-wrap capitalize">{purchase.itemName || purchase.plan || purchase.itemId || 'Unknown item'}</p>
                         </td>
                         <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                          <p className="text-gray-900 whitespace-no-wrap capitalize">{purchase.itemPrice}</p>
+                          <p className="text-gray-900 whitespace-no-wrap">{purchase.itemPrice || purchase.amount || purchase.price || 'Not recorded'}</p>
                         </td>
                         <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                           <span className={`px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(purchase.status)}`}>
@@ -160,15 +160,18 @@ const AdminStorePurchasesPage = () => {
       {selectedPurchase && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 w-full max-w-lg">
-            <h2 className="text-2xl font-bold mb-4">Review Purchase</h2>
+            <h2 className="text-2xl font-bold mb-4">{selectedPurchase.transactionType === 'subscription' ? 'Review Subscription Payment' : 'Review Purchase'}</h2>
             <p><strong>User:</strong> {selectedPurchase.userId ? selectedPurchase.userId.name : 'Unknown User'}</p>
-            <p><strong>Item:</strong> {selectedPurchase.itemName}</p>
-            <p><strong>Price:</strong> {selectedPurchase.itemPrice}</p>
+            <p><strong>Type:</strong> {selectedPurchase.transactionType === 'subscription' ? 'Subscription' : 'Store purchase'}</p>
+            <p><strong>Item:</strong> {selectedPurchase.itemName || selectedPurchase.plan || selectedPurchase.itemId || 'Unknown item'}</p>
+            <p><strong>Price:</strong> {selectedPurchase.itemPrice || selectedPurchase.amount || selectedPurchase.price || 'Not recorded'}</p>
             <p><strong>Status:</strong> <span className={`px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(selectedPurchase.status)}`}>{selectedPurchase.status}</span></p>
             <p><strong>Submitted:</strong> {new Date(selectedPurchase.createdAt).toLocaleString()}</p>
-            <div className="my-4">
-              <img src={selectedPurchase.bankSlipUrl} alt="Bank slip" className="max-h-96 w-full object-contain" />
-            </div>
+            {selectedPurchase.bankSlipUrl && (
+              <div className="my-4">
+                <img src={selectedPurchase.bankSlipUrl} alt="Bank slip" className="max-h-96 w-full object-contain" />
+              </div>
+            )}
             {selectedPurchase.status === 'refund_required' && (
               <div className="my-4 p-3 bg-orange-100 text-orange-900 rounded">
                 <strong>Payment requires refund review.</strong>
