@@ -3228,3 +3228,89 @@ test("MongoDB Durable Object routing is stable and spreads authenticated users",
   assert.ok(shards.size > 1, "authenticated users should distribute across MongoDB connection shards");
   assert.equal(getMongoShardName(new Request("https://example.test"), env), "mongo-primary");
 });
+
+
+test("successful WebXPay subscription settlement clears its matching checkout reservation", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "0123456789abcdef01234567";
+  const userId = new ObjectId("abcdef0123456789abcdef01");
+  const reservationId = "reservation-success";
+  const subscription = {
+    _id: new ObjectId(orderId), userId, plan: "monthly", status: "pending",
+    checkoutReservationId: reservationId
+  };
+  let userUpdate;
+  const purchases = { async findOne() { return null; } };
+  const subscriptions = {
+    async findOne() { return subscription; },
+    async updateOne(query, update) {
+      Object.assign(subscription, update.$set || {});
+      return { modifiedCount: 1, matchedCount: 1 };
+    }
+  };
+  const users = {
+    async updateOne(query, update) {
+      userUpdate = { query, update };
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) {
+    if (name === "purchases") return purchases;
+    if (name === "subscriptions") return subscriptions;
+    if (name === "users") return users;
+    assert.fail("Unexpected collection " + name);
+  } };
+  const session = { async withTransaction(callback) { return callback(); }, async endSession() {} };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+  const result = await connection.settleWebXPay(orderId, "00", "provider-reference");
+  assert.equal(result.status, 200);
+  assert.equal(subscription.status, "active");
+  assert.equal(userUpdate.query._id, userId);
+  assert.equal(userUpdate.query["pendingSubscriptionCheckout.reservationId"], reservationId);
+  assert.deepEqual(userUpdate.update.$unset, { pendingSubscriptionCheckout: "" });
+  assert.equal(userUpdate.update.$set.plan, "premium");
+});
+
+test("declined WebXPay subscription settlement clears its matching checkout reservation", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "1123456789abcdef01234567";
+  const userId = new ObjectId("abcdef0123456789abcdef01");
+  const reservationId = "reservation-declined";
+  const subscription = {
+    _id: new ObjectId(orderId), userId, plan: "weekly", status: "pending",
+    checkoutReservationId: reservationId
+  };
+  let userUpdate;
+  const purchases = { async findOne() { return null; } };
+  const subscriptions = {
+    async findOne() { return subscription; },
+    async updateOne(query, update) {
+      Object.assign(subscription, update.$set || {});
+      return { modifiedCount: 1, matchedCount: 1 };
+    }
+  };
+  const users = {
+    async updateOne(query, update) {
+      userUpdate = { query, update };
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const db = { collection(name) {
+    if (name === "purchases") return purchases;
+    if (name === "subscriptions") return subscriptions;
+    if (name === "users") return users;
+    assert.fail("Unexpected collection " + name);
+  } };
+  const session = { async withTransaction(callback) { return callback(); }, async endSession() {} };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+  const result = await connection.settleWebXPay(orderId, "15", "provider-reference");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "declined");
+  assert.equal(subscription.status, "cancelled");
+  assert.equal(userUpdate.query["pendingSubscriptionCheckout.reservationId"], reservationId);
+  assert.deepEqual(userUpdate.update.$unset, { pendingSubscriptionCheckout: "" });
+});
