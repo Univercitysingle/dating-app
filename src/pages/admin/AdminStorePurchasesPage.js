@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../../api/apiClient';
+import { useAuth } from '../../context/AuthContext';
 
 const AdminStorePurchasesPage = () => {
   const [purchases, setPurchases] = useState([]);
@@ -7,6 +8,7 @@ const AdminStorePurchasesPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+  const { user: adminUser } = useAuth();
 
   const fetchPurchases = useCallback(async () => {
     setIsLoading(true);
@@ -17,7 +19,7 @@ const AdminStorePurchasesPage = () => {
       });
       setPurchases(response || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while fetching purchases.');
+      setError(err.data?.message || err.message || 'An error occurred while fetching purchases.');
     } finally {
       setIsLoading(false);
     }
@@ -41,7 +43,7 @@ const AdminStorePurchasesPage = () => {
       fetchPurchases();
       handleCloseModal();
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while approving the purchase.');
+      setError(err.data?.message || err.message || 'An error occurred while approving the purchase.');
     }
   };
 
@@ -55,7 +57,7 @@ const AdminStorePurchasesPage = () => {
       fetchPurchases();
       handleCloseModal();
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while rejecting the purchase.');
+      setError(err.data?.message || err.message || 'An error occurred while rejecting the purchase.');
     }
   };
 
@@ -73,7 +75,7 @@ const AdminStorePurchasesPage = () => {
       await fetchPurchases();
       handleCloseModal();
     } catch (err) {
-      setError(err.response?.data?.message || 'Unable to record the refund.');
+      setError(err.data?.message || err.message || 'Unable to record the refund.');
     }
   };
 
@@ -218,7 +220,7 @@ const AdminStorePurchasesPage = () => {
                   <button onClick={() => handleApprove(selectedPurchase._id)} className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Approve</button>
                 </>
               )}
-              {selectedPurchase.status === 'refund_required' && (
+              {adminUser?.role === 'superadmin' && selectedPurchase.status === 'refund_required' && (
                 <button
                   onClick={() => handleRecordRefund(selectedPurchase)}
                   className="px-4 py-2 rounded-md text-white bg-purple-700 hover:bg-purple-800"
