@@ -3629,7 +3629,7 @@ export class MongoDBConnection {
   async getAdminPurchases(uid, status = "all") {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
-    if (status !== "all" && !["pending", "completed", "rejected"].includes(status)) return { status: 400, body: { message: "Invalid purchase status" } };
+    if (status !== "all" && !["pending", "completed", "rejected", "refund_required"].includes(status)) return { status: 400, body: { message: "Invalid purchase status" } };
     try {
       const db = this.getDatabase(await this.getClient());
       const match = status === "all" ? {} : { status };
