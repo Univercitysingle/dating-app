@@ -120,8 +120,8 @@ const AdminSupportTicketDetailPage = () => {
     setError(null);
     setActionMessage(null);
     try {
-      const response = await apiClient.put('/admin/support-tickets/' + ticketId + '/status', changes);
-      setTicket(response);
+      await apiClient.put('/admin/support-tickets/' + ticketId + '/status', changes);
+      await fetchTicketDetails();
       setActionMessage('Ticket details updated.');
     } catch (err) {
       setError(err.data?.message || err.message || 'Unable to update ticket status.');
