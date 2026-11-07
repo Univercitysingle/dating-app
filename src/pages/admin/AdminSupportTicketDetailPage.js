@@ -245,10 +245,12 @@ const AdminSupportTicketDetailPage = () => {
         <div className="divide-y divide-slate-100 px-5">
           {history.length === 0 ? <p className="py-4 text-sm text-slate-500">No administrative changes recorded yet.</p> : history.map((entry, index) => (
             <div key={entry._id || index} className="py-3">
-              <p className="text-xs text-slate-500">{formatDate(entry.createdAt)}</p>
-              <ul className="mt-1 space-y-1">{(Array.isArray(entry.changes) ? entry.changes : []).map((change, changeIndex) => (
-                <li key={changeIndex} className="text-sm text-slate-700"><strong>{change.field}</strong>: {change.from === null ? 'Not set' : String(change.from)} <span aria-hidden="true">→</span> {change.to === null ? 'Unassigned' : String(change.to)}</li>
-              ))}</ul>
+              <p className="text-xs text-slate-500">{formatDate(entry.createdAt)} · {entry.actorType === 'admin' ? 'Staff action' : 'Customer action'}</p>
+              {entry.eventType === 'support_ticket_message_edited' ? <div className="mt-1 text-sm text-slate-700"><strong>Message edited</strong><p className="mt-1 text-xs text-slate-500">Previous: {entry.previousMessage}</p><p className="text-xs text-slate-700">Updated: {entry.updatedMessage}</p></div>
+                : entry.eventType === 'support_ticket_message_deleted' ? <div className="mt-1 text-sm text-slate-700"><strong>Message deleted</strong><p className="mt-1 text-xs text-slate-500">Original content retained in restricted audit history.</p></div>
+                : <ul className="mt-1 space-y-1">{(Array.isArray(entry.changes) ? entry.changes : []).map((change, changeIndex) => (
+                  <li key={changeIndex} className="text-sm text-slate-700"><strong>{change.field}</strong>: {change.from === null ? 'Not set' : String(change.from)} <span aria-hidden="true">→</span> {change.to === null ? 'Unassigned' : String(change.to)}</li>
+                ))}</ul>}
             </div>
           ))}
         </div>
