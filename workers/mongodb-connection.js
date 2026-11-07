@@ -3629,7 +3629,7 @@ export class MongoDBConnection {
   async getAdminPurchases(uid, status = "all") {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
-    if (status !== "all" && !["pending", "completed", "rejected", "refund_required"].includes(status)) return { status: 400, body: { message: "Invalid purchase status" } };
+    if (status !== "all" && !["pending", "completed", "rejected", "refund_required", "refunded"].includes(status)) return { status: 400, body: { message: "Invalid purchase status" } };
     try {
       const db = this.getDatabase(await this.getClient());
       const match = status === "all" ? {} : { status };
@@ -3727,6 +3727,44 @@ export class MongoDBConnection {
     }
   }
 
+  async recordAdminRefund(uid, transactionId, transactionType, refundReference, note = "") {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    if (typeof transactionId !== "string" || !/^[a-fA-F0-9]{24}$/.test(transactionId)) return { status: 400, body: { message: "Invalid transaction ID" } };
+    if (!["store_purchase", "subscription"].includes(transactionType)) return { status: 400, body: { message: "Invalid transaction type" } };
+    if (typeof refundReference !== "string" || refundReference.trim().length < 3 || refundReference.trim().length > 160) return { status: 400, body: { message: "A valid merchant refund reference is required" } };
+    if (typeof note !== "string" || note.length > 1000) return { status: 400, body: { message: "Refund note must be 1000 characters or fewer" } };
+    let outcome = { status: 503, body: { message: "Refund record unavailable; no completion was confirmed" } };
+    let session;
+    try {
+      const client = await this.getClient();
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(client);
+      const collection = db.collection(transactionType === "subscription" ? "subscriptions" : "purchases");
+      session = client.startSession();
+      await session.withTransaction(async () => {
+        const transaction = await collection.findOne({ _id: new ObjectId(transactionId), status: "refund_required" }, { session });
+        if (!transaction) { outcome = { status: 409, body: { message: "Refund review record not found or already processed" } }; throw new Error("ABORT_REFUND_RECORD"); }
+        const now = new Date();
+        const refundRef = refundReference.trim();
+        await db.collection("auditlogs").insertOne({
+          eventType: "payment_refund_recorded", actorUid: uid, targetUid: transaction.userId,
+          transactionId: transaction._id, transactionType, paymentReference: transaction.paymentReference || null,
+          refundReference: refundRef, note: note.trim(), outcome: "completed", createdAt: now
+        }, { session });
+        const changed = await collection.updateOne({ _id: transaction._id, status: "refund_required" }, { $set: {
+          status: "refunded", refundReference: refundRef, refundNote: note.trim(),
+          refundProcessedAt: now, refundProcessedBy: uid, updatedAt: now
+        } }, { session });
+        if (!changed.modifiedCount) { outcome = { status: 409, body: { message: "Refund record changed before it could be updated" } }; throw new Error("ABORT_REFUND_RECORD"); }
+        outcome = { status: 200, body: { message: "Refund completion recorded", refundReference: refundRef } };
+      });
+      return outcome;
+    } catch (error) {
+      if (outcome.status === 409) return outcome;
+      return { status: 503, body: { message: "Refund record unavailable; no completion was confirmed" } };
+    } finally { if (session) await session.endSession().catch(() => {}); }
+  }
   async getAdminTransactions(uid) {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
@@ -5358,7 +5396,11 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/login-history") result = await this.getAdminLogs(body.claims.sub, "login", body.search || "");
       else if (url.pathname === "/internal/admin/audit-logs") result = await this.getAdminLogs(body.claims.sub, "audit", body.search || "");
       else if (url.pathname === "/internal/admin/purchases") result = await this.getAdminPurchases(body.claims.sub, body.status || "all");
-      else if (url.pathname === "/internal/admin/purchase-action") result = await this.moderateAdminPurchase(body.claims.sub, body.purchaseId, body.action, body.reason || "");
+      else if (url.pathname === "/internal/admin/purchase-action") {
+        result = body.action === "record-refund"
+          ? await this.recordAdminRefund(body.claims.sub, body.purchaseId, body.transactionType, body.refundReference, body.note || "")
+          : await this.moderateAdminPurchase(body.claims.sub, body.purchaseId, body.action, body.reason || "");
+      }
       else result = await this.getAdminAnalyticsSummary(body.claims.sub, body.params || {});
       return json(result.body, result.status);
     }
