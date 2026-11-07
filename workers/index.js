@@ -21,6 +21,37 @@ function darkFantasyRegionGate(request, env) {
   return null;
 }
 
+export function getMongoShardName(request, env = {}) {
+  const authorization = request?.headers?.get("authorization") || "";
+  const token = authorization.match(/^Bearer\s+([A-Za-z0-9._-]+)$/i)?.[1];
+  if (!token) return "mongo-primary";
+
+  let uid;
+  try {
+    const encodedPayload = token.split(".")[1];
+    if (!encodedPayload) return "mongo-primary";
+    const base64 = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const claims = JSON.parse(atob(padded));
+    uid = typeof claims.sub === "string" ? claims.sub
+      : typeof claims.user_id === "string" ? claims.user_id
+        : typeof claims.uid === "string" ? claims.uid : null;
+  } catch {
+    return "mongo-primary";
+  }
+
+  if (!uid || uid.length > 256) return "mongo-primary";
+  const configured = Number(env.MONGODB_CONNECTION_SHARDS);
+  const shardCount = Number.isInteger(configured) && configured >= 1 && configured <= 16
+    ? configured : 4;
+  let hash = 2166136261;
+  for (let index = 0; index < uid.length; index += 1) {
+    hash ^= uid.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return "mongo-shard-" + ((hash >>> 0) % shardCount);
+}
+
 export function isFirebaseDatabaseUrl(value) {
   if (typeof value !== "string" || value.length > 512) return false;
   try {
@@ -451,7 +482,7 @@ export default {
       }
 
       try {
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const probe = await connection.fetch("https://internal.invalid/internal/ping", { method: "POST" });
         if (!probe.ok) {
@@ -471,7 +502,7 @@ export default {
       if (!payload || typeof payload.newPassword !== "string") return json({ error: "Password must be at least 6 characters long." }, 400);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/set-initial-password", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -523,7 +554,7 @@ export default {
           const token = await createSuperadminCustomToken(env, payload.email, payload.password);
           if (!token) return json({ error: "Invalid credentials" }, 401);
           if (!env.MONGODB_CONNECTION) return json({ error: "Superadmin account service unavailable" }, 503);
-          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
           const connection = env.MONGODB_CONNECTION.get(id);
           const provisionResponse = await connection.fetch("https://internal.invalid/internal/superadmin-provision", {
             method: "POST",
@@ -557,7 +588,7 @@ export default {
           headers: { authorization: "Bearer " + payload.token }
         });
         const claims = await authenticateFirebaseRequest(authRequest, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/profile", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -639,7 +670,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Profile service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const payload = request.method === "PUT" ? await request.json().catch(() => null) : null;
         if (request.method === "PUT" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
@@ -665,7 +696,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Swipe service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/undo-swipe", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -703,7 +734,7 @@ export default {
             status: 429, headers: { ...JSON_HEADERS, "retry-after": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))) }
           });
         }
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/swipe", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -728,7 +759,7 @@ export default {
       if (!targetUid || targetUid.length > 128) return json({ error: "Invalid user ID" }, 400);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/swipe", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -760,7 +791,7 @@ export default {
         if (request.method === "PUT" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
           return json({ error: "Invalid notification preferences" }, 400);
         }
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/notification-preferences", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -781,7 +812,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Notification service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/notifications", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -802,7 +833,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Match service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const isConfirmed = url.pathname === "/api/matches/confirmed";
         const response = await connection.fetch("https://internal.invalid/" + (isConfirmed ? "internal/confirmed-matches" : "internal/potential-matches"), {
@@ -825,7 +856,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         const filters = Object.fromEntries(url.searchParams.entries());
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/discover", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -850,7 +881,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Profile service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/subscriptions", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -871,7 +902,7 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Profile service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/likes", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -914,7 +945,7 @@ export default {
         if (!file || typeof file.arrayBuffer !== "function" || !allowedTypes[file.type]) return json({ message: "Attach a JPEG, PNG, GIF, WebP image, or PDF" }, 400);
         if (file.size < 1 || file.size > 10 * 1024 * 1024) return json({ message: "Each attachment must be 10 MB or smaller" }, 400);
         if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const check = async (path) => {
           const response = await connection.fetch("https://internal.invalid" + path, {
@@ -1026,7 +1057,7 @@ export default {
             ...(proxyStatus ? { proxyStatus } : {})
           }, 503);
         }
-        const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION && env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         if (!id) {
           await requestCdnObject(env, key, "DELETE", { "Origin": env.FRONTEND_URL ? new URL(env.FRONTEND_URL).origin : url.origin }, undefined, claims).catch(() => {});
           return json({ message: "Photo metadata service unavailable" }, 503);
@@ -1072,7 +1103,7 @@ export default {
         const ownedPhotoKey = new RegExp("^photos-" + claims.sub + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i");
         if (!ownedPhotoKey.test(key)) return json({ error: "Photo does not belong to the current user or has an invalid key" }, 403);
         if (!env.MONGODB_CONNECTION) return json({ message: "Photo metadata service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/photo-delete", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, key })
@@ -1114,7 +1145,7 @@ export default {
       if (!targetUid || targetUid.length > 128) return json({ error: "Invalid user ID" }, 400);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/public-profile", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1139,7 +1170,7 @@ export default {
       if (!payload || !Array.isArray(payload.photos)) return json({ error: "Invalid payload. 'photos' must be an array." }, 400);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/photo-order", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1167,7 +1198,7 @@ export default {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         const limited = await enforceAccountRateLimit(env, "unmatch-user", claims.sub, 20, 60 * 60 * 1000, "Unmatch action limit reached. Please retry later.");
         if (limited) return limited;
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/unmatch", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1195,7 +1226,7 @@ export default {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         const limited = await enforceAccountRateLimit(env, blockMatch[1] + "-user", claims.sub, 20, 60 * 60 * 1000, "Block action limit reached. Please retry later.");
         if (limited) return limited;
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/block", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1219,7 +1250,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ error: statusRoute[1] === "purchase" ? "Purchase service unavailable" : "Subscription service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/" + statusRoute[1] + "-status", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1244,7 +1275,7 @@ export default {
       }
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/support-tickets", {
           method: "POST",
@@ -1270,7 +1301,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/support-ticket-message", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1294,7 +1325,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/support-ticket", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1329,7 +1360,7 @@ export default {
         if (action && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
           return json({ message: "A valid request body is required" }, 400);
         }
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const internalPath = !ticketId ? "/internal/admin/support-tickets"
           : action === "messages" ? "/internal/admin/support-ticket-message"
@@ -1368,7 +1399,7 @@ export default {
           if (isAction && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
             return json({ message: "A valid request body is required" }, 400);
           }
-          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
           const connection = env.MONGODB_CONNECTION.get(id);
           const response = await connection.fetch("https://internal.invalid" + (isList ? "/internal/admin/purchases" : "/internal/admin/purchase-action"), {
             method: "POST", headers: { "content-type": "application/json" },
@@ -1404,7 +1435,7 @@ export default {
           if (request.method !== "DELETE" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
             return json({ message: "A valid JSON object is required" }, 400);
           }
-          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
           const connection = env.MONGODB_CONNECTION.get(id);
           let internalPath;
           if (isCreate) internalPath = "/internal/admin/user-create";
@@ -1529,7 +1560,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ message: "Administration service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         let internalPath;
         const body = { claims };
@@ -1589,7 +1620,7 @@ export default {
           if (limited) return limited;
         }
         if (!env.MONGODB_CONNECTION) return json({ message: "Report administration service unavailable." }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const params = Object.fromEntries(url.searchParams.entries());
         const body = isList
@@ -1624,7 +1655,7 @@ export default {
         // even if the Durable Object binding is accidentally omitted at deploy time.
         const limited = await enforceAccountRateLimit(env, "report-user", claims.sub, 3, 60 * 60 * 1000, "Report limit reached. Please retry later.");
         if (limited) return limited;
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/create-report", {
           method: "POST",
@@ -1669,7 +1700,7 @@ export default {
           const quota = await limited.json();
           if (!quota.allowed) return json({ error: "You have reached the daily verification submission limit." }, 429);
         }
-        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         let internalPath;
         let body = { claims };
         if (isOwn) {
@@ -1766,7 +1797,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ error: "Community service unavailable" }, 503);
-        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         const route = url.pathname.replace(/\/+$/, "");
         const segments = route.replace("/api/dark-fantasy/communities", "").split("/").filter(Boolean);
         const method = request.method;
@@ -1827,7 +1858,7 @@ export default {
           }
           createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
           if (!env.MONGODB_CONNECTION) return json({ error: "Purchase service unavailable" }, 503);
-          const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+          const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
           const eligibilityResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ claims })
@@ -1846,7 +1877,7 @@ export default {
           catch { return json({ error: "Payment gateway is not configured." }, 503); }
         }
         if (!env.MONGODB_CONNECTION) return json({ error: "Dark Fantasy service unavailable" }, 503);
-        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         const internalPath = route === "/api/dark-fantasy/status" ? "/internal/dark-fantasy/status"
           : route === "/api/dark-fantasy/discover" ? "/internal/dark-fantasy/discover"
           : "/internal/dark-fantasy/profile";
@@ -1879,7 +1910,7 @@ export default {
         const payload = await request.json().catch(() => null);
         if (!payload || typeof payload.itemId !== "string") return json({ error: "Invalid item ID." }, 400);
         if (!env.MONGODB_CONNECTION) return json({ error: "Purchase service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/create-purchase", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1908,7 +1939,7 @@ export default {
         const payload = await request.json().catch(() => null);
         if (!payload || typeof payload.plan !== "string") return json({ error: "Invalid subscription plan." }, 400);
         if (!env.MONGODB_CONNECTION) return json({ error: "Subscription service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/create-subscription", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -1950,7 +1981,7 @@ export default {
         }
         const statusCode = fields[3];
         if (!env.MONGODB_CONNECTION) return json({ error: "Payment settlement unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/webxpay-settle", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -2013,7 +2044,7 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const connection = env.MONGODB_CONNECTION?.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const connection = env.MONGODB_CONNECTION?.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         if (!connection) return json({ error: "Video Rooms service unavailable" }, 503);
         const accessResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
@@ -2068,7 +2099,7 @@ export default {
       if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         const response = await connection.fetch("https://internal.invalid/internal/video-rooms/earnings", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, payload: {} })
         });
@@ -2092,7 +2123,7 @@ export default {
       try {
         createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const accessConnection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const accessConnection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         const accessResponse = await accessConnection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
         });
@@ -2126,7 +2157,7 @@ export default {
       if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         const accessResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
         });
@@ -2158,7 +2189,7 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ error: "Calling service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         let payload = null;
         let internalPath = "/internal/calls/" + action;
@@ -2211,7 +2242,7 @@ export default {
           });
         }
         if (!env.MONGODB_CONNECTION) return json({ error: "Chat service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         if (chatRoute[1] === "conversations") {
           const response = await connection.fetch("https://internal.invalid/internal/chat/conversations", {
@@ -2357,7 +2388,7 @@ export default {
       let databaseStatus = "unavailable";
       if (env.MONGODB_CONNECTION) {
         try {
-          const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+          const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
           const connection = env.MONGODB_CONNECTION.get(id);
           const response = await connection.fetch("https://internal.invalid/internal/ping", { method: "POST" });
           databaseStatus = response.ok ? "connected" : "disconnected";
@@ -2386,7 +2417,7 @@ export default {
       }
       if (!env.MONGODB_CONNECTION) return json({ error: "Expiration service unavailable" }, 503);
       try {
-        const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/scheduled-expirations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: cronRoute[1] }) });
         const result = await response.json().catch(() => ({ error: "Expiration service unavailable" }));
