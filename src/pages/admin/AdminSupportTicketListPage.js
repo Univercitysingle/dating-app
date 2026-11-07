@@ -17,7 +17,7 @@ const AdminSupportTicketListPage = () => {
       const response = await apiClient.get('/admin/support-tickets');
       setTickets(response.tickets || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while fetching tickets.');
+      setError(err.data?.message || err.message || 'An error occurred while fetching tickets.');
     } finally {
       setIsLoading(false);
     }
