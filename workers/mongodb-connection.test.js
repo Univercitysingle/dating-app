@@ -3239,7 +3239,7 @@ test("successful WebXPay subscription settlement clears its matching checkout re
     _id: new ObjectId(orderId), userId, plan: "monthly", status: "pending",
     checkoutReservationId: reservationId
   };
-  let userUpdate;
+  const userUpdates = [];
   const purchases = { async findOne() { return null; } };
   const subscriptions = {
     async findOne() { return subscription; },
@@ -3250,7 +3250,7 @@ test("successful WebXPay subscription settlement clears its matching checkout re
   };
   const users = {
     async updateOne(query, update) {
-      userUpdate = { query, update };
+      userUpdates.push({ query, update });
       return { matchedCount: 1, modifiedCount: 1 };
     }
   };
@@ -3267,10 +3267,11 @@ test("successful WebXPay subscription settlement clears its matching checkout re
   const result = await connection.settleWebXPay(orderId, "00", "provider-reference");
   assert.equal(result.status, 200);
   assert.equal(subscription.status, "active");
-  assert.equal(userUpdate.query._id, userId);
-  assert.equal(userUpdate.query["pendingSubscriptionCheckout.reservationId"], reservationId);
-  assert.deepEqual(userUpdate.update.$unset, { pendingSubscriptionCheckout: "" });
-  assert.equal(userUpdate.update.$set.plan, "premium");
+  assert.equal(userUpdates.length, 2);
+  assert.equal(userUpdates[0].query._id, userId);
+  assert.equal(userUpdates[0].update.$set.plan, "premium");
+  assert.equal(userUpdates[1].query["pendingSubscriptionCheckout.reservationId"], reservationId);
+  assert.deepEqual(userUpdates[1].update.$unset, { pendingSubscriptionCheckout: "" });
 });
 
 test("declined WebXPay subscription settlement clears its matching checkout reservation", async () => {
