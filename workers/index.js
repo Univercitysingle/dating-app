@@ -1344,6 +1344,32 @@ export default {
       }
     }
 
+    const supportTicketMessageAction = url.pathname.match(/^\/api\/support-tickets\/([^/]+)\/messages\/([a-fA-F0-9]{24})$/);
+    if (supportTicketMessageAction && ["PATCH", "DELETE"].includes(request.method)) {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      let ticketId;
+      try { ticketId = decodeURIComponent(supportTicketMessageAction[1]); } catch { return json({ message: "Invalid ticket ID" }, 400); }
+      const payload = request.method === "PATCH" ? await request.json().catch(() => null) : {};
+      if (request.method === "PATCH" && (!payload || typeof payload !== "object" || Array.isArray(payload))) return json({ message: "A valid message is required." }, 400);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const isEdit = request.method === "PATCH";
+        const response = await connection.fetch("https://internal.invalid/internal/support-ticket-message-" + (isEdit ? "edit" : "delete"), {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, ticketId, messageId: supportTicketMessageAction[2], payload })
+        });
+        const body = await response.json().catch(() => ({ message: "Support ticket service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Support ticket service unavailable" }, 503);
+      }
+    }
+
     const supportTicketMessage = url.pathname.match(/^\/api\/support-tickets\/([^/]+)\/messages$/);
     if (supportTicketMessage && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
@@ -1397,31 +1423,34 @@ export default {
     const adminSupportMatch = url.pathname === adminSupportBase || url.pathname.startsWith(adminSupportBase + "/");
     if (adminSupportMatch) {
       const adminSupportParts = url.pathname.slice(adminSupportBase.length).split("/").filter(Boolean);
-      if (adminSupportParts.length > 2) return json({ error: "Not found" }, 404);
+      if (adminSupportParts.length > 3) return json({ error: "Not found" }, 404);
       const ticketId = adminSupportParts[0];
       const action = adminSupportParts[1];
-      const allowed = (!ticketId && request.method === "GET") ||
+      const messageId = adminSupportParts[2];
+      const allowed = (!ticketId && !action && request.method === "GET") ||
         (ticketId && !action && request.method === "GET") ||
-        (ticketId && action === "messages" && request.method === "POST") ||
-        (ticketId && action === "status" && request.method === "PUT");
+        (ticketId && action === "messages" && !messageId && request.method === "POST") ||
+        (ticketId && action === "messages" && /^[a-fA-F0-9]{24}$/.test(messageId || "") && ["PATCH", "DELETE"].includes(request.method)) ||
+        (ticketId && action === "status" && !messageId && request.method === "PUT");
       if (!allowed) return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (!env.MONGODB_CONNECTION) return json({ message: "Administration service unavailable" }, 503);
-        const payload = action ? await request.json().catch(() => null) : null;
-        if (action && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+        const payload = request.method === "DELETE" || !action ? null : await request.json().catch(() => null);
+        if (action && request.method !== "DELETE" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
           return json({ message: "A valid request body is required" }, 400);
         }
         const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const internalPath = !ticketId ? "/internal/admin/support-tickets"
+          : action === "messages" && messageId ? "/internal/admin/support-ticket-message-" + (request.method === "PATCH" ? "edit" : "delete")
           : action === "messages" ? "/internal/admin/support-ticket-message"
           : action === "status" ? "/internal/admin/support-ticket-status"
           : "/internal/admin/support-ticket";
         const response = await connection.fetch("https://internal.invalid" + internalPath, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims, ticketId, payload, params: Object.fromEntries(url.searchParams.entries()) })
+          body: JSON.stringify({ claims, ticketId, messageId, payload, params: Object.fromEntries(url.searchParams.entries()) })
         });
         const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
         return json(result, response.status);
@@ -2320,6 +2349,30 @@ export default {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
         return json({ error: "Calling service unavailable" }, 503);
+      }
+    }
+
+    const chatMessageAction = url.pathname.match(/^\/api\/chat\/messages\/([a-fA-F0-9]{24})$/);
+    if (chatMessageAction && ["PATCH", "DELETE"].includes(request.method)) {
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      const payload = request.method === "PATCH" ? await request.json().catch(() => null) : {};
+      if (request.method === "PATCH" && (!payload || typeof payload !== "object" || Array.isArray(payload))) return json({ error: "A valid message is required" }, 400);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ error: "Chat service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const isEdit = request.method === "PATCH";
+        const response = await connection.fetch("https://internal.invalid/internal/chat/message-" + (isEdit ? "edit" : "delete"), {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, messageId: chatMessageAction[1], payload })
+        });
+        const result = await response.json().catch(() => ({ error: "Chat message operation unavailable" }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Chat service unavailable" }, 503);
       }
     }
 
