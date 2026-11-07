@@ -2400,7 +2400,7 @@ export class MongoDBConnection {
       const total = await db.collection("reports").countDocuments(query);
       const uids = [...new Set(reports.flatMap(report => [report.reporterUid, report.reportedUserUid]).filter(Boolean))];
       const userProjection = {
-        uid: 1, name: 1, isProfileVisible: 1, role: 1,
+        uid: 1, name: 1, isProfileVisible: 1, role: 1, accountStatus: 1, suspendedUntil: 1,
         ...(admin.role === "superadmin" ? { email: 1, mobileNumber: 1 } : {})
       };
       const users = uids.length ? await db.collection("users").find(
