@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logger from '../../utils/logger';
 import apiClient from '../../api/apiClient';
@@ -9,9 +9,11 @@ const AdminReportListPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const { user: adminUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const reportedUidParam = searchParams.get('reportedUserUid') || '';
 
   const [filterStatus, setFilterStatus] = useState('pending_review');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(reportedUidParam);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -43,6 +45,11 @@ const AdminReportListPage = () => {
       setIsLoading(false);
     }
   }, [adminUser]);
+
+  useEffect(() => {
+    setSearchQuery(reportedUidParam);
+    setCurrentPage(1);
+  }, [reportedUidParam]);
 
   useEffect(() => {
     if (adminUser) {
@@ -93,11 +100,16 @@ const AdminReportListPage = () => {
             onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }}
             className="px-3 py-2 border border-gray-300 rounded-md shadow-sm"
           >
+            <option value="">All statuses</option>
             <option value="pending_review">Pending Review</option>
             <option value="under_investigation">Under Investigation</option>
             <option value="resolved_no_action">Resolved: No Action</option>
+            <option value="resolved_warning_issued_to_reported_user">Warning Issued</option>
+            <option value="resolved_reporter_notified">Reporter Notified</option>
+            <option value="resolved_content_removed">Content Removed</option>
             <option value="resolved_user_suspended">Resolved: User Suspended</option>
             <option value="resolved_user_banned">Resolved: User Banned</option>
+            <option value="resolved_user_restored">Resolved: User Restored</option>
           </select>
         </div>
         <div>
@@ -108,7 +120,7 @@ const AdminReportListPage = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md shadow-sm"
-            placeholder="Name or Email"
+            placeholder={adminUser?.role === "superadmin" ? "Name, email or UID" : "Name or UID"}
           />
         </div>
       </div>
@@ -138,10 +150,10 @@ const AdminReportListPage = () => {
                     <tr key={report._id}>
                       <td className="px-6 py-4">
                         <Link to={`/admin/reports/${report._id}`} className="text-indigo-600 hover:underline">
-                          {report.reportedUserUid?.name || 'N/A'}
+                          {report.reportedUser?.name || 'N/A'}
                         </Link>
                       </td>
-                      <td className="px-6 py-4">{report.reporterUid?.name || 'N/A'}</td>
+                      <td className="px-6 py-4">{report.reporter?.name || 'N/A'}</td>
                       <td className="px-6 py-4 text-sm">{report.reason}</td>
                       <td className="px-6 py-4"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">{report.status}</span></td>
                       <td className="px-6 py-4">{new Date(report.createdAt).toLocaleDateString()}</td>
@@ -149,6 +161,9 @@ const AdminReportListPage = () => {
                         <button onClick={() => handleAction(report._id, 'dismiss')} className="text-gray-600 hover:text-gray-900">Dismiss</button>
                         <button onClick={() => handleAction(report._id, 'suspend_user')} className="text-yellow-600 hover:text-yellow-900">Suspend</button>
                         <button onClick={() => handleAction(report._id, 'ban_user')} className="text-red-600 hover:text-red-900">Ban</button>
+                        {["temporarily_suspended", "permanently_banned"].includes(report.reportedUser?.accountStatus) && (
+                          <button onClick={() => handleAction(report._id, 'restore_user')} className="text-green-600 hover:text-green-900">Restore</button>
+                        )}
                       </td>
                     </tr>
                   ))
