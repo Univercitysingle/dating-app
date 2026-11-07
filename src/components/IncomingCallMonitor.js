@@ -305,10 +305,11 @@ export default function IncomingCallMonitor() {
       checkCall();
       checkActivity();
     });
-    // Keep call detection responsive without issuing a request every 2.5 seconds.
-    // Inbox and notification refreshes share one 30-second activity cycle.
-    callTimer = window.setInterval(checkCall, 10000);
-    activityTimer = window.setInterval(checkActivity, 30000);
+    // Calls remain responsive with a 15-second check. Notifications and inbox
+    // data are lower urgency, so share a 90-second refresh cycle instead of
+    // downloading both collections every 30 seconds.
+    callTimer = window.setInterval(checkCall, 15000);
+    activityTimer = window.setInterval(checkActivity, 90000);
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkCall();
