@@ -2681,8 +2681,8 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { message: "User not found" } };
       const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId), userId: user._id });
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
-      if (ticket.status === "Closed") return { status: 403, body: { message: "This ticket is closed and cannot be updated." } };
       const now = new Date();
+      const wasClosed = ticket.status === "Closed";
       const attachments = Array.isArray(payload.attachments) ? payload.attachments.slice(0, 5).filter(item => {
         if (!item || typeof item.key !== "string" || typeof item.url !== "string" ||
             typeof item.name !== "string" ||
@@ -2715,7 +2715,26 @@ export class MongoDBConnection {
       const message = { ticketId: ticket._id, senderId: user._id, message: payload.message.trim(), ...(attachments.length ? { attachments } : {}), createdAt: now, updatedAt: now };
       const result = await db.collection("ticketmessages").insertOne(message);
       message._id = result.insertedId;
-      await db.collection("supporttickets").updateOne({ _id: ticket._id, userId: user._id }, { $set: { status: "In Progress", updatedAt: now } });
+      const reopening = wasClosed;
+      const nextStatus = reopening ? "Open" : "In Progress";
+      const ticketUpdate = { status: nextStatus, updatedAt: now };
+      if (reopening) {
+        const slaHours = { Urgent: 1, High: 4, Normal: 24, Low: 72 };
+        ticketUpdate.resolutionSummary = null;
+        ticketUpdate.resolvedAt = null;
+        ticketUpdate.resolvedByUid = null;
+        ticketUpdate.slaDueAt = new Date(now.getTime() + (slaHours[ticket.priority] || 24) * 60 * 60 * 1000);
+      }
+      await db.collection("supporttickets").updateOne({ _id: ticket._id, userId: user._id }, { $set: ticketUpdate });
+      if (reopening) await db.collection("auditlogs").insertOne({
+        eventType: "support_ticket_updated", actorUid: uid, actorType: "customer",
+        ticketId: ticket._id,
+        changes: [
+          { field: "status", from: "Closed", to: "Open" },
+          { field: "resolutionSummary", from: ticket.resolutionSummary || null, to: null }
+        ],
+        createdAt: now
+      });
       return { status: 201, body: message };
     } catch {
       return { status: 503, body: { message: "Support ticket service is temporarily unavailable." } };
@@ -4025,6 +4044,12 @@ export class MongoDBConnection {
       }
       changes.assignedToUid = payload.assignedToUid;
     }
+    if (Object.prototype.hasOwnProperty.call(payload, "resolutionSummary")) {
+      if (typeof payload.resolutionSummary !== "string" || payload.resolutionSummary.trim().length > 2000) {
+        return { status: 400, body: { message: "Resolution summary must be between 1 and 2000 characters" } };
+      }
+      changes.resolutionSummary = payload.resolutionSummary.trim();
+    }
     if (!Object.keys(changes).length) return { status: 400, body: { message: "At least one ticket field must be updated" } };
     try {
       const { ObjectId } = await import("mongodb");
@@ -4041,12 +4066,34 @@ export class MongoDBConnection {
       }
       const now = new Date();
       const nextPriority = changes.priority || current.priority || "Normal";
-      if (!current.slaDueAt || Object.prototype.hasOwnProperty.call(changes, "priority")) {
+      const isClosing = changes.status === "Closed";
+      const isReopening = current.status === "Closed" && changes.status && changes.status !== "Closed";
+      if (Object.prototype.hasOwnProperty.call(changes, "resolutionSummary") && !isClosing && current.status !== "Closed") {
+        return { status: 400, body: { message: "A resolution summary can only be set when closing a ticket" } };
+      }
+      if (isClosing) {
+        const summary = changes.resolutionSummary ?? current.resolutionSummary;
+        if (typeof summary !== "string" || !summary.trim()) {
+          return { status: 400, body: { message: "Add a resolution summary before closing this ticket" } };
+        }
+        changes.resolutionSummary = summary.trim();
+        if (current.status !== "Closed") {
+          changes.resolvedAt = now;
+          changes.resolvedByUid = uid;
+        }
+      }
+      if (isReopening) {
+        changes.resolutionSummary = null;
+        changes.resolvedAt = null;
+        changes.resolvedByUid = null;
+        changes.slaDueAt = new Date(now.getTime() + slaHours[nextPriority] * 60 * 60 * 1000);
+      } else if (!current.slaDueAt || Object.prototype.hasOwnProperty.call(changes, "priority")) {
         changes.slaDueAt = new Date(now.getTime() + slaHours[nextPriority] * 60 * 60 * 1000);
       }
-      const auditChanges = Object.entries(changes).filter(([key]) => key !== "slaDueAt").map(([field, value]) => ({
-        field, from: current[field] ?? null, to: value
-      })).filter(item => JSON.stringify(item.from) !== JSON.stringify(item.to));
+      const auditChanges = Object.entries(changes)
+        .filter(([key]) => !["slaDueAt", "resolvedAt", "resolvedByUid"].includes(key))
+        .map(([field, value]) => ({ field, from: current[field] ?? null, to: value }))
+        .filter(item => JSON.stringify(item.from) !== JSON.stringify(item.to));
       const result = await tickets.findOneAndUpdate(
         { _id: ticketObjectId },
         { $set: { ...changes, updatedAt: now } },
