@@ -45,10 +45,27 @@ describe('AdminStorePurchasesPage', () => {
     expect(await screen.findByText('Subscription')).toBeInTheDocument();
     expect(screen.getByText('monthly')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
-    expect(screen.getByText('Review Subscription Payment')).toBeInTheDocument();
+    expect(screen.getByText('Payment Details')).toBeInTheDocument();
     expect(screen.getByText('late_success_after_cancelled_checkout')).toBeInTheDocument();
     expect(screen.getByText('webxpay-payment-123')).toBeInTheDocument();
     expect(screen.getByText(/Do not approve or reject this transaction/i)).toBeInTheDocument();
+  });
+
+  test('does not expose manual approval or rejection for pending IPG payments', async () => {
+    apiClient.get.mockResolvedValueOnce([{
+      _id: '507f1f77bcf86cd799439014',
+      transactionType: 'purchase',
+      itemName: '5 Super Likes',
+      status: 'pending',
+      createdAt: '2026-11-07T09:00:00.000Z',
+      userId: { name: 'Synthetic Test User' }
+    }]);
+    render(<AdminStorePurchasesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View' }));
+    expect(screen.getByText(/Awaiting confirmation from WebXPay/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 
   test('requests the refund_required filter from the Worker API', async () => {
