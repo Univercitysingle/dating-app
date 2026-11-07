@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { MongoDBConnection, getMongoPoolSize } from "./mongodb-connection.js";
-import Worker from "./index.js";
+import Worker, { getMongoShardName } from "./index.js";
 
 test("discovery applies selected gender, reciprocal preferences, and looking-for filters", async () => {
   let capturedMatch;
@@ -3140,4 +3140,22 @@ test("MongoDB connection pool size is bounded and safely configurable", () => {
   assert.equal(getMongoPoolSize("0"), 10);
   assert.equal(getMongoPoolSize("21"), 10);
   assert.equal(getMongoPoolSize("not-a-number"), 10);
+});
+
+
+test("MongoDB Durable Object routing is stable and spreads authenticated users", () => {
+  const makeRequest = uid => {
+    const payload = Buffer.from(JSON.stringify({ sub: uid })).toString("base64url");
+    return new Request("https://example.test/api/chat/conversations", {
+      headers: { authorization: "Bearer header." + payload + ".signature" }
+    });
+  };
+  const env = { MONGODB_CONNECTION_SHARDS: "4" };
+  assert.equal(getMongoShardName(makeRequest("same-user"), env), getMongoShardName(makeRequest("same-user"), env));
+  assert.match(getMongoShardName(makeRequest("same-user"), env), /^mongo-shard-[0-3]$/);
+  const shards = new Set(Array.from({ length: 32 }, (_, index) =>
+    getMongoShardName(makeRequest("load-test-user-" + index), env)
+  ));
+  assert.ok(shards.size > 1, "authenticated users should distribute across MongoDB connection shards");
+  assert.equal(getMongoShardName(new Request("https://example.test"), env), "mongo-primary");
 });
