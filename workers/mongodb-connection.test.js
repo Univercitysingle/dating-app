@@ -3432,3 +3432,40 @@ test("admin report search supports user names without exposing email search to o
   assert.equal(result.body.reports[0].reportedUser.name, "Target Member");
   assert.equal(result.body.reports[0].reporter.name, "Reporter Member");
 });
+
+
+test("admin analytics counts unique active subscribers rather than subscription documents", async () => {
+  const users = {
+    async findOne() { return { uid: "admin", role: "admin" }; },
+    async countDocuments() { return 12; },
+    aggregate() { return { toArray: async () => [{ _id: "2026-11-07", count: 3 }] }; }
+  };
+  const subscriptions = {
+    async distinct(field, query) {
+      assert.equal(field, "userId");
+      assert.deepEqual(query, { status: "active" });
+      return ["subscriber-a", "subscriber-b"];
+    }
+  };
+  const reports = { async distinct() { return ["reported-a"]; } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "subscriptions") return subscriptions;
+      if (name === "reports") return reports;
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getAdminAnalyticsSummary("admin", {
+    startDate: "2026-11-01T00:00:00.000Z",
+    endDate: "2026-11-07T23:59:59.999Z"
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.userStats, { total: 12, paid: 2, unpaid: 10 });
+  assert.equal(result.body.reportedUsersCount, 1);
+});
