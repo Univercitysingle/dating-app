@@ -1883,12 +1883,12 @@ export class MongoDBConnection {
     if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, plan)) {
       return { status: 400, body: { error: "Invalid subscription plan." } };
     }
+    let reservationId = null;
+    let reservationUserId = null;
     try {
       const db = this.getDatabase(await this.getClient());
       // Atlas still has legacy unique indexes for both Stripe and PayHere
-      // subscription IDs. A WebXPay pending record has neither provider ID, but
-      // those indexes treat multiple nulls as duplicates. Do not require DDL
-      // permissions at request time; use unique internal markers until settlement.
+      // subscription IDs. WebXPay uses unique internal markers until settlement.
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found" } };
@@ -1914,10 +1914,33 @@ export class MongoDBConnection {
         createdAt: { $gte: pendingCutoff }
       }, { projection: { _id: 1 } });
       if (pending) return { status: 409, body: { error: "A subscription checkout is already pending. Complete it before starting another." } };
+      // A read-then-insert check is not sufficient under concurrent requests.
+      // Claim a short-lived per-user reservation with one conditional MongoDB
+      // write so only one checkout can pass this point.
+      reservationId = crypto.randomUUID();
+      reservationUserId = user._id;
+      const reservationExpiry = new Date(now.getTime() + 30 * 60 * 1000);
+      const reservation = await users.updateOne(
+        {
+          _id: user._id,
+          $or: [
+            { pendingSubscriptionCheckout: { $exists: false } },
+            { pendingSubscriptionCheckout: null },
+            { "pendingSubscriptionCheckout.expiresAt": { $lte: now } }
+          ]
+        },
+        { $set: { pendingSubscriptionCheckout: { reservationId, expiresAt: reservationExpiry } } }
+      );
+      if (!reservation.matchedCount) {
+        reservationId = null;
+        reservationUserId = null;
+        return { status: 409, body: { error: "A subscription checkout is already pending. Complete it before starting another." } };
+      }
       const subscription = {
         userId: user._id,
         plan,
         status: "pending",
+        checkoutReservationId: reservationId,
         // WebXPay does not issue Stripe or PayHere subscription IDs. Unique
         // internal markers prevent legacy unique indexes from colliding on null.
         stripeSubscriptionId: "webxpay-pending-" + crypto.randomUUID(),
@@ -1940,6 +1963,19 @@ export class MongoDBConnection {
         }
       };
     } catch (error) {
+      if (reservationId && reservationUserId) {
+        try {
+          const db = this.getDatabase(await this.getClient());
+          await db.collection("users").updateOne(
+            { _id: reservationUserId, "pendingSubscriptionCheckout.reservationId": reservationId },
+            { $unset: { pendingSubscriptionCheckout: "" } }
+          );
+        } catch (releaseError) {
+          console.error("Subscription checkout reservation release failed", {
+            message: String(releaseError?.message || "unknown").slice(0, 160)
+          });
+        }
+      }
       console.error("MongoDB subscription creation failed", {
         phase: "create-pending-subscription",
         name: error && typeof error.name === "string" ? error.name : "Error",
@@ -2027,6 +2063,13 @@ export class MongoDBConnection {
           throw new Error("PAYMENT_STATE_CHANGED");
         }
         if (!success) {
+          if (subscription?.checkoutReservationId) {
+            await db.collection("users").updateOne(
+              { _id: subscription.userId, "pendingSubscriptionCheckout.reservationId": subscription.checkoutReservationId },
+              { $unset: { pendingSubscriptionCheckout: "" } },
+              { session }
+            );
+          }
           outcome = { status: 200, body: { success: true, processed: false, status: "declined" } };
           return;
         }
@@ -2084,7 +2127,10 @@ export class MongoDBConnection {
           );
           const changedUser = await db.collection("users").updateOne(
             { _id: subscription.userId },
-            { $set: { plan: "premium", trialExpires: null, updatedAt: now } },
+            {
+              $set: { plan: "premium", trialExpires: null, updatedAt: now },
+              ...(subscription.checkoutReservationId ? { $unset: { pendingSubscriptionCheckout: "" } } : {})
+            },
             { session }
           );
           if (!changedUser.matchedCount) throw new Error("PAYMENT_USER_MISSING");
