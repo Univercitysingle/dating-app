@@ -118,16 +118,9 @@ describe('Admin endpoint input validation', () => {
     });
   });
 
-  it('rejects non-string rejection reasons before purchase lookup', async () => {
-    const res = makeResponse();
-    await adminUsersController.rejectPurchase({
-      params: { purchaseId: '507f1f77bcf86cd799439011' },
-      body: { reason: { $ne: '' } },
-    }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'A rejection reason of 1-500 characters is required.',
-    });
+  it('does not expose manual purchase approval or rejection handlers', () => {
+    expect(adminUsersController.approvePurchase).toBeUndefined();
+    expect(adminUsersController.rejectPurchase).toBeUndefined();
   });
 
   it('fails closed when a role middleware is configured with an unknown role', () => {
