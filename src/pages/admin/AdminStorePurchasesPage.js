@@ -12,7 +12,7 @@ const AdminStorePurchasesPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get('/admin/purchases', {
+      const response = await apiClient.get('/admin/users/purchases', {
         params: { status: filter },
       });
       setPurchases(response || []);
@@ -37,7 +37,7 @@ const AdminStorePurchasesPage = () => {
 
   const handleApprove = async (purchaseId) => {
     try {
-      await apiClient.post(`/admin/purchases/${purchaseId}/approve`);
+      await apiClient.post(`/admin/users/purchases/${purchaseId}/approve`);
       fetchPurchases();
       handleCloseModal();
     } catch (err) {
@@ -51,7 +51,7 @@ const AdminStorePurchasesPage = () => {
       return; // Admin cancelled the prompt
     }
     try {
-      await apiClient.post(`/admin/purchases/${purchaseId}/reject`, { reason });
+      await apiClient.post(`/admin/users/purchases/${purchaseId}/reject`, { reason });
       fetchPurchases();
       handleCloseModal();
     } catch (err) {
@@ -65,7 +65,7 @@ const AdminStorePurchasesPage = () => {
     if (!refundReference || refundReference.trim().length < 3) return;
     const note = prompt('Optional refund note (for example, merchant portal confirmation details):') || '';
     try {
-      await apiClient.post(`/admin/purchases/${transaction._id}/record-refund`, {
+      await apiClient.post(`/admin/users/purchases/${transaction._id}/record-refund`, {
         transactionType: transaction.transactionType,
         refundReference: refundReference.trim(),
         note,
