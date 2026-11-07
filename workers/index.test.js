@@ -1558,7 +1558,10 @@ test("WebXPay callback verifies the signed response before asking MongoDB to set
   });
   const orderId = "0123456789abcdef01234567";
   const signedPayload = orderId + "|T123456|2026-10-21 12:00:00|00|Approved|1";
-  const payment = Buffer.from(signedPayload, "utf8").toString("base64");
+  const payment = privateEncrypt({
+    key: privateKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, Buffer.from(signedPayload, "utf8")).toString("base64");
   const signature = privateEncrypt({
     key: privateKey,
     padding: constants.RSA_PKCS1_PADDING
@@ -1594,7 +1597,10 @@ test("WebXPay callback rejects invalid signatures and does not settle an order",
     privateKeyEncoding: { type: "pkcs8", format: "pem" }
   });
   let called = false;
-  const payment = Buffer.from("0123456789abcdef01234567|T123|date|1|00|Approved").toString("base64");
+  const payment = privateEncrypt({
+    key: privateKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, Buffer.from("0123456789abcdef01234567|T123|2026-10-21 12:00:00|00|Approved|1")).toString("base64");
   const response = await worker.fetch(new Request("https://dating-app.test/api/webxpay/response", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
