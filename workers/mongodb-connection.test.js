@@ -3469,3 +3469,116 @@ test("admin analytics counts unique active subscribers rather than subscription 
   assert.deepEqual(result.body.userStats, { total: 12, paid: 2, unpaid: 10 });
   assert.equal(result.body.reportedUsersCount, 1);
 });
+
+
+test("admin support inbox searches safely and returns total pagination metadata", async () => {
+  let capturedTicketQuery;
+  let capturedUserQuery;
+  const matchingUserId = "507f1f77bcf86cd799439011";
+  const users = {
+    find(query) {
+      capturedUserQuery = query;
+      return { limit() { return this; }, toArray: async () => [{ _id: matchingUserId }] };
+    }
+  };
+  const tickets = {
+    find(query) {
+      capturedTicketQuery = query;
+      return {
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
+        toArray: async () => []
+      };
+    },
+    countDocuments: async () => 23
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "users") return users;
+    if (name === "supporttickets") return tickets;
+    assert.fail("Unexpected collection: " + name);
+  } });
+
+  const result = await connection.getAdminSupportTickets("admin-uid", {
+    page: "2", limit: "10", status: "Open", search: "A.*"
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.total, 23);
+  assert.equal(result.body.totalPages, 3);
+  assert.equal(result.body.currentPage, 2);
+  assert.equal(capturedTicketQuery.status, "Open");
+  assert.equal(capturedTicketQuery.$or[0].subject.$regex, "A\\.\\*");
+  assert.deepEqual(capturedTicketQuery.$or[2].userId.$in, [matchingUserId]);
+  assert.equal(capturedUserQuery.$or.some(item => Object.hasOwn(item, "email")), false);
+});
+
+test("admin private notes are stored as internal and do not move the customer-facing status", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ticketId = "507f1f77bcf86cd799439011";
+  const adminId = new ObjectId("507f1f77bcf86cd799439012");
+  const updates = [];
+  let insertedMessage;
+  const users = { findOne: async () => ({ _id: adminId }) };
+  const tickets = {
+    findOne: async () => ({ _id: new ObjectId(ticketId), status: "In Progress" }),
+    updateOne: async (query, update) => { updates.push(update); return { modifiedCount: 1 }; }
+  };
+  const messages = {
+    insertOne: async message => { insertedMessage = message; return { insertedId: new ObjectId("507f1f77bcf86cd799439013") }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "users") return users;
+    if (name === "supporttickets") return tickets;
+    if (name === "ticketmessages") return messages;
+    assert.fail("Unexpected collection: " + name);
+  } });
+
+  const result = await connection.addAdminSupportMessage("admin-uid", ticketId, {
+    message: "Check the payment logs before replying.",
+    isInternalNote: true
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(insertedMessage.isInternalNote, true);
+  assert.equal(insertedMessage.isFromAdmin, true);
+  assert.equal(updates[0].$set.status, undefined);
+  assert.ok(updates[0].$set.updatedAt instanceof Date);
+});
+
+test("customer ticket detail never returns private admin notes", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ticketId = "507f1f77bcf86cd799439021";
+  let messageQuery;
+  const userId = new ObjectId("507f1f77bcf86cd799439022");
+  const ticket = { _id: new ObjectId(ticketId), userId, status: "Waiting for Customer" };
+  const users = {
+    findOne: async query => query.uid ? { _id: userId } : null,
+    find: () => ({ toArray: async () => [] })
+  };
+  const tickets = { findOne: async () => ticket };
+  const messages = {
+    find(query) {
+      messageQuery = query;
+      return { sort() { return this; }, toArray: async () => [] };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "users") return users;
+    if (name === "supporttickets") return tickets;
+    if (name === "ticketmessages") return messages;
+    assert.fail("Unexpected collection: " + name);
+  } });
+
+  const result = await connection.getSupportTicket("customer-uid", ticketId);
+  assert.equal(result.status, 200);
+  assert.deepEqual(messageQuery, { ticketId: ticket._id, isInternalNote: { $ne: true } });
+});
