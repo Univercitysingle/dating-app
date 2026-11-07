@@ -2379,9 +2379,16 @@ export class MongoDBConnection {
       const limit = Number.isInteger(params.limit) && params.limit > 0 ? Math.min(params.limit, 100) : 10;
       if (typeof params.search === "string" && params.search.trim()) {
         const term = params.search.trim().slice(0, 128);
-        const searchQuery = admin.role === "superadmin"
-          ? { $or: [{ uid: term }, { email: term }] }
-          : { uid: term };
+        const escapedTerm = term.split("").map(character =>
+          "\\.^$*+?()[]{}|".includes(character) ? "\\" + character : character
+        ).join("");
+        const searchQuery = {
+          $or: [
+            { uid: term },
+            { name: { $regex: escapedTerm, $options: "i" } },
+            ...(admin.role === "superadmin" ? [{ email: { $regex: escapedTerm, $options: "i" } }] : [])
+          ]
+        };
         const matchingUsers = await db.collection("users").find(
           searchQuery, { projection: { uid: 1 } }
         ).toArray();
