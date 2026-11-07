@@ -3829,9 +3829,9 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const dateFilter = { createdAt: { $gte: startDate, $lte: endDate } };
-      const [totalUsers, paidUsers, signups, reportedUsers] = await Promise.all([
+      const [totalUsers, paidUserIds, signups, reportedUsers] = await Promise.all([
         db.collection("users").countDocuments({}),
-        db.collection("subscriptions").countDocuments({ status: "active" }),
+        db.collection("subscriptions").distinct("userId", { status: "active" }),
         db.collection("users").aggregate([
           { $match: dateFilter },
           { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
@@ -3839,6 +3839,7 @@ export class MongoDBConnection {
         ]).toArray(),
         db.collection("reports").distinct("reportedUserUid")
       ]);
+      const paidUsers = Array.isArray(paidUserIds) ? paidUserIds.length : 0;
       return { status: 200, body: {
         userStats: { total: totalUsers, paid: paidUsers, unpaid: Math.max(0, totalUsers - paidUsers) },
         signupsPerDay: signups,
