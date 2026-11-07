@@ -3648,7 +3648,7 @@ export class MongoDBConnection {
       // is hidden from administrators.
       if (status === "refund_required" || status === "refunded") {
         refundSubscriptions = await db.collection("subscriptions").aggregate([
-          { $match: { status: "refund_required" } },
+          { $match: { status } },
           { $sort: { paidLateAt: -1, updatedAt: -1 } },
           { $limit: 500 },
           ...lookupUser
