@@ -3077,7 +3077,7 @@ test("late successful WebXPay callback flags a cancelled subscription for refund
 });
 
 
-test("admin refund review queue includes flagged store purchases and subscriptions", async () => {
+test("admin refund queue includes store purchases and subscriptions for both review and completed filters", async () => {
   const connection = new MongoDBConnection({}, {});
   const queried = [];
   connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
@@ -3086,10 +3086,11 @@ test("admin refund review queue includes flagged store purchases and subscriptio
       collection(name) {
         return {
           aggregate(pipeline) {
-            queried.push({ name, match: pipeline[0].$match });
+            const status = pipeline[0].$match.status;
+            queried.push({ name, status });
             const record = name === "purchases"
-              ? { _id: "purchase-1", status: "refund_required", paidLateAt: new Date("2026-11-07T10:00:00Z") }
-              : { _id: "subscription-1", status: "refund_required", paidLateAt: new Date("2026-11-07T11:00:00Z") };
+              ? { _id: "purchase-1", status, paidLateAt: new Date("2026-11-07T10:00:00Z") }
+              : { _id: "subscription-1", status, paidLateAt: new Date("2026-11-07T11:00:00Z") };
             return { toArray: async () => [record] };
           }
         };
@@ -3097,17 +3098,16 @@ test("admin refund review queue includes flagged store purchases and subscriptio
     })
   });
 
-  const result = await connection.getAdminPurchases("admin-uid", "refund_required");
-  assert.equal(result.status, 200);
-  assert.deepEqual(queried.map(entry => entry.name), ["purchases", "subscriptions"]);
-  assert.deepEqual(queried.map(entry => entry.match), [
-    { status: "refund_required" },
-    { status: "refund_required" }
-  ]);
-  assert.equal(result.body.length, 2);
-  assert.equal(result.body[0].transactionType, "subscription");
-  assert.equal(result.body[1].transactionType, "store_purchase");
-  assert.ok(result.body.every(record => record.status === "refund_required"));
+  for (const status of ["refund_required", "refunded"]) {
+    const result = await connection.getAdminPurchases("admin-uid", status);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.length, 2);
+    assert.equal(result.body[0].transactionType, "subscription");
+    assert.equal(result.body[1].transactionType, "store_purchase");
+    assert.ok(result.body.every(record => record.status === status));
+  }
+  assert.deepEqual(queried.map(entry => entry.name), ["purchases", "subscriptions", "purchases", "subscriptions"]);
+  assert.deepEqual(queried.map(entry => entry.status), ["refund_required", "refund_required", "refunded", "refunded"]);
 });
 
 test("only superadmins can record a completed refund and the action is audited transactionally", async () => {
