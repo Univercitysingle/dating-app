@@ -1951,7 +1951,14 @@ export default {
         if (!response.ok) return json(order, response.status);
         const planLabel = order.plan ? order.plan.charAt(0).toUpperCase() + order.plan.slice(1) + " Subscription" : "Premium Subscription";
         try { return buildWebXPayCheckoutForm(order, env, "/premium", planLabel); }
-        catch { return json({ error: "Payment gateway is not configured." }, 503); }
+        catch {
+          // A checkout reservation must not survive a form-generation failure.
+          await connection.fetch("https://internal.invalid/internal/subscription-abandon", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ claims, orderId: order.orderId })
+          }).catch(() => null);
+          return json({ error: "Payment gateway is not configured. You can try again." }, 503);
+        }
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
