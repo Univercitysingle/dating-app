@@ -13,7 +13,7 @@ const AdminTransactionsPage = () => {
             const response = await apiClient.get('/admin/transactions');
             setTransactions(response || []);
         } catch (err) {
-            setError(err.response?.data?.message || 'An error occurred while fetching transactions.');
+            setError(err.data?.message || err.message || 'An error occurred while fetching transactions.');
         } finally {
             setIsLoading(false);
         }
@@ -71,8 +71,8 @@ const AdminTransactionsPage = () => {
                                     transactions.map((tx) => (
                                         <tr key={tx._id}>
                                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
-                                                <p className="text-gray-900 whitespace-no-wrap">{tx.userId ? tx.userId.name : 'Unknown'}</p>
-                                                <p className="text-gray-600 whitespace-no-wrap text-xs">{tx.userId ? tx.userId.email : 'N/A'}</p>
+                                                <p className="text-gray-900 whitespace-no-wrap">{(tx.user || tx.userId)?.name || 'Unknown'}</p>
+                                                <p className="text-gray-600 whitespace-no-wrap text-xs">{(tx.user || tx.userId)?.email || 'N/A'}</p>
                                             </td>
                                             <td className="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                                 <p className="text-gray-900 whitespace-no-wrap">{tx.type}</p>
