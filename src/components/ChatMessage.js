@@ -104,8 +104,8 @@ const ChatMessage = ({ message, currentUser, otherUser, onEdit, onDelete }) => {
         </div>
         {!message.deletedAt && (isSender || ['admin', 'superadmin'].includes(currentUser?.role)) && String(message._id).match(/^[a-fA-F0-9]{24}$/) && (
           <div className={`mt-2 flex justify-end gap-3 text-xs ${isSender ? 'text-white/80' : 'text-slate-500'}`}>
-            {onEdit && <button type="button" onClick={() => onEdit(message)} className="underline hover:no-underline">Edit</button>}
-            {onDelete && <button type="button" onClick={() => onDelete(message)} className="underline hover:no-underline">Delete</button>}
+            {onEdit && (['admin', 'superadmin'].includes(currentUser?.role) || Date.now() - new Date(message.timestamp).getTime() <= 15 * 60 * 1000) && <button type="button" onClick={() => onEdit(message)} className="underline hover:no-underline">Edit</button>}
+            {onDelete && (['admin', 'superadmin'].includes(currentUser?.role) || Date.now() - new Date(message.timestamp).getTime() <= 60 * 60 * 1000) && <button type="button" onClick={() => onDelete(message)} className="underline hover:no-underline">Delete</button>}
           </div>
         )}
       </div>
