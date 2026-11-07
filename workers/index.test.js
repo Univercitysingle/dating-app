@@ -1591,7 +1591,7 @@ test("WebXPay callback verifies the signed response before asking MongoDB to set
 });
 
 test("WebXPay callback rejects invalid signatures and does not settle an order", async () => {
-  const { publicKey } = generateKeyPairSync("rsa", {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     publicKeyEncoding: { type: "spki", format: "pem" },
     privateKeyEncoding: { type: "pkcs8", format: "pem" }
