@@ -3369,3 +3369,66 @@ test("declined WebXPay subscription settlement clears its matching checkout rese
   assert.equal(userUpdate.query["pendingSubscriptionCheckout.reservationId"], reservationId);
   assert.deepEqual(userUpdate.update.$unset, { pendingSubscriptionCheckout: "" });
 });
+
+
+test("admin report search supports user names without exposing email search to ordinary admins", async () => {
+  let capturedUserSearch;
+  let capturedReportSearch;
+  const users = {
+    findOne: async () => ({ uid: "admin", role: "admin" }),
+    find(query) {
+      if (query.$or) {
+        capturedUserSearch = query;
+        return { toArray: async () => [{ uid: "target" }] };
+      }
+      if (query.uid && Array.isArray(query.uid.$in)) {
+        return { toArray: async () => [
+          { uid: "target", name: "Target Member" },
+          { uid: "reporter", name: "Reporter Member" }
+        ] };
+      }
+      assert.fail("Unexpected user query");
+    }
+  };
+  const reports = {
+    find(query) {
+      capturedReportSearch = query;
+      return {
+        sort() { return this; },
+        skip() { return this; },
+        limit() { return this; },
+        toArray: async () => [{
+          _id: "report-id",
+          reporterUid: "reporter",
+          reportedUserUid: "target",
+          status: "pending_review"
+        }]
+      };
+    },
+    countDocuments: async () => 1
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "reports") return reports;
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getAdminReports("admin", {
+    status: "pending_review",
+    search: "Target Member",
+    page: 1,
+    limit: 10
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedReportSearch.reportedUserUid, { $in: ["target"] });
+  assert.equal(capturedUserSearch.$or[1].name.$regex, "Target Member");
+  assert.equal(capturedUserSearch.$or.some(item => Object.hasOwn(item, "email")), false);
+  assert.equal(result.body.reports[0].reportedUser.name, "Target Member");
+  assert.equal(result.body.reports[0].reporter.name, "Reporter Member");
+});
