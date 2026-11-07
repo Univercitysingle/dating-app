@@ -59,6 +59,24 @@ const AdminStorePurchasesPage = () => {
     }
   };
 
+  const handleRecordRefund = async (transaction) => {
+    if (!window.confirm('Only continue if the refund has already been completed and verified in the WebXPay merchant portal. This action records the refund and closes the review item.')) return;
+    const refundReference = prompt('Enter the WebXPay refund reference:');
+    if (!refundReference || refundReference.trim().length < 3) return;
+    const note = prompt('Optional refund note (for example, merchant portal confirmation details):') || '';
+    try {
+      await apiClient.post(`/admin/purchases/${transaction._id}/record-refund`, {
+        transactionType: transaction.transactionType,
+        refundReference: refundReference.trim(),
+        note,
+      });
+      await fetchPurchases();
+      handleCloseModal();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to record the refund.');
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending':
@@ -69,6 +87,8 @@ const AdminStorePurchasesPage = () => {
         return 'bg-red-200 text-red-800';
       case 'refund_required':
         return 'bg-orange-200 text-orange-900';
+      case 'refunded':
+        return 'bg-purple-200 text-purple-900';
       default:
         return 'bg-gray-200 text-gray-800';
     }
@@ -104,6 +124,7 @@ const AdminStorePurchasesPage = () => {
             <FilterButton status="completed">Completed</FilterButton>
             <FilterButton status="rejected">Rejected</FilterButton>
             <FilterButton status="refund_required">Refund review</FilterButton>
+            <FilterButton status="refunded">Refunded</FilterButton>
           </div>
 
           {error && <p className="text-red-500">{error}</p>}
@@ -193,6 +214,14 @@ const AdminStorePurchasesPage = () => {
                   <button onClick={() => handleReject(selectedPurchase._id)} className="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700">Reject</button>
                   <button onClick={() => handleApprove(selectedPurchase._id)} className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Approve</button>
                 </>
+              )}
+              {selectedPurchase.status === 'refund_required' && (
+                <button
+                  onClick={() => handleRecordRefund(selectedPurchase)}
+                  className="px-4 py-2 rounded-md text-white bg-purple-700 hover:bg-purple-800"
+                >
+                  Record completed refund
+                </button>
               )}
             </div>
           </div>
