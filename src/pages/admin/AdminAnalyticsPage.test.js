@@ -9,13 +9,11 @@ jest.mock('../../api/apiClient', () => ({
 }));
 
 jest.mock('react-chartjs-2', () => ({
-  Line: () => <div data-testid="line-chart" />,
-  Pie: () => <div data-testid="pie-chart" />
+  Line: () => 'line chart',
+  Pie: () => 'pie chart'
 }));
 
-jest.mock('react-datepicker', () => function MockDatePicker() {
-  return <input aria-label="Date filter" readOnly />;
-});
+jest.mock('react-datepicker', () => () => null);
 
 describe('AdminAnalyticsPage', () => {
   beforeEach(() => {
@@ -32,8 +30,8 @@ describe('AdminAnalyticsPage', () => {
     render(<AdminAnalyticsPage />);
 
     expect(await screen.findByText('10')).toBeInTheDocument();
-    expect(screen.getByTestId('line-chart')).toBeInTheDocument();
-    expect(screen.getByTestId('pie-chart')).toBeInTheDocument();
+    expect(screen.getByText('line chart')).toBeInTheDocument();
+    expect(screen.getByText('pie chart')).toBeInTheDocument();
     expect(screen.getByText(/Location breakdown is not currently available/i)).toBeInTheDocument();
     expect(apiClient.get).toHaveBeenCalledWith(
       expect.stringMatching(/^\/admin\/analytics\/summary\?/),
