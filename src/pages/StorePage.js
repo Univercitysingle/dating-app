@@ -94,6 +94,16 @@ const StorePage = () => {
     if (isProcessing) return;
     setIsProcessing(true);
     setNotification({ show: false, message: '', type: 'info' });
+    let checkoutOrderId = null;
+    let cspViolationHandler = null;
+    const releaseFailedCheckout = async () => {
+      if (kind !== 'subscription' || !checkoutOrderId) return;
+      try {
+        await apiClient.post('/subscription/abandon', { orderId: checkoutOrderId });
+      } catch (releaseError) {
+        // Keep the reservation if the backend cannot prove cancellation is safe.
+      }
+    };
     try {
       const response = kind === 'subscription'
         ? await apiClient.post('/subscription', { plan: plan.plan, currency: 'LKR' })
@@ -107,6 +117,13 @@ const StorePage = () => {
       const parsed = new DOMParser().parseFromString(response, 'text/html');
       const gatewayForm = parsed.querySelector('form');
       if (!gatewayForm || !gatewayForm.action) throw new Error('Invalid payment gateway form returned.');
+      checkoutOrderId = gatewayForm.dataset.orderId || null;
+      if (!checkoutOrderId) {
+        const returnField = gatewayForm.querySelector('input[name="return_url"]');
+        if (returnField?.value) {
+          try { checkoutOrderId = new URL(returnField.value).searchParams.get('purchaseId'); } catch {}
+        }
+      }
       const gatewayUrl = new URL(gatewayForm.action);
       if (gatewayUrl.protocol !== 'https:' || !['stagingxpay.info', 'govpay.webxpay.com'].includes(gatewayUrl.hostname)) {
         throw new Error('Unapproved payment gateway URL.');
@@ -125,8 +142,22 @@ const StorePage = () => {
       });
       if (!form.querySelector('input[name="payment"]')) throw new Error('Payment payload is missing.');
       document.body.appendChild(form);
+      if (kind === 'subscription' && checkoutOrderId) {
+        cspViolationHandler = (event) => {
+          if (event.effectiveDirective !== 'form-action' ||
+              !String(event.blockedURI || '').includes(gatewayUrl.hostname)) return;
+          document.removeEventListener('securitypolicyviolation', cspViolationHandler);
+          cspViolationHandler = null;
+          releaseFailedCheckout().then(() => {
+            setNotification({ show: true, message: 'The payment page was blocked by the browser. Your checkout was released. Please try subscribing again.', type: 'error' });
+          });
+        };
+        document.addEventListener('securitypolicyviolation', cspViolationHandler);
+      }
       form.requestSubmit();
     } catch (error) {
+      if (cspViolationHandler) document.removeEventListener('securitypolicyviolation', cspViolationHandler);
+      await releaseFailedCheckout();
       setNotification({ show: true, message: getUserFriendlyError(error, 'We could not start checkout. Please try again.'), type: 'error' });
     } finally {
       setIsProcessing(false);
