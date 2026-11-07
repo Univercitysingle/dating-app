@@ -60,7 +60,7 @@ const CallHistoryMessage = ({ call, currentUser }) => {
   );
 };
 
-const ChatMessage = ({ message, currentUser, otherUser }) => {
+const ChatMessage = ({ message, currentUser, otherUser, onEdit, onDelete }) => {
   if (message?.messageType === 'call') return <CallHistoryMessage call={message.call} currentUser={currentUser} />;
   const isSender = currentUser && message.senderUid === currentUser.uid;
   const userProfile = isSender ? currentUser : otherUser;
@@ -94,13 +94,20 @@ const ChatMessage = ({ message, currentUser, otherUser }) => {
              : 'chat-bubble-received text-gray-800 dark:text-neutral-200 rounded-bl-md'
         }`}
       >
-        <p className="whitespace-pre-wrap text-sm leading-6">{message.messageContent}</p>
-        <div className="flex items-center justify-end mt-1">
+        <p className={`whitespace-pre-wrap text-sm leading-6 ${message.deletedAt ? 'italic opacity-75' : ''}`}>{message.deletedAt ? 'This message was deleted.' : message.messageContent}</p>
+        <div className="flex flex-wrap items-center justify-end gap-2 mt-1">
+          {message.editedAt && !message.deletedAt && <span className={`text-[10px] ${isSender ? 'text-blue-200' : 'text-gray-400'}`}>Edited</span>}
           <p className={`text-xs ${isSender ? 'text-blue-200' : 'text-gray-400 dark:text-neutral-400'}`}>
             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </p>
           {isSender && <MessageStatus status={message.status} />}
         </div>
+        {!message.deletedAt && (isSender || ['admin', 'superadmin'].includes(currentUser?.role)) && String(message._id).match(/^[a-fA-F0-9]{24}$/) && (
+          <div className={`mt-2 flex justify-end gap-3 text-xs ${isSender ? 'text-white/80' : 'text-slate-500'}`}>
+            {onEdit && <button type="button" onClick={() => onEdit(message)} className="underline hover:no-underline">Edit</button>}
+            {onDelete && <button type="button" onClick={() => onDelete(message)} className="underline hover:no-underline">Delete</button>}
+          </div>
+        )}
       </div>
     </div>
   );
