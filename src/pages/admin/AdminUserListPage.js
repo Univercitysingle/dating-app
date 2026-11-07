@@ -11,6 +11,7 @@ const AdminUserListPage = () => {
   const [error, setError] = useState(null);
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
+  const emptyStateColumnCount = adminUser?.role === 'superadmin' ? 8 : 6;
 
   // State for filters and pagination
   const [searchTerm, setSearchTerm] = useState('');
@@ -168,7 +169,7 @@ const AdminUserListPage = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.length === 0 ? (
-                  <tr><td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">No users found.</td></tr>
+                  <tr><td colSpan={emptyStateColumnCount} className="px-6 py-4 text-center text-sm text-gray-500">No users found.</td></tr>
                 ) : (
                   users.map(user => (
                     <tr key={user._id}>
