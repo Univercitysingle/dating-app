@@ -112,7 +112,7 @@ const AdminStorePurchasesPage = () => {
       <div className="container mx-auto px-4 sm:px-8">
         <div className="py-8">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold leading-tight">Store Purchase Requests</h2>
+            <h2 className="text-2xl font-semibold leading-tight">Payment Review & Store Purchases</h2>
             <button onClick={fetchPurchases} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
                 Refresh
             </button>
@@ -193,13 +193,16 @@ const AdminStorePurchasesPage = () => {
                 <img src={selectedPurchase.bankSlipUrl} alt="Bank slip" className="max-h-96 w-full object-contain" />
               </div>
             )}
-            {selectedPurchase.status === 'refund_required' && (
-              <div className="my-4 p-3 bg-orange-100 text-orange-900 rounded">
-                <strong>Payment requires refund review.</strong>
-                <p>Do not approve or reject this transaction. Confirm the payment with WebXPay and process any refund through the merchant portal.</p>
+            {(selectedPurchase.status === 'refund_required' || selectedPurchase.status === 'refunded') && (
+              <div className={`my-4 p-3 rounded ${selectedPurchase.status === 'refunded' ? 'bg-purple-100 text-purple-900' : 'bg-orange-100 text-orange-900'}`}>
+                <strong>{selectedPurchase.status === 'refunded' ? 'Refund completion recorded.' : 'Payment requires refund review.'}</strong>
+                <p>{selectedPurchase.status === 'refunded' ? 'A superadmin recorded the completed refund. Verify the merchant reference in WebXPay if further reconciliation is needed.' : 'Do not approve or reject this transaction. Confirm the payment with WebXPay and process any refund through the merchant portal.'}</p>
                 {selectedPurchase.refundReason && <p><strong>Reason:</strong> {selectedPurchase.refundReason}</p>}
                 {selectedPurchase.paymentReference && <p><strong>Payment reference:</strong> {selectedPurchase.paymentReference}</p>}
                 {selectedPurchase.paidLateAt && <p><strong>Payment received:</strong> {new Date(selectedPurchase.paidLateAt).toLocaleString()}</p>}
+                {selectedPurchase.refundReference && <p><strong>Refund reference:</strong> {selectedPurchase.refundReference}</p>}
+                {selectedPurchase.refundProcessedAt && <p><strong>Refund recorded:</strong> {new Date(selectedPurchase.refundProcessedAt).toLocaleString()}</p>}
+                {selectedPurchase.refundNote && <p><strong>Refund note:</strong> {selectedPurchase.refundNote}</p>}
               </div>
             )}
             {selectedPurchase.status === 'rejected' && selectedPurchase.rejectionReason && (
