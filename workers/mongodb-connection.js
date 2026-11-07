@@ -2650,7 +2650,7 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { message: "User not found" } };
       const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId), userId: user._id });
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
-      const messages = await db.collection("ticketmessages").find({ ticketId: ticket._id }).sort({ createdAt: 1 }).toArray();
+      const messages = await db.collection("ticketmessages").find({ ticketId: ticket._id, isInternalNote: { $ne: true } }).sort({ createdAt: 1 }).toArray();
       const senderIds = [...new Set(messages.map(item => String(item.senderId)))];
       const { ObjectId: MongoObjectId } = await import("mongodb");
       const senders = senderIds.length
@@ -3933,6 +3933,9 @@ export class MongoDBConnection {
     if (!payload || typeof payload.message !== "string" || !payload.message.trim() || payload.message.length > 4000) {
       return { status: 400, body: { message: "A message between 1 and 4000 characters is required" } };
     }
+    if (payload.isInternalNote !== undefined && typeof payload.isInternalNote !== "boolean") {
+      return { status: 400, body: { message: "Invalid internal note setting" } };
+    }
     try {
       const { ObjectId } = await import("mongodb");
       const db = this.getDatabase(await this.getClient());
@@ -3948,15 +3951,17 @@ export class MongoDBConnection {
         ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"].includes(item.type) &&
         Number.isFinite(Number(item.size)) && Number(item.size) > 0 && Number(item.size) <= 10 * 1024 * 1024
       ).map(item => ({ key: item.key, url: item.url, name: item.name.slice(0, 180), type: item.type, size: Number(item.size) })) : [];
+      const isInternalNote = payload.isInternalNote === true;
       const message = {
         ticketId: ticketObjectId, senderId: adminUser._id, message: payload.message.trim(),
         ...(attachments.length ? { attachments } : {}),
+        ...(isInternalNote ? { isInternalNote: true } : {}),
         isFromAdmin: true, createdAt: now, updatedAt: now
       };
       const inserted = await db.collection("ticketmessages").insertOne(message);
-      await db.collection("supporttickets").updateOne(
-        { _id: ticketObjectId }, { $set: { status: "Waiting for Customer", updatedAt: now } }
-      );
+      const update = { updatedAt: now };
+      if (!isInternalNote) update.status = "Waiting for Customer";
+      await db.collection("supporttickets").updateOne({ _id: ticketObjectId }, { $set: update });
       return { status: 201, body: { ...message, _id: inserted.insertedId } };
     } catch {
       return { status: 503, body: { message: "Unable to add support message" } };
