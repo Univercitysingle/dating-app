@@ -3250,3 +3250,15 @@ test("subscription refund completion updates subscriptions and writes its transa
   assert.equal(operations[0].entry.paymentReference, "WX-SUB-PAY-456");
   assert.equal(operations[1].type, "subscription_update");
 });
+
+
+test("analytics CSV export safely quotes dates and normalizes signup counts", () => {
+  const csv = buildAnalyticsCsv([
+    { _id: "2026-11-07", count: 2 },
+    { _id: '2026-11-08,"late"', count: "3" },
+    { _id: "2026-11-09", count: "invalid" }
+  ]);
+
+  assert.equal(csv, 'date,new_signups\n"2026-11-07",2\n"2026-11-08,""late""",3\n"2026-11-09",0');
+  assert.equal(buildAnalyticsCsv(null), null);
+});
