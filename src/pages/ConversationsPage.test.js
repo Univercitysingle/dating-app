@@ -55,16 +55,11 @@ describe('ConversationsPage inbox synchronization', () => {
     expect(screen.getByRole('link', { name: 'Alex, 3 unread messages' })).toHaveClass('bg-rose-50/70');
   });
 
-  it('refreshes the inbox every five seconds and reorders new activity', async () => {
-    apiClient.get
-      .mockResolvedValueOnce([
-        conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
-        conversation('room-b', 'Sam', '2026-11-04T07:00:00.000Z', 0),
-      ])
-      .mockResolvedValueOnce([
-        conversation('room-b', 'Sam', '2026-11-04T09:00:00.000Z', 2),
-        conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
-      ]);
+  it('updates the inbox from activity events without periodic API polling', async () => {
+    apiClient.get.mockResolvedValueOnce([
+      conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
+      conversation('room-b', 'Sam', '2026-11-04T07:00:00.000Z', 0),
+    ]);
 
     render(
       <MemoryRouter>
@@ -74,16 +69,23 @@ describe('ConversationsPage inbox synchronization', () => {
 
     expect(await screen.findByText('Alex')).toBeInTheDocument();
     await act(async () => {
-      jest.advanceTimersByTime(5000);
-      await Promise.resolve();
+      window.dispatchEvent(new CustomEvent('dating-app-conversations-updated', {
+        detail: [
+          conversation('room-b', 'Sam', '2026-11-04T09:00:00.000Z', 2),
+          conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
+        ],
+      }));
     });
 
-    expect(apiClient.get).toHaveBeenCalledTimes(2);
     expect(screen.getByText('2 unread')).toBeInTheDocument();
     const links = screen.getAllByRole('link');
     const samIndex = links.findIndex(link => link.textContent.includes('Sam'));
     const alexIndex = links.findIndex(link => link.textContent.includes('Alex'));
     expect(samIndex).toBeGreaterThanOrEqual(0);
     expect(alexIndex).toBeGreaterThan(samIndex);
-  });
-});
+
+    await act(async () => {
+      jest.advanceTimersByTime(60000);
+    });
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+  });});
