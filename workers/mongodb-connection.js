@@ -2065,10 +2065,47 @@ export class MongoDBConnection {
         }
         const success = statusCode === "0" || statusCode === "00";
         const now = new Date();
+        // A delayed success callback can arrive after a checkout was cancelled
+        // locally or after the gateway previously reported a decline. Never grant
+        // access in that case, but do flag the captured payment for refund review.
+        const lateSuccessAfterCancellation = success &&
+          ((purchase && record.status === "rejected") || (subscription && record.status === "cancelled"));
+        if (lateSuccessAfterCancellation) {
+          const collection = purchase ? purchases : subscriptions;
+          const changed = await collection.updateOne(
+            { _id: record._id, status: record.status },
+            { $set: {
+              status: "refund_required",
+              refundReviewRequired: true,
+              refundReason: "late_success_after_cancelled_checkout",
+              paymentReference: String(reference).slice(0, 128),
+              ...(gatewayMetadata.transactionDate ? { gatewayTransactionDate: gatewayMetadata.transactionDate } : {}),
+              ...(gatewayMetadata.gatewayId ? { paymentGatewayId: gatewayMetadata.gatewayId } : {}),
+              ...(gatewayMetadata.gatewayComment ? { paymentGatewayComment: gatewayMetadata.gatewayComment } : {}),
+              paidLateAt: now,
+              updatedAt: now
+            } },
+            { session }
+          );
+          if (!changed.modifiedCount) {
+            outcome = { status: 409, body: { error: "Transaction was already processed." } };
+            throw new Error("PAYMENT_STATE_CHANGED");
+          }
+          outcome = {
+            status: 200,
+            body: {
+              success: true,
+              processed: false,
+              refundReviewRequired: true,
+              message: "Payment was received after checkout cancellation and has been flagged for refund review."
+            }
+          };
+          return;
+        }
         const isVideoTicketPurchase = Boolean(purchase && typeof purchase.itemId === "string" &&
           purchase.itemId.startsWith("video-room-ticket:"));
         const lateExpiredTicket = Boolean(isVideoTicketPurchase && record.status === "expired");
-        const terminalStates = purchase ? ["completed", "rejected", "refund_required"] : ["active", "cancelled", "inactive"];
+        const terminalStates = purchase ? ["completed", "rejected", "refund_required"] : ["active", "cancelled", "inactive", "refund_required"];
         if (terminalStates.includes(record.status)) {
           outcome = { status: 200, body: { success: true, message: "Payment already processed." } };
           return;
