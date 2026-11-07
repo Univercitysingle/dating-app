@@ -241,6 +241,11 @@ function withTimeout(promise, timeoutMs, operation) {
   ]).finally(() => clearTimeout(timer));
 }
 
+export function getMongoPoolSize(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 20 ? parsed : 10;
+}
+
 export class MongoDBConnection {
   constructor(state, env) {
     this.state = state;
@@ -263,8 +268,12 @@ export class MongoDBConnection {
           // Atlas connections must always use TLS, including when an operator
           // supplies a standard mongodb:// URI instead of an SRV URI.
           tls: true,
-          maxPoolSize: 1,
+          // The Durable Object is shared by all API users. A single socket
+          // serialized MongoDB operations and became a throughput bottleneck.
+          // Keep the pool bounded so Atlas connection usage remains predictable.
+          maxPoolSize: getMongoPoolSize(this.env.MONGODB_MAX_POOL_SIZE),
           minPoolSize: 0,
+          waitQueueTimeoutMS: 5000,
           serverSelectionTimeoutMS: 5000,
           connectTimeoutMS: 5000,
           maxIdleTimeMS: 20000
