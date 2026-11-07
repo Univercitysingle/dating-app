@@ -4708,7 +4708,7 @@ export class MongoDBConnection {
       // cursor contract must always be a plain string.
       const publicMessageFields = [
         "roomId", "senderUid", "receiverUid", "messageContent", "timestamp",
-        "status", "deliveredAt", "readAt", "clientMessageId"
+        "status", "deliveredAt", "readAt", "clientMessageId", "editedAt", "deletedAt"
       ];
       const serializedMessages = messages.map(message => {
         const safeMessage = {};
@@ -4804,7 +4804,7 @@ export class MongoDBConnection {
             const safeMessage = {};
             for (const field of [
               "roomId", "senderUid", "receiverUid", "messageContent", "timestamp",
-              "status", "deliveredAt", "readAt", "clientMessageId"
+              "status", "deliveredAt", "readAt", "clientMessageId", "editedAt", "deletedAt"
             ]) {
               if (item.lastMessage[field] !== undefined) safeMessage[field] = item.lastMessage[field];
             }
@@ -5046,18 +5046,49 @@ export class MongoDBConnection {
     }
   }
 
+  async updateChatMessage(uid, messageId, payload = {}) {
+    if (typeof messageId !== "string" || !/^[a-fA-F0-9]{24}$/.test(messageId) ||
+        typeof payload.messageContent !== "string" || !payload.messageContent.trim() || payload.messageContent.trim().length > 5000) {
+      return { status: 400, body: { error: "A valid message ID and message content are required" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const { ObjectId } = await import("mongodb");
+      const actor = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!actor) return { status: 404, body: { error: "User not found" } };
+      const messages = db.collection("chatmessages");
+      const id = new ObjectId(messageId);
+      const message = await messages.findOne({ _id: id });
+      if (!message || message.deletedAt) return { status: 404, body: { error: "Message not found" } };
+      const isAdmin = ["admin", "superadmin"].includes(actor.role);
+      if (!isAdmin && message.senderUid !== uid) return { status: 403, body: { error: "You can only edit your own messages" } };
+      if (!isAdmin && Date.now() - new Date(message.timestamp).getTime() > 15 * 60 * 1000) return { status: 403, body: { error: "Messages can only be edited within 15 minutes of sending" } };
+      const now = new Date();
+      await db.collection("auditlogs").insertOne({ eventType: "chat_message_edited", actorUid: uid, actorType: isAdmin ? "admin" : "customer", messageId: id, roomId: message.roomId, previousMessage: message.messageContent, updatedMessage: payload.messageContent.trim(), createdAt: now });
+      await messages.updateOne({ _id: id, deletedAt: { $exists: false } }, { $set: { messageContent: payload.messageContent.trim(), editedAt: now, editedByUid: uid, updatedAt: now } });
+      return { status: 200, body: { ...message, messageContent: payload.messageContent.trim(), editedAt: now, editedByUid: uid } };
+    } catch { return { status: 503, body: { error: "Unable to edit chat message" } }; }
+  }
+
   async deleteChatMessage(uid, messageId) {
     if (typeof messageId !== "string" || !/^[a-fA-F0-9]{24}$/.test(messageId)) return { status: 400, body: { error: "Invalid message ID" } };
     try {
       const db = this.getDatabase(await this.getClient());
       const { ObjectId } = await import("mongodb");
-      const result = await db.collection("chatmessages").deleteOne({
-        _id: new ObjectId(messageId), senderUid: uid, status: "sent"
-      });
-      return result.deletedCount ? { status: 200, body: { success: true } } : { status: 404, body: { error: "Message not found" } };
-    } catch {
-      return { status: 503, body: { error: "Unable to roll back chat message" } };
-    }
+      const actor = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      if (!actor) return { status: 404, body: { error: "User not found" } };
+      const messages = db.collection("chatmessages");
+      const id = new ObjectId(messageId);
+      const message = await messages.findOne({ _id: id });
+      if (!message || message.deletedAt) return { status: 404, body: { error: "Message not found" } };
+      const isAdmin = ["admin", "superadmin"].includes(actor.role);
+      if (!isAdmin && message.senderUid !== uid) return { status: 403, body: { error: "You can only delete your own messages" } };
+      if (!isAdmin && Date.now() - new Date(message.timestamp).getTime() > 60 * 60 * 1000) return { status: 403, body: { error: "Messages can only be deleted within one hour of sending" } };
+      const now = new Date();
+      await db.collection("auditlogs").insertOne({ eventType: "chat_message_deleted", actorUid: uid, actorType: isAdmin ? "admin" : "customer", messageId: id, roomId: message.roomId, previousMessage: message.messageContent, createdAt: now });
+      await messages.updateOne({ _id: id, deletedAt: { $exists: false } }, { $set: { messageContent: "This message was deleted.", deletedAt: now, deletedByUid: uid, updatedAt: now } });
+      return { status: 200, body: { success: true, messageId } };
+    } catch { return { status: 503, body: { error: "Unable to delete chat message" } }; }
   }
 
 
@@ -5358,6 +5389,8 @@ export class MongoDBConnection {
         url.pathname === "/internal/chat/conversations" ||
         url.pathname === "/internal/chat/send" ||
         url.pathname === "/internal/chat/rollback" ||
+        url.pathname === "/internal/chat/message-edit" ||
+        url.pathname === "/internal/chat/message-delete" ||
         url.pathname === "/internal/chat/typing-read" ||
         url.pathname === "/internal/chat/typing-write" ||
         url.pathname === "/internal/chat/delivered" ||
@@ -5379,6 +5412,10 @@ export class MongoDBConnection {
         result = await this.markChatDelivered(body.claims.sub, body.payload);
       } else if (url.pathname === "/internal/chat/read") {
         result = await this.markChatRead(body.claims.sub, body.payload);
+      } else if (url.pathname === "/internal/chat/message-edit") {
+        result = await this.updateChatMessage(body.claims.sub, body.messageId, body.payload || {});
+      } else if (url.pathname === "/internal/chat/message-delete" || url.pathname === "/internal/chat/rollback") {
+        result = await this.deleteChatMessage(body.claims.sub, body.messageId);
       } else {
         result = await this.deleteChatMessage(body.claims.sub, body.messageId);
       }
