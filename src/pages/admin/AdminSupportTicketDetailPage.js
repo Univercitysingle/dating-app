@@ -23,6 +23,8 @@ const AdminSupportTicketDetailPage = () => {
   const [newStatus, setNewStatus] = useState('');
   const [newPriority, setNewPriority] = useState('Normal');
   const [newCategory, setNewCategory] = useState('Other');
+  const [staff, setStaff] = useState([]);
+  const [assignedToUid, setAssignedToUid] = useState('');
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [attachments, setAttachments] = useState([]);
 
@@ -36,6 +38,8 @@ const AdminSupportTicketDetailPage = () => {
       setNewStatus(response.ticket?.status || 'Open');
       setNewPriority(response.ticket?.priority || 'Normal');
       setNewCategory(response.ticket?.category || 'Other');
+      setStaff(Array.isArray(response.staff) ? response.staff : []);
+      setAssignedToUid(response.ticket?.assignedToUid || '');
     } catch (err) {
       setError(err.data?.message || err.message || 'Unable to load this support ticket.');
     } finally {
@@ -107,6 +111,7 @@ const AdminSupportTicketDetailPage = () => {
     if (newStatus && newStatus !== ticket?.status) changes.status = newStatus;
     if (newPriority !== (ticket?.priority || 'Normal')) changes.priority = newPriority;
     if (newCategory !== (ticket?.category || 'Other')) changes.category = newCategory;
+    if (assignedToUid !== (ticket?.assignedToUid || '')) changes.assignedToUid = assignedToUid || null;
     if (!Object.keys(changes).length) return;
     setIsSavingStatus(true);
     setError(null);
@@ -114,7 +119,7 @@ const AdminSupportTicketDetailPage = () => {
     try {
       const response = await apiClient.put('/admin/support-tickets/' + ticketId + '/status', changes);
       setTicket(response);
-      setActionMessage('Ticket status updated.');
+      setActionMessage('Ticket details updated.');
     } catch (err) {
       setError(err.data?.message || err.message || 'Unable to update ticket status.');
     } finally {
@@ -166,9 +171,14 @@ const AdminSupportTicketDetailPage = () => {
               <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Category</span>
                 <select value={newCategory} onChange={event => setNewCategory(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{categories.map(value => <option key={value}>{value}</option>)}</select>
               </label>
-              <button type="button" onClick={handleUpdateStatus} disabled={isSavingStatus || (newStatus === ticket.status && newPriority === (ticket.priority || 'Normal') && newCategory === (ticket.category || 'Other'))} className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">{isSavingStatus ? 'Saving…' : 'Save changes'}</button>
+              <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Assigned to</span>
+                <select value={assignedToUid} onChange={event => setAssignedToUid(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <option value="">Unassigned</option>{staff.map(person => <option key={person.uid} value={person.uid}>{person.name} ({person.role})</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={handleUpdateStatus} disabled={isSavingStatus || (newStatus === ticket.status && newPriority === (ticket.priority || 'Normal') && newCategory === (ticket.category || 'Other') && assignedToUid === (ticket.assignedToUid || ''))} className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">{isSavingStatus ? 'Saving…' : 'Save changes'}</button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Metadata changes do not send a customer message.</p>
+            <p className="mt-2 text-xs text-slate-500"><span className="font-semibold">SLA deadline:</span> {ticket.slaDueAt ? formatDate(ticket.slaDueAt) : 'Set when ticket is updated'}{ticket.slaDueAt && new Date(ticket.slaDueAt).getTime() < Date.now() && ticket.status !== 'Closed' && <span className="ml-1 font-bold text-rose-700">Overdue</span>}<br />Metadata changes do not send a customer message.</p>
           </div>
         </div>
       </section>
