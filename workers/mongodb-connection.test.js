@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MongoDBConnection } from "./mongodb-connection.js";
+import { MongoDBConnection, getMongoPoolSize } from "./mongodb-connection.js";
 import Worker from "./index.js";
 
 test("discovery applies selected gender, reciprocal preferences, and looking-for filters", async () => {
@@ -3129,4 +3129,15 @@ test("users can withdraw a pending photo verification and delete its encrypted e
   assert.equal(result.status, 200);
   assert.equal(result.body.withdrawn, true);
   assert.deepEqual(filter, { uid: "user-1", status: "pending_review" });
+});
+
+
+test("MongoDB connection pool size is bounded and safely configurable", () => {
+  assert.equal(getMongoPoolSize(undefined), 10);
+  assert.equal(getMongoPoolSize("8"), 8);
+  assert.equal(getMongoPoolSize("1"), 1);
+  assert.equal(getMongoPoolSize("20"), 20);
+  assert.equal(getMongoPoolSize("0"), 10);
+  assert.equal(getMongoPoolSize("21"), 10);
+  assert.equal(getMongoPoolSize("not-a-number"), 10);
 });
