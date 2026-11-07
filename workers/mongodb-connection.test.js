@@ -3383,7 +3383,7 @@ test("admin report search supports user names without exposing email search to o
       }
       if (query.uid && Array.isArray(query.uid.$in)) {
         return { toArray: async () => [
-          { uid: "target", name: "Target Member" },
+          { uid: "target", name: "Target Member", accountStatus: "temporarily_suspended" },
           { uid: "reporter", name: "Reporter Member" }
         ] };
       }
