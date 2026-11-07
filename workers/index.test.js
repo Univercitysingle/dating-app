@@ -3171,3 +3171,82 @@ test("admin purchase list rejects unknown status filters", async () => {
   const result = await connection.getAdminPurchases("admin-uid", "unrecognized");
   assert.equal(result.status, 400);
 });
+
+
+test("refund recording is idempotent and does not audit an already-refunded transaction", async () => {
+  const transactionId = "507f1f77bcf86cd799439013";
+  const operations = [];
+  const db = {
+    collection(name) {
+      if (name === "purchases") return {
+        async findOne() { return null; },
+        async updateOne() { operations.push("update"); return { modifiedCount: 0 }; }
+      };
+      return { async insertOne() { operations.push("audit"); } };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({
+    startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} })
+  });
+  connection.getDatabase = () => db;
+
+  const result = await connection.recordAdminRefund("admin-uid", transactionId, "store_purchase", "WX-REFUND-ALREADY");
+
+  assert.equal(result.status, 409);
+  assert.deepEqual(operations, []);
+});
+
+test("subscription refund completion updates subscriptions and writes its transaction type to the audit log", async () => {
+  const transactionId = "507f1f77bcf86cd799439014";
+  const transaction = {
+    _id: (await import("mongodb")).ObjectId.createFromHexString(transactionId),
+    userId: "user-456",
+    status: "refund_required",
+    paymentReference: "WX-SUB-PAY-456"
+  };
+  const operations = [];
+  const subscriptionCollection = {
+    async findOne(filter) {
+      assert.equal(filter.status, "refund_required");
+      return transaction;
+    },
+    async updateOne(filter, update) {
+      operations.push({ type: "subscription_update", filter, update });
+      Object.assign(transaction, update.$set);
+      return { modifiedCount: 1 };
+    }
+  };
+  const auditCollection = {
+    async insertOne(entry) {
+      operations.push({ type: "audit", entry });
+      return { insertedId: "audit-sub-1" };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "subscriptions") return subscriptionCollection;
+      if (name === "auditlogs") return auditCollection;
+      throw new Error("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async (_uid, superadminOnly) => {
+    assert.equal(superadminOnly, true);
+    return { status: 200, role: "superadmin" };
+  };
+  connection.getClient = async () => ({
+    startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} })
+  });
+  connection.getDatabase = () => db;
+
+  const result = await connection.recordAdminRefund("admin-uid", transactionId, "subscription", "WX-SUB-REFUND-456");
+
+  assert.equal(result.status, 200);
+  assert.equal(transaction.status, "refunded");
+  assert.equal(operations[0].type, "audit");
+  assert.equal(operations[0].entry.transactionType, "subscription");
+  assert.equal(operations[0].entry.paymentReference, "WX-SUB-PAY-456");
+  assert.equal(operations[1].type, "subscription_update");
+});
