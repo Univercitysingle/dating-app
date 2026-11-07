@@ -698,6 +698,9 @@ export default {
       if (!env.MONGODB_CONNECTION) return json({ error: "Swipe service unavailable" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        // undoSwipe performs a legacy subscription-index migration. Keep this
+        // one-time index maintenance on the primary connection to avoid races
+        // while the other user requests use the connection shards.
         const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/undo-swipe", {
