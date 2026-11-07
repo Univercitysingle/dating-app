@@ -3077,25 +3077,37 @@ test("late successful WebXPay callback flags a cancelled subscription for refund
 });
 
 
-test("admin purchase list accepts refund_required as a filter and returns only flagged records", async () => {
+test("admin refund review queue includes flagged store purchases and subscriptions", async () => {
   const connection = new MongoDBConnection({}, {});
-  let match;
+  const queried = [];
   connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
   connection.getClient = async () => ({
     db: () => ({
-      collection: () => ({
-        aggregate(pipeline) {
-          match = pipeline[0].$match;
-          return { toArray: async () => [{ _id: "purchase-1", status: "refund_required" }] };
-        }
-      })
+      collection(name) {
+        return {
+          aggregate(pipeline) {
+            queried.push({ name, match: pipeline[0].$match });
+            const record = name === "purchases"
+              ? { _id: "purchase-1", status: "refund_required", paidLateAt: new Date("2026-11-07T10:00:00Z") }
+              : { _id: "subscription-1", status: "refund_required", paidLateAt: new Date("2026-11-07T11:00:00Z") };
+            return { toArray: async () => [record] };
+          }
+        };
+      }
     })
   });
 
   const result = await connection.getAdminPurchases("admin-uid", "refund_required");
   assert.equal(result.status, 200);
-  assert.deepEqual(match, { status: "refund_required" });
-  assert.equal(result.body[0].status, "refund_required");
+  assert.deepEqual(queried.map(entry => entry.name), ["purchases", "subscriptions"]);
+  assert.deepEqual(queried.map(entry => entry.match), [
+    { status: "refund_required" },
+    { status: "refund_required" }
+  ]);
+  assert.equal(result.body.length, 2);
+  assert.equal(result.body[0].transactionType, "subscription");
+  assert.equal(result.body[1].transactionType, "store_purchase");
+  assert.ok(result.body.every(record => record.status === "refund_required"));
 });
 
 test("admin purchase list rejects unknown status filters", async () => {
