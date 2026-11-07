@@ -3633,13 +3633,32 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const match = status === "all" ? {} : { status };
-      const purchases = await db.collection("purchases").aggregate([
-        { $match: match }, { $sort: { createdAt: -1 } }, { $limit: 500 },
+      const lookupUser = [
         { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "user" } },
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
         { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
+      ];
+      const purchases = await db.collection("purchases").aggregate([
+        { $match: match }, { $sort: { createdAt: -1 } }, { $limit: 500 },
+        ...lookupUser
       ]).toArray();
-      return { status: 200, body: purchases.map(p => {
+      let refundSubscriptions = [];
+      // Delayed successful callbacks can flag cancelled subscriptions too.
+      // Include them in the same read-only refund queue so no captured payment
+      // is hidden from administrators.
+      if (status === "refund_required") {
+        refundSubscriptions = await db.collection("subscriptions").aggregate([
+          { $match: { status: "refund_required" } },
+          { $sort: { paidLateAt: -1, updatedAt: -1 } },
+          { $limit: 500 },
+          ...lookupUser
+        ]).toArray();
+      }
+      const records = [
+        ...purchases.map(record => ({ ...record, transactionType: "store_purchase" })),
+        ...refundSubscriptions.map(record => ({ ...record, transactionType: "subscription" }))
+      ].sort((a, b) => new Date(b.paidLateAt || b.createdAt || 0) - new Date(a.paidLateAt || a.createdAt || 0)).slice(0, 500);
+      return { status: 200, body: records.map(p => {
         const safeUser = p.user ? { ...p.user } : null;
         if (safeUser && access.role !== "superadmin") stripPrivateContactFields(safeUser);
         return { ...p, userId: safeUser };
