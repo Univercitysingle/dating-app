@@ -101,7 +101,6 @@
 #admin-main.admin-ux .shadow,
 #admin-main.admin-ux .shadow-md,
 #admin-main.admin-ux .shadow-lg { box-shadow: 0 8px 28px rgba(15,23,42,.07); }
-#admin-main.admin-ux :where(.bg-white, .dark\\:bg-neutral-800) { overflow-wrap: anywhere; }
 #admin-main.admin-ux .react-datepicker-wrapper { width: 100%; }
 #admin-main.admin-ux .react-datepicker__input-container input { width: 100%; }
 #admin-main.admin-ux .recharts-responsive-container,
