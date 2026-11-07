@@ -350,6 +350,17 @@ jobs:
             test "$STATUS" = "401" || { echo "Expected anonymous request to $PATH_TO_CHECK to return 401; received $STATUS"; cat /tmp/route-response.json; exit 1; }
           done
 
+      - name: Verify admin purchase and refund routes reject anonymous requests
+        env:
+          WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATUS="$(curl --silent --show-error --output /tmp/admin-purchases-response.json --write-out '%{http_code}' "$WORKER_URL/api/admin/users/purchases")"
+          test "$STATUS" = "401" || { echo "Expected anonymous admin purchase list request to return 401; received $STATUS"; cat /tmp/admin-purchases-response.json; exit 1; }
+          STATUS="$(curl --silent --show-error --output /tmp/admin-refund-response.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"transactionType":"store_purchase","refundReference":"STAGING-REF-001","note":"Anonymous route authorization check"}' "$WORKER_URL/api/admin/users/purchases/507f1f77bcf86cd799439011/record-refund")"
+          test "$STATUS" = "401" || { echo "Expected anonymous refund recording request to return 401; received $STATUS"; cat /tmp/admin-refund-response.json; exit 1; }
+
       - name: Run OWASP ZAP passive baseline against deployed API Worker
         timeout-minutes: 5
         continue-on-error: true
