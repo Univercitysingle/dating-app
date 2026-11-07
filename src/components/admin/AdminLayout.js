@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import './admin-ux.css';
 import { Navigate, NavLink, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -176,7 +177,7 @@ const AdminLayout = () => {
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-700 ring-1 ring-indigo-100">{initials || 'A'}</span>
           </div>
         </header>
-        <main id="admin-main" className="w-full flex-1 px-4 py-6 sm:px-7 sm:py-8 lg:px-9">
+        <main id="admin-main" className="admin-ux w-full flex-1 px-4 py-6 sm:px-7 sm:py-8 lg:px-9">
           <div className="mx-auto w-full max-w-[1600px]"><Outlet /></div>
         </main>
         <footer className="border-t border-slate-200/70 px-4 py-4 text-center text-[11px] text-slate-400 sm:px-7 lg:px-9">
