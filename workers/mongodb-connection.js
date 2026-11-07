@@ -3862,11 +3862,23 @@ export class MongoDBConnection {
       if (!allowedStatuses.includes(params.status)) return { status: 400, body: { message: "Invalid ticket status" } };
       query.status = params.status;
     }
+    const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
     try {
       const db = this.getDatabase(await this.getClient());
+      if (search) {
+        const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = { $regex: escaped, $options: "i" };
+        const matchingUsers = await db.collection("users").find(
+          { $or: [{ name: regex }, ...(access.role === "superadmin" ? [{ email: regex }] : [])] },
+          { projection: { _id: 1 } }
+        ).limit(200).toArray();
+        const searchClauses = [{ subject: regex }, { ticketNumber: regex }];
+        if (matchingUsers.length) searchClauses.push({ userId: { $in: matchingUsers.map(user => user._id) } });
+        query.$or = searchClauses;
+      }
       const ticketsCollection = db.collection("supporttickets");
       const [tickets, total] = await Promise.all([
-        ticketsCollection.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+        ticketsCollection.find(query).sort({ updatedAt: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
         ticketsCollection.countDocuments(query)
       ]);
       const userIds = tickets.map(ticket => ticket.userId).filter(Boolean);
@@ -3879,7 +3891,7 @@ export class MongoDBConnection {
       const userMap = new Map(users.map(user => [String(user._id), user]));
       return { status: 200, body: {
         tickets: tickets.map(ticket => ({ ...ticket, userId: userMap.get(String(ticket.userId)) || null })),
-        totalPages: Math.ceil(total / limit), currentPage: page
+        total, totalPages: Math.ceil(total / limit), currentPage: page, limit
       } };
     } catch {
       return { status: 503, body: { message: "Unable to load support tickets" } };
