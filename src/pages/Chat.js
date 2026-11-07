@@ -165,7 +165,7 @@ function Chat() {
     };
     if (user?.uid && chatId) {
       syncHistory();
-      historyPollRef.current = window.setInterval(pollHistory, 5000);
+      historyPollRef.current = window.setInterval(pollHistory, 30000);
       document.addEventListener('visibilitychange', pollHistory);
     }
     return () => {
@@ -231,7 +231,7 @@ function Chat() {
     };
     if (user?.uid && chatId) {
       refreshCallHistory();
-      const interval = window.setInterval(pollCallHistory, 15000);
+      const interval = window.setInterval(pollCallHistory, 60000);
       document.addEventListener('visibilitychange', pollCallHistory);
       return () => {
         cancelled = true;
@@ -267,7 +267,7 @@ function Chat() {
     };
     if (user?.uid && chatId) {
       refreshTyping();
-      const interval = window.setInterval(pollTyping, 1200);
+      const interval = window.setInterval(pollTyping, 5000);
       document.addEventListener('visibilitychange', pollTyping);
       return () => {
         cancelled = true;
@@ -462,7 +462,7 @@ function Chat() {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     if (value.trim()) {
       const now = Date.now();
-      if (!wasTyping || now - typingLastSentAtRef.current > 2500) {
+      if (!typingLastSentAtRef.current || now - typingLastSentAtRef.current > 5000) {
         if (socket?.connected) socket.emit('typing', { roomId: chatId, receiverUid: otherUser.uid });
         apiClient.post('/chat/typing', { roomId: chatId, isTyping: true }).catch(() => {});
         typingLastSentAtRef.current = now;
@@ -472,7 +472,7 @@ function Chat() {
         apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
         typingLastSentAtRef.current = 0;
         typingTimeoutRef.current = null;
-      }, 1800);
+      }, 2500);
     } else {
       if (socket?.connected) socket.emit('stopTyping', { roomId: chatId, receiverUid: otherUser.uid });
       apiClient.post('/chat/typing', { roomId: chatId, isTyping: false }).catch(() => {});
