@@ -1804,7 +1804,7 @@ test("failed subscription checkout can be cancelled and releases only its own re
   assert.equal(subscriptionUpdate.filter.status, "pending");
   assert.equal(subscriptionUpdate.update.$set.cancellationReason, "checkout_start_failed");
   assert.equal(userUpdate.filter["pendingSubscriptionCheckout.reservationId"], reservationId);
-  assert.ok(userUpdate.update.$unset.pendingSubscriptionCheckout);
+  assert.equal(Object.hasOwn(userUpdate.update.$unset, "pendingSubscriptionCheckout"), true);
 });
 
 test("subscription checkout cancellation refuses to cancel a settled payment", async () => {
