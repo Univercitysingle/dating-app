@@ -5005,6 +5005,15 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if (url.pathname === "/internal/subscription-abandon") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.orderId !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.abandonPendingSubscription(body.claims.sub, body.orderId);
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/webxpay-settle") {
       const body = await request.json().catch(() => null);
       if (!body || typeof body.orderId !== "string" || typeof body.statusCode !== "string") return json({ error: "Invalid request" }, 400);
