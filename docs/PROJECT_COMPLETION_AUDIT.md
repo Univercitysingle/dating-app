@@ -78,3 +78,10 @@ The following cannot be truthfully marked complete from repository code alone:
 ## Completion rule
 
 Do not assign a final completion percentage until every mindmap requirement has a mapped implementation, automated test where practical, and staging acceptance evidence. Keep the previous approximate 65% figure labelled provisional; this audit does not certify a new percentage.
+
+
+## Documentation catalogue update (2026-11-07)
+
+Added structured product requirements, user journeys, roadmap, analytics definitions, system architecture, API reference, database design, integration specification, matching, chat, payments, video, verification, moderation, performance, testing, deployment/rollback, monitoring/incident response, privacy/retention, community policy outline, release management and security remediation tracking.
+
+These are living specifications and acceptance baselines. They do not certify that the described features are fully implemented or accepted. The API and database catalogues require continued synchronisation with actual route registrations, Worker source, schema/index setup and staging tests. Legal/privacy and payment-provider approval items remain external gates.
