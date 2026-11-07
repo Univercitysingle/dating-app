@@ -262,12 +262,13 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
     ["contact_number", user.contactNumber || "0711234567"],
     ["address_line_one", "N/A"],
     ["process_currency", "LKR"],
-    ["secret_key", env.WEBXPAY_SECRET_KEY],
+    ["cms", "PHP"],
+    ["enc_method", "JCs3J+6oSz4V0LgE0zi/Bg=="],
+    ["secret_key", String(env.WEBXPAY_SECRET_KEY).trim()],
     ["return_url", returnUrl.toString()],
     ["custom_fields", ""],
     ["payment", encryptedPayment]
   ];
-  if (itemDescription) fields.push(["items", itemDescription]);
   const nonce = crypto.randomUUID();
   const inputs = fields.map(([name, value]) =>
     '<input type="hidden" name="' + escapeHtml(name) + '" value="' + escapeHtml(value) + '">'
@@ -287,6 +288,8 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
     }
   });
 }
+
+export { buildWebXPayCheckoutForm };
 
 async function readWebXPayCallback(request) {
   const raw = await request.text();
