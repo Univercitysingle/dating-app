@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit } from "./index.js";
 import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
@@ -1039,6 +1039,31 @@ test("unblocking removes the target and preserves legacy message shape", async (
   assert.equal(result.status, 200);
   assert.deepEqual(update.$pull, { blocked: "user-2" });
   assert.deepEqual(result.body, { message: "User user-2 successfully unblocked." });
+});
+
+
+test("photo upload rate limiting fails closed when the limiter binding is missing", async () => {
+  const response = await enforceAccountRateLimit(
+    {},
+    "photo-upload-user",
+    "user-123",
+    10,
+    60 * 60 * 1000,
+    "Photo upload limit reached. Please retry later."
+  );
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /abuse protection is unavailable/i);
+});
+
+test("photo upload rate limiting fails closed when the limiter service is unavailable", async () => {
+  const response = await enforceAccountRateLimit({
+    RATE_LIMITER: {
+      idFromName: (name) => name,
+      get: () => ({ fetch: async () => new Response("unavailable", { status: 503 }) })
+    }
+  }, "photo-upload-user", "user-123", 10, 60 * 60 * 1000, "Photo upload limit reached. Please retry later.");
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /temporarily unavailable/i);
 });
 
 test("R2 photo upload and deletion routes require Firebase authentication", async () => {
