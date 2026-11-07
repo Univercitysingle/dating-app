@@ -762,7 +762,17 @@ test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and
       return { insertedId: "subscription-id" };
     }
   };
-  const users = { async findOne() { order.push("find-user"); return user; } };
+  const users = {
+    async findOne() { order.push("find-user"); return user; },
+    async updateOne(filter, update) {
+      order.push("reserve-checkout");
+      assert.equal(filter._id, user._id);
+      assert.ok(Array.isArray(filter.$or));
+      assert.ok(update.$set.pendingSubscriptionCheckout.reservationId);
+      user.pendingSubscriptionCheckout = update.$set.pendingSubscriptionCheckout;
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
   const db = { collection(name) { return name === "users" ? users : subscriptions; } };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
@@ -770,7 +780,9 @@ test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and
   connection.ensureSubscriptionIndexes = async () => { assert.fail("Request-time subscription creation must not require index permissions"); };
   const result = await connection.createPendingSubscription("user-1", "monthly");
   assert.equal(result.status, 201);
-  assert.deepEqual(order, ["find-user", "expire-stale", "check-active", "check-pending", "insert"]);
+  assert.deepEqual(order, ["find-user", "expire-stale", "check-active", "check-pending", "reserve-checkout", "insert"]);
+  assert.ok(insertedSubscription.checkoutReservationId);
+  assert.equal(user.pendingSubscriptionCheckout.reservationId, insertedSubscription.checkoutReservationId);
   assert.match(insertedSubscription.stripeSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
   assert.match(insertedSubscription.payhereSubscriptionId, /^webxpay-pending-[0-9a-f-]{36}$/);
   assert.notEqual(insertedSubscription.stripeSubscriptionId, insertedSubscription.payhereSubscriptionId);
@@ -1734,6 +1746,29 @@ test("moderation fails closed when the audit entry cannot be persisted", async (
   assert.deepEqual(order, ["audit-insert"]);
 });
 
+
+test("concurrent subscription checkout loses safely when the per-user reservation is already claimed", async () => {
+  const user = { _id: "user-object-id", uid: "user-1" };
+  const subscriptions = {
+    async updateMany() { return { modifiedCount: 0 }; },
+    async findOne() { return null; }
+  };
+  const users = {
+    async findOne() { return user; },
+    async updateOne(filter, update) {
+      assert.equal(filter._id, user._id);
+      assert.ok(update.$set.pendingSubscriptionCheckout.reservationId);
+      return { matchedCount: 0, modifiedCount: 0 };
+    }
+  };
+  const db = { collection(name) { return name === "users" ? users : subscriptions; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.createPendingSubscription("user-1", "monthly");
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /already pending/i);
+});
 
 test("pending WebXPay subscription checkout blocks a second checkout and expires stale attempts", async () => {
   const user = { _id: "user-object-id", uid: "user-1" };
