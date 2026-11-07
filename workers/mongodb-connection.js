@@ -5659,7 +5659,8 @@ export class MongoDBConnection {
 
     if ([
       "/internal/admin/support-tickets", "/internal/admin/support-ticket",
-      "/internal/admin/support-ticket-message", "/internal/admin/support-ticket-status"
+      "/internal/admin/support-ticket-message", "/internal/admin/support-ticket-message-edit",
+      "/internal/admin/support-ticket-message-delete", "/internal/admin/support-ticket-status"
     ].includes(url.pathname)) {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ message: "Invalid request" }, 400);
@@ -5667,6 +5668,8 @@ export class MongoDBConnection {
       if (url.pathname === "/internal/admin/support-tickets") result = await this.getAdminSupportTickets(body.claims.sub, body.params || {});
       else if (url.pathname === "/internal/admin/support-ticket") result = await this.getAdminSupportTicket(body.claims.sub, body.ticketId);
       else if (url.pathname === "/internal/admin/support-ticket-message") result = await this.addAdminSupportMessage(body.claims.sub, body.ticketId, body.payload || {});
+      else if (url.pathname === "/internal/admin/support-ticket-message-edit") result = await this.updateSupportTicketMessage(body.claims.sub, body.ticketId, body.messageId, body.payload || {}, true);
+      else if (url.pathname === "/internal/admin/support-ticket-message-delete") result = await this.deleteSupportTicketMessage(body.claims.sub, body.ticketId, body.messageId, true);
       else result = await this.updateAdminSupportStatus(body.claims.sub, body.ticketId, body.payload || {});
       return json(result.body, result.status);
     }
@@ -5757,6 +5760,17 @@ export class MongoDBConnection {
         return json({ message: "Invalid request" }, 400);
       }
       const result = await this.submitSupportTicketFeedback(body.claims.sub, body.ticketId, body.payload);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/support-ticket-message-edit" || url.pathname === "/internal/support-ticket-message-delete") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.ticketId !== "string" || typeof body.messageId !== "string") {
+        return json({ message: "Invalid request" }, 400);
+      }
+      const result = url.pathname.endsWith("-edit")
+        ? await this.updateSupportTicketMessage(body.claims.sub, body.ticketId, body.messageId, body.payload || {}, false)
+        : await this.deleteSupportTicketMessage(body.claims.sub, body.ticketId, body.messageId, false);
       return json(result.body, result.status);
     }
 
