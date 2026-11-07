@@ -2034,7 +2034,7 @@ export class MongoDBConnection {
           const userUpdate = {};
           if (purchase.itemId === "super-like-5") userUpdate.$inc = { purchasedSuperLikes: 5 };
           else if (purchase.itemId === "undo-swipes-5") userUpdate.$inc = { purchasedUndoSwipes: 5 };
-          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };
+          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 30 * 60 * 1000) };
           else if (["dark-fantasy-monthly", "dark-fantasy-creator-monthly", "dark-fantasy-unlimited-pass"].includes(purchase.itemId)) {
             const entitlementField = purchase.itemId === "dark-fantasy-monthly" ? "darkFantasyAccessUntil" : purchase.itemId === "dark-fantasy-creator-monthly" ? "creatorGalleryAccessUntil" : "darkFantasyUnlimitedUntil";
             const existingUser = await db.collection("users").findOne({ _id: purchase.userId }, { projection: { [entitlementField]: 1 }, session });
