@@ -1392,19 +1392,6 @@ export default {
           body: JSON.stringify({ claims, ticketId, payload, params: Object.fromEntries(url.searchParams.entries()) })
         });
         const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
-        if (url.pathname === "/api/admin/analytics/export" && response.ok) {
-          const csv = buildAnalyticsCsv(result.signupsPerDay);
-          if (csv !== null) {
-            return new Response(csv, {
-              status: 200,
-              headers: {
-                ...JSON_HEADERS,
-                "content-type": "text/csv; charset=utf-8",
-                "content-disposition": 'attachment; filename="analytics_export.csv"'
-              }
-            });
-          }
-        }
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
@@ -1624,6 +1611,19 @@ export default {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
         });
         const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
+        if (url.pathname === "/api/admin/analytics/export" && response.ok) {
+          const csv = buildAnalyticsCsv(result.signupsPerDay);
+          if (csv !== null) {
+            return new Response(csv, {
+              status: 200,
+              headers: {
+                ...JSON_HEADERS,
+                "content-type": "text/csv; charset=utf-8",
+                "content-disposition": 'attachment; filename="analytics_export.csv"'
+              }
+            });
+          }
+        }
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
