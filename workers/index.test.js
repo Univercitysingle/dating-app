@@ -3274,3 +3274,25 @@ test("admin purchase approval accepts an omitted body while reject and refund re
   assert.equal(normalizeAdminPurchaseActionPayload("record-refund", null), null);
   assert.deepEqual(normalizeAdminPurchaseActionPayload("record-refund", { refundReference: "WX-123" }), { refundReference: "WX-123" });
 });
+
+test("admin support ticket filters reject unknown priority and category values", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  const invalidPriority = await connection.getAdminSupportTickets("admin-1", { priority: "Critical" });
+  const invalidCategory = await connection.getAdminSupportTickets("admin-1", { category: "Billing" });
+  assert.equal(invalidPriority.status, 400);
+  assert.equal(invalidCategory.status, 400);
+  assert.match(invalidPriority.body.message, /priority/i);
+  assert.match(invalidCategory.body.message, /category/i);
+});
+
+test("admin support ticket updates validate priority and category before database access", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  const invalidPriority = await connection.updateAdminSupportStatus("admin-1", "0123456789abcdef01234567", { priority: "Critical" });
+  const invalidCategory = await connection.updateAdminSupportStatus("admin-1", "0123456789abcdef01234567", { category: "Billing" });
+  const emptyUpdate = await connection.updateAdminSupportStatus("admin-1", "0123456789abcdef01234567", {});
+  assert.equal(invalidPriority.status, 400);
+  assert.equal(invalidCategory.status, 400);
+  assert.equal(emptyUpdate.status, 400);
+});
