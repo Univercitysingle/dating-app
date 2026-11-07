@@ -159,7 +159,7 @@ const AdminSupportTicketListPage = () => {
                   <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusStyle(ticket.status)}`}>{ticket.status || 'Unknown'}</span></td>
                   <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ticket.priority === 'Urgent' ? 'bg-rose-100 text-rose-800' : ticket.priority === 'High' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600'}`}>{ticket.priority || 'Normal'}</span></td>
                   <td><span className="text-xs text-slate-600">{ticket.category || 'Other'}</span></td>
-                  <td><span className="text-xs text-slate-600">{ticket.assignedToUid ? 'Assigned' : 'Unassigned'}</span></td>
+                  <td><span className="text-xs text-slate-600">{ticket.assignedToUid ? (ticket.assignedToName || 'Administrator') : 'Unassigned'}</span></td>
                   <td><span className={`whitespace-nowrap text-xs font-semibold ${slaState(ticket) === 'Overdue' ? 'text-rose-700' : 'text-slate-500'}`}>{slaState(ticket)}</span></td>
                   <td><span className="whitespace-nowrap text-xs text-slate-500">{formatDate(ticket.updatedAt)}</span></td>
                   <td className="text-right"><Link to={`/admin/support-tickets/${ticket._id}`} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:border-indigo-200 hover:bg-indigo-50">Open <span aria-hidden="true">→</span></Link></td>
