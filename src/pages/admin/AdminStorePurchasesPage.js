@@ -37,30 +37,6 @@ const AdminStorePurchasesPage = () => {
     setSelectedPurchase(null);
   };
 
-  const handleApprove = async (purchaseId) => {
-    try {
-      await apiClient.post(`/admin/users/purchases/${purchaseId}/approve`);
-      fetchPurchases();
-      handleCloseModal();
-    } catch (err) {
-      setError(err.data?.message || err.message || 'An error occurred while approving the purchase.');
-    }
-  };
-
-  const handleReject = async (purchaseId) => {
-    const reason = prompt('Please enter the reason for rejecting this purchase:');
-    if (!reason) {
-      return; // Admin cancelled the prompt
-    }
-    try {
-      await apiClient.post(`/admin/users/purchases/${purchaseId}/reject`, { reason });
-      fetchPurchases();
-      handleCloseModal();
-    } catch (err) {
-      setError(err.data?.message || err.message || 'An error occurred while rejecting the purchase.');
-    }
-  };
-
   const handleRecordRefund = async (transaction) => {
     if (!window.confirm('Only continue if the refund has already been completed and verified in the WebXPay merchant portal. This action records the refund and closes the review item.')) return;
     const refundReference = prompt('Enter the WebXPay refund reference:');
@@ -112,9 +88,10 @@ const AdminStorePurchasesPage = () => {
   return (
     <>
       <div className="container mx-auto px-4 sm:px-8">
+        <p className="mt-3 text-sm text-gray-600">Payment outcomes are confirmed by WebXPay and processed automatically. This page is for monitoring and reconciliation, not manual payment approval.</p>
         <div className="py-8">
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold leading-tight">Payment Review & Store Purchases</h2>
+            <h2 className="text-2xl font-semibold leading-tight">IPG Payment Monitoring</h2>
             <button onClick={fetchPurchases} className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
                 Refresh
             </button>
@@ -139,7 +116,7 @@ const AdminStorePurchasesPage = () => {
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type / Item</th>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Submitted At</th>
+                    <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Created At</th>
                     <th className="px-5 py-3 border-b-2 border-gray-200 bg-gray-100"></th>
                   </tr>
                 </thead>
@@ -147,7 +124,7 @@ const AdminStorePurchasesPage = () => {
                   {isLoading ? (
                     <tr><td colSpan="6" className="text-center py-4">Loading...</td></tr>
                   ) : purchases.length === 0 ? (
-                    <tr><td colSpan="6" className="text-center py-4">No purchases found for this filter.</td></tr>
+                    <tr><td colSpan="6" className="text-center py-4">No payment records found for this filter.</td></tr>
                   ) : (
                     purchases.map((purchase) => (
                       <tr key={purchase._id}>
@@ -183,7 +160,7 @@ const AdminStorePurchasesPage = () => {
       {selectedPurchase && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 w-full max-w-lg">
-            <h2 className="text-2xl font-bold mb-4">{selectedPurchase.transactionType === 'subscription' ? 'Review Subscription Payment' : 'Review Purchase'}</h2>
+            <h2 className="text-2xl font-bold mb-4">Payment Details</h2>
             <p><strong>User:</strong> {selectedPurchase.userId ? selectedPurchase.userId.name : 'Unknown User'}</p>
             <p><strong>Type:</strong> {selectedPurchase.transactionType === 'subscription' ? 'Subscription' : 'Store purchase'}</p>
             <p><strong>Item:</strong> {selectedPurchase.itemName || selectedPurchase.plan || selectedPurchase.itemId || 'Unknown item'}</p>
@@ -212,14 +189,11 @@ const AdminStorePurchasesPage = () => {
                   <strong>Rejection Reason:</strong> {selectedPurchase.rejectionReason}
               </div>
             )}
+            {selectedPurchase.status === 'pending' && (
+              <p className="my-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Awaiting confirmation from WebXPay. Payment status and purchased benefits are updated by the verified gateway response. No manual action is required.</p>
+            )}
             <div className="flex justify-end space-x-4">
-              <button onClick={handleCloseModal} className="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancel</button>
-              {selectedPurchase.status === 'pending' && (
-                <>
-                  <button onClick={() => handleReject(selectedPurchase._id)} className="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700">Reject</button>
-                  <button onClick={() => handleApprove(selectedPurchase._id)} className="px-4 py-2 rounded-md text-white bg-green-600 hover:bg-green-700">Approve</button>
-                </>
-              )}
+              <button onClick={handleCloseModal} className="px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Close</button>
               {adminUser?.role === 'superadmin' && selectedPurchase.status === 'refund_required' && (
                 <button
                   onClick={() => handleRecordRefund(selectedPurchase)}
