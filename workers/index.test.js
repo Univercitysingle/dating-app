@@ -3110,6 +3110,61 @@ test("admin refund review queue includes flagged store purchases and subscriptio
   assert.ok(result.body.every(record => record.status === "refund_required"));
 });
 
+test("only superadmins can record a completed refund and the action is audited transactionally", async () => {
+  const transactionId = "507f1f77bcf86cd799439011";
+  const transaction = { _id: (await import("mongodb")).ObjectId.createFromHexString(transactionId), userId: "user-123", status: "refund_required", paymentReference: "WX-PAY-123" };
+  const operations = [];
+  const purchaseCollection = {
+    async findOne(filter) {
+      assert.equal(filter.status, "refund_required");
+      return transaction;
+    },
+    async updateOne(filter, update) {
+      operations.push({ type: "update", filter, update });
+      Object.assign(transaction, update.$set);
+      return { modifiedCount: 1 };
+    }
+  };
+  const auditCollection = {
+    async insertOne(entry) {
+      operations.push({ type: "audit", entry });
+      return { insertedId: "audit-1" };
+    }
+  };
+  const db = { collection(name) { return name === "purchases" ? purchaseCollection : auditCollection; } };
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async (_uid, superadminOnly) => {
+    assert.equal(superadminOnly, true);
+    return { status: 200, role: "superadmin" };
+  };
+  connection.getClient = async () => ({
+    startSession: () => ({ withTransaction: async fn => fn(), endSession: async () => {} })
+  });
+  connection.getDatabase = () => db;
+
+  const result = await connection.recordAdminRefund("admin-uid", transactionId, "store_purchase", "WX-REFUND-456", "Confirmed in merchant portal");
+
+  assert.equal(result.status, 200);
+  assert.equal(transaction.status, "refunded");
+  assert.equal(transaction.refundReference, "WX-REFUND-456");
+  assert.equal(transaction.refundProcessedBy, "admin-uid");
+  assert.equal(operations[0].type, "audit");
+  assert.equal(operations[0].entry.eventType, "payment_refund_recorded");
+  assert.equal(operations[0].entry.paymentReference, "WX-PAY-123");
+  assert.equal(operations[1].type, "update");
+});
+
+test("refund recording rejects ordinary admins and invalid merchant references", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.requireAdmin = async () => ({ status: 403, body: { message: "Forbidden" } });
+  const forbidden = await connection.recordAdminRefund("admin-uid", "507f1f77bcf86cd799439011", "subscription", "WX-REFUND-789");
+  assert.equal(forbidden.status, 403);
+
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  const invalid = await connection.recordAdminRefund("admin-uid", "507f1f77bcf86cd799439011", "subscription", "x");
+  assert.equal(invalid.status, 400);
+});
+
 test("admin purchase list rejects unknown status filters", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
