@@ -3646,7 +3646,7 @@ export class MongoDBConnection {
       // Delayed successful callbacks can flag cancelled subscriptions too.
       // Include them in the same read-only refund queue so no captured payment
       // is hidden from administrators.
-      if (status === "refund_required") {
+      if (status === "refund_required" || status === "refunded") {
         refundSubscriptions = await db.collection("subscriptions").aggregate([
           { $match: { status: "refund_required" } },
           { $sort: { paidLateAt: -1, updatedAt: -1 } },
