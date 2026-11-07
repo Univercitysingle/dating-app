@@ -14,6 +14,10 @@ const SupportTicketDetailPage = () => {
   const [isSending, setIsSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [attachments, setAttachments] = useState([]);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackError, setFeedbackError] = useState(null);
 
   const fetchTicketDetails = async () => {
     setIsLoading(true);
@@ -68,6 +72,24 @@ const SupportTicketDetailPage = () => {
     }
   };
 
+  const handleSubmitFeedback = async (event) => {
+    event.preventDefault();
+    if (!feedbackRating || isSubmittingFeedback || ticket?.status !== 'Closed' || ticket?.customerFeedback) return;
+    setFeedbackError(null);
+    setIsSubmittingFeedback(true);
+    try {
+      await apiClient.post('/support-tickets/' + ticketId + '/feedback', {
+        rating: feedbackRating,
+        comment: feedbackComment.trim()
+      });
+      await fetchTicketDetails();
+    } catch (err) {
+      setFeedbackError(getUserFriendlyError(err, 'Your feedback could not be submitted. Please try again.'));
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
   if (isLoading) {
     return <LoadingState spinnerOnly />;
   }
@@ -101,6 +123,33 @@ const SupportTicketDetailPage = () => {
           This ticket is closed. Sending a new reply will reopen it and notify the support team.
           {ticket.resolutionSummary && <p className="mt-2"><strong>Previous resolution:</strong> {ticket.resolutionSummary}</p>}
         </div>}
+
+        {ticket.status === 'Closed' && <section className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5" aria-labelledby="ticket-feedback-heading">
+          <h2 id="ticket-feedback-heading" className="text-lg font-semibold text-slate-900">How was your support experience?</h2>
+          {ticket.customerFeedback ? <div className="mt-3" role="status">
+            <p className="font-medium text-emerald-700">Thank you for your feedback.</p>
+            <p className="mt-1 text-sm text-slate-700">Your rating: {ticket.customerFeedback.rating} out of 5</p>
+            {ticket.customerFeedback.comment && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{ticket.customerFeedback.comment}</p>}
+          </div> : <form onSubmit={handleSubmitFeedback} className="mt-3 space-y-3">
+            <fieldset>
+              <legend className="mb-2 text-sm text-slate-700">Choose a rating from 1 to 5</legend>
+              <div className="flex flex-wrap gap-2">
+                {[1, 2, 3, 4, 5].map(value => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${feedbackRating === value ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-slate-300 bg-white text-slate-700'}`}>
+                  <input type="radio" name="ticket-feedback-rating" value={value} checked={feedbackRating === value} onChange={() => setFeedbackRating(value)} required />
+                  {value} {value === 1 ? 'Poor' : value === 5 ? 'Excellent' : ''}
+                </label>)}
+              </div>
+            </fieldset>
+            <label className="block text-sm font-medium text-slate-700">Additional comments (optional)
+              <textarea rows="3" maxLength={1000} value={feedbackComment} onChange={event => setFeedbackComment(event.target.value)} placeholder="Tell us what went well or what we could improve." className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm" />
+            </label>
+            {feedbackError && <p role="alert" className="text-sm text-red-600">{feedbackError}</p>}
+            <button type="submit" disabled={!feedbackRating || isSubmittingFeedback} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+              {isSubmittingFeedback ? 'Submitting...' : 'Submit feedback'}
+            </button>
+            <p className="text-xs text-slate-500">You can submit feedback once for this ticket. Your comment is visible to the support team.</p>
+          </form>}
+        </section>}
 
         <div className="border-t border-gray-200 mt-4 pt-4 space-y-4">
           {messages.map((msg) => (

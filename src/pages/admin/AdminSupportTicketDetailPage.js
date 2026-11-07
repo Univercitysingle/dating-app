@@ -205,6 +205,13 @@ const AdminSupportTicketDetailPage = () => {
         {ticket.resolvedAt && <p className="mt-2 text-xs text-emerald-700">Resolved {formatDate(ticket.resolvedAt)}</p>}
       </section>}
 
+      {ticket.customerFeedback && <section className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5">
+        <h2 className="text-sm font-bold text-indigo-950">Customer satisfaction feedback</h2>
+        <p className="mt-2 text-lg font-semibold text-indigo-900">{ticket.customerFeedback.rating} / 5</p>
+        {ticket.customerFeedback.comment ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-indigo-900">{ticket.customerFeedback.comment}</p> : <p className="mt-2 text-sm text-indigo-800">No additional comment provided.</p>}
+        {ticket.customerFeedback.submittedAt && <p className="mt-2 text-xs text-indigo-700">Submitted {formatDate(ticket.customerFeedback.submittedAt)}</p>}
+      </section>}
+
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
           <h2 className="font-bold text-slate-900">Ticket audit history</h2>

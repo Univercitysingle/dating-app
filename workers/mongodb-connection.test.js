@@ -3631,6 +3631,50 @@ test("admin must provide a resolution summary before closing a support ticket", 
   assert.ok(audits[0].changes.some(change => change.field === "resolutionSummary"));
 });
 
+test("customer can submit one satisfaction rating only after a ticket is closed", async () => {
+  const { ObjectId } = await import("mongodb");
+  const ticketId = "507f1f77bcf86cd799439051";
+  const ticketObjectId = new ObjectId(ticketId);
+  const userId = new ObjectId("507f1f77bcf86cd799439052");
+  const audits = [];
+  let savedFeedback;
+  const ticket = { _id: ticketObjectId, userId, status: "Closed" };
+  const tickets = {
+    findOne: async () => ({ ...ticket, ...(savedFeedback ? { customerFeedback: savedFeedback } : {}) }),
+    updateOne: async (query, update) => {
+      if (query.status === "Closed" && query.customerFeedback.$exists === false && !savedFeedback) {
+        savedFeedback = update.$set.customerFeedback;
+        return { modifiedCount: 1 };
+      }
+      return { modifiedCount: 0 };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ _id: userId }) };
+      if (name === "supporttickets") return tickets;
+      if (name === "auditlogs") return { insertOne: async entry => { audits.push(entry); } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const invalid = await connection.submitSupportTicketFeedback("customer-uid", ticketId, { rating: 6 });
+  assert.equal(invalid.status, 400);
+  const submitted = await connection.submitSupportTicketFeedback("customer-uid", ticketId, {
+    rating: 5, comment: "The support team resolved this quickly."
+  });
+  assert.equal(submitted.status, 201);
+  assert.equal(submitted.body.customerFeedback.rating, 5);
+  assert.equal(submitted.body.customerFeedback.comment, "The support team resolved this quickly.");
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].eventType, "support_ticket_feedback_submitted");
+  const duplicate = await connection.submitSupportTicketFeedback("customer-uid", ticketId, { rating: 4 });
+  assert.equal(duplicate.status, 409);
+});
+
 test("customer reply reopens a closed support ticket and resets its SLA", async () => {
   const { ObjectId } = await import("mongodb");
   const ticketId = "507f1f77bcf86cd799439041";

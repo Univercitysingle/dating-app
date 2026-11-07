@@ -1318,6 +1318,32 @@ export default {
       }
     }
 
+    const supportTicketFeedback = url.pathname.match(/^\/api\/support-tickets\/([^/]+)\/feedback$/);
+    if (supportTicketFeedback) {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      const payload = await request.json().catch(() => null);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({ message: "Feedback is required." }, 400);
+      let ticketId;
+      try { ticketId = decodeURIComponent(supportTicketFeedback[1]); } catch { return json({ message: "Invalid ticket ID" }, 400); }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (!env.MONGODB_CONNECTION) return json({ message: "Support ticket service unavailable" }, 503);
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/support-ticket-feedback", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, ticketId, payload })
+        });
+        const body = await response.json().catch(() => ({ message: "Support ticket service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ message: "Support ticket service unavailable" }, 503);
+      }
+    }
+
     const supportTicketMessage = url.pathname.match(/^\/api\/support-tickets\/([^/]+)\/messages$/);
     if (supportTicketMessage && request.method === "POST") {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);

@@ -2668,6 +2668,46 @@ export class MongoDBConnection {
     }
   }
 
+  async submitSupportTicketFeedback(uid, ticketId, payload) {
+    if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId) ||
+        !payload || !Number.isInteger(payload.rating) || payload.rating < 1 || payload.rating > 5 ||
+        (payload.comment !== undefined && (typeof payload.comment !== "string" || payload.comment.trim().length > 1000))) {
+      return { status: 400, body: { message: "A rating from 1 to 5 and an optional comment of up to 1,000 characters are required." } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { message: "User not found" } };
+      const tickets = db.collection("supporttickets");
+      const ticketObjectId = new ObjectId(ticketId);
+      const ticket = await tickets.findOne({ _id: ticketObjectId, userId: user._id });
+      if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
+      if (ticket.status !== "Closed") return { status: 409, body: { message: "Feedback is available after the ticket has been closed." } };
+      if (ticket.customerFeedback) return { status: 409, body: { message: "Feedback has already been submitted for this ticket." } };
+      const now = new Date();
+      const feedback = { rating: payload.rating, comment: typeof payload.comment === "string" ? payload.comment.trim() : "", submittedAt: now };
+      const saved = await tickets.updateOne(
+        { _id: ticketObjectId, userId: user._id, status: "Closed", customerFeedback: { $exists: false } },
+        { $set: { customerFeedback: feedback } }
+      );
+      if (!saved.modifiedCount) {
+        const latest = await tickets.findOne({ _id: ticketObjectId, userId: user._id }, { projection: { status: 1, customerFeedback: 1 } });
+        if (!latest) return { status: 404, body: { message: "Ticket not found" } };
+        return { status: 409, body: { message: latest.customerFeedback ? "Feedback has already been submitted for this ticket." : "Feedback is available after the ticket has been closed." } };
+      }
+      await db.collection("auditlogs").insertOne({
+        eventType: "support_ticket_feedback_submitted", actorUid: uid, actorType: "customer",
+        ticketId: ticketObjectId,
+        changes: [{ field: "customerFeedback.rating", from: null, to: feedback.rating }],
+        createdAt: now
+      });
+      return { status: 201, body: { customerFeedback: feedback } };
+    } catch {
+      return { status: 503, body: { message: "Support ticket service is temporarily unavailable." } };
+    }
+  }
+
   async addSupportTicketMessage(uid, ticketId, payload) {
     if (typeof ticketId !== "string" || !/^[a-fA-F0-9]{24}$/.test(ticketId) ||
         !payload || typeof payload.message !== "string" || !payload.message.trim() ||
@@ -5594,6 +5634,15 @@ export class MongoDBConnection {
         return json({ message: "Invalid request" }, 400);
       }
       const result = await this.getSupportTicket(body.claims.sub, body.ticketId);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/support-ticket-feedback") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" || typeof body.ticketId !== "string") {
+        return json({ message: "Invalid request" }, 400);
+      }
+      const result = await this.submitSupportTicketFeedback(body.claims.sub, body.ticketId, body.payload);
       return json(result.body, result.status);
     }
 
