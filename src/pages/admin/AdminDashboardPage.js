@@ -35,6 +35,7 @@ const quickLinks = [
   { title: 'Manage users', description: 'Search accounts, review profiles, and manage user access.', to: '/admin/users' },
   { title: 'Review reports', description: 'Open user reports and follow up on safety concerns.', to: '/admin/reports' },
   { title: 'View analytics', description: 'Review signup trends and available platform metrics.', to: '/admin/analytics' },
+  { title: 'Payment review', description: 'Review pending purchases and reconcile late payment refunds.', to: '/admin/purchases' },
   { title: 'Transactions', description: 'Inspect subscription and purchase records.', to: '/admin/transactions' },
   { title: 'Support tickets', description: 'Review user support requests and their status.', to: '/admin/support-tickets' },
 ];
