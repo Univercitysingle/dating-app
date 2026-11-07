@@ -3,6 +3,117 @@ import test from "node:test";
 import { MongoDBConnection, getMongoPoolSize } from "./mongodb-connection.js";
 import Worker, { getMongoShardName } from "./index.js";
 
+test("chat message edits and deletes enforce sender ownership and preserve audited soft-delete history", async () => {
+  const { ObjectId } = await import("mongodb");
+  const actorId = new ObjectId();
+  const messageId = new ObjectId();
+  const audit = [];
+  let stored = {
+    _id: messageId, senderUid: "chat-owner", receiverUid: "chat-peer",
+    roomId: "chat-room", messageContent: "Original", timestamp: new Date()
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ role: "user", _id: actorId }) };
+      if (name === "chatmessages") return {
+        findOne: async () => stored,
+        updateOne: async (_query, update) => { stored = { ...stored, ...update.$set }; return { matchedCount: 1 }; }
+      };
+      if (name === "auditlogs") return { insertOne: async entry => { audit.push(entry); return { insertedId: new ObjectId() }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const edited = await connection.updateChatMessage("chat-owner", messageId.toHexString(), { messageContent: "Updated" });
+  assert.equal(edited.status, 200);
+  assert.equal(stored.messageContent, "Updated");
+  assert.ok(stored.editedAt instanceof Date);
+  assert.equal(audit[0].eventType, "chat_message_edited");
+  assert.equal(audit[0].previousMessage, "Original");
+
+  const deleted = await connection.deleteChatMessage("chat-owner", messageId.toHexString());
+  assert.equal(deleted.status, 200);
+  assert.equal(stored.messageContent, "This message was deleted.");
+  assert.ok(stored.deletedAt instanceof Date);
+  assert.equal(audit[1].eventType, "chat_message_deleted");
+  assert.equal(audit[1].previousMessage, "Updated");
+});
+
+test("chat message edits reject attempts to modify another participant's message", async () => {
+  const { ObjectId } = await import("mongodb");
+  const messageId = new ObjectId();
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ role: "user" }) };
+      if (name === "chatmessages") return { findOne: async () => ({
+        _id: messageId, senderUid: "another-user", messageContent: "Protected",
+        timestamp: new Date(), roomId: "room"
+      }) };
+      if (name === "auditlogs") return { insertOne: async () => assert.fail("Unauthorized edit must not be audited as a change") };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+  const result = await connection.updateChatMessage("requesting-user", messageId.toHexString(), { messageContent: "Tampered" });
+  assert.equal(result.status, 403);
+});
+
+test("support ticket message edits and deletes are audited soft operations", async () => {
+  const { ObjectId } = await import("mongodb");
+  const actorId = new ObjectId();
+  const ticketId = new ObjectId();
+  const messageId = new ObjectId();
+  const audit = [];
+  let stored = {
+    _id: messageId, ticketId, senderId: actorId, message: "Customer original",
+    createdAt: new Date(), isFromAdmin: false
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ _id: actorId }) };
+      if (name === "supporttickets") return { findOne: async () => ({ _id: ticketId, userId: actorId }) };
+      if (name === "ticketmessages") return {
+        findOne: async () => stored,
+        updateOne: async (_query, update) => { stored = { ...stored, ...update.$set }; if (update.$unset) delete stored.attachments; return { matchedCount: 1 }; }
+      };
+      if (name === "auditlogs") return { insertOne: async entry => { audit.push(entry); return { insertedId: new ObjectId() }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const edited = await connection.updateSupportTicketMessage("customer-uid", ticketId.toHexString(), messageId.toHexString(), { message: "Customer updated" });
+  assert.equal(edited.status, 200);
+  assert.equal(stored.message, "Customer updated");
+  assert.equal(audit[0].eventType, "support_ticket_message_edited");
+
+  stored.attachments = [{ key: "private-attachment" }];
+  const deleted = await connection.deleteSupportTicketMessage("customer-uid", ticketId.toHexString(), messageId.toHexString());
+  assert.equal(deleted.status, 200);
+  assert.equal(stored.message, "This message was deleted.");
+  assert.ok(stored.deletedAt instanceof Date);
+  assert.equal(stored.attachments, undefined);
+  assert.equal(audit[1].eventType, "support_ticket_message_deleted");
+});
+
+test("support ticket message admin moderation requires an administrator role", async () => {
+  const connection = Object.create(MongoDBConnection.prototype);
+  let databaseAccessed = false;
+  connection.requireAdmin = async () => ({ status: 403, body: { message: "Forbidden" } });
+  connection.getClient = async () => { databaseAccessed = true; return {}; };
+  const result = await connection.deleteSupportTicketMessage(
+    "ordinary-user", "507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012", true
+  );
+  assert.equal(result.status, 403);
+  assert.equal(databaseAccessed, false);
+});
+
 test("discovery applies selected gender, reciprocal preferences, and looking-for filters", async () => {
   let capturedMatch;
   const users = {
