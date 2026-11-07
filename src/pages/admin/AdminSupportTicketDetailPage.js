@@ -111,6 +111,31 @@ const AdminSupportTicketDetailPage = () => {
     }
   };
 
+  const handleEditMessage = async (msg) => {
+    const nextMessage = window.prompt('Edit support message', msg.message || '');
+    if (nextMessage === null || !nextMessage.trim() || nextMessage.trim() === msg.message) return;
+    try {
+      await apiClient.patch('/admin/support-tickets/' + ticketId + '/messages/' + msg._id, { message: nextMessage.trim() });
+      await fetchTicketDetails();
+      setActionMessage('Message updated.');
+      setError(null);
+    } catch (err) {
+      setError(err.data?.message || err.message || 'Unable to edit this message.');
+    }
+  };
+
+  const handleDeleteMessage = async (msg) => {
+    if (!window.confirm('Delete this message? Its content will be retained in restricted audit history.')) return;
+    try {
+      await apiClient.delete('/admin/support-tickets/' + ticketId + '/messages/' + msg._id);
+      await fetchTicketDetails();
+      setActionMessage('Message deleted.');
+      setError(null);
+    } catch (err) {
+      setError(err.data?.message || err.message || 'Unable to delete this message.');
+    }
+  };
+
   const handleUpdateStatus = async () => {
     const changes = {};
     if (newStatus && newStatus !== ticket?.status) changes.status = newStatus;
@@ -245,8 +270,13 @@ const AdminSupportTicketDetailPage = () => {
                   </div>
                   <time className="text-xs text-slate-500">{formatDate(msg.createdAt)}</time>
                 </div>
-                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{msg.message}</p>
-                {Array.isArray(msg.attachments) && msg.attachments.length > 0 && <div className="mt-3 space-y-2 border-t border-slate-200/70 pt-3">
+                <p className={`whitespace-pre-wrap break-words text-sm leading-6 text-slate-700 ${msg.deletedAt ? 'italic opacity-70' : ''}`}>{msg.deletedAt ? 'This message was deleted.' : msg.message}</p>
+                {msg.editedAt && !msg.deletedAt && <span className="mt-1 block text-[11px] text-slate-500">Edited {formatDate(msg.editedAt)}</span>}
+                {!msg.deletedAt && <div className="mt-2 flex gap-3 text-xs">
+                  <button type="button" onClick={() => handleEditMessage(msg)} className="font-semibold text-indigo-700 underline">Edit</button>
+                  <button type="button" onClick={() => handleDeleteMessage(msg)} className="font-semibold text-rose-700 underline">Delete</button>
+                </div>}
+                {!msg.deletedAt && Array.isArray(msg.attachments) && msg.attachments.length > 0 && <div className="mt-3 space-y-2 border-t border-slate-200/70 pt-3">
                   {msg.attachments.map((file) => <a key={file.key} href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 break-all text-sm font-medium text-indigo-700 underline"><span aria-hidden="true">{file.type?.startsWith('image/') ? '▧' : '↗'}</span>{file.name || 'Attachment'}</a>)}
                 </div>}
               </article>
