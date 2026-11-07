@@ -38,18 +38,6 @@ router.get(
   requireRole(['admin', 'superadmin']),
   adminUsersController.getPurchases
 );
-router.post(
-  '/purchases/:id/approve',
-  authMiddleware,
-  requireRole(['admin', 'superadmin']),
-  adminUsersController.approvePurchase
-);
-router.post(
-  '/purchases/:id/reject',
-  authMiddleware,
-  requireRole(['admin', 'superadmin']),
-  adminUsersController.rejectPurchase
-);
 
 // GET /api/admin/users/:userId - Get a specific user by ID
 router.get(
