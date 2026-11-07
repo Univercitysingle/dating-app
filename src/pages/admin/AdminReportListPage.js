@@ -12,7 +12,7 @@ const AdminReportListPage = () => {
   const [searchParams] = useSearchParams();
   const reportedUidParam = searchParams.get('reportedUserUid') || '';
 
-  const [filterStatus, setFilterStatus] = useState('pending_review');
+  const [filterStatus, setFilterStatus] = useState(reportedUidParam ? '' : 'pending_review');
   const [searchQuery, setSearchQuery] = useState(reportedUidParam);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -48,6 +48,7 @@ const AdminReportListPage = () => {
 
   useEffect(() => {
     setSearchQuery(reportedUidParam);
+    setFilterStatus(reportedUidParam ? '' : 'pending_review');
     setCurrentPage(1);
   }, [reportedUidParam]);
 
