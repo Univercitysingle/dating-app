@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import {
@@ -27,159 +27,255 @@ ChartJS.register(
   ArcElement
 );
 
+const formatDate = date => date instanceof Date && !Number.isNaN(date.getTime())
+  ? date.toISOString()
+  : '';
+
 const AdminAnalyticsPage = () => {
   const [analyticsData, setAnalyticsData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState(null);
-
-  // State for date filtering
-  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)));
-  const [endDate, setEndDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date;
+  });
+  const [endDate, setEndDate] = useState(() => new Date());
 
   useEffect(() => {
+    if (!startDate || !endDate || startDate > endDate) {
+      setError('Choose a valid date range.');
+      setIsLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let active = true;
     const fetchAnalytics = async () => {
       setIsLoading(true);
+      setError(null);
+      const queryParams = new URLSearchParams({
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+      });
       try {
-        const queryParams = new URLSearchParams({
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-        });
-        const data = await apiClient.get(`/admin/analytics/summary?${queryParams.toString()}`);
-        logger.info("Fetched analytics summary:", data);
-        setAnalyticsData(data);
+        const data = await apiClient.get(
+          `/admin/analytics/summary?${queryParams.toString()}`,
+          { signal: controller.signal }
+        );
+        if (!active) return;
+        setAnalyticsData(data && typeof data === 'object' ? data : {});
+        logger.info('Fetched analytics summary.');
       } catch (err) {
-        setError(err.message);
-        logger.error("Failed to fetch analytics summary:", err);
+        if (!active || err?.name === 'AbortError') return;
+        setError(err?.message || 'Unable to load analytics.');
+        logger.error('Failed to fetch analytics summary:', err);
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     };
+
     fetchAnalytics();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [startDate, endDate]);
 
+  const exportAnalytics = useCallback(async () => {
+    if (!startDate || !endDate || startDate > endDate) return;
+    setIsExporting(true);
+    setError(null);
+    const queryParams = new URLSearchParams({
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+    });
+    try {
+      // Use apiClient so the Firebase ID token is attached. A plain anchor
+      // request to /api bypasses the authenticated API client.
+      const csv = await apiClient.get(`/admin/analytics/export?${queryParams.toString()}`);
+      if (typeof csv !== 'string' || !csv.trim()) {
+        throw new Error('The analytics export did not return a CSV file.');
+      }
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const objectUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = 'analytics_export.csv';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      setError(err?.message || 'Unable to export analytics.');
+      logger.error('Failed to export analytics:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [startDate, endDate]);
+
+  const signups = Array.isArray(analyticsData?.signupsPerDay)
+    ? analyticsData.signupsPerDay
+    : [];
+  const userStats = analyticsData?.userStats || {};
+  const locations = Array.isArray(analyticsData?.locations)
+    ? analyticsData.locations
+    : [];
+
   const lineChartData = {
-    labels: analyticsData?.signupsPerDay.map(d => d._id) || [],
-    datasets: [
-      {
-        label: 'New User Sign-ups',
-        data: analyticsData?.signupsPerDay.map(d => d.count) || [],
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-      },
-    ],
+    labels: signups.map(day => day?._id || ''),
+    datasets: [{
+      label: 'New user sign-ups',
+      data: signups.map(day => Number(day?.count) || 0),
+      borderColor: 'rgb(75, 192, 192)',
+      backgroundColor: 'rgba(75, 192, 192, 0.5)',
+    }],
   };
 
   const pieChartData = {
-    labels: ['Paid Users', 'Unpaid Users'],
-    datasets: [
-      {
-        label: '# of Users',
-        data: [
-          analyticsData?.userStats.paid || 0,
-          analyticsData?.userStats.unpaid || 0,
-        ],
-        backgroundColor: [
-          'rgba(75, 192, 192, 0.2)',
-          'rgba(255, 99, 132, 0.2)',
-        ],
-        borderColor: [
-          'rgba(75, 192, 192, 1)',
-          'rgba(255, 99, 132, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
+    labels: ['Paid users', 'Unpaid users'],
+    datasets: [{
+      label: 'Users',
+      data: [Number(userStats.paid) || 0, Number(userStats.unpaid) || 0],
+      backgroundColor: ['rgba(75, 192, 192, 0.2)', 'rgba(255, 99, 132, 0.2)'],
+      borderColor: ['rgba(75, 192, 192, 1)', 'rgba(255, 99, 132, 1)'],
+      borderWidth: 1,
+    }],
   };
 
-  if (isLoading) return <p className="text-center p-4">Loading analytics data...</p>;
-  if (error) return <p className="text-center text-red-500 p-4">Error: {error}</p>;
-  if (!analyticsData) return <p className="text-center p-4">No analytics data found.</p>;
+  if (isLoading && !analyticsData) {
+    return <p className="p-4 text-center" role="status">Loading analytics data...</p>;
+  }
 
   return (
-    <div className="container mx-auto p-4 space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-gray-800">Analytics Dashboard</h1>
-        {/* Date Filter Section */}
-        <div className="flex items-center space-x-4">
+    <main className="container mx-auto space-y-8 p-4">
+      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-800">Analytics dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Platform metrics for the selected reporting period.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+            Start date
             <DatePicker
-                selected={startDate}
-                onChange={(date) => setStartDate(date)}
-                selectsStart
-                startDate={startDate}
-                endDate={endDate}
-                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+              selected={startDate}
+              onChange={date => {
+                if (!date) return;
+                setStartDate(date);
+                if (endDate && date > endDate) setEndDate(date);
+              }}
+              selectsStart
+              startDate={startDate}
+              endDate={endDate}
+              maxDate={endDate || undefined}
+              dateFormat="yyyy-MM-dd"
+              ariaLabelledBy="analytics-start-date"
+              className="w-36 rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+            End date
             <DatePicker
-                selected={endDate}
-                onChange={(date) => setEndDate(date)}
-                selectsEnd
-                startDate={startDate}
-                endDate={endDate}
-                minDate={startDate}
-                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm"
+              selected={endDate}
+              onChange={date => {
+                if (!date) return;
+                setEndDate(date);
+                if (startDate && date < startDate) setStartDate(date);
+              }}
+              selectsEnd
+              startDate={startDate}
+              endDate={endDate}
+              minDate={startDate || undefined}
+              maxDate={new Date()}
+              dateFormat="yyyy-MM-dd"
+              ariaLabelledBy="analytics-end-date"
+              className="w-36 rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
-            <a
-                href={`/api/admin/analytics/export?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`}
-                download
-                className="bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded shadow-md"
-            >
-                Export to CSV
-            </a>
+          </label>
+          <button
+            type="button"
+            onClick={exportAnalytics}
+            disabled={isExporting || isLoading || !analyticsData}
+            className="self-end rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isExporting ? 'Exporting...' : 'Export CSV'}
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Key Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 shadow rounded-lg text-center">
-            <h3 className="text-md font-medium text-gray-500 uppercase">Total Users</h3>
-            <p className="text-3xl font-semibold text-gray-800 mt-2">{analyticsData.userStats.total}</p>
-        </div>
-        <div className="bg-white p-6 shadow rounded-lg text-center">
-            <h3 className="text-md font-medium text-gray-500 uppercase">Paid Users</h3>
-            <p className="text-3xl font-semibold text-gray-800 mt-2">{analyticsData.userStats.paid}</p>
-        </div>
-        <div className="bg-white p-6 shadow rounded-lg text-center">
-            <h3 className="text-md font-medium text-gray-500 uppercase">Reported Users</h3>
-            <p className="text-3xl font-semibold text-gray-800 mt-2">{analyticsData.reportedUsersCount}</p>
-        </div>
-      </div>
+      {error && (
+        <section role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {error}
+        </section>
+      )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 shadow rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">User Subscription Status</h3>
-          <Pie data={pieChartData} />
-        </div>
-        <div className="bg-white p-6 shadow rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">New User Sign-ups</h3>
-          <Line data={lineChartData} />
-        </div>
-      </div>
+      {isLoading && analyticsData && (
+        <p className="text-sm text-gray-500" role="status">Refreshing analytics...</p>
+      )}
 
-      {/* Location Data Table */}
-      <div className="bg-white p-6 shadow rounded-lg">
-        <h3 className="text-lg font-semibold mb-4">User Locations (Placeholder)</h3>
-        <p className="text-sm text-gray-500 mb-4">Note: Location data is placeholder and not live.</p>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Country</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User Count</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {analyticsData.locations.map(loc => (
-                <tr key={loc._id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{loc._id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{loc.count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      {!analyticsData && !isLoading && !error && (
+        <p className="rounded-lg bg-white p-6 text-center text-gray-600">No analytics data found for this period.</p>
+      )}
+
+      {analyticsData && (
+        <>
+          <section aria-label="Key metrics" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              ['Total users', userStats.total],
+              ['Paid users', userStats.paid],
+              ['Reported users', analyticsData.reportedUsersCount],
+            ].map(([label, value]) => (
+              <article key={label} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                <h2 className="text-sm font-medium uppercase tracking-wide text-gray-500">{label}</h2>
+                <p className="mt-2 text-3xl font-semibold text-gray-900">
+                  {Number.isFinite(Number(value)) ? Number(value).toLocaleString() : 'Unavailable'}
+                </p>
+              </article>
+            ))}
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <article className="min-w-0 rounded-lg bg-white p-5 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold">User subscription status</h2>
+              <Pie data={pieChartData} />
+            </article>
+            <article className="min-w-0 rounded-lg bg-white p-5 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold">New user sign-ups</h2>
+              {signups.length ? <Line data={lineChartData} /> : (
+                <p className="py-12 text-center text-sm text-gray-500">No sign-ups recorded in this date range.</p>
+              )}
+            </article>
+          </section>
+
+          <section className="rounded-lg bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold">User locations</h2>
+            {locations.length ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Country</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">User count</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {locations.map(location => (
+                      <tr key={location?._id || 'unknown'}>
+                        <td className="px-4 py-3 text-sm text-gray-700">{location?._id || 'Unknown'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{Number(location?.count) || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Location breakdown is not currently available from the analytics API.</p>
+            )}
+          </section>
+        </>
+      )}
+    </main>
   );
 };
 
