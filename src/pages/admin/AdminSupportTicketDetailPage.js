@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
 
 const statuses = ['Open', 'In Progress', 'Waiting for Customer', 'Closed'];
+const priorities = ['Urgent', 'High', 'Normal', 'Low'];
+const categories = ['Account', 'Payments', 'Profile', 'Verification', 'Safety', 'Technical', 'Other'];
 const formatDate = (value) => {
   const date = value ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Date unavailable';
@@ -19,6 +21,8 @@ const AdminSupportTicketDetailPage = () => {
   const [actionMessage, setActionMessage] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [newStatus, setNewStatus] = useState('');
+  const [newPriority, setNewPriority] = useState('Normal');
+  const [newCategory, setNewCategory] = useState('Other');
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [attachments, setAttachments] = useState([]);
 
@@ -30,6 +34,8 @@ const AdminSupportTicketDetailPage = () => {
       setTicket(response.ticket);
       setMessages(Array.isArray(response.messages) ? response.messages : []);
       setNewStatus(response.ticket?.status || 'Open');
+      setNewPriority(response.ticket?.priority || 'Normal');
+      setNewCategory(response.ticket?.category || 'Other');
     } catch (err) {
       setError(err.data?.message || err.message || 'Unable to load this support ticket.');
     } finally {
@@ -97,12 +103,16 @@ const AdminSupportTicketDetailPage = () => {
   };
 
   const handleUpdateStatus = async () => {
-    if (!newStatus || newStatus === ticket?.status) return;
+    const changes = {};
+    if (newStatus && newStatus !== ticket?.status) changes.status = newStatus;
+    if (newPriority !== (ticket?.priority || 'Normal')) changes.priority = newPriority;
+    if (newCategory !== (ticket?.category || 'Other')) changes.category = newCategory;
+    if (!Object.keys(changes).length) return;
     setIsSavingStatus(true);
     setError(null);
     setActionMessage(null);
     try {
-      const response = await apiClient.put('/admin/support-tickets/' + ticketId + '/status', { status: newStatus });
+      const response = await apiClient.put('/admin/support-tickets/' + ticketId + '/status', changes);
       setTicket(response);
       setActionMessage('Ticket status updated.');
     } catch (err) {
@@ -146,14 +156,19 @@ const AdminSupportTicketDetailPage = () => {
             </div>
           </div>
           <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 lg:w-auto lg:min-w-[280px]">
-            <label htmlFor="ticket-status" className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Ticket status</label>
-            <div className="flex gap-2">
-              <select id="ticket-status" value={newStatus} onChange={event => setNewStatus(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
-                {statuses.map(status => <option key={status} value={status}>{status}</option>)}
-              </select>
-              <button type="button" onClick={handleUpdateStatus} disabled={isSavingStatus || newStatus === ticket.status} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">{isSavingStatus ? 'Saving…' : 'Save'}</button>
+            <div className="space-y-3">
+              <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Status</span>
+                <select id="ticket-status" value={newStatus} onChange={event => setNewStatus(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{statuses.map(status => <option key={status} value={status}>{status}</option>)}</select>
+              </label>
+              <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Priority</span>
+                <select value={newPriority} onChange={event => setNewPriority(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{priorities.map(value => <option key={value}>{value}</option>)}</select>
+              </label>
+              <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Category</span>
+                <select value={newCategory} onChange={event => setNewCategory(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{categories.map(value => <option key={value}>{value}</option>)}</select>
+              </label>
+              <button type="button" onClick={handleUpdateStatus} disabled={isSavingStatus || (newStatus === ticket.status && newPriority === (ticket.priority || 'Normal') && newCategory === (ticket.category || 'Other'))} className="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">{isSavingStatus ? 'Saving…' : 'Save changes'}</button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Changing status does not send a customer message.</p>
+            <p className="mt-2 text-xs text-slate-500">Metadata changes do not send a customer message.</p>
           </div>
         </div>
       </section>
