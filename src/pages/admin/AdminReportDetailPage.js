@@ -83,15 +83,15 @@ const AdminReportDetailPage = () => {
       <div className="grid md:grid-cols-2 gap-6">
         <div className="bg-white p-6 shadow rounded-lg">
           <h3 className="text-lg font-semibold border-b pb-2 mb-4">Reported User</h3>
-          <p><strong>Name:</strong> {report.reportedUserUid?.name || 'N/A'}</p>
-          <p><strong>Email:</strong> {report.reportedUserUid?.email || 'N/A'}</p>
-          <p><strong>Role:</strong> {report.reportedUserUid?.role}</p>
-          <p><strong>Suspended Until:</strong> {report.reportedUserUid?.suspendedUntil ? new Date(report.reportedUserUid.suspendedUntil).toLocaleString() : 'Not suspended'}</p>
+          <p><strong>Name:</strong> {report.reportedUser?.name || 'N/A'}</p>
+          <p><strong>Email:</strong> {report.reportedUser?.email || 'N/A'}</p>
+          <p><strong>Role:</strong> {report.reportedUser?.role || 'N/A'}</p>
+          <p><strong>Suspended Until:</strong> {report.reportedUser?.suspendedUntil ? new Date(report.reportedUser.suspendedUntil).toLocaleString() : 'Not suspended'}</p>
         </div>
         <div className="bg-white p-6 shadow rounded-lg">
           <h3 className="text-lg font-semibold border-b pb-2 mb-4">Reporter</h3>
-          <p><strong>Name:</strong> {report.reporterUid?.name || 'N/A'}</p>
-          <p><strong>Email:</strong> {report.reporterUid?.email || 'N/A'}</p>
+          <p><strong>Name:</strong> {report.reporter?.name || 'N/A'}</p>
+          <p><strong>Email:</strong> {report.reporter?.email || 'N/A'}</p>
         </div>
       </div>
 
