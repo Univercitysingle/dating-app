@@ -1401,7 +1401,7 @@ export default {
       const parts = url.pathname.slice(adminPurchasesBase.length).split("/").filter(Boolean);
       const isList = parts.length === 0 && request.method === "GET";
       const isAction = parts.length === 2 && /^[a-fA-F0-9]{24}$/.test(parts[0]) &&
-        ["approve", "reject"].includes(parts[1]) && request.method === "POST";
+        ["approve", "reject", "record-refund"].includes(parts[1]) && request.method === "POST";
       if (isList || isAction) {
         if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
         try {
@@ -1418,7 +1418,10 @@ export default {
             body: JSON.stringify({
               claims, status: url.searchParams.get("status") || "all",
               purchaseId: parts[0], action: parts[1],
-              reason: payload && payload.reason
+              reason: payload && payload.reason,
+              transactionType: payload && payload.transactionType,
+              refundReference: payload && payload.refundReference,
+              note: payload && payload.note
             })
           });
           const result = await response.json().catch(() => ({ message: "Administration service unavailable" }));
