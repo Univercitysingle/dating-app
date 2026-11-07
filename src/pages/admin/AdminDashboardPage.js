@@ -5,40 +5,52 @@ import logger from '../../utils/logger';
 import apiClient from '../../api/apiClient';
 
 const formatMetric = (value) => {
-  if (value === null || value === undefined || value === '') return '—';
+  if (value === null || value === undefined || value === '') return 'Not available';
   const numericValue = Number(value);
-  return Number.isFinite(numericValue)
-    ? new Intl.NumberFormat().format(numericValue)
-    : String(value);
+  return Number.isFinite(numericValue) ? new Intl.NumberFormat().format(numericValue) : String(value);
 };
 
-const StatCard = ({ title, value, description, loading, accent }) => (
-  <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        {loading ? (
-          <div className="mt-3 h-9 w-24 animate-pulse rounded bg-gray-100" aria-label="Loading metric" />
-        ) : (
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-900">
-            {formatMetric(value)}
-          </p>
-        )}
-      </div>
-      <span className={`mt-1 h-2.5 w-2.5 rounded-full ${accent}`} aria-hidden="true" />
-    </div>
-    {description && <p className="mt-3 text-xs text-gray-500">{description}</p>}
-  </section>
-);
+const metricCards = [
+  { title: 'Total users', key: 'totalUsers', description: 'All registered accounts', icon: '◎', tone: 'indigo' },
+  { title: 'New users', key: 'newUsers', description: 'Sign-ups in the last 24 hours', icon: '↗', tone: 'sky' },
+  { title: 'Active users', key: 'activeUsers', description: 'Activity in the last 24 hours', icon: '◉', tone: 'emerald' },
+  { title: 'Pending reports', key: 'pendingReports', description: 'Awaiting moderation review', icon: '⚑', tone: 'amber' },
+];
 
 const quickLinks = [
-  { title: 'Manage users', description: 'Search accounts, review profiles, and manage user access.', to: '/admin/users' },
-  { title: 'Review reports', description: 'Open user reports and follow up on safety concerns.', to: '/admin/reports' },
-  { title: 'View analytics', description: 'Review signup trends and available platform metrics.', to: '/admin/analytics' },
-  { title: 'Payment review', description: 'Review pending purchases and reconcile late payment refunds.', to: '/admin/purchases' },
-  { title: 'Transactions', description: 'Inspect subscription and purchase records.', to: '/admin/transactions' },
-  { title: 'Support tickets', description: 'Review user support requests and their status.', to: '/admin/support-tickets' },
+  { title: 'User management', description: 'Search accounts, review profiles, and manage access.', to: '/admin/users', icon: '◎', tone: 'indigo' },
+  { title: 'Reports & safety', description: 'Review reports and take action on safety concerns.', to: '/admin/reports', icon: '⚑', tone: 'rose' },
+  { title: 'Analytics', description: 'Understand sign-ups and platform activity.', to: '/admin/analytics', icon: '▥', tone: 'sky' },
+  { title: 'Payment review', description: 'Review pending purchases and refund cases.', to: '/admin/purchases', icon: '◇', tone: 'violet' },
+  { title: 'Transactions', description: 'Inspect subscription and purchase records.', to: '/admin/transactions', icon: '⇄', tone: 'emerald' },
+  { title: 'Support tickets', description: 'Keep user support requests moving.', to: '/admin/support-tickets', icon: '▤', tone: 'amber' },
 ];
+
+const toneClasses = {
+  indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
+  sky: 'bg-sky-50 text-sky-700 ring-sky-100',
+  emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+  rose: 'bg-rose-50 text-rose-700 ring-rose-100',
+  violet: 'bg-violet-50 text-violet-700 ring-violet-100',
+};
+
+const StatCard = ({ metric, value, loading }) => (
+  <article className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.03)] transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-slate-500">{metric.title}</p>
+        {loading ? (
+          <div className="mt-4 h-9 w-28 animate-pulse rounded-lg bg-slate-100" aria-label="Loading metric" />
+        ) : (
+          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{formatMetric(value)}</p>
+        )}
+      </div>
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ring-1 ${toneClasses[metric.tone]}`} aria-hidden="true">{metric.icon}</span>
+    </div>
+    <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-400">{metric.description}</p>
+  </article>
+);
 
 const AdminDashboardPage = () => {
   const [stats, setStats] = useState(null);
@@ -53,7 +65,6 @@ const AdminDashboardPage = () => {
       setIsLoading(false);
       return;
     }
-
     setIsLoading(true);
     setError(null);
     try {
@@ -73,92 +84,79 @@ const AdminDashboardPage = () => {
     fetchStats();
   }, [fetchStats]);
 
-  const metricCards = [
-    { title: 'Total users', value: stats?.totalUsers, description: 'Accounts registered on the platform', accent: 'bg-indigo-500' },
-    { title: 'New users', value: stats?.newUsers, description: 'Sign-ups in the last 24 hours', accent: 'bg-blue-500' },
-    { title: 'Active users', value: stats?.activeUsers, description: 'Activity in the last 24 hours', accent: 'bg-emerald-500' },
-    { title: 'Pending reports', value: stats?.pendingReports, description: 'Reports awaiting moderation', accent: 'bg-amber-500' },
-  ];
-
   return (
-    <main className="space-y-6">
-      <header className="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-indigo-800 p-6 text-white shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-200">Platform operations</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Admin dashboard</h1>
-          <p className="mt-2 max-w-2xl text-sm text-indigo-100">
-            Monitor platform activity, manage accounts, and keep user safety and support workflows moving.
-          </p>
-          {adminUser?.email && (
-            <p className="mt-3 text-xs text-indigo-200">
-              Signed in as {adminUser.email} · {adminUser.role === 'superadmin' ? 'Super administrator' : 'Administrator'}
+    <div className="space-y-8">
+      <section className="relative isolate overflow-hidden rounded-[28px] bg-[#111a35] px-6 py-7 text-white shadow-xl shadow-indigo-950/10 sm:px-9 sm:py-9">
+        <div className="absolute -right-20 -top-28 -z-10 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
+        <div className="absolute -bottom-32 right-1/3 -z-10 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+        <div className="flex flex-col gap-7 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Platform operations
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Good to see you{adminUser?.displayName || adminUser?.name ? `, ${(adminUser.displayName || adminUser.name).split(' ')[0]}` : ''}.</h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">
+              Your operations overview is ready. Monitor platform health, keep your community safe, and stay on top of payments and support.
             </p>
-          )}
+            <p className="mt-4 text-xs text-slate-400">{adminUser?.role === 'superadmin' ? 'Super administrator access' : 'Administrator access'}</p>
+          </div>
+          <button type="button" onClick={fetchStats} disabled={isLoading} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-60">
+            <span aria-hidden="true" className={isLoading ? 'animate-spin' : ''}>↻</span>
+            {isLoading ? 'Refreshing data' : 'Refresh overview'}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={fetchStats}
-          disabled={isLoading}
-          className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isLoading ? 'Refreshing…' : 'Refresh metrics'}
-        </button>
-      </header>
+      </section>
 
       {error && (
-        <section role="alert" className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <section role="alert" className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-red-900">Dashboard metrics unavailable</h2>
-            <p className="mt-1 text-sm text-red-800">{error}</p>
+            <h3 className="font-semibold text-rose-900">Dashboard data is unavailable</h3>
+            <p className="mt-1 text-sm text-rose-700">{error}</p>
           </div>
-          <button type="button" onClick={fetchStats} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-100">
-            Try again
-          </button>
+          <button type="button" onClick={fetchStats} className="rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100">Try again</button>
         </section>
       )}
 
       <section aria-label="Platform metrics">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-gray-900">Platform overview</h2>
-          {lastUpdated && (
-            <p className="text-xs text-gray-500">
-              Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          )}
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">At a glance</p>
+            <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-900">Platform overview</h3>
+          </div>
+          {lastUpdated && <p className="text-xs text-slate-400">Last updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {metricCards.map((metric) => (
-            <StatCard key={metric.title} {...metric} loading={isLoading && !stats} />
-          ))}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+          {metricCards.map((metric) => <StatCard key={metric.key} metric={metric} value={stats?.[metric.key]} loading={isLoading && !stats} />)}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-900">Administration shortcuts</h2>
-          <p className="mt-1 text-sm text-gray-500">Jump directly to the main operational areas.</p>
+      <section>
+        <div className="mb-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">Your workspace</p>
+          <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-900">Jump back into work</h3>
+          <p className="mt-1 text-sm text-slate-500">The tools you need to manage the DateMe platform.</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {quickLinks.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="group rounded-xl border border-gray-200 p-4 transition hover:border-indigo-300 hover:bg-indigo-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              <span className="flex items-center justify-between gap-3">
-                <span className="font-semibold text-gray-900 group-hover:text-indigo-800">{item.title}</span>
-                <span aria-hidden="true" className="text-gray-400 transition group-hover:translate-x-1 group-hover:text-indigo-600">→</span>
+            <Link key={item.to} to={item.to} className="group flex min-h-[142px] items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ring-1 transition group-hover:scale-105 ${toneClasses[item.tone]}`} aria-hidden="true">{item.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-900 transition group-hover:text-indigo-700">{item.title}</span>
+                  <span aria-hidden="true" className="text-lg text-slate-300 transition group-hover:translate-x-1 group-hover:text-indigo-600">→</span>
+                </span>
+                <span className="mt-2 block text-sm leading-5 text-slate-500">{item.description}</span>
               </span>
-              <span className="mt-2 block text-sm leading-5 text-gray-500">{item.description}</span>
             </Link>
           ))}
         </div>
       </section>
 
-      <p className="text-xs leading-5 text-gray-500">
-        Metrics are supplied by the admin API. A blank metric is shown as unavailable, not as zero, so missing data is not mistaken for a confirmed count.
+      <p className="rounded-xl border border-slate-200/70 bg-white/70 px-4 py-3 text-xs leading-5 text-slate-400">
+        Metrics are supplied by the admin API. Missing values are labelled as unavailable rather than shown as zero.
       </p>
-    </main>
+    </div>
   );
 };
 
