@@ -4490,7 +4490,6 @@ export class MongoDBConnection {
   async updateTypingStatus(uid, payload) {
     const { roomId, isTyping } = payload || {};
     if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
-        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid)) ||
         typeof isTyping !== "boolean") {
       return { status: 400, body: { error: "Invalid typing status" } };
     }
@@ -4527,8 +4526,7 @@ export class MongoDBConnection {
   }
 
   async getTypingStatus(uid, roomId) {
-    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
-        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid))) {
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId)) {
       return { status: 400, body: { error: "Invalid chat room" } };
     }
     try {
@@ -4561,8 +4559,7 @@ export class MongoDBConnection {
 
   async markChatDelivered(uid, payload) {
     const { roomId, messageIds } = payload || {};
-    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
-        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid)) || !Array.isArray(messageIds) || messageIds.length > 100) {
+    if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) || !Array.isArray(messageIds) || messageIds.length > 100) {
       return { status: 400, body: { error: "Invalid delivery receipt" } };
     }
     try {
@@ -4583,7 +4580,6 @@ export class MongoDBConnection {
   async markChatRead(uid, payload) {
     const { roomId, messageIds } = payload || {};
     if (typeof uid !== "string" || !uid || !this.parseChatRoom(roomId) ||
-        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid)) ||
         !Array.isArray(messageIds) || messageIds.length > 100) {
       return { status: 400, body: { error: "Invalid read receipt" } };
     }
