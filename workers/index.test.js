@@ -2316,7 +2316,7 @@ test("chat send persists through MongoDB and returns the saved message", async (
     },
     MONGODB_CONNECTION: {
       idFromName(name) {
-        assert.equal(name, "mongo-primary");
+        assert.match(name, /^mongo-shard-[0-3]$/);
         return "mongo-primary";
       },
       get() {
@@ -2446,7 +2446,7 @@ test("authenticated chat read receipts route to the MongoDB Durable Object", asy
       FIREBASE_PROJECT_ID: "test-project",
       MONGODB_CONNECTION: {
         idFromName(name) {
-          assert.equal(name, "mongo-primary");
+          assert.match(name, /^mongo-shard-[0-3]$/);
           return name;
         },
         get() {
@@ -2515,7 +2515,7 @@ test("authenticated chat delivery receipts route to the MongoDB Durable Object",
       FIREBASE_PROJECT_ID: "test-project",
       MONGODB_CONNECTION: {
         idFromName(name) {
-          assert.equal(name, "mongo-primary");
+          assert.match(name, /^mongo-shard-[0-3]$/);
           return name;
         },
         get() {
