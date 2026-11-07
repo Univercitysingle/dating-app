@@ -21,10 +21,10 @@ const AdminSupportTicketDetailPage = () => {
     try {
       const response = await apiClient.get(`/admin/support-tickets/${ticketId}`);
       setTicket(response.ticket);
-      setMessages(response.messages);
+      setMessages(Array.isArray(response.messages) ? response.messages : []);
       setNewStatus(response.ticket.status);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while fetching ticket details.');
+      setError(err.data?.message || err.message || 'An error occurred while fetching ticket details.');
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +51,7 @@ const AdminSupportTicketDetailPage = () => {
       setNewMessage('');
       setAttachments([]);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while sending the message.');
+      setError(err.data?.message || err.message || 'An error occurred while sending the message.');
     }
   };
 
@@ -60,7 +60,7 @@ const AdminSupportTicketDetailPage = () => {
       const response = await apiClient.put(`/admin/support-tickets/${ticketId}/status`, { status: newStatus });
       setTicket(response);
     } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred while updating the status.');
+      setError(err.data?.message || err.message || 'An error occurred while updating the status.');
     }
   };
 
@@ -83,7 +83,7 @@ const AdminSupportTicketDetailPage = () => {
           <div>
             <h1 className="text-2xl font-semibold">{ticket.subject}</h1>
             <p className="text-sm text-gray-600">Ticket #{ticket.ticketNumber}</p>
-            <p className="text-sm text-gray-600">User: {ticket.userId.name} ({ticket.userId.email})</p>
+            <p className="text-sm text-gray-600">User: {ticket.userId?.name || 'Unknown'}{ticket.userId?.email ? ` (${ticket.userId.email})` : ''}</p>
           </div>
           <div className="flex items-center space-x-4">
             <select
@@ -93,6 +93,7 @@ const AdminSupportTicketDetailPage = () => {
             >
               <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
+              <option value="Waiting for Customer">Waiting for Customer</option>
               <option value="Closed">Closed</option>
             </select>
             <button
