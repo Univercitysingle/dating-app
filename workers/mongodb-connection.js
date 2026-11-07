@@ -3918,10 +3918,11 @@ export class MongoDBConnection {
       const ticket = await db.collection("supporttickets").findOne({ _id: new ObjectId(ticketId) });
       if (!ticket) return { status: 404, body: { message: "Ticket not found" } };
       const userProjection = access.role === "superadmin" ? { name: 1, email: 1 } : { name: 1 };
-      const [user, messages, staff] = await Promise.all([
+      const [user, messages, staff, history] = await Promise.all([
         db.collection("users").findOne({ _id: ticket.userId }, { projection: userProjection }),
         db.collection("ticketmessages").find({ ticketId: new ObjectId(ticketId) }).sort({ createdAt: 1 }).toArray(),
-        db.collection("users").find({ role: { $in: ["admin", "superadmin"] } }, { projection: { uid: 1, name: 1, role: 1 } }).limit(100).toArray()
+        db.collection("users").find({ role: { $in: ["admin", "superadmin"] } }, { projection: { uid: 1, name: 1, role: 1 } }).limit(100).toArray(),
+        db.collection("auditlogs").find({ ticketId: new ObjectId(ticketId), eventType: "support_ticket_updated" }).sort({ createdAt: -1 }).limit(100).toArray()
       ]);
       const senderIds = messages.map(message => message.senderId).filter(Boolean);
       const senders = senderIds.length ? await db.collection("users").find(
@@ -3931,6 +3932,7 @@ export class MongoDBConnection {
       return { status: 200, body: {
         ticket: { ...ticket, userId: user || null },
         staff: staff.filter(item => typeof item.uid === "string").map(({ uid, name, role }) => ({ uid, name: name || "Administrator", role })),
+        history,
         messages: messages.map(message => ({ ...message, senderId: senderMap.get(String(message.senderId)) || null }))
       } };
     } catch {
