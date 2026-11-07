@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate, NavLink, Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { Navigate, NavLink, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const navigation = [
