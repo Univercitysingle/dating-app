@@ -1987,6 +1987,56 @@ export class MongoDBConnection {
     }
   }
 
+  async abandonPendingSubscription(uid, orderId) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId)) {
+      return { status: 400, body: { error: "Invalid checkout request." } };
+    }
+    try {
+      const { ObjectId } = await import("mongodb");
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const subscriptions = db.collection("subscriptions");
+      const user = await users.findOne({ uid }, { projection: { _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found." } };
+      const subscription = await subscriptions.findOne({ _id: new ObjectId(orderId), userId: user._id });
+      if (!subscription) return { status: 404, body: { error: "Checkout not found." } };
+      if (subscription.status === "cancelled") {
+        if (subscription.checkoutReservationId) {
+          await users.updateOne(
+            { _id: user._id, "pendingSubscriptionCheckout.reservationId": subscription.checkoutReservationId },
+            { $unset: { pendingSubscriptionCheckout: "" } }
+          );
+        }
+        return { status: 200, body: { success: true, status: "cancelled" } };
+      }
+      if (subscription.status !== "pending") {
+        return { status: 409, body: { error: "This payment can no longer be cancelled. Check its payment status before retrying.", status: subscription.status } };
+      }
+      const now = new Date();
+      const cancelled = await subscriptions.updateOne(
+        { _id: subscription._id, userId: user._id, status: "pending" },
+        { $set: { status: "cancelled", cancellationReason: "checkout_start_failed", updatedAt: now } }
+      );
+      if (!cancelled.modifiedCount) {
+        const latest = await subscriptions.findOne({ _id: subscription._id }, { projection: { status: 1 } });
+        return { status: 409, body: { error: "Payment status changed. Check the transaction before retrying.", status: latest?.status || "unknown" } };
+      }
+      if (subscription.checkoutReservationId) {
+        await users.updateOne(
+          { _id: user._id, "pendingSubscriptionCheckout.reservationId": subscription.checkoutReservationId },
+          { $unset: { pendingSubscriptionCheckout: "" } }
+        );
+      }
+      return { status: 200, body: { success: true, status: "cancelled" } };
+    } catch (error) {
+      console.error("Pending subscription checkout cancellation failed", {
+        message: String(error?.message || "unknown").slice(0, 160)
+      });
+      return { status: 503, body: { error: "Could not safely release this checkout. Please check payment status." } };
+    }
+  }
+
   async settleWebXPay(orderId, statusCode, reference = "", gatewayMetadata = {}) {
     if (typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId) ||
         !["0", "00", "15"].includes(String(statusCode)) ||
