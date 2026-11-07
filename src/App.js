@@ -161,6 +161,18 @@ function AdminRoute({ children }) {
   return children;
 }
 
+
+function SuperAdminRoute({ children }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingState title="Verifying superadmin access" message="Checking your administrator permissions." />;
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'superadmin') return <Navigate to="/unauthorized" replace />;
+  return children;
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -236,7 +248,7 @@ function App() {
               <Route path="users/:userId/edit" element={<AdminUserEditPage />} />
               <Route path="users/:userId/profile" element={<AdminUserProfileViewPage />} />
               <Route path="reports" element={<AdminReportsPage />} />
-              <Route path="verifications" element={<AdminPhotoVerificationsPage />} />
+              <Route path="verifications" element={<SuperAdminRoute><AdminPhotoVerificationsPage /></SuperAdminRoute>} />
               <Route path="reports/:reportId" element={<AdminReportDetailPage />} />
               <Route path="analytics" element={<AdminAnalyticsPage />} />
               <Route path="transactions" element={<AdminTransactionsPage />} />
