@@ -1617,6 +1617,33 @@ test("WebXPay callback rejects invalid signatures and does not settle an order",
 });
 
 
+test("WebXPay callback returns retryable 503 when MongoDB settlement is unavailable", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const payload = "0123456789abcdef01234567|T123456|2026-10-21 12:00:00|00|Approved|1";
+  const encrypt = value => privateEncrypt({
+    key: privateKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, Buffer.from(value, "utf8")).toString("base64");
+  const response = await worker.fetch(new Request("https://dating-app.test/api/webxpay/response", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ payment: encrypt(payload), signature: encrypt(payload) })
+  }), {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-id"; },
+      get() { return { async fetch() { throw new Error("MongoDB temporarily unavailable"); } }; }
+    }
+  });
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /temporarily unavailable/i);
+});
+
+
 test("WebXPay purchase settlement grants benefits once and is idempotent", async () => {
   const { ObjectId } = await import("mongodb");
   const orderId = "0123456789abcdef01234567";
