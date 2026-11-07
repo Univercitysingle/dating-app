@@ -4081,7 +4081,10 @@ export class MongoDBConnection {
         db.collection("users").findOne({ _id: ticket.userId }, { projection: userProjection }),
         db.collection("ticketmessages").find({ ticketId: new ObjectId(ticketId) }).sort({ createdAt: 1 }).toArray(),
         db.collection("users").find({ role: { $in: ["admin", "superadmin"] } }, { projection: { uid: 1, name: 1, role: 1 } }).limit(100).toArray(),
-        db.collection("auditlogs").find({ ticketId: new ObjectId(ticketId), eventType: "support_ticket_updated" }).sort({ createdAt: -1 }).limit(100).toArray()
+        db.collection("auditlogs").find({
+          ticketId: new ObjectId(ticketId),
+          eventType: { $in: ["support_ticket_updated", "support_ticket_message_edited", "support_ticket_message_deleted"] }
+        }).sort({ createdAt: -1 }).limit(150).toArray()
       ]);
       const senderIds = messages.map(message => message.senderId).filter(Boolean);
       const senders = senderIds.length ? await db.collection("users").find(
