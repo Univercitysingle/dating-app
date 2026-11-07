@@ -21,7 +21,9 @@ function darkFantasyRegionGate(request, env) {
   return null;
 }
 
-// This only selects a connection Durable Object. Authentication is still verified\n// by each API route before any protected operation is executed.\nexport function getMongoShardName(request, env = {}) {
+// This only selects a connection Durable Object. Authentication is still verified
+// by each API route before any protected operation is executed.
+export function getMongoShardName(request, env = {}) {
   const authorization = request?.headers?.get("authorization") || "";
   const token = authorization.match(/^Bearer\s+([A-Za-z0-9._-]+)$/i)?.[1];
   if (!token) return "mongo-primary";
