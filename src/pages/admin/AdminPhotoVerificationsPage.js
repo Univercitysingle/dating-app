@@ -56,13 +56,13 @@ const AdminPhotoVerificationsPage = () => {
           <button type="button" onClick={() => setSelected(null)} className="mb-4 text-sm underline">Back to queue</button>
           <h2 className="text-lg font-semibold">{selected.user?.name || selected.uid}</h2>
           <p className="text-sm text-gray-600 mb-3">Challenge: {selected.challenge}</p>
-          {selected.automatedAssessment?.status === 'assessed' ? (
+          {selected.automatedAssessment?.status === 'client_assessed' ? (
             <div className="mb-4 rounded-lg border bg-slate-50 p-3 text-sm text-slate-700">
-              <strong>Automated face assessment (advisory only)</strong>
+              <strong>Browser face comparison (untrusted advisory only)</strong>
               <p>Frames analyzed: {selected.automatedAssessment.framesAnalyzed}; frames with a detected face: {selected.automatedAssessment.framesWithFace}; profile photos compared: {selected.automatedAssessment.profilePhotosCompared}.</p>
-              <p>Face distance: {selected.automatedAssessment.bestDistance == null ? 'Unavailable' : selected.automatedAssessment.bestDistance.toFixed(3)}. This is not an approval threshold or liveness result.</p>
+              <p>Face distance: {selected.automatedAssessment.bestDistance == null ? 'Unavailable' : selected.automatedAssessment.bestDistance.toFixed(3)}. This value was generated on the user's device and can be manipulated. It is not an approval threshold, identity proof, or liveness result. Make the decision from the live video and profile photos.</p>
             </div>
-          ) : <p className="mb-4 text-sm text-amber-700">Automated assessment unavailable. Complete the manual review using the video and profile photos.</p>}
+          ) : <p className="mb-4 text-sm text-amber-700">Browser comparison unavailable or inconclusive. Complete the manual review using the video and profile photos.</p>}
           <video controls playsInline className="w-full max-w-xl rounded-lg bg-black" src={selected.videoUrl} />
           <h3 className="mt-5 mb-2 font-semibold">Profile photos</h3>
           <div className="flex flex-wrap gap-3">
@@ -79,7 +79,7 @@ const AdminPhotoVerificationsPage = () => {
         <div className="space-y-3">
           {items.length ? items.map(item => (
             <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4">
-              <div><strong>{item.user?.name || item.uid}</strong><p className="text-sm text-gray-500">Submitted {new Date(item.createdAt).toLocaleString()} · Challenge: {item.challenge} · Face assessment: {item.automatedAssessment?.status === 'assessed' ? 'available' : 'manual only'}</p></div>
+              <div><strong>{item.user?.name || item.uid}</strong><p className="text-sm text-gray-500">Submitted {new Date(item.createdAt).toLocaleString()} · Challenge: {item.challenge} · Face assessment: {item.automatedAssessment?.status === 'client_assessed' ? 'browser advisory' : 'manual only'}</p></div>
               <button type="button" disabled={busy} onClick={() => openEvidence(item)} className="rounded-lg bg-gray-900 px-4 py-2 text-white disabled:opacity-50">Review private video</button>
             </article>
           )) : <p className="rounded-lg border bg-white p-5 text-gray-600">No pending photo verification requests.</p>}
