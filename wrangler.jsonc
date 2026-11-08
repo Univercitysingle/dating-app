@@ -60,10 +60,6 @@
           "binding": "CDN_PROXY",
           "service": "dateme",
           "environment": "production"
-        },
-        {
-          "binding": "FACE_VERIFICATION",
-          "service": "dating-app-face-verification-staging"
         }
       ],
       "durable_objects": {
