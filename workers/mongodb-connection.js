@@ -5218,50 +5218,25 @@ export class MongoDBConnection {
       const binary = Uint8Array.from(atob(payload.videoBase64), char => char.charCodeAt(0));
       if (binary.byteLength > 3_145_728) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
       if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.videoBase64)) return { status: 400, body: { error: "Invalid video encoding." } };
-      let automatedAssessment = { engine: "@vladmandic/face-api", status: "unavailable" };
-      if (this.env.FACE_VERIFICATION && typeof this.env.FACE_VERIFICATION.fetch === "function") {
-        try {
-          const configuredCdn = String(this.env.CDN_HOSTNAME || "").trim();
-          const normalizedCdn = configuredCdn.startsWith("https://") || configuredCdn.startsWith("http://") ? configuredCdn : "https://" + configuredCdn;
-          const cdnOrigin = new URL(normalizedCdn).origin;
-          const profilePhotoUrls = user.photos.map(photo => typeof photo === "string" ? photo : photo?.url)
-            .filter(value => typeof value === "string")
-            .filter(value => {
-              try {
-                const parsed = new URL(value);
-                return parsed.protocol === "https:" && parsed.origin === cdnOrigin;
-              } catch { return false; }
-            }).slice(0, 6);
-          if (profilePhotoUrls.length) {
-            const assessmentResponse = await this.env.FACE_VERIFICATION.fetch("https://face-verification.internal/internal/assess", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                videoBase64: payload.videoBase64,
-                mimeType: payload.mimeType,
-                challenge: payload.challenge,
-                profilePhotoUrls
-              }),
-              signal: AbortSignal.timeout(25000)
-            });
-            if (assessmentResponse.ok) {
-              const result = await assessmentResponse.json();
-              automatedAssessment = {
-                engine: "@vladmandic/face-api",
-                status: "assessed",
-                framesAnalyzed: Number(result.framesAnalyzed) || 0,
-                framesWithFace: Number(result.framesWithFace) || 0,
-                profilePhotosCompared: Number(result.profilePhotosCompared) || 0,
-                bestDistance: Number.isFinite(result.bestDistance) ? result.bestDistance : null,
-                challengeAssessment: "not_verified",
-                assessedAt: new Date()
-              };
-            }
-          }
-        } catch {
-          // Inference is advisory. A cold start or service outage must never block manual verification.
-        }
-      }
+      // Browser inference is an untrusted advisory signal. Never use it to approve or reject.
+      const clientAssessment = payload.clientAssessment && typeof payload.clientAssessment === "object"
+        ? payload.clientAssessment : {};
+      const safeCount = value => Number.isInteger(value) && value >= 0 ? Math.min(value, 10) : 0;
+      const candidateDistance = Number(clientAssessment.bestDistance);
+      const automatedAssessment = {
+        engine: "@vladmandic/face-api",
+        engineVersion: "1.7.15",
+        source: "user_browser_untrusted",
+        status: clientAssessment.status === "assessed" ? "client_assessed" : "unavailable",
+        framesAnalyzed: safeCount(clientAssessment.framesAnalyzed),
+        framesWithFace: safeCount(clientAssessment.framesWithFace),
+        profilePhotosCompared: safeCount(clientAssessment.profilePhotosCompared),
+        bestDistance: Number.isFinite(candidateDistance) && candidateDistance >= 0 && candidateDistance <= 2
+          ? candidateDistance : null,
+        challengeAssessment: "not_verified",
+        livenessAssessment: "not_verified",
+        assessedAt: new Date()
+      };
       const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
       const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
       const iv = crypto.getRandomValues(new Uint8Array(12));
