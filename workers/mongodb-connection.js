@@ -5221,7 +5221,8 @@ export class MongoDBConnection {
       if (this.env.FACE_VERIFICATION && typeof this.env.FACE_VERIFICATION.fetch === "function") {
         try {
           const configuredCdn = String(this.env.CDN_HOSTNAME || "").trim();
-          const cdnOrigin = new URL(/^https?:\\/\\//i.test(configuredCdn) ? configuredCdn : "https://" + configuredCdn).origin;
+          const normalizedCdn = configuredCdn.startsWith("https://") || configuredCdn.startsWith("http://") ? configuredCdn : "https://" + configuredCdn;
+          const cdnOrigin = new URL(normalizedCdn).origin;
           const profilePhotoUrls = user.photos.map(photo => typeof photo === "string" ? photo : photo?.url)
             .filter(value => typeof value === "string")
             .filter(value => {
