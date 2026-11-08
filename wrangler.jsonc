@@ -3,20 +3,39 @@
   "name": "dating-app-api",
   "main": "workers/index.js",
   "compatibility_date": "2026-10-21",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
   "workers_dev": true,
   "vars": {
     "MIGRATION_STAGE": "scaffold"
   },
   "durable_objects": {
     "bindings": [
-      { "name": "RATE_LIMITER", "class_name": "RateLimiter" },
-      { "name": "MONGODB_CONNECTION", "class_name": "MongoDBConnection" }
+      {
+        "name": "RATE_LIMITER",
+        "class_name": "RateLimiter"
+      },
+      {
+        "name": "MONGODB_CONNECTION",
+        "class_name": "MongoDBConnection"
+      }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["RateLimiter"] },
-    { "tag": "v2", "new_sqlite_classes": ["MongoDBConnection"] }
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "RateLimiter"
+      ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": [
+        "MongoDBConnection"
+      ]
+    }
   ],
   "env": {
     "staging": {
@@ -41,20 +60,42 @@
           "binding": "CDN_PROXY",
           "service": "dateme",
           "environment": "production"
+        },
+        {
+          "binding": "FACE_VERIFICATION",
+          "service": "dating-app-face-verification-staging"
         }
       ],
       "durable_objects": {
         "bindings": [
-          { "name": "RATE_LIMITER", "class_name": "RateLimiter" },
-          { "name": "MONGODB_CONNECTION", "class_name": "MongoDBConnection" }
+          {
+            "name": "RATE_LIMITER",
+            "class_name": "RateLimiter"
+          },
+          {
+            "name": "MONGODB_CONNECTION",
+            "class_name": "MongoDBConnection"
+          }
         ]
       },
       "migrations": [
-        { "tag": "v1", "new_sqlite_classes": ["RateLimiter"] },
-        { "tag": "v2", "new_sqlite_classes": ["MongoDBConnection"] }
+        {
+          "tag": "v1",
+          "new_sqlite_classes": [
+            "RateLimiter"
+          ]
+        },
+        {
+          "tag": "v2",
+          "new_sqlite_classes": [
+            "MongoDBConnection"
+          ]
+        }
       ],
       "triggers": {
-        "crons": ["0 * * * *"]
+        "crons": [
+          "0 * * * *"
+        ]
       }
     }
   }
