@@ -107,7 +107,7 @@ jobs:
           set -euo pipefail
           npm install --no-audit --no-fund
           npm audit --audit-level=high
-          npx --yes wrangler@4 deploy --config wrangler.jsonc
+          npx --yes wrangler@4 deploy --config wrangler.jsonc --var "ALLOWED_PHOTO_ORIGIN:$CDN_HOSTNAME"
 
       - name: Deploy isolated staging Worker
         id: deploy
