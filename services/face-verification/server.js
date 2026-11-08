@@ -21,7 +21,7 @@ async function loadModels() {
   return modelsReady;
 }
 
-function readJson(req, maxBytes = 5 * 1024 * 1024) {
+function readJson(req, maxBytes = 15 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
