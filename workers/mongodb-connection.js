@@ -5222,17 +5222,22 @@ export class MongoDBConnection {
       const clientAssessment = payload.clientAssessment && typeof payload.clientAssessment === "object"
         ? payload.clientAssessment : {};
       const safeCount = value => Number.isInteger(value) && value >= 0 ? Math.min(value, 10) : 0;
-      const candidateDistance = Number(clientAssessment.bestDistance);
+      const candidateDistance = clientAssessment.bestDistance;
+      const framesAnalyzed = safeCount(clientAssessment.framesAnalyzed);
+      const framesWithFace = safeCount(clientAssessment.framesWithFace);
+      const profilePhotosCompared = Math.min(safeCount(clientAssessment.profilePhotosCompared), 6);
+      const hasAssessment = clientAssessment.status === "assessed" && framesAnalyzed > 0 &&
+        framesWithFace > 0 && profilePhotosCompared > 0 && typeof candidateDistance === "number" &&
+        Number.isFinite(candidateDistance) && candidateDistance >= 0 && candidateDistance <= 2;
       const automatedAssessment = {
         engine: "@vladmandic/face-api",
         engineVersion: "1.7.15",
         source: "user_browser_untrusted",
-        status: clientAssessment.status === "assessed" ? "client_assessed" : "unavailable",
-        framesAnalyzed: safeCount(clientAssessment.framesAnalyzed),
-        framesWithFace: safeCount(clientAssessment.framesWithFace),
-        profilePhotosCompared: safeCount(clientAssessment.profilePhotosCompared),
-        bestDistance: Number.isFinite(candidateDistance) && candidateDistance >= 0 && candidateDistance <= 2
-          ? candidateDistance : null,
+        status: hasAssessment ? "client_assessed" : "unavailable",
+        framesAnalyzed,
+        framesWithFace,
+        profilePhotosCompared,
+        bestDistance: hasAssessment ? candidateDistance : null,
         challengeAssessment: "not_verified",
         livenessAssessment: "not_verified",
         assessedAt: new Date()
