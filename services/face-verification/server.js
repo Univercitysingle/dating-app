@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import "@tensorflow/tfjs-node";
 import * as canvas from "canvas";
-import * as faceapi from "@vladmandic/face-api";
+import faceapi from "@vladmandic/face-api";
 
 const { Canvas, Image, ImageData, loadImage } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
