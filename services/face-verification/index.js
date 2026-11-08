@@ -41,7 +41,7 @@ export default {
         const response = await fetch(photoUrl, { redirect: "manual", headers: { accept: "image/*" } });
         if (!response.ok || response.status >= 300 || !String(response.headers.get("content-type") || "").startsWith("image/")) continue;
         const bytes = await response.arrayBuffer();
-        if (!bytes.byteLength || bytes.byteLength > 1_500_000) continue;
+        if (!bytes.byteLength || bytes.byteLength > 1_000_000) continue;
         let binary = "";
         const view = new Uint8Array(bytes);
         for (let offset = 0; offset < view.length; offset += 0x8000) binary += String.fromCharCode(...view.subarray(offset, offset + 0x8000));
