@@ -5217,6 +5217,7 @@ export class MongoDBConnection {
       if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.videoBase64)) return { status: 400, body: { error: "Invalid video encoding." } };
       const binary = Uint8Array.from(atob(payload.videoBase64), char => char.charCodeAt(0));
       if (binary.byteLength > 3_145_728) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.videoBase64)) return { status: 400, body: { error: "Invalid video encoding." } };
       let automatedAssessment = { engine: "@vladmandic/face-api", status: "unavailable" };
       if (this.env.FACE_VERIFICATION && typeof this.env.FACE_VERIFICATION.fetch === "function") {
         try {
