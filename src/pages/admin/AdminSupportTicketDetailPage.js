@@ -314,7 +314,7 @@ const AdminSupportTicketDetailPage = () => {
           <label htmlFor="admin-ticket-message" className="sr-only">Message</label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">Insert a {isInternalNote ? 'staff note' : 'reply'} template</span>
-            <select value="" onChange={event => { const templates = isInternalNote ? internalNoteTemplates : customerReplyTemplates; const selected = templates.find(template => template.label === event.target.value); if (selected) setNewMessage(current => current.trim() ? current + '\\n\\n' + selected.value : selected.value); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+            <select value="" onChange={event => { const templates = isInternalNote ? internalNoteTemplates : customerReplyTemplates; const selected = templates.find(template => template.label === event.target.value); if (selected) setNewMessage(current => current.trim() ? current + '\n\n' + selected.value : selected.value); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
               <option value="">Choose a template…</option>
               {(isInternalNote ? internalNoteTemplates : customerReplyTemplates).map(template => <option key={template.label} value={template.label}>{template.label}</option>)}
             </select>
