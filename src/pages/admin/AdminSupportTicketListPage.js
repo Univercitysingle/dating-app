@@ -104,7 +104,7 @@ const AdminSupportTicketListPage = () => {
       </header>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_140px_120px_130px_130px_130px_auto_auto]">
+        <form onSubmit={handleSearch} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(260px,1.5fr)_repeat(5,minmax(135px,1fr))_auto_auto]">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search tickets</span>
             <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Ticket number, subject or customer" maxLength={100} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
@@ -159,7 +159,35 @@ const AdminSupportTicketListPage = () => {
           <div><h3 className="font-bold text-slate-900">Support requests</h3><p className="mt-1 text-xs text-slate-500">Sorted by most recently updated</p></div>
           <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">Page {page} of {totalPages}</span>
         </div>
-        <div className="overflow-x-auto">
+        <div className="grid grid-cols-1 gap-3 p-3 md:hidden">
+          {isLoading ? (
+            <div className="rounded-xl border border-slate-100 p-8 text-center text-sm text-slate-500">Loading support inbox…</div>
+          ) : error ? (
+            <div className="rounded-xl border border-slate-100 p-6 text-center text-sm text-slate-500">The queue could not be loaded. Use the retry action above.</div>
+          ) : tickets.length === 0 ? (
+            <div className="rounded-xl border border-slate-100 p-8 text-center"><p className="font-semibold text-slate-800">No matching tickets</p><p className="mt-1 text-sm text-slate-500">Try another search or clear the filters.</p></div>
+          ) : tickets.map((ticket) => (
+            <article key={ticket._id} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-500">{ticket.ticketNumber || 'Ticket'}</span>
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusStyle(ticket.status)}`}>{ticket.status || 'Unknown'}</span>
+              </div>
+              <h4 className="mt-3 break-words text-sm font-semibold text-slate-900">{ticket.subject || 'No subject'}</h4>
+              <p className="mt-1 truncate text-sm text-slate-600">{ticket.userId?.name || 'Unknown user'}</p>
+              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs">
+                <div><span className="block text-slate-400">Priority</span><span className="mt-0.5 inline-block font-semibold text-slate-700">{ticket.priority || 'Normal'}</span></div>
+                <div><span className="block text-slate-400">Category</span><span className="mt-0.5 inline-block font-medium text-slate-700">{ticket.category || 'Other'}</span></div>
+                <div className="min-w-0"><span className="block text-slate-400">Assigned to</span><span className="mt-0.5 block truncate font-medium text-slate-700">{ticket.assignedToUid ? (ticket.assignedToName || 'Administrator') : 'Unassigned'}</span></div>
+                <div><span className="block text-slate-400">SLA</span><span className={`mt-0.5 block font-semibold ${slaState(ticket) === 'Overdue' ? 'text-rose-700' : 'text-slate-600'}`}>{slaState(ticket)}</span></div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span className="min-w-0 truncate text-xs text-slate-400">Updated {formatDate(ticket.updatedAt)}</span>
+                <Link to={`/admin/support-tickets/${ticket._id}`} className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">Open ticket</Link>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full">
             <thead><tr><th>Ticket</th><th>Customer</th><th>Subject</th><th>Status</th><th>Priority</th><th>Category</th><th>Assignment</th><th>SLA</th><th>Last updated</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
@@ -168,7 +196,7 @@ const AdminSupportTicketListPage = () => {
               ) : error ? (
                 <tr><td colSpan="10" className="py-10 text-center text-sm text-slate-500">The queue could not be loaded. Use the retry action above.</td></tr>
               ) : tickets.length === 0 ? (
-                <tr><td colSpan="6" className="px-5 py-14 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-xl text-emerald-600">✓</div><p className="mt-3 font-semibold text-slate-800">No matching tickets</p><p className="mt-1 text-sm text-slate-500">Try another search or clear the filters.</p></td></tr>
+                <tr><td colSpan="10" className="px-5 py-14 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-xl text-emerald-600">✓</div><p className="mt-3 font-semibold text-slate-800">No matching tickets</p><p className="mt-1 text-sm text-slate-500">Try another search or clear the filters.</p></td></tr>
               ) : tickets.map((ticket) => (
                 <tr key={ticket._id}>
                   <td><span className="font-semibold text-slate-800">{ticket.ticketNumber || 'Ticket'}</span></td>
