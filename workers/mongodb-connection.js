@@ -5211,7 +5211,8 @@ export class MongoDBConnection {
       let automatedAssessment = { engine: "@vladmandic/face-api", status: "unavailable" };
       if (this.env.FACE_VERIFICATION && typeof this.env.FACE_VERIFICATION.fetch === "function") {
         try {
-          const cdnOrigin = new URL(String(this.env.CDN_HOSTNAME || "")).origin;
+          const configuredCdn = String(this.env.CDN_HOSTNAME || "").trim();
+          const cdnOrigin = new URL(/^https?:\\/\\//i.test(configuredCdn) ? configuredCdn : "https://" + configuredCdn).origin;
           const profilePhotoUrls = user.photos.map(photo => typeof photo === "string" ? photo : photo?.url)
             .filter(value => typeof value === "string")
             .filter(value => {
