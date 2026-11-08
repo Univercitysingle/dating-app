@@ -5208,6 +5208,48 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found." } };
       if (!Array.isArray(user.photos) || user.photos.length === 0) return { status: 400, body: { error: "Add at least one profile photo before requesting verification." } };
       if (user.isVerified === true) return { status: 409, body: { error: "Your profile is already verified." } };
+      let automatedAssessment = { engine: "@vladmandic/face-api", status: "unavailable" };
+      if (this.env.FACE_VERIFICATION && typeof this.env.FACE_VERIFICATION.fetch === "function") {
+        try {
+          const cdnOrigin = new URL(String(this.env.CDN_HOSTNAME || "")).origin;
+          const profilePhotoUrls = user.photos.map(photo => typeof photo === "string" ? photo : photo?.url)
+            .filter(value => typeof value === "string")
+            .filter(value => {
+              try {
+                const parsed = new URL(value);
+                return parsed.protocol === "https:" && parsed.origin === cdnOrigin;
+              } catch { return false; }
+            }).slice(0, 6);
+          if (profilePhotoUrls.length) {
+            const assessmentResponse = await this.env.FACE_VERIFICATION.fetch("https://face-verification.internal/internal/assess", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                videoBase64: payload.videoBase64,
+                mimeType: payload.mimeType,
+                challenge: payload.challenge,
+                profilePhotoUrls
+              }),
+              signal: AbortSignal.timeout(25000)
+            });
+            if (assessmentResponse.ok) {
+              const result = await assessmentResponse.json();
+              automatedAssessment = {
+                engine: "@vladmandic/face-api",
+                status: "assessed",
+                framesAnalyzed: Number(result.framesAnalyzed) || 0,
+                framesWithFace: Number(result.framesWithFace) || 0,
+                profilePhotosCompared: Number(result.profilePhotosCompared) || 0,
+                bestDistance: Number.isFinite(result.bestDistance) ? result.bestDistance : null,
+                challengeAssessment: "not_verified",
+                assessedAt: new Date()
+              };
+            }
+          }
+        } catch {
+          // Inference is advisory. A cold start or service outage must never block manual verification.
+        }
+      }
       const verifications = db.collection("photoVerifications");
       if (typeof verifications.createIndex === "function") {
         await verifications.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: "photo_verification_ttl" });
@@ -5225,6 +5267,7 @@ export class MongoDBConnection {
       const now = new Date();
       const document = {
         uid, status: "pending_review", challenge: payload.challenge, mimeType: payload.mimeType,
+        automatedAssessment,
         encryptedVideo: base64(ciphertext), iv: base64(iv), encryption: "AES-256-GCM",
         consentedAt: now, createdAt: now, expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
       };
@@ -5277,7 +5320,7 @@ export class MongoDBConnection {
       const byUid = new Map(users.map(user => [user.uid, user]));
       return { status: 200, body: records.map(item => ({
         id: String(item._id), uid: item.uid, challenge: item.challenge, mimeType: item.mimeType,
-        createdAt: item.createdAt, user: byUid.get(item.uid) || null
+        createdAt: item.createdAt, automatedAssessment: item.automatedAssessment || null, user: byUid.get(item.uid) || null
       })) };
     } catch {
       return { status: 503, body: { error: "Verification queue is unavailable." } };
