@@ -189,7 +189,7 @@ const AdminSupportTicketDetailPage = () => {
   if (!ticket) return <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Ticket not found.</div>;
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-4 sm:space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/admin/support-tickets" className="text-sm font-semibold text-indigo-700 hover:text-indigo-900">← Back to support inbox</Link>
         <button type="button" onClick={fetchTicketDetails} disabled={isLoading} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-white">Refresh ticket</button>
@@ -198,11 +198,11 @@ const AdminSupportTicketDetailPage = () => {
       {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
       {actionMessage && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{actionMessage}</div>}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 xl:p-7">
+        <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[.16em] text-indigo-600">Support request</p>
-            <h1 className="mt-2 break-words text-2xl font-bold tracking-tight text-slate-900">{ticket.subject || 'No subject'}</h1>
+            <h1 className="mt-2 break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{ticket.subject || 'No subject'}</h1>
             <p className="mt-2 text-sm text-slate-500">Ticket #{ticket.ticketNumber || ticket._id}</p>
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
               <span className="text-slate-600"><strong className="text-slate-800">Customer:</strong> {ticket.userId?.name || 'Unknown user'}</span>
@@ -211,7 +211,7 @@ const AdminSupportTicketDetailPage = () => {
               <span className="text-slate-500">Updated {formatDate(ticket.updatedAt)}</span>
             </div>
           </div>
-          <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 lg:w-auto lg:min-w-[280px]">
+          <div className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4 xl:w-[320px] xl:shrink-0">
             <div className="space-y-3">
               <label className="block"><span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Status</span>
                 <select id="ticket-status" value={newStatus} onChange={event => setNewStatus(event.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{statuses.map(status => <option key={status} value={status}>{status}</option>)}</select>
@@ -252,11 +252,11 @@ const AdminSupportTicketDetailPage = () => {
       </section>}
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+        <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
           <h2 className="font-bold text-slate-900">Ticket audit history</h2>
           <p className="mt-1 text-xs text-slate-500">Administrative changes, newest first.</p>
         </div>
-        <div className="divide-y divide-slate-100 px-5">
+        <div className="divide-y divide-slate-100 px-4 sm:px-5">
           {history.length === 0 ? <p className="py-4 text-sm text-slate-500">No administrative changes recorded yet.</p> : history.map((entry, index) => (
             <div key={entry._id || index} className="py-3">
               <p className="text-xs text-slate-500">{formatDate(entry.createdAt)} · {entry.actorType === 'admin' ? 'Staff action' : 'Customer action'}</p>
@@ -275,10 +275,10 @@ const AdminSupportTicketDetailPage = () => {
           <h2 className="font-bold text-slate-900">Conversation history</h2>
           <p className="mt-1 text-xs text-slate-500">Customer replies and staff-only notes are shown in chronological order.</p>
         </div>
-        <div className="space-y-4 bg-slate-50/70 p-4 sm:p-6">
+        <div className="space-y-3 bg-slate-50/70 p-3 sm:space-y-4 sm:p-6">
           {messages.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">No messages yet.</p> : messages.map((msg) => (
             <div key={msg._id} className={`flex ${msg.isFromAdmin ? 'justify-start' : 'justify-end'}`}>
-              <article className={`w-full max-w-2xl rounded-2xl border p-4 shadow-sm ${msg.isInternalNote ? 'border-amber-300 bg-amber-50' : msg.isFromAdmin ? 'border-slate-200 bg-white' : 'border-indigo-200 bg-indigo-50'}`}>
+              <article className={`w-full min-w-0 max-w-2xl rounded-2xl border p-3 shadow-sm sm:p-4 ${msg.isInternalNote ? 'border-amber-300 bg-amber-50' : msg.isFromAdmin ? 'border-slate-200 bg-white' : 'border-indigo-200 bg-indigo-50'}`}>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-slate-800">{msg.isInternalNote ? 'Staff note' : msg.isFromAdmin ? 'Support team' : (msg.senderId?.name || 'Customer')}</span>
@@ -302,9 +302,9 @@ const AdminSupportTicketDetailPage = () => {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div><h2 className="font-bold text-slate-900">Respond to ticket</h2><p className="mt-1 text-sm text-slate-500">Send a customer reply or record a private staff note.</p></div>
-          <div className="inline-flex rounded-xl bg-slate-100 p-1">
+          <div className="grid w-full grid-cols-2 rounded-xl bg-slate-100 p-1 sm:inline-flex sm:w-auto sm:grid-cols-none">
             <button type="button" onClick={() => setIsInternalNote(false)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${!isInternalNote ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Customer reply</button>
             <button type="button" onClick={() => setIsInternalNote(true)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${isInternalNote ? 'bg-amber-100 text-amber-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Internal note</button>
           </div>
