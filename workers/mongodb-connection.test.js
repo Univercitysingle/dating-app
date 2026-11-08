@@ -3889,3 +3889,35 @@ test("customer ticket detail never returns private admin notes", async () => {
   assert.equal(result.status, 200);
   assert.deepEqual(messageQuery, { ticketId: ticket._id, isInternalNote: { $ne: true } });
 });
+
+
+test("admin support inbox filters assigned and unassigned tickets safely", async () => {
+  let capturedQuery;
+  const tickets = {
+    find(query) {
+      capturedQuery = query;
+      return { sort() { return this; }, skip() { return this; }, limit() { return this; }, toArray: async () => [] };
+    },
+    countDocuments: async () => 0
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "supporttickets") return tickets;
+    assert.fail("Unexpected collection: " + name);
+  } });
+
+  const assigned = await connection.getAdminSupportTickets("admin-uid", { assignment: "assigned" });
+  assert.equal(assigned.status, 200);
+  assert.deepEqual(capturedQuery.assignedToUid, { $exists: true, $nin: ["", null] });
+
+  const unassigned = await connection.getAdminSupportTickets("admin-uid", { assignment: "unassigned" });
+  assert.equal(unassigned.status, 200);
+  assert.ok(capturedQuery.$and[0].$or.some(clause => clause.assignedToUid?.$exists === false));
+  assert.ok(capturedQuery.$and[0].$or.some(clause => clause.assignedToUid === null));
+  assert.ok(capturedQuery.$and[0].$or.some(clause => clause.assignedToUid === ""));
+
+  const invalid = await connection.getAdminSupportTickets("admin-uid", { assignment: "someone-else" });
+  assert.equal(invalid.status, 400);
+});
