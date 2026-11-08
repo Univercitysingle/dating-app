@@ -1,0 +1,16 @@
+{
+  "name": "dating-app-face-verification",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs-node": "4.22.0",
+    "@vladmandic/face-api": "1.7.15",
+    "canvas": "2.11.2"
+  },
+  "engines": {
+    "node": ">=22 <23"
+  }
+}
