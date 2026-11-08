@@ -6,7 +6,6 @@ on:
       - migrate-to-serverless
     paths:
       - "workers/**"
-      - "services/face-verification/**"
       - "package.json"
       - "package-lock.json"
       - "wrangler.jsonc"
@@ -99,15 +98,6 @@ jobs:
       - name: Run Worker tests
         working-directory: workers
         run: npm test
-
-      - name: Build and deploy private face verification Worker and Container
-        working-directory: services/face-verification
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --ignore-scripts --no-audit --no-fund
-          npm audit --audit-level=high
-          npx --yes wrangler@4 deploy --config wrangler.jsonc --var "ALLOWED_PHOTO_ORIGIN:$CDN_HOSTNAME"
 
       - name: Deploy isolated staging Worker
         id: deploy
