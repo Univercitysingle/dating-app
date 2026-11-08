@@ -3921,3 +3921,100 @@ test("admin support inbox filters assigned and unassigned tickets safely", async
   const invalid = await connection.getAdminSupportTickets("admin-uid", { assignment: "someone-else" });
   assert.equal(invalid.status, 400);
 });
+
+
+test("photo verification stores only bounded, untrusted browser face assessment metadata", async () => {
+  const inserted = [];
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        findOne: async () => ({ uid: "verification-user", isVerified: false, photos: ["https://cdn.example.test/photo.jpg"] })
+      };
+      if (name === "photoVerifications") return {
+        createIndex: async () => {},
+        findOne: async () => null,
+        insertOne: async document => { inserted.push(document); return { insertedId: "verification-id" }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = { VERIFICATION_ENCRYPTION_KEY: "a".repeat(64) };
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.submitPhotoVerification("verification-user", {
+    consent: true,
+    videoBase64: Buffer.alloc(1024, 1).toString("base64"),
+    mimeType: "video/webm",
+    challenge: "turn_left",
+    clientAssessment: {
+      status: "assessed",
+      framesAnalyzed: 4,
+      framesWithFace: 99,
+      profilePhotosCompared: 20,
+      bestDistance: 0.42,
+      descriptor: Array(128).fill(0.1)
+    }
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(inserted.length, 1);
+  assert.equal(inserted[0].status, "pending_review");
+  assert.deepEqual(inserted[0].automatedAssessment, {
+    engine: "@vladmandic/face-api",
+    engineVersion: "1.7.15",
+    source: "user_browser_untrusted",
+    status: "client_assessed",
+    framesAnalyzed: 4,
+    framesWithFace: 4,
+    profilePhotosCompared: 6,
+    bestDistance: 0.42,
+    challengeAssessment: "not_verified",
+    livenessAssessment: "not_verified",
+    assessedAt: inserted[0].automatedAssessment.assessedAt
+  });
+  assert.ok(inserted[0].automatedAssessment.assessedAt instanceof Date);
+  assert.equal("descriptor" in inserted[0].automatedAssessment, false);
+  assert.equal("clientAssessment" in inserted[0], false);
+});
+
+test("photo verification treats missing browser assessment as unavailable and never interprets null distance as zero", async () => {
+  const inserted = [];
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        findOne: async () => ({ uid: "verification-user", isVerified: false, photos: ["https://cdn.example.test/photo.jpg"] })
+      };
+      if (name === "photoVerifications") return {
+        createIndex: async () => {},
+        findOne: async () => null,
+        insertOne: async document => { inserted.push(document); return { insertedId: "verification-id" }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = { VERIFICATION_ENCRYPTION_KEY: "b".repeat(64) };
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.submitPhotoVerification("verification-user", {
+    consent: true,
+    videoBase64: Buffer.alloc(1024, 2).toString("base64"),
+    mimeType: "video/webm",
+    challenge: "smile",
+    clientAssessment: {
+      status: "assessed",
+      framesAnalyzed: 5,
+      framesWithFace: 2,
+      profilePhotosCompared: 1,
+      bestDistance: null
+    }
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(inserted[0].automatedAssessment.status, "unavailable");
+  assert.equal(inserted[0].automatedAssessment.bestDistance, null);
+  assert.equal(inserted[0].status, "pending_review");
+});
