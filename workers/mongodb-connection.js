@@ -4016,13 +4016,27 @@ export class MongoDBConnection {
       if (!allowedCategories.includes(params.category)) return { status: 400, body: { message: "Invalid ticket category" } };
       query.category = params.category;
     }
+    if (typeof params.assignment === "string" && params.assignment) {
+      if (!["assigned", "unassigned"].includes(params.assignment)) {
+        return { status: 400, body: { message: "Invalid assignment filter" } };
+      }
+      if (params.assignment === "assigned") {
+        query.assignedToUid = { $exists: true, $nin: ["", null] };
+      } else {
+        query.$and = [...(query.$and || []), { $or: [
+          { assignedToUid: { $exists: false } },
+          { assignedToUid: null },
+          { assignedToUid: "" }
+        ] }];
+      }
+    }
     if (typeof params.sla === "string" && params.sla) {
       if (!["overdue", "due-soon"].includes(params.sla)) return { status: 400, body: { message: "Invalid SLA filter" } };
       const now = new Date();
       const slaClause = params.sla === "overdue"
         ? { slaDueAt: { $lt: now } }
         : { slaDueAt: { $gte: now, $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000) } };
-      query.$and = [slaClause, { status: { $ne: "Closed" } }];
+      query.$and = [...(query.$and || []), slaClause, { status: { $ne: "Closed" } }];
     }
     const search = typeof params.search === "string" ? params.search.trim().slice(0, 100) : "";
     try {
