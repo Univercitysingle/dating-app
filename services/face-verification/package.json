@@ -6,10 +6,10 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "@tensorflow/tfjs-node": "4.22.0",
+    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
     "@vladmandic/face-api": "1.7.15",
-    "canvas": "2.11.2",
-    "@cloudflare/containers": "0.3.7"
+    "@napi-rs/canvas": "1.0.9"
   },
   "engines": {
     "node": ">=22 <23"
