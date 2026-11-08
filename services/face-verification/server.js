@@ -4,9 +4,10 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import "@tensorflow/tfjs-node";
-import * as canvas from "canvas";
-import faceapi from "@vladmandic/face-api";
+import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-backend-cpu";
+import * as canvas from "@napi-rs/canvas";
+import * as faceapi from "@vladmandic/face-api/dist/face-api.esm-nobundle.js";
 
 const { Canvas, Image, ImageData, loadImage } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
@@ -14,6 +15,8 @@ const MODEL_PATH = process.env.FACE_MODEL_PATH || path.join(process.cwd(), "node
 let modelsReady;
 async function loadModels() {
   if (!modelsReady) modelsReady = (async () => {
+    await tf.setBackend("cpu");
+    await tf.ready();
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODEL_PATH);
     await faceapi.nets.faceLandmark68Net.loadFromDisk(MODEL_PATH);
     await faceapi.nets.faceRecognitionNet.loadFromDisk(MODEL_PATH);
