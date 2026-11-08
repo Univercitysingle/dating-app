@@ -32,3 +32,13 @@ The API fails closed and does not accept evidence unless the secret is exactly 6
 - Review only when the user has consented. Reject unclear or inconclusive evidence and allow a retry.
 - The current seven-day TTL requires MongoDB TTL monitor execution, which is asynchronous and may occur after the exact expiry time.
 - This is a low-cost manual review workflow, not a substitute for a specialist anti-spoofing provider or legal review of biometric-data processing in each operating jurisdiction.
+
+## Automated face assessment (staging)
+
+A separate private Cloudflare Worker named `dating-app-face-verification-staging` fronts a Cloudflare Container running Node.js, TensorFlow.js and the pinned `@vladmandic/face-api@1.7.15` package. The API Worker invokes it through a Cloudflare Service Binding. The face service is not exposed on a public Workers URL.
+
+The service samples up to seven frames from the consented video, detects faces, creates face descriptors, and compares them with up to six profile photos fetched only from the configured HTTPS CDN origin. It stores only aggregate assessment metadata with the existing encrypted evidence record. Temporary video and image files are removed after processing.
+
+The face-distance value is advisory and is not calibrated as an approval threshold. Challenge completion and liveness are not automatically verified. Every submission remains `pending_review` and only a superadmin can approve or reject it. If the inference service is unavailable, submission falls back to the existing manual review flow.
+
+Cloudflare Containers require a Workers Paid plan. The GitHub Actions staging deployment builds the container image and deploys the private face service before deploying the API Worker.
