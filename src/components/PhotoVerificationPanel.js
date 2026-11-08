@@ -93,20 +93,16 @@ async function assessInBrowser(videoBlob, photos) {
     canvas.width = 640;
     canvas.height = 480;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    const fractions = [0.12, 0.32, 0.52, 0.72, 0.9].filter(fraction => video.duration > 0 && fraction < 1);
     let framesWithFace = 0;
     let bestDistance = null;
     let framesAnalyzed = 0;
-
-    for (const fraction of fractions) {
-      await new Promise((resolve, reject) => {
-        video.addEventListener('seeked', resolve, { once: true });
-        video.addEventListener('error', () => reject(new Error('Could not sample the recorded video.')), { once: true });
-        video.currentTime = fraction * video.duration;
-      });
+    await video.play();
+    for (let sample = 0; sample < 5; sample += 1) {
+      await new Promise(resolve => window.setTimeout(resolve, 850));
+      if (video.readyState < 2 || video.ended) break;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       framesAnalyzed += 1;
-      const result = await faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
+      const result = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
         .withFaceLandmarks(true).withFaceDescriptor();
       if (!result?.descriptor) continue;
       framesWithFace += 1;
