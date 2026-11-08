@@ -5,6 +5,20 @@ import apiClient from '../../api/apiClient';
 const statuses = ['Open', 'In Progress', 'Waiting for Customer', 'Closed'];
 const priorities = ['Urgent', 'High', 'Normal', 'Low'];
 const categories = ['Account', 'Payments', 'Profile', 'Verification', 'Safety', 'Technical', 'Other'];
+const customerReplyTemplates = [
+  { label: 'Acknowledgement', value: 'Thank you for contacting support. We have received your request and are reviewing it. We will update you as soon as we have more information.' },
+  { label: 'Need more information', value: 'To help us investigate this, please share any relevant details or screenshots. Please do not send your password, one-time codes, or full payment card details.' },
+  { label: 'Payment investigation', value: 'Thank you for reporting this payment issue. We are checking the transaction status with our payment records. Please allow us time to verify the result before attempting another payment.' },
+  { label: 'Verification assistance', value: 'We can help with your verification request. Please review the instructions in your account and provide any requested information through the secure verification process. Do not send sensitive identity documents in this chat unless the app specifically requests them.' },
+  { label: 'Technical troubleshooting', value: 'Please try signing out and signing back in, then repeat the action. If the issue continues, let us know your device, browser or app version, and the approximate time it occurred.' },
+  { label: 'Resolved', value: 'We have completed our review and addressed the reported issue. Please check your account and let us know if you continue to experience any problems.' }
+];
+const internalNoteTemplates = [
+  { label: 'Investigation started', value: 'Investigation started. Reviewing the reported issue and relevant account activity.' },
+  { label: 'Payment reconciliation', value: 'Payment reconciliation required. Verify the gateway transaction reference and confirmed payment status before changing any entitlement.' },
+  { label: 'Awaiting customer', value: 'Further information is required from the customer before the investigation can proceed.' },
+  { label: 'Escalation', value: 'Escalated for specialist review. Record the team or administrator taking ownership and the next follow-up action.' }
+];
 const formatDate = (value) => {
   const date = value ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Date unavailable';
@@ -298,6 +312,14 @@ const AdminSupportTicketDetailPage = () => {
         {isInternalNote && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"><strong>Private note:</strong> The customer cannot see this message or its attachments.</div>}
         <form onSubmit={handleSendMessage} className="space-y-3">
           <label htmlFor="admin-ticket-message" className="sr-only">Message</label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-slate-600">Insert a {isInternalNote ? 'staff note' : 'reply'} template</span>
+            <select value="" onChange={event => { const templates = isInternalNote ? internalNoteTemplates : customerReplyTemplates; const selected = templates.find(template => template.label === event.target.value); if (selected) setNewMessage(current => current.trim() ? current + '\\n\\n' + selected.value : selected.value); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <option value="">Choose a template…</option>
+              {(isInternalNote ? internalNoteTemplates : customerReplyTemplates).map(template => <option key={template.label} value={template.label}>{template.label}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">Templates are inserted into the editor only. Review and edit the text before sending.</span>
+          </label>
           <textarea id="admin-ticket-message" rows="5" maxLength={4000} value={newMessage} onChange={event => setNewMessage(event.target.value)} placeholder={isInternalNote ? 'Write a private note for other support staff…' : 'Write a clear reply to the customer…'} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm leading-6 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
