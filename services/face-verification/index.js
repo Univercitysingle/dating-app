@@ -32,7 +32,7 @@ export default {
 
     const allowedOrigin = String(env.ALLOWED_PHOTO_ORIGIN || "");
     let expectedOrigin;
-    try { expectedOrigin = new URL(allowedOrigin).origin; } catch { return json({ error: "Photo origin is not configured." }, 503); }
+    try { expectedOrigin = new URL(/^https?:\\/\\//i.test(allowedOrigin) ? allowedOrigin : "https://" + allowedOrigin).origin; } catch { return json({ error: "Photo origin is not configured." }, 503); }
     const profilePhotos = [];
     for (const rawUrl of payload.profilePhotoUrls) {
       try {
