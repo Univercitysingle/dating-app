@@ -4389,3 +4389,36 @@ input, select, textarea { min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+
+/* Compact video-call controls for short landscape viewports. */
+@media (max-height: 520px) and (max-width: 900px) and (orientation: landscape) {
+  .call-video-self-view {
+    width: clamp(4.5rem, 14vw, 6.25rem) !important;
+    height: clamp(5.25rem, 30vh, 7rem) !important;
+    top: calc(env(safe-area-inset-top) + 3.75rem) !important;
+    right: max(0.5rem, env(safe-area-inset-right)) !important;
+    border-radius: 0.85rem !important;
+  }
+  .call-video-controls {
+    width: auto !important;
+    max-width: min(92vw, 21rem) !important;
+    gap: 0.65rem !important;
+    padding: 0.45rem 0.7rem !important;
+    border-radius: 1.4rem !important;
+  }
+  .call-video-control-button {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+  }
+  .call-video-end-button { width: 3.5rem !important; }
+  .call-video-control-button svg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+  .call-video-control-button span {
+    margin-top: 0.1rem !important;
+    font-size: 0.55rem !important;
+    line-height: 0.7rem !important;
+  }
+}
