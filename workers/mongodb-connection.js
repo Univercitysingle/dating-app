@@ -5208,6 +5208,15 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found." } };
       if (!Array.isArray(user.photos) || user.photos.length === 0) return { status: 400, body: { error: "Add at least one profile photo before requesting verification." } };
       if (user.isVerified === true) return { status: 409, body: { error: "Your profile is already verified." } };
+      const verifications = db.collection("photoVerifications");
+      if (typeof verifications.createIndex === "function") {
+        await verifications.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: "photo_verification_ttl" });
+      }
+      const pending = await verifications.findOne({ uid, status: "pending_review" }, { projection: { _id: 1 } });
+      if (pending) return { status: 409, body: { error: "You already have a verification waiting for review." } };
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.videoBase64)) return { status: 400, body: { error: "Invalid video encoding." } };
+      const binary = Uint8Array.from(atob(payload.videoBase64), char => char.charCodeAt(0));
+      if (binary.byteLength > 3_145_728) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
       let automatedAssessment = { engine: "@vladmandic/face-api", status: "unavailable" };
       if (this.env.FACE_VERIFICATION && typeof this.env.FACE_VERIFICATION.fetch === "function") {
         try {
@@ -5251,15 +5260,6 @@ export class MongoDBConnection {
           // Inference is advisory. A cold start or service outage must never block manual verification.
         }
       }
-      const verifications = db.collection("photoVerifications");
-      if (typeof verifications.createIndex === "function") {
-        await verifications.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0, name: "photo_verification_ttl" });
-      }
-      const pending = await verifications.findOne({ uid, status: "pending_review" }, { projection: { _id: 1 } });
-      if (pending) return { status: 409, body: { error: "You already have a verification waiting for review." } };
-      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.videoBase64)) return { status: 400, body: { error: "Invalid video encoding." } };
-      const binary = Uint8Array.from(atob(payload.videoBase64), char => char.charCodeAt(0));
-      if (binary.byteLength > 3_145_728) return { status: 413, body: { error: "Verification video must be 3 MB or smaller." } };
       const keyBytes = Uint8Array.from(secret.match(/.{2}/g), pair => parseInt(pair, 16));
       const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
       const iv = crypto.getRandomValues(new Uint8Array(12));
