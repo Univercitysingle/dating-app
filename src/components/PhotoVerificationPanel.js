@@ -137,7 +137,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
     <section className="profile-settings-group" aria-labelledby="photo-verification-title">
       <h3 id="photo-verification-title">Photo verification</h3>
       <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-3">
-        Record a short live selfie video. A superadmin will compare it with your profile photos.
+        Record a short live selfie video. The verification service will compare sampled video frames with your profile photos. A superadmin makes the final decision.
         The video is encrypted and removed after review or after seven days.
       </p>
       {status.status === 'loading' ? <p>Loading verification status…</p> : null}
@@ -157,7 +157,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
       ) : null}
       {!isVerified && status.status !== 'verified' && status.status !== 'approved' && status.status !== 'pending_review' && (
         <>
-          <p className="text-sm mb-3">For privacy, camera access starts only when you press the button. We do not use automated face recognition or claim automated liveness detection.</p>
+          <p className="text-sm mb-3">Camera access starts only when you press the button. With your consent, sampled frames are processed by our face-matching service and compared with your profile photos. Automated matching is advisory only. A superadmin makes the final decision, and we do not claim certified liveness detection.</p>
           <video ref={videoRef} src={previewUrl || undefined} controls playsInline muted className="w-full max-w-sm rounded-xl bg-black aspect-video" />
           {challenge && <p className="my-3 font-medium">Your random challenge: {challenge.label}</p>}
           <div className="flex flex-wrap gap-3 my-3">
@@ -169,7 +169,7 @@ const PhotoVerificationPanel = ({ isVerified = false }) => {
           {videoBlob && <p className="text-sm text-green-700 dark:text-green-400">Recording ready ({Math.ceil(videoBlob.size / 1024)} KB). Review it before submitting.</p>}
           <label className="flex items-start gap-2 text-sm my-3">
             <input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} className="mt-1" />
-            <span>I consent to this selfie video being processed for photo verification, viewed by authorized superadmins, and retained for up to seven days if not reviewed sooner.</span>
+            <span>I explicitly consent to biometric face matching of this selfie video against my profile photos for photo verification, and to authorized superadmins reviewing the video. The encrypted video is retained for up to seven days if not reviewed sooner. Automated matching does not make the final decision.</span>
           </label>
           <button type="button" onClick={submit} disabled={!videoBlob || !consent || busy} className="rounded-full bg-green-600 px-5 py-2 text-white disabled:opacity-50">
             {busy ? 'Submitting…' : 'Submit for review'}
