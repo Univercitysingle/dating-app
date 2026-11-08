@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import "@tensorflow/tfjs-node";
 import * as canvas from "canvas";
 import * as faceapi from "@vladmandic/face-api";
 
