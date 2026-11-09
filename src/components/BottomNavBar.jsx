@@ -12,6 +12,7 @@ const BottomNavBar = () => {
   return (
     <nav
       className="app-bottom-nav fixed bottom-0 left-0 right-0 z-50"
+      aria-label="Primary navigation"
     >
       <div className="mx-auto flex w-full max-w-xl justify-around">
         <NavLink
