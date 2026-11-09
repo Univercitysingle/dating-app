@@ -134,80 +134,88 @@ function Profile() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let cancelled = false;
 
     const fetchProfile = async () => {
-        try {
-            const data = await apiClient.get(`/users/${userId}`);
-            setProfile(data);
-        } catch (error) {
-            setFetchError(getUserFriendlyError(error, 'We could not load this profile. Please try again.'));
+      try {
+        const data = await apiClient.get(`/users/${userId}`);
+        if (!cancelled) setProfile(data);
+      } catch (error) {
+        if (!cancelled) {
+          setFetchError(getUserFriendlyError(error, 'We could not load this profile. Please try again.'));
         }
+      }
     };
 
     const fetchOwnProfile = async () => {
-        try {
-            const data = await apiClient.get('/users/me');
-            setProfile(data);
-            const savedMobile = typeof data.mobileNumber === 'string' ? data.mobileNumber : '';
-            const matchingCallingCode = countryCallingCodes.map(item => item.code).sort((a, b) => b.length - a.length).find(code => savedMobile.startsWith(code));
-            setMobileCountryCode(matchingCallingCode || '+971');
-            setMobileNationalNumber(matchingCallingCode ? savedMobile.slice(matchingCallingCode.length).replace(/\D/g, '') : savedMobile.replace(/\D/g, ''));
-            setEditableFields({
-                education: data.education || '',
-                relationshipGoals: data.relationshipGoals || 'Figuring it out',
-                bio: data.bio || '',
-                personalityType: data.personalityType || '',
-                interests: data.interests || [],
-                profilePrompts: data.profilePrompts || [],
-                lifestyle: data.lifestyle || {},
-                badges: data.badges || {},
-                sexualOrientation: data.sexualOrientation || '',
-                mobileNumber: data.mobileNumber || '',
-                familyStatus: data.familyStatus || '',
-                siblings: data.siblings || '',
-            });
-        } catch (error) {
-            setFetchError(getUserFriendlyError(error, 'We could not load your profile. Please try again.'));
+      try {
+        const data = await apiClient.get('/users/me');
+        if (cancelled) return;
+        setProfile(data);
+        const savedMobile = typeof data.mobileNumber === 'string' ? data.mobileNumber : '';
+        const matchingCallingCode = countryCallingCodes.map(item => item.code).sort((a, b) => b.length - a.length).find(code => savedMobile.startsWith(code));
+        setMobileCountryCode(matchingCallingCode || '+971');
+        setMobileNationalNumber(matchingCallingCode ? savedMobile.slice(matchingCallingCode.length).replace(/\D/g, '') : savedMobile.replace(/\D/g, ''));
+        setEditableFields({
+          education: data.education || '',
+          relationshipGoals: data.relationshipGoals || 'Figuring it out',
+          bio: data.bio || '',
+          personalityType: data.personalityType || '',
+          interests: data.interests || [],
+          profilePrompts: data.profilePrompts || [],
+          lifestyle: data.lifestyle || {},
+          badges: data.badges || {},
+          sexualOrientation: data.sexualOrientation || '',
+          mobileNumber: data.mobileNumber || '',
+          familyStatus: data.familyStatus || '',
+          siblings: data.siblings || '',
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setFetchError(getUserFriendlyError(error, 'We could not load your profile. Please try again.'));
         }
+      }
     };
 
     const fetchSubscriptionHistory = async () => {
-        try {
-            const subs = await apiClient.get('/users/me/subscriptions');
-            if (Array.isArray(subs)) {
-                setSubscriptions(subs);
-            } else {
-                setSubscriptions([]);
-            }
-        } catch (error) {
-            console.error('Failed to fetch subscription history:', error);
-            setSubscriptions([]); // Ensure it's an array on error too
+      try {
+        const subs = await apiClient.get('/users/me/subscriptions');
+        if (!cancelled) setSubscriptions(Array.isArray(subs) ? subs : []);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to fetch subscription history:', error);
+          setSubscriptions([]);
         }
+      }
     };
 
     if (userId) {
-        fetchProfile();
+      fetchProfile();
     } else if (currentUser) {
-        fetchOwnProfile();
-        fetchSubscriptionHistory();
-
+      fetchOwnProfile();
+      fetchSubscriptionHistory();
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [userId, currentUser?.uid]);
 
   useEffect(() => {
     const profileUid = userId || currentUser?.uid;
 
     if (socket && profileUid) {
-      socket.emit('subscribeToProfile', profileUid);
-      socket.on('profileUpdated', (updatedProfile) => {
-        if (updatedProfile.uid === profileUid) {
+      const handleProfileUpdated = (updatedProfile) => {
+        if (updatedProfile?.uid === profileUid) {
           setProfile(updatedProfile);
         }
-      });
+      };
+      socket.emit('subscribeToProfile', profileUid);
+      socket.on('profileUpdated', handleProfileUpdated);
 
       return () => {
         socket.emit('unsubscribeFromProfile', profileUid);
-        socket.off('profileUpdated');
+        socket.off('profileUpdated', handleProfileUpdated);
       };
     }
   }, [socket, userId, currentUser?.uid]);
