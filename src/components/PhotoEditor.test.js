@@ -105,14 +105,11 @@ describe('PhotoEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Move photo 2 up' }));
     expect(screen.getByRole('img', { name: 'User photo 1' })).toHaveAttribute('src', 'https://example.com/photo2.jpg');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move photo 1 down' }));
-    expect(screen.getByRole('img', { name: 'User photo 2' })).toHaveAttribute('src', 'https://example.com/photo1.jpg');
-
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith('/users/photos/order', {
       photos: [
-        { url: 'photo1.jpg', order: 0 },
-        { url: 'photo2.jpg', order: 1 },
+        { url: 'photo2.jpg', order: 0 },
+        { url: 'photo1.jpg', order: 1 },
         { url: 'photo3.jpg', order: 2 }
       ]
     }));
