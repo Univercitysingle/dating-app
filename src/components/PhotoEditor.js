@@ -4,7 +4,7 @@ import PhotoUploader from './PhotoUploader';
 import { getUserFriendlyError } from '../utils/apiErrors';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
-const PhotoEditor = ({ photos, onSave, onCancel }) => {
+const PhotoEditor = ({ photos, onSave, onCancel, onPhotosChange }) => {
   const [localPhotos, setLocalPhotos] = useState(Array.isArray(photos) ? photos : []);
   const [actionError, setActionError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -44,7 +44,9 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
       const responsePhotos = getPhotosFromResponse(response);
       // Some successful API responses contain only a status/message. In that
       // case, update the editor locally instead of assigning undefined state.
-      setLocalPhotos(responsePhotos || localPhotos.filter(photo => photo?.url !== photoUrl));
+      const nextPhotos = responsePhotos || localPhotos.filter(photo => photo?.url !== photoUrl);
+      setLocalPhotos(nextPhotos);
+      onPhotosChange?.(nextPhotos);
     } catch (err) {
       console.error('Failed to delete photo:', err);
       setActionError(getUserFriendlyError(err, 'Unable to delete this photo. Please try again.'));
@@ -82,7 +84,11 @@ const PhotoEditor = ({ photos, onSave, onCancel }) => {
     const cdnUrl = uploadResponse.cdnUrl || (key.startsWith('https://') || key.startsWith('http://') ? key : '');
     if (!cdnUrl) return;
     const newPhoto = { url: cdnUrl, order: localPhotos.length, size: uploadResponse.size || uploadResponse.photo?.size || 0 };
-    setLocalPhotos(currentPhotos => [...currentPhotos, newPhoto]);
+    setLocalPhotos(currentPhotos => {
+      const nextPhotos = [...currentPhotos, newPhoto];
+      onPhotosChange?.(nextPhotos);
+      return nextPhotos;
+    });
   };
 
   return (
