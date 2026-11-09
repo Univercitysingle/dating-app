@@ -1050,6 +1050,90 @@ nav.fixed.bottom-0.left-0.right-0 a svg {
   --app-radius: 12px;
 }
 
+/* User-selected dark appearance. Keep the palette token-based so custom CSS
+   surfaces follow the same theme as Tailwind's class-based dark variants. */
+html.dark {
+  color-scheme: dark;
+  --app-ink: #f2edf1;
+  --app-muted: #b8aeb7;
+  --app-surface: #211d24;
+  --app-canvas: #151219;
+  --app-border: #39313b;
+  --app-accent: #e58aa2;
+  --app-accent-strong: #f0a2b6;
+}
+
+html.dark body {
+  background: var(--app-canvas);
+  color: var(--app-ink);
+}
+
+html.dark .app-shell,
+html.dark .app-main,
+html.dark .profile-page,
+html.dark .inbox-page,
+html.dark .inbox-workspace {
+  background-color: var(--app-canvas);
+  color: var(--app-ink);
+}
+
+html.dark .profile-settings,
+html.dark .profile-settings-row,
+html.dark .state-panel,
+html.dark .conversation-list,
+html.dark .like-card,
+html.dark .store-card,
+html.dark .subscription-page .grid > div,
+html.dark .conversation-row {
+  background-color: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-ink);
+}
+
+html.dark .profile-settings-heading h2,
+html.dark .profile-settings-group > h3,
+html.dark .profile-settings-row-copy strong,
+html.dark .page-title,
+html.dark .inbox-page h1,
+html.dark .inbox-page h2,
+html.dark .inbox-page h3 {
+  color: var(--app-ink);
+}
+
+html.dark .profile-settings-row-copy span,
+html.dark .profile-settings-value,
+html.dark .profile-settings-chevron,
+html.dark .profile-settings-heading p:last-child {
+  color: var(--app-muted);
+}
+
+html.dark .conversation-row {
+  border-bottom-color: var(--app-border);
+}
+
+html.dark .conversation-row:hover {
+  background: #2b222b;
+}
+
+html.dark .chat-wallpaper {
+  background-color: #1b1720;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(214, 135, 165, .045) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 78% 68%, rgba(170, 139, 167, .05) 0 2px, transparent 2.5px),
+    linear-gradient(135deg, rgba(35, 27, 38, .72), rgba(25, 20, 29, .82));
+}
+
+html.dark .app-bottom-nav {
+  background: rgba(33, 29, 36, .97);
+  border-color: var(--app-border);
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  color-scheme: dark;
+}
+
 body {
   background: var(--app-canvas);
   color: var(--app-ink);
