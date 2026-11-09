@@ -1,35 +1,43 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 
 const ThemeContext = createContext();
 
 export const useTheme = () => useContext(ThemeContext);
 
-export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(() => {
-    const storedTheme = localStorage.getItem('theme');
-    if (storedTheme) {
-      return storedTheme;
-    }
-    // Default to light theme if nothing is stored and no system preference
+const readStoredTheme = () => {
+  try {
+    const storedTheme = window.localStorage.getItem('theme');
+    return storedTheme === 'dark' || storedTheme === 'light' ? storedTheme : 'light';
+  } catch (_) {
     return 'light';
-  });
+  }
+};
+
+export const ThemeProvider = ({ children }) => {
+  const [theme, setThemeState] = useState(readStoredTheme);
+
+  const setTheme = useCallback((nextTheme) => {
+    if (nextTheme !== 'light' && nextTheme !== 'dark') return;
+    setThemeState(nextTheme);
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+    root.classList.toggle('dark', theme === 'dark');
+    root.style.colorScheme = theme;
+    try {
+      window.localStorage.setItem('theme', theme);
+    } catch (_) {
+      // The in-memory preference still applies when storage is unavailable.
     }
-    localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
-  };
+  const toggleTheme = useCallback(() => {
+    setThemeState((current) => current === 'light' ? 'dark' : 'light');
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
