@@ -4037,6 +4037,7 @@ test("reciprocal likes create one match and repeated likes upsert notifications 
       if (name === "matches") return {
         async findOne(query) {
           if (!match) return null;
+          if (query._id) return query._id === match._id ? { ...match, likedBy: [...match.likedBy] } : null;
           const pairMatches = (query.$or || []).some(clause =>
             clause.user1Uid === match.user1Uid && clause.user2Uid === match.user2Uid
           );
