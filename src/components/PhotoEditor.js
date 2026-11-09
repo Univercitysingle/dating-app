@@ -84,11 +84,9 @@ const PhotoEditor = ({ photos, onSave, onCancel, onPhotosChange }) => {
     const cdnUrl = uploadResponse.cdnUrl || (key.startsWith('https://') || key.startsWith('http://') ? key : '');
     if (!cdnUrl) return;
     const newPhoto = { url: cdnUrl, order: localPhotos.length, size: uploadResponse.size || uploadResponse.photo?.size || 0 };
-    setLocalPhotos(currentPhotos => {
-      const nextPhotos = [...currentPhotos, newPhoto];
-      onPhotosChange?.(nextPhotos);
-      return nextPhotos;
-    });
+    const nextPhotos = [...localPhotos, newPhoto];
+    setLocalPhotos(nextPhotos);
+    onPhotosChange?.(nextPhotos);
   };
 
   return (
