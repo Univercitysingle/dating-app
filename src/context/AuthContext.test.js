@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getAuth, onIdTokenChanged } from 'firebase/auth';
-import AuthContextProvider, { AuthProvider, useAuth } from './AuthContext';
+import { AuthProvider, useAuth } from './AuthContext';
 import apiClient from '../api/apiClient';
 
 jest.mock('firebase/auth', () => ({
