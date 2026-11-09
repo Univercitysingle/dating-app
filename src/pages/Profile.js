@@ -97,7 +97,7 @@ function Profile() {
   const { userId } = useParams();
   const { user: currentUser, logout, setUser } = useAuth();
   const { socket } = useSocket();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -556,14 +556,19 @@ function Profile() {
 
                       <div className="profile-settings-group">
                           <h3>Preferences &amp; help</h3>
-                          <button type="button" className="profile-settings-row profile-settings-row-button" onClick={toggleTheme}>
+                          <div className="profile-settings-row profile-appearance-row">
                               <span className="profile-settings-icon" aria-hidden="true">
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/></svg>
                               </span>
                               <span className="profile-settings-row-copy"><strong>Appearance</strong><span>Choose how the app looks on your device.</span></span>
-                              <span className="profile-settings-value">{theme === 'dark' ? 'Dark' : 'Light'} mode</span>
-                              <svg className="profile-settings-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                          </button>
+                              <label className="profile-appearance-control">
+                                  <span className="sr-only">App appearance</span>
+                                  <select aria-label="App appearance" value={theme} onChange={(event) => setTheme(event.target.value)}>
+                                      <option value="light">Light mode</option>
+                                      <option value="dark">Dark mode</option>
+                                  </select>
+                              </label>
+                          </div>
                           <button type="button" className="profile-settings-row profile-settings-row-button" onClick={() => navigate('/support')}>
                               <span className="profile-settings-icon" aria-hidden="true">
                                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><path d="M4 13h3v6H6a2 2 0 0 1-2-2zM20 13h-3v6h1a2 2 0 0 0 2-2zM17 19a5 5 0 0 1-5 2"/></svg>
