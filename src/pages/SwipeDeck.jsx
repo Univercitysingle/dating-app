@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import apiClient from '../api/apiClient';
 import SwipeCard from '../components/SwipeCard';
@@ -110,21 +110,31 @@ const SwipeDeck = () => {
   const [activeFilters, setActiveFilters] = useState({});
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+  const discoverRequestSequence = useRef(0);
 
   const fetchUsersToSwipe = useCallback(async (filters = {}) => {
+    const requestSequence = ++discoverRequestSequence.current;
     setIsLoading(true);
     setError(null);
     setNewMatchInfo(null);
     try {
       const data = await apiClient.get('/users/discover', { params: filters });
+      if (requestSequence !== discoverRequestSequence.current) return;
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
+      if (requestSequence !== discoverRequestSequence.current) return;
       console.error("Error fetching users for swipe deck:", err);
       setError(getUserFriendlyError(err, 'We could not load profiles. Please try again.'));
       setUsers([]);
     } finally {
-      setIsLoading(false);
+      if (requestSequence === discoverRequestSequence.current) {
+        setIsLoading(false);
+      }
     }
+  }, []);
+
+  useEffect(() => () => {
+    discoverRequestSequence.current += 1;
   }, []);
 
   useEffect(() => {
@@ -231,10 +241,15 @@ const SwipeDeck = () => {
   const handleApplyFilters = async (filters) => {
     const { preference = user?.preference || 'everyone', ...discoveryFilters } = filters;
     try {
-      if (preference !== (user?.preference || 'everyone')) {
+      const preferenceChanged = preference !== (user?.preference || 'everyone');
+      if (preferenceChanged) {
         const updatedProfile = await apiClient.put('/users/me', { preference });
         if (typeof setUser === 'function') {
+          // The user-preference effect performs the single refresh after the
+          // context update. Avoid issuing a second, overlapping Discover call.
           setUser(previous => ({ ...previous, ...updatedProfile, preference }));
+        } else {
+          fetchUsersToSwipe({ ...discoveryFilters, preference });
         }
       }
       const nextFilters = { ...discoveryFilters, preference };
@@ -246,7 +261,7 @@ const SwipeDeck = () => {
           console.warn('Could not persist discovery filters in this browser.', storageError);
         }
       }
-      fetchUsersToSwipe(discoveryFilters);
+      if (!preferenceChanged) fetchUsersToSwipe(nextFilters);
       setShowFilters(false);
     } catch (err) {
       setSwipeError(getUserFriendlyError(err, 'We could not save your discovery preference. Please try again.'));
