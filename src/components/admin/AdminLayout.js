@@ -144,7 +144,7 @@ const AdminLayout = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb] text-slate-900 lg:flex">
+    <div className="admin-shell min-h-screen bg-[#f5f7fb] text-slate-900 lg:flex">
       <aside className={`relative z-30 hidden shrink-0 transition-[width] duration-300 lg:block ${isSidebarMinimized ? 'w-[88px]' : 'w-[272px]'}`}>
         <div className="fixed inset-y-0 left-0 h-screen" style={{ width: isSidebarMinimized ? 88 : 272 }}>
           {sidebar(false)}
@@ -159,7 +159,7 @@ const AdminLayout = () => {
       )}
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl sm:px-7 lg:px-9">
+        <header className="admin-header sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl sm:px-7 lg:px-9">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" onClick={() => setMobileMenuOpen(true)} aria-label="Open navigation" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 lg:hidden">☰</button>
             <div className="min-w-0">
@@ -180,7 +180,7 @@ const AdminLayout = () => {
         <main id="admin-main" className="admin-ux w-full flex-1 px-4 py-6 sm:px-7 sm:py-8 lg:px-9">
           <div className="mx-auto w-full max-w-[1600px]"><Outlet /></div>
         </main>
-        <footer className="border-t border-slate-200/70 px-4 py-4 text-center text-[11px] text-slate-400 sm:px-7 lg:px-9">
+        <footer className="admin-footer border-t border-slate-200/70 px-4 py-4 text-center text-[11px] text-slate-400 sm:px-7 lg:px-9">
           DateMe administration · Secure operations workspace
         </footer>
       </div>
