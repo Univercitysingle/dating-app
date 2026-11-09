@@ -48,7 +48,8 @@ describe('PhotoEditor', () => {
     const remainingPhotos = initialPhotos.slice(1);
     apiClient.delete.mockResolvedValue({ photos: remainingPhotos });
 
-    const { rerender } = render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
+    const onPhotosChange = jest.fn();
+    const { rerender } = render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} onPhotosChange={onPhotosChange} />);
 
     // Click the delete button on the first photo
     const deleteButtons = screen.getAllByText('X');
@@ -58,6 +59,7 @@ describe('PhotoEditor', () => {
       // The full URL should be sent to the backend now
       expect(apiClient.delete).toHaveBeenCalledWith('/users/photos', { photoUrl: 'https://example.com/photo1.jpg' });
     });
+    expect(onPhotosChange).toHaveBeenCalledWith(remainingPhotos);
 
     // Rerender with the new photos from the mocked API response
     rerender(<PhotoEditor photos={remainingPhotos} onSave={onSave} onCancel={onCancel} />);
@@ -117,7 +119,8 @@ describe('PhotoEditor', () => {
   });
 
   test('adds a new photo when upload is complete', async () => {
-    render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
+    const onPhotosChange = jest.fn();
+    render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} onPhotosChange={onPhotosChange} />);
 
     // Simulate the uploader calling the onUploadComplete callback with the new API response structure
     act(() => {
@@ -133,5 +136,9 @@ describe('PhotoEditor', () => {
       expect(images).toHaveLength(4);
       expect(images[3]).toHaveAttribute('src', 'https://dateme.enadoctemp.workers.dev/new-photo.jpg');
     });
+    expect(onPhotosChange).toHaveBeenCalledWith([
+      ...initialPhotos,
+      { url: 'https://dateme.enadoctemp.workers.dev/new-photo.jpg', order: 3, size: 0 }
+    ]);
   });
 });
