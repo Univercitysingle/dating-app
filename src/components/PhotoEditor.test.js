@@ -78,9 +78,10 @@ describe('PhotoEditor', () => {
     render(<PhotoEditor photos={initialPhotos} onSave={onSave} onCancel={onCancel} />);
 
     // The component should extract the keys from the URLs before sending
-    const expectedPhotosPayload = initialPhotos.map(p => ({
-      ...p,
-      url: p.url.substring(p.url.lastIndexOf('/') + 1)
+    const expectedPhotosPayload = initialPhotos.map((photo, order) => ({
+      ...photo,
+      url: photo.url.substring(photo.url.lastIndexOf('/') + 1),
+      order
     }));
 
     fireEvent.click(screen.getByText('Save'));
