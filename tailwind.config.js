@@ -1,5 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // The app toggles the `dark` class on <html> from ThemeContext.
+  // Tailwind must use class-based dark mode rather than OS media preference.
+  darkMode: 'class',
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
     "./public/index.html"
