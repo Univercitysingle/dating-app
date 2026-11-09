@@ -4506,3 +4506,301 @@ input, select, textarea { min-width: 0; }
     line-height: 0.7rem !important;
   }
 }
+
+
+/* ================================================================
+   Application-wide user-selected theme
+   Keep this block last so every route (discover, likes, inbox, chat,
+   profile, support, subscriptions, admin and settings) shares one
+   palette instead of individual pages retaining hard-coded light UI.
+   ================================================================ */
+html.dark {
+  color-scheme: dark;
+  --app-ink: #f4eff4;
+  --app-muted: #b9aeb9;
+  --app-surface: #211c25;
+  --app-canvas: #151119;
+  --app-border: #39313d;
+  --app-accent: #e58aa2;
+  --app-accent-strong: #f0a2b6;
+  background: var(--app-canvas);
+}
+
+html.dark body,
+html.dark #root {
+  min-height: 100%;
+  background: var(--app-canvas) !important;
+  color: var(--app-ink);
+}
+
+html.dark body,
+html.dark #root,
+html.dark .app-shell,
+html.dark .app-main,
+html.dark main,
+html.dark .page-container,
+html.dark .profile-page,
+html.dark .discover-page,
+html.dark .inbox-page,
+html.dark .inbox-workspace,
+html.dark .subscription-page,
+html.dark .support-page,
+html.dark .admin-page,
+html.dark [data-theme-surface="page"] {
+  background-color: var(--app-canvas);
+  color: var(--app-ink);
+}
+
+/* Reusable card, panel, list and modal surfaces used across routes. */
+html.dark .profile-settings,
+html.dark .profile-settings-row,
+html.dark .profile-card,
+html.dark .profile-section,
+html.dark .profile-details,
+html.dark .profile-hero,
+html.dark .inbox-workspace,
+html.dark .inbox-sidebar,
+html.dark .conversation-list,
+html.dark .conversation-row,
+html.dark .state-panel,
+html.dark .empty-state,
+html.dark .discover-empty-state,
+html.dark .like-card,
+html.dark .store-card,
+html.dark .subscription-page .grid > div,
+html.dark .subscription-page .grid > button,
+html.dark .support-ticket,
+html.dark .support-ticket-card,
+html.dark .ticket-card,
+html.dark .ticket-message,
+html.dark .admin-card,
+html.dark .admin-panel,
+html.dark .admin-table-wrap,
+html.dark .modal-content,
+html.dark [role="dialog"],
+html.dark [data-theme-surface="card"],
+html.dark [data-theme-surface="panel"] {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-ink);
+}
+
+/* Tailwind utility surfaces are used heavily in page-level JSX. */
+html.dark [class~="bg-white"],
+html.dark [class~="bg-gray-50"],
+html.dark [class~="bg-gray-100"],
+html.dark [class~="bg-slate-50"],
+html.dark [class~="bg-slate-100"],
+html.dark [class~="bg-neutral-50"],
+html.dark [class~="bg-neutral-100"],
+html.dark [class~="bg-zinc-50"],
+html.dark [class~="bg-zinc-100"] {
+  background-color: var(--app-surface) !important;
+}
+
+html.dark [class~="text-gray-900"],
+html.dark [class~="text-gray-800"],
+html.dark [class~="text-gray-700"],
+html.dark [class~="text-slate-900"],
+html.dark [class~="text-slate-800"],
+html.dark [class~="text-slate-700"],
+html.dark [class~="text-neutral-900"],
+html.dark [class~="text-neutral-800"],
+html.dark [class~="text-zinc-900"],
+html.dark [class~="text-zinc-800"] {
+  color: var(--app-ink) !important;
+}
+
+html.dark [class~="text-gray-600"],
+html.dark [class~="text-gray-500"],
+html.dark [class~="text-slate-600"],
+html.dark [class~="text-slate-500"],
+html.dark [class~="text-neutral-600"],
+html.dark [class~="text-neutral-500"],
+html.dark [class~="text-zinc-600"],
+html.dark [class~="text-zinc-500"] {
+  color: var(--app-muted) !important;
+}
+
+html.dark [class~="border-gray-100"],
+html.dark [class~="border-gray-200"],
+html.dark [class~="border-gray-300"],
+html.dark [class~="border-slate-100"],
+html.dark [class~="border-slate-200"],
+html.dark [class~="border-neutral-100"],
+html.dark [class~="border-neutral-200"],
+html.dark [class~="border-zinc-100"],
+html.dark [class~="border-zinc-200"] {
+  border-color: var(--app-border) !important;
+}
+
+/* Common hard-coded component styles that Tailwind cannot override. */
+html.dark .chat-header,
+html.dark .chat-composer,
+html.dark .chat-whatsapp-composer,
+html.dark .chat-typing-indicator,
+html.dark .chat-bubble-received,
+html.dark .chat-whatsapp-composer .chat-message-input,
+html.dark .chat-composer input,
+html.dark .chat-call-panel .call-utility-button,
+html.dark .call-history-chip,
+html.dark .inbox-workspace,
+html.dark .profile-settings,
+html.dark .profile-settings-row,
+html.dark .discover-filter-panel,
+html.dark .discover-filter-footer,
+html.dark .filter-select,
+html.dark .filter-reset-button,
+html.dark .filter-button,
+html.dark .auth-card,
+html.dark .form-control,
+html.dark .conversation-avatar,
+html.dark .chat-profile-action,
+html.dark .chat-header-call-actions .call-icon-button {
+  background-color: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-ink);
+}
+
+html.dark .chat-messages,
+html.dark .chat-wallpaper,
+html.dark .profile-page,
+html.dark .subscription-page,
+html.dark .auth-page {
+  background-color: var(--app-canvas);
+  color: var(--app-ink);
+}
+
+html.dark .chat-messages {
+  background-image: radial-gradient(circle at 12% 8%, rgba(229, 138, 162, .055), transparent 30%);
+}
+
+html.dark .chat-wallpaper {
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(214, 135, 165, .045) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 78% 68%, rgba(170, 139, 167, .05) 0 2px, transparent 2.5px),
+    linear-gradient(135deg, rgba(35, 27, 38, .72), rgba(25, 20, 29, .82));
+}
+
+html.dark .chat-bubble-received,
+html.dark .chat-message-stack .chat-bubble-received {
+  background: #2b2430;
+  border-color: #403644;
+  color: var(--app-ink);
+}
+
+html.dark .chat-whatsapp-composer .chat-message-input,
+html.dark .chat-composer input,
+html.dark .form-control,
+html.dark .filter-select,
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.dark textarea,
+html.dark select {
+  background-color: #29232e;
+  border-color: #49404c;
+  color: var(--app-ink);
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #a99eaa;
+}
+
+html.dark .profile-settings-heading h2,
+html.dark .profile-settings-group > h3,
+html.dark .profile-settings-row-copy strong,
+html.dark .profile-settings-row-copy span,
+html.dark .profile-settings-value,
+html.dark .profile-settings-chevron,
+html.dark .page-title,
+html.dark .discover-subtitle,
+html.dark .inbox-page h1,
+html.dark .inbox-page h2,
+html.dark .inbox-page h3 {
+  color: var(--app-ink);
+}
+
+html.dark .conversation-row,
+html.dark .chat-header,
+html.dark .chat-composer,
+html.dark .chat-whatsapp-composer,
+html.dark .inbox-sidebar,
+html.dark .discover-filter-footer {
+  border-color: var(--app-border);
+}
+
+html.dark .conversation-row:hover,
+html.dark .chat-participant-link:hover,
+html.dark .profile-settings-row-button:hover {
+  background: #302632;
+}
+
+html.dark .app-bottom-nav,
+html.dark nav.fixed.bottom-0.left-0.right-0 {
+  background: rgba(33, 28, 37, .97);
+  border-color: var(--app-border);
+  color: var(--app-ink);
+}
+
+html.dark .discover-page .discover-actions .discover-action-button,
+html.dark .discover-header .filter-button,
+html.dark .discover-filter-icon-button {
+  background: rgba(38, 31, 42, .96);
+  border-color: var(--app-border);
+  color: var(--app-ink);
+}
+
+html.dark .discover-empty-state {
+  background: rgba(33, 28, 37, .94);
+  border-color: var(--app-border);
+  color: var(--app-ink);
+}
+
+html.dark .discover-empty-state *,
+html.dark .profile-page,
+html.dark .inbox-page,
+html.dark .subscription-page,
+html.dark .support-page,
+html.dark .admin-page {
+  color: var(--app-ink);
+}
+
+html.dark table,
+html.dark thead,
+html.dark tbody,
+html.dark tr,
+html.dark td,
+html.dark th {
+  border-color: var(--app-border);
+}
+
+html.dark table tbody tr {
+  background-color: var(--app-surface);
+  color: var(--app-ink);
+}
+
+html.dark hr {
+  border-color: var(--app-border);
+}
+
+html.dark .app-bottom-nav a,
+html.dark .app-bottom-nav button,
+html.dark nav.fixed.bottom-0.left-0.right-0 a,
+html.dark nav.fixed.bottom-0.left-0.right-0 button {
+  color: inherit;
+}
+
+html.dark .login-page {
+  /* Login already uses its own dark photographic design in both modes. */
+  color-scheme: dark;
+}
+
+/* Avoid forcing dark colours on explicit status, brand and action surfaces. */
+html.dark .app-primary-button,
+html.dark .chat-bubble-sent,
+html.dark .chat-message-stack .chat-bubble-sent,
+html.dark .chat-send-button,
+html.dark .filter-apply-button,
+html.dark [data-theme-preserve="true"] {
+  color: #fff;
+}
