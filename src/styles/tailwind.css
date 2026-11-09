@@ -4804,3 +4804,49 @@ html.dark .filter-apply-button,
 html.dark [data-theme-preserve="true"] {
   color: #fff;
 }
+
+
+/* Final responsive and appearance refinements. */
+.profile-appearance-row {
+  gap: 14px;
+}
+.profile-appearance-control {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.profile-appearance-control select {
+  min-width: 132px;
+  min-height: 42px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  padding: 8px 34px 8px 12px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.profile-appearance-control select:focus-visible {
+  outline: 3px solid rgba(233, 75, 120, .3);
+  outline-offset: 2px;
+}
+.app-bottom-nav .nav-item {
+  min-width: 0;
+}
+.app-bottom-nav .nav-item span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .app-bottom-nav .nav-item { gap: 4px; padding-right: 2px; padding-left: 2px; }
+  .app-bottom-nav .nav-item span { font-size: 9px; letter-spacing: -.02em; }
+  .app-bottom-nav .nav-item svg { width: 20px; height: 20px; }
+  .profile-appearance-row { align-items: flex-start; flex-wrap: wrap; }
+  .profile-appearance-control { margin-left: auto; }
+}
+html.dark .profile-appearance-control select {
+  background: #29232e;
+  border-color: #49404c;
+  color: #f4eff4;
+}
