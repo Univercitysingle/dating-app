@@ -500,7 +500,11 @@ test("like swipe creates a pending match and notification", async () => {
     updateOne: async () => ({ matchedCount: 1 })
   };
   const notifications = {
-    insertOne: async (doc) => { insertedNotification = doc; },
+    async updateOne(query, update, options) {
+      insertedNotification = { ...query, ...update.$setOnInsert, updatedAt: update.$set.updatedAt };
+      assert.equal(options.upsert, true);
+      return { upsertedCount: 1 };
+    },
     deleteOne: async () => ({ deletedCount: 0 })
   };
   const connection = new MongoDBConnection({}, {});
@@ -529,7 +533,14 @@ test("super-like consumes a purchased credit and records super-like notification
     insertOne: async (doc) => { insertedMatch = doc; return { insertedId: "super-match-id" }; },
     updateOne: async () => ({ matchedCount: 1 })
   };
-  const notifications = { insertOne: async (doc) => { insertedNotification = doc; }, deleteOne: async () => ({ deletedCount: 0 }) };
+  const notifications = {
+    async updateOne(query, update, options) {
+      insertedNotification = { ...query, ...update.$setOnInsert, updatedAt: update.$set.updatedAt };
+      assert.equal(options.upsert, true);
+      return { upsertedCount: 1 };
+    },
+    deleteOne: async () => ({ deletedCount: 0 })
+  };
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "matches" ? matches : notifications }) });
   const result = await connection.recordSwipe("user-1", "user-2", "superlike");
