@@ -167,8 +167,50 @@ jobs:
             echo "::error::No Cloudflare Pages project could be selected."
             exit 1
           fi
-          echo "Discovered Cloudflare Pages project: $project"
+          if [[ "$project" != "dating-app-staging" ]]; then
+            echo "::error::Refusing to deploy staging from non-staging Pages project: $project"
+            exit 1
+          fi
+          echo "Discovered dedicated staging Pages project: $project"
           echo "CLOUDFLARE_PAGES_PROJECT_NAME=$project" >> "$GITHUB_ENV"
+
+      - name: Ensure migration branch is the staging Pages production branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          project_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT_NAME}"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            --header "Content-Type: application/json" "$project_url")"
+          response="$(cat "$response_file")"
+          if [[ ! "$status" =~ ^2[0-9][0-9]$ ]] || [[ "$(jq -r '.success' <<< "$response")" != "true" ]]; then
+            echo "::error::Could not inspect the dedicated staging Pages project (HTTP $status)."
+            jq -r '(.errors // [])[]? | .message' <<< "$response"
+            exit 1
+          fi
+          production_branch="$(jq -r '.result.production_branch // empty' <<< "$response")"
+          if [[ "$production_branch" != "migrate-to-serverless" ]]; then
+            echo "Updating staging Pages production branch from '${production_branch:-unset}' to migrate-to-serverless."
+            status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+              --request PATCH \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              --data '{"production_branch":"migrate-to-serverless"}' "$project_url")"
+            response="$(cat "$response_file")"
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]] || [[ "$(jq -r '.success' <<< "$response")" != "true" ]]; then
+              echo "::error::Could not set the staging Pages production branch (HTTP $status)."
+              jq -r '(.errors // [])[]? | .message' <<< "$response"
+              exit 1
+            fi
+          fi
+          verified_branch="$(jq -r '.result.production_branch // empty' <<< "$response")"
+          if [[ "$verified_branch" != "migrate-to-serverless" ]]; then
+            echo "::error::Staging Pages production branch verification failed."
+            exit 1
+          fi
+          echo "Staging Pages production branch verified: migrate-to-serverless"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
