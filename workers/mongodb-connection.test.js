@@ -4018,3 +4018,78 @@ test("photo verification treats missing browser assessment as unavailable and ne
   assert.equal(inserted[0].automatedAssessment.bestDistance, null);
   assert.equal(inserted[0].status, "pending_review");
 });
+
+
+test("reciprocal likes create one match and repeated likes upsert notifications instead of duplicating them", async () => {
+  const usersByUid = new Map([
+    ["alice", { uid: "alice", blocked: [] }],
+    ["bob", { uid: "bob", blocked: [] }]
+  ]);
+  let match = null;
+  const notificationUpserts = [];
+  const notificationDeletes = [];
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) { return usersByUid.get(uid) || null; },
+        async updateOne() { return { matchedCount: 1, modifiedCount: 1 }; }
+      };
+      if (name === "matches") return {
+        async findOne(query) {
+          if (!match) return null;
+          const pairMatches = (query.$or || []).some(clause =>
+            clause.user1Uid === match.user1Uid && clause.user2Uid === match.user2Uid
+          );
+          return pairMatches ? { ...match, likedBy: [...match.likedBy] } : null;
+        },
+        async insertOne(document) {
+          match = { ...document, _id: "match-1", likedBy: [...document.likedBy] };
+          return { insertedId: "match-1" };
+        },
+        async updateOne(query, update) {
+          if (update.$addToSet?.likedBy && !match.likedBy.includes(update.$addToSet.likedBy)) {
+            match.likedBy.push(update.$addToSet.likedBy);
+          }
+          if (update.$set) Object.assign(match, update.$set);
+          return { matchedCount: 1, modifiedCount: 1 };
+        }
+      };
+      if (name === "notifications") return {
+        async updateOne(query, update, options) {
+          notificationUpserts.push({ query, update, options });
+          return { matchedCount: 0, upsertedCount: options?.upsert ? 1 : 0 };
+        },
+        async deleteOne(query) {
+          notificationDeletes.push(query);
+          return { deletedCount: 0 };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const firstLike = await connection.recordSwipe("alice", "bob", "like");
+  assert.equal(firstLike.status, 200);
+  assert.equal(firstLike.body.status, "pending");
+
+  const reciprocalLike = await connection.recordSwipe("bob", "alice", "like");
+  assert.equal(reciprocalLike.status, 200);
+  assert.equal(reciprocalLike.body.status, "matched");
+  assert.deepEqual(match.likedBy.sort(), ["alice", "bob"]);
+  assert.equal(notificationUpserts.length, 3);
+  assert.ok(notificationUpserts.every(item => item.options.upsert === true));
+  assert.ok(notificationUpserts.some(item => item.query.type === "match" && item.query.recipientUid === "alice"));
+  assert.ok(notificationUpserts.some(item => item.query.type === "match" && item.query.recipientUid === "bob"));
+
+  const repeatedLike = await connection.recordSwipe("alice", "bob", "like");
+  assert.equal(repeatedLike.status, 200);
+  assert.equal(repeatedLike.body.status, "matched");
+  assert.equal(notificationUpserts.length, 5);
+  assert.equal(notificationUpserts.filter(item =>
+    item.query.type === "match" && item.query.recipientUid === "bob" && item.query.senderUid === "alice"
+  ).length, 2);
+  assert.ok(notificationDeletes.length >= 2);
+});
