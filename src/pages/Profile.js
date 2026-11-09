@@ -708,8 +708,19 @@ function Profile() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <PhotoEditor
                         photos={profile.photos || []}
+                        onPhotosChange={(updatedPhotos) => {
+                            setProfile(currentProfile => currentProfile
+                                ? { ...currentProfile, photos: updatedPhotos }
+                                : currentProfile);
+                        }}
                         onSave={(updatedUser) => {
-                            setProfile(updatedUser);
+                            setProfile(currentProfile => ({
+                                ...(currentProfile || {}),
+                                ...updatedUser,
+                                photos: Array.isArray(updatedUser?.photos)
+                                    ? updatedUser.photos
+                                    : currentProfile?.photos || []
+                            }));
                             setIsEditingPhotos(false);
                         }}
                         onCancel={() => setIsEditingPhotos(false)}
