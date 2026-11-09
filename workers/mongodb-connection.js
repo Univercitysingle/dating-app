@@ -992,14 +992,17 @@ export class MongoDBConnection {
         await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: finalStatus, updatedAt: now } });
         match.status = finalStatus;
         const notificationType = finalStatus === "matched" ? "match" : action === "superlike" ? "superlike" : "like";
-        await db.collection("notifications").insertOne({
-          recipientUid: targetUid,
-          senderUid: uid,
-          type: notificationType,
-          status: "pending",
-          createdAt: now,
-          updatedAt: now
-        });
+        await db.collection("notifications").updateOne(
+          { recipientUid: targetUid, senderUid: uid, type: notificationType },
+          { $setOnInsert: {
+            recipientUid: targetUid,
+            senderUid: uid,
+            type: notificationType,
+            status: "pending",
+            createdAt: now
+          }, $set: { updatedAt: now } },
+          { upsert: true }
+        );
         if (finalStatus === "matched") {
           await db.collection("notifications").deleteOne({
             recipientUid: targetUid, senderUid: uid, type: { $in: ["like", "superlike"] }
@@ -1007,14 +1010,17 @@ export class MongoDBConnection {
           await db.collection("notifications").deleteOne({
             recipientUid: uid, senderUid: targetUid, type: { $in: ["like", "superlike"] }
           });
-          await db.collection("notifications").insertOne({
-            recipientUid: uid,
-            senderUid: targetUid,
-            type: "match",
-            status: "pending",
-            createdAt: now,
-            updatedAt: now
-          });
+          await db.collection("notifications").updateOne(
+            { recipientUid: uid, senderUid: targetUid, type: "match" },
+            { $setOnInsert: {
+              recipientUid: uid,
+              senderUid: targetUid,
+              type: "match",
+              status: "pending",
+              createdAt: now
+            }, $set: { updatedAt: now } },
+            { upsert: true }
+          );
         }
       } else {
         await db.collection("notifications").deleteOne({
