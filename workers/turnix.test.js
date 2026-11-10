@@ -77,7 +77,8 @@ test("ExpressTURN is the primary relay and Turnix is exposed as ordered fallback
   ]);
   assert.equal(config.iceServerTiers[0].name, "expressturn-primary");
   assert.equal(config.iceServerTiers[0].iceServers.at(-1).username, "express-user");
-  assert.equal(config.iceServerTiers[1].name, "turnix-fallback-direct-stun");
+  assert.equal(config.iceServerTiers[1].name, "turnix-fallback-turn-udp");
+  assert.equal(config.iceServerTiers.at(-1).name, "direct-stun-fallback");
   assert.ok(config.iceServerTiers.some(tier => tier.name === "turnix-fallback-turn-udp"));
   assert.ok(config.iceServerTiers.some(tier => tier.name === "turnix-fallback-turn-tcp"));
   assert.equal(config.iceServers, config.iceServerTiers[0].iceServers);
