@@ -8,7 +8,7 @@ self.addEventListener('push', event => {
   const title = typeof payload.title === 'string' ? payload.title.slice(0, 100) : 'Hart2Hart';
   const options = {
     body: typeof payload.body === 'string' ? payload.body.slice(0, 180) : 'You have a new notification.',
-    icon: '/logo192.png',
+    icon: '/logo.jpg',
     badge: '/favicon.ico',
     tag: typeof payload.tag === 'string' ? payload.tag.slice(0, 100) : 'hart2hart-notification',
     data: { url: typeof payload.url === 'string' ? payload.url : '/conversations' },
