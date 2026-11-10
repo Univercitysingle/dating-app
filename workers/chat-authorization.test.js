@@ -277,7 +277,7 @@ test("call creation rejects a receiver who is not a participant in the supplied 
     alice: { uid: "alice", blocked: [], accountStatus: "active" },
     bob: { uid: "bob", blocked: [], accountStatus: "active" }
   };
-  let callSessionAccessed = false;
+  let insertAttempted = false;
   const db = {
     collection(name) {
       if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
@@ -285,10 +285,10 @@ test("call creation rejects a receiver who is not a participant in the supplied 
       if (name === "chatmessages") return {
         async findOne() { return { senderUid: "alice", receiverUid: "charlie" }; }
       };
-      if (name === "callSessions") {
-        callSessionAccessed = true;
-        return { async findOne() { return null; } };
-      }
+      if (name === "callSessions") return {
+        async findOne() { return null; },
+        async insertOne() { insertAttempted = true; }
+      };
       assert.fail("Unexpected collection: " + name);
     }
   };
@@ -302,7 +302,7 @@ test("call creation rejects a receiver who is not a participant in the supplied 
   });
 
   assert.equal(result.status, 403);
-  assert.equal(callSessionAccessed, false);
+  assert.equal(insertAttempted, false);
 });
 
 test("call history supports opaque chat room IDs and remains participant-scoped", async () => {
