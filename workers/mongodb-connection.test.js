@@ -2297,9 +2297,11 @@ test("global incoming call lookup returns only the authenticated receiver's live
   };
   const users = {
     async findOne(filter, options) {
-      assert.equal(filter.uid, "caller-uid");
-      assert.deepEqual(options.projection, { _id: 0, name: 1 });
-      return { name: "Caller Name" };
+      if (options?.projection?._id === 0 && options?.projection?.name === 1) {
+        assert.equal(filter.uid, "caller-uid");
+        return { uid: "caller-uid", name: "Caller Name", blocked: [] };
+      }
+      return { uid: filter.uid, blocked: [] };
     }
   };
   const connection = new MongoDBConnection({}, {});
@@ -2307,6 +2309,8 @@ test("global incoming call lookup returns only the authenticated receiver's live
   connection.getDatabase = () => ({ collection(name) {
     if (name === "callSessions") return calls;
     if (name === "users") return users;
+    if (name === "matches") return { async findOne() { return null; } };
+    if (name === "chatmessages") return {};
     assert.fail("Unexpected collection: " + name);
   } });
 
