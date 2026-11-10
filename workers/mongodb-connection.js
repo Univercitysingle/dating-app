@@ -4460,8 +4460,7 @@ export class MongoDBConnection {
   async createCall(uid, payload) {
     const { roomId, receiverUid, type, offer } = payload || {};
     if (typeof uid !== "string" || !uid || typeof receiverUid !== "string" || !receiverUid ||
-        receiverUid === uid || typeof roomId !== "string" ||
-        ![uid + "-" + receiverUid, receiverUid + "-" + uid].includes(roomId) ||
+        receiverUid === uid || typeof roomId !== "string" || roomId.length < 3 || roomId.length > 260 ||
         !["audio", "video"].includes(type) || !offer || offer.type !== "offer" ||
         typeof offer.sdp !== "string" || offer.sdp.length > 200000) {
       return { status: 400, body: { error: "Invalid call request" } };
@@ -4479,6 +4478,19 @@ export class MongoDBConnection {
           (Array.isArray(caller.blocked) && caller.blocked.includes(receiverUid)) ||
           (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid)) ||
           await this.isChatMatchInactive(db, uid, receiverUid)) {
+        return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
+      }
+      // Chat room IDs are opaque and must not be reconstructed from UIDs.
+      // Resolve the peer from a persisted message in this exact room, then
+      // require that it is the intended receiver before creating a call.
+      const conversation = await db.collection("chatmessages").findOne({
+        roomId,
+        $or: [{ senderUid: uid }, { receiverUid: uid }]
+      }, { projection: { senderUid: 1, receiverUid: 1 } });
+      const roomPeerUid = conversation
+        ? (conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid)
+        : null;
+      if (roomPeerUid !== receiverUid) {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
       }
       const calls = db.collection("callSessions");
@@ -4572,8 +4584,7 @@ export class MongoDBConnection {
 
   async getCallHistory(uid, roomId) {
     if (typeof uid !== "string" || !uid || typeof roomId !== "string" ||
-        roomId.length > 260 || roomId.length < 3 ||
-        !(roomId.startsWith(uid + "-") || roomId.endsWith("-" + uid))) {
+        roomId.length > 260 || roomId.length < 3) {
       return { status: 400, body: { error: "Invalid call room" } };
     }
     try {
