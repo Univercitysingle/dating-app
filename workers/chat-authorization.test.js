@@ -8,13 +8,16 @@ test("chat delivery and read receipts constrain updates to the authenticated rec
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({
     collection(name) {
-      assert.equal(name, "chatmessages");
-      return {
+      if (name === "chatmessages") return {
+        async findOne() { return { senderUid: "alice", receiverUid: "bob" }; },
         async updateMany(filter, update) {
           calls.push({ filter, update });
           return { modifiedCount: 1 };
         }
       };
+      if (name === "users") return { async findOne() { return { blocked: [] }; } };
+      if (name === "matches") return { async findOne() { return null; } };
+      assert.fail("Unexpected collection: " + name);
     }
   });
 
