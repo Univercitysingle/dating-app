@@ -7,7 +7,7 @@ Dark Fantasy is implemented as a separate, opt-in paid add-on. It is **disabled 
 Configure these only in the staging Worker and Pages environments after approval:
 
 - Worker DARK_FANTASY_ENABLED=true — enables the API.
-- Worker DARK_FANTASY_ALLOWED_COUNTRIES=US,GB,... — comma-separated ISO 3166-1 alpha-2 country allowlist of countries that have been reviewed and approved. Empty or missing allowlist denies access. Cloudflare's country signal is only a coarse location control and is not proof of residence.
+- Worker DARK_FANTASY_ALLOWED_COUNTRIES=US,GB,... — comma-separated ISO 3166-1 alpha-2 country allowlist of countries that have been reviewed and approved. Empty, missing, malformed, or wildcard (`*`) configuration denies access. Cloudflare's country signal is only a coarse location control and is not proof of residence.
 - Worker DARK_FANTASY_PAYMENTS_APPROVED=true — permits checkout for this add-on only after the payment processor/acquirer has approved the exact service in writing.
 - Pages REACT_APP_DARK_FANTASY_ENABLED=true — displays the entry in navigation and renders the feature UI.
 
