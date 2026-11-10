@@ -2365,11 +2365,13 @@ test("chat conversations exclude users blocked in either direction", async () =>
   const otherUsers = {
     "blocked-by-alice": { uid: "blocked-by-alice", name: "Blocked by Alice" },
     "blocked-alice": { uid: "blocked-alice", name: "Blocked Alice", blocked: ["alice"] },
+    "unmatched": { uid: "unmatched", name: "Unmatched" },
     "allowed": { uid: "allowed", name: "Allowed", email: "private@example.com", mobileNumber: "+971500000000" }
   };
   const messages = [
     { roomId: "alice-blocked-by-alice", senderUid: "alice", receiverUid: "blocked-by-alice", messageContent: "hidden" },
     { roomId: "alice-blocked-alice", senderUid: "blocked-alice", receiverUid: "alice", messageContent: "hidden" },
+    { roomId: "alice-unmatched", senderUid: "alice", receiverUid: "unmatched", messageContent: "hidden after unmatch" },
     {
       _id: { toHexString: () => "6729a0000000000000000002" },
       roomId: "alice-allowed",
@@ -2396,8 +2398,17 @@ test("chat conversations exclude users blocked in either direction", async () =>
         },
         find(filter) {
           profileBatchQueries++;
-          assert.deepEqual(filter.uid.$in, ["blocked-by-alice", "blocked-alice", "allowed"]);
+          assert.deepEqual(filter.uid.$in, ["blocked-by-alice", "blocked-alice", "unmatched", "allowed"]);
           return { async toArray() { return Object.values(otherUsers); } };
+        }
+      };
+      if (name === "matches") return {
+        async findOne(filter) {
+          const pair = filter.$or || [];
+          return pair.some(item => item.user1Uid === "alice" && item.user2Uid === "unmatched" ||
+            item.user1Uid === "unmatched" && item.user2Uid === "alice")
+            ? { status: "unmatched" }
+            : null;
         }
       };
       return {
