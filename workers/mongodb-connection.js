@@ -5211,6 +5211,9 @@ export class MongoDBConnection {
       if (!message || message.deletedAt) return { status: 404, body: { error: "Message not found" } };
       const isAdmin = ["admin", "superadmin"].includes(actor.role);
       if (!isAdmin && message.senderUid !== uid) return { status: 403, body: { error: "You can only edit your own messages" } };
+      if (!isAdmin && await this.isChatPairUnavailable(db, uid, message.roomId)) {
+        return { status: 403, body: { error: "This conversation is no longer available" } };
+      }
       if (!isAdmin && Date.now() - new Date(message.timestamp).getTime() > 15 * 60 * 1000) return { status: 403, body: { error: "Messages can only be edited within 15 minutes of sending" } };
       const now = new Date();
       await db.collection("auditlogs").insertOne({ eventType: "chat_message_edited", actorUid: uid, actorType: isAdmin ? "admin" : "customer", messageId: id, roomId: message.roomId, previousMessage: message.messageContent, updatedMessage: payload.messageContent.trim(), createdAt: now });
@@ -5232,6 +5235,9 @@ export class MongoDBConnection {
       if (!message || message.deletedAt) return { status: 404, body: { error: "Message not found" } };
       const isAdmin = ["admin", "superadmin"].includes(actor.role);
       if (!isAdmin && message.senderUid !== uid) return { status: 403, body: { error: "You can only delete your own messages" } };
+      if (!isAdmin && await this.isChatPairUnavailable(db, uid, message.roomId)) {
+        return { status: 403, body: { error: "This conversation is no longer available" } };
+      }
       if (!isAdmin && Date.now() - new Date(message.timestamp).getTime() > 60 * 60 * 1000) return { status: 403, body: { error: "Messages can only be deleted within one hour of sending" } };
       const now = new Date();
       await db.collection("auditlogs").insertOne({ eventType: "chat_message_deleted", actorUid: uid, actorType: isAdmin ? "admin" : "customer", messageId: id, roomId: message.roomId, previousMessage: message.messageContent, createdAt: now });
