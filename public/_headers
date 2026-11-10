@@ -14,3 +14,6 @@
 
 /register
   X-Robots-Tag: noindex, nofollow, noarchive
+
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
