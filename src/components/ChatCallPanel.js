@@ -753,10 +753,11 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     try {
       // Refresh the full camera list after permission has been granted. Some
       // browsers expose labels and device IDs only after getUserMedia succeeds.
-      const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device =>
+      const enumeratedDevices = (await navigator.mediaDevices.enumerateDevices()).filter(device =>
         device.kind === 'videoinput' && device.deviceId
       );
-      setVideoInputs(devices);
+      if (enumeratedDevices.length) setVideoInputs(enumeratedDevices);
+      const devices = enumeratedDevices.length ? enumeratedDevices : videoInputs;
       const alternatives = devices.filter(device => device.deviceId !== currentDeviceId);
       const preferred = alternatives.find(device => {
         const label = (device.label || '').toLowerCase();
