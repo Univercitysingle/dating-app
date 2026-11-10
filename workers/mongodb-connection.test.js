@@ -2374,6 +2374,7 @@ test("global incoming call lookup returns only the authenticated receiver's live
   assert.equal(staleFilter.filter.receiverUid, "receiver-uid");
   assert.equal(staleFilter.filter.status, "ringing");
   assert.equal(staleFilter.update.$set.status, "missed");
+  assert.equal(staleFilter.update.$set.endReason, "no_answer");
   assert.equal(updates.length, 1);
   assert.equal(updates[0].filter._id, call._id);
   assert.ok(updates[0].update.$set.receiverLastSeenAt instanceof Date);
