@@ -1997,7 +1997,9 @@ test("chat conversations use a valid inclusion projection and return successfull
   const result = await connection.getChatConversations("alice");
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, []);
-  assert.deepEqual(userProjection, { _id: 1, uid: 1, blocked: 1 });
+  assert.deepEqual(userProjection, {
+    _id: 1, uid: 1, blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+  });
 });
 
 test("chat message remains saved when Firebase Realtime Database rejects the sync write", async () => {
