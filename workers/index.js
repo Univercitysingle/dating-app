@@ -387,6 +387,42 @@ export async function requestTurnixIceConfig(request, env, claims, fetchImpl = f
   }
 }
 
+export function buildExpressTurnIceServers(env = {}) {
+  const username = String(env.EXPRESSTURN_USERNAME || "").trim();
+  const credential = String(env.EXPRESSTURN_PASSWORD || "").trim();
+  if (!username || !credential) return [];
+  return [{
+    urls: ["turn:free.expressturn.com:3478?transport=udp", "turn:free.expressturn.com:3478?transport=tcp"],
+    username,
+    credential
+  }];
+}
+
+export function buildCallIceProviderConfig({ env = {}, turnix = null } = {}) {
+  const stunServers = [
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:global.stun.twilio.com:3478"] }
+  ];
+  const expressServers = buildExpressTurnIceServers(env);
+  const turnixServers = Array.isArray(turnix?.iceServers) ? turnix.iceServers : [];
+  const tiers = [];
+  if (expressServers.length) tiers.push({ name: "expressturn-primary", iceServers: [...stunServers, ...expressServers] });
+  if (turnixServers.length) {
+    for (const tier of buildTurnixIceServerTiers(turnixServers)) {
+      if (tier.iceServers.length) tiers.push({ name: "turnix-fallback-" + tier.name, iceServers: [...stunServers, ...tier.iceServers] });
+    }
+  }
+  if (!tiers.length) tiers.push({ name: "direct-stun", iceServers: stunServers });
+  const hasTurnix = turnixServers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(value => typeof value === "string" && /^turns?:/i.test(value)));
+  return {
+    iceServers: tiers[0].iceServers,
+    iceServerTiers: tiers,
+    iceTransportPolicy: "all",
+    turnConfigured: expressServers.length > 0 || hasTurnix,
+    ...(turnix?.expiresAt ? { expiresAt: turnix.expiresAt, credentialExpiresAt: Math.floor(Date.parse(turnix.expiresAt) / 1000) } : {})
+  };
+}
+
 export function buildTurnixIceServerTiers(iceServers) {
   const stun = [];
   const turn = [];
@@ -2209,14 +2245,18 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        if (env.TURNIX_API_TOKEN) {
-          try {
-            const turnix = await requestTurnixIceConfig(request, env, claims);
-            return json({ iceServers: turnix.iceServers, iceTransportPolicy: "all", turnConfigured: turnix.iceServers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(value => /^turns?:/i.test(value))), credentialExpiresAt: Math.floor(Date.parse(turnix.expiresAt) / 1000), expiresAt: turnix.expiresAt });
-          } catch (error) {
-            console.warn("Turnix call ICE credentials unavailable", { status: error?.status || 502 });
-            return json({ error: error?.status === 429 ? "TURN usage limit reached" : "Call ICE configuration unavailable" }, error?.status === 429 ? 503 : (error?.status === 401 ? 502 : (error?.status || 502)));
+        if ((env.EXPRESSTURN_USERNAME && env.EXPRESSTURN_PASSWORD) || env.TURNIX_API_TOKEN) {
+          let turnix = null;
+          if (env.TURNIX_API_TOKEN) {
+            try { turnix = await requestTurnixIceConfig(request, env, claims); }
+            catch (error) {
+              console.warn("Turnix call ICE fallback unavailable", { status: error?.status || 502 });
+              if (!env.EXPRESSTURN_USERNAME || !env.EXPRESSTURN_PASSWORD) {
+                return json({ error: error?.status === 429 ? "TURN usage limit reached" : "Call ICE configuration unavailable" }, error?.status === 429 ? 503 : (error?.status === 401 ? 502 : (error?.status || 502)));
+              }
+            }
           }
+          return json(buildCallIceProviderConfig({ env, turnix }));
         }
         const stunServers = [
           { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
@@ -2264,15 +2304,18 @@ export default {
         if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
         if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
 
-        if (env.TURNIX_API_TOKEN) {
-          try {
-            const turnix = await requestTurnixIceConfig(request, env, claims);
-            const credentialExpiresAt = Math.floor(Date.parse(turnix.expiresAt) / 1000);
-            return json({ iceServers: turnix.iceServers, iceServerTiers: buildTurnixIceServerTiers(turnix.iceServers), iceTransportPolicy: "all", turnConfigured: turnix.iceServers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(value => /^turns?:/i.test(value))), credentialExpiresAt, expiresAt: turnix.expiresAt });
-          } catch (error) {
-            console.warn("Turnix Video Rooms ICE credentials unavailable", { status: error?.status || 502 });
-            return json({ error: error?.status === 429 ? "TURN usage limit reached" : "ICE configuration unavailable" }, error?.status === 429 ? 503 : (error?.status === 401 ? 502 : (error?.status || 502)));
+        if ((env.EXPRESSTURN_USERNAME && env.EXPRESSTURN_PASSWORD) || env.TURNIX_API_TOKEN) {
+          let turnix = null;
+          if (env.TURNIX_API_TOKEN) {
+            try { turnix = await requestTurnixIceConfig(request, env, claims); }
+            catch (error) {
+              console.warn("Turnix Video Rooms ICE fallback unavailable", { status: error?.status || 502 });
+              if (!env.EXPRESSTURN_USERNAME || !env.EXPRESSTURN_PASSWORD) {
+                return json({ error: error?.status === 429 ? "TURN usage limit reached" : "ICE configuration unavailable" }, error?.status === 429 ? 503 : (error?.status === 401 ? 502 : (error?.status || 502)));
+              }
+            }
           }
+          return json(buildCallIceProviderConfig({ env, turnix }));
         }
 
         const stunServers = [
