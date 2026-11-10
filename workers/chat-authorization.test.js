@@ -228,3 +228,121 @@ test("chat history is denied before message access for a suspended account", asy
   assert.equal(result.status, 403);
   assert.equal(messageCollectionAccessed, false);
 });
+
+
+test("call creation supports opaque chat room IDs using persisted room membership", async () => {
+  const roomId = "4algfrbMzreXjpUg07ISRiJe8iI2-dTC31uC4gLbbDz1OS9uIET2I1K52";
+  const usersByUid = {
+    alice: { uid: "alice", blocked: [], accountStatus: "active" },
+    bob: { uid: "bob", blocked: [], accountStatus: "active" }
+  };
+  let insertedCall = null;
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      if (name === "chatmessages") return {
+        async findOne(filter) {
+          assert.equal(filter.roomId, roomId);
+          return { senderUid: "alice", receiverUid: "bob" };
+        }
+      };
+      if (name === "callSessions") return {
+        async findOne() { return null; },
+        async insertOne(call) { insertedCall = call; return { insertedId: "call-id" }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createCall("alice", {
+    roomId, receiverUid: "bob", type: "video",
+    offer: { type: "offer", sdp: "valid-offer" }
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(result.body.roomId, roomId);
+  assert.equal(result.body.receiverUid, "bob");
+  assert.equal(result.body.type, "video");
+  assert.equal(String(result.body._id), "call-id");
+  assert.equal(insertedCall.roomId, roomId);
+});
+
+test("call creation rejects a receiver who is not a participant in the supplied room", async () => {
+  const roomId = "opaque-room-id-for-alice-and-charlie";
+  const usersByUid = {
+    alice: { uid: "alice", blocked: [], accountStatus: "active" },
+    bob: { uid: "bob", blocked: [], accountStatus: "active" }
+  };
+  let callSessionAccessed = false;
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      if (name === "chatmessages") return {
+        async findOne() { return { senderUid: "alice", receiverUid: "charlie" }; }
+      };
+      if (name === "callSessions") {
+        callSessionAccessed = true;
+        return { async findOne() { return null; } };
+      }
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createCall("alice", {
+    roomId, receiverUid: "bob", type: "audio",
+    offer: { type: "offer", sdp: "valid-offer" }
+  });
+
+  assert.equal(result.status, 403);
+  assert.equal(callSessionAccessed, false);
+});
+
+test("call history supports opaque chat room IDs and remains participant-scoped", async () => {
+  const roomId = "4algfrbMzreXjpUg07ISRiJe8iI2-dTC31uC4gLbbDz1OS9uIET2I1K52";
+  const call = {
+    _id: "call-id", roomId, callerUid: "alice", receiverUid: "bob",
+    type: "video", status: "ended", offer: { sdp: "private-offer" },
+    answer: { sdp: "private-answer" }, signals: [{ candidate: "private-candidate" }]
+  };
+  const db = {
+    collection(name) {
+      if (name === "callSessions") return {
+        async updateMany() { return { modifiedCount: 0 }; },
+        find(filter) {
+          assert.equal(filter.roomId, roomId);
+          assert.deepEqual(filter.$or, [{ callerUid: "alice" }, { receiverUid: "alice" }]);
+          return {
+            sort() { return this; },
+            limit() { return this; },
+            async toArray() { return [call]; }
+          };
+        }
+      };
+      if (name === "users") return {
+        async findOne({ uid }) { return { uid, blocked: [], accountStatus: "active" }; }
+      };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getCallHistory("alice", roomId);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.calls.length, 1);
+  assert.equal(result.body.calls[0].roomId, roomId);
+  assert.equal("offer" in result.body.calls[0], false);
+  assert.equal("answer" in result.body.calls[0], false);
+  assert.equal("signals" in result.body.calls[0], false);
+});
