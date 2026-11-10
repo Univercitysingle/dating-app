@@ -12,7 +12,8 @@ function darkFantasyRegionGate(request, env) {
     return json({ error: "Dark Fantasy is not currently available." }, 404);
   }
   const setting = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").trim().toUpperCase();
-  if (setting === "*") return null;
+  // A wildcard is not an approved-country allowlist. Fail closed until
+  // the operator supplies explicit, reviewed ISO country codes.
   const allowed = setting.split(",").map(value => value.trim()).filter(value => /^[A-Z]{2}$/.test(value));
   const country = String(request.cf?.country || "").toUpperCase();
   if (!allowed.length || !country || !allowed.includes(country)) {
