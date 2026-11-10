@@ -4533,7 +4533,7 @@ export class MongoDBConnection {
         for (const expiredCall of expiredCalls) {
           const expired = await calls.updateOne(
             { _id: expiredCall._id, status: "ringing" },
-            { $set: { status: "missed", endedAt: now, updatedAt: now } }
+            { $set: { status: "missed", endReason: "no_answer", endedAt: now, updatedAt: now } }
           );
           if (expired.modifiedCount === 1) {
             await db.collection("notifications").insertOne({
@@ -4595,7 +4595,7 @@ export class MongoDBConnection {
       await callsCollection.updateMany(
         { roomId, status: "ringing", createdAt: { $lt: staleBefore },
           $or: [{ callerUid: uid }, { receiverUid: uid }] },
-        { $set: { status: "missed", endedAt: new Date(), updatedAt: new Date() } }
+        { $set: { status: "missed", endReason: "no_answer", endedAt: new Date(), updatedAt: new Date() } }
       );
       const calls = await callsCollection.find({
         roomId, $or: [{ callerUid: uid }, { receiverUid: uid }]
@@ -4768,6 +4768,16 @@ export class MongoDBConnection {
         set.receiverLastSeenAt = now;
       } else {
         set.endedAt = now;
+        set.endedByUid = uid;
+        if (action === "decline") {
+          set.endReason = "declined";
+        } else if (call.status === "accepted") {
+          set.endReason = "completed";
+          const connectedAt = new Date(call.connectedAt || call.updatedAt || call.createdAt).getTime();
+          set.durationSeconds = Number.isFinite(connectedAt) ? Math.max(0, Math.floor((now.getTime() - connectedAt) / 1000)) : 0;
+        } else {
+          set.endReason = "cancelled";
+        }
       }
       await calls.updateOne(
         { _id: call._id, status: { $in: ["ringing", "accepted"] } },
