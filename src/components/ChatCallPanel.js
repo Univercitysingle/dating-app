@@ -248,6 +248,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     queuedRemoteRef.current = [];
   }, []);
 
+  const iceProviderTiersRef = useRef([]);
   const reconnectAttemptsRef = useRef(0);
   const reconnectingRef = useRef(false);
   const reconnectTimerRef = useRef(null);
@@ -284,9 +285,16 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       // participants may initiate recovery; offer-collision handling below
       // deterministically selects the polite peer.
       const freshIce = await getCallIceConfig();
-      if (Array.isArray(freshIce?.iceServers) && freshIce.iceServers.length &&
+      if (Array.isArray(freshIce?.iceServerTiers) && freshIce.iceServerTiers.length) {
+        iceProviderTiersRef.current = freshIce.iceServerTiers;
+      }
+      const fallbackIndex = Math.min(reconnectAttemptsRef.current, Math.max(0, iceProviderTiersRef.current.length - 1));
+      const fallbackTier = iceProviderTiersRef.current[fallbackIndex];
+      const selectedIceServers = fallbackTier?.iceServers || freshIce?.iceServers;
+      if (Array.isArray(selectedIceServers) && selectedIceServers.length &&
           typeof peer.setConfiguration === 'function') {
-        peer.setConfiguration({ iceServers: freshIce.iceServers, iceTransportPolicy: 'all', iceCandidatePoolSize: 2 });
+        peer.setConfiguration({ iceServers: selectedIceServers, iceTransportPolicy: 'all', iceCandidatePoolSize: 2 });
+        if (fallbackTier?.name) setStatus('Reconnecting through ' + fallbackTier.name.replace(/-/g, ' ') + '…');
       }
       const offer = await peer.createOffer({ iceRestart: true });
       await peer.setLocalDescription(offer);
@@ -312,6 +320,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     localStreamRef.current = stream;
     setLocalStream(stream);
     const iceConfig = await getCallIceConfig();
+    iceProviderTiersRef.current = Array.isArray(iceConfig?.iceServerTiers) ? iceConfig.iceServerTiers : [];
     const peer = new RTCPeerConnection({
       iceServers: Array.isArray(iceConfig?.iceServers) && iceConfig.iceServers.length ? iceConfig.iceServers : ICE_SERVERS,
       iceTransportPolicy: 'all',
