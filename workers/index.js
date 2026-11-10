@@ -408,9 +408,12 @@ export function buildCallIceProviderConfig({ env = {}, turnix = null } = {}) {
   const tiers = [];
   if (expressServers.length) tiers.push({ name: "expressturn-primary", iceServers: [...stunServers, ...expressServers] });
   if (turnixServers.length) {
-    for (const tier of buildTurnixIceServerTiers(turnixServers)) {
+    const turnixTiers = buildTurnixIceServerTiers(turnixServers);
+    for (const tier of turnixTiers.filter(item => item.name !== "direct-stun")) {
       if (tier.iceServers.length) tiers.push({ name: "turnix-fallback-" + tier.name, iceServers: [...stunServers, ...tier.iceServers] });
     }
+    const directTier = turnixTiers.find(item => item.name === "direct-stun");
+    if (directTier?.iceServers.length) tiers.push({ name: "direct-stun-fallback", iceServers: stunServers });
   }
   if (!tiers.length) tiers.push({ name: "direct-stun", iceServers: stunServers });
   const hasTurnix = turnixServers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(value => typeof value === "string" && /^turns?:/i.test(value)));
