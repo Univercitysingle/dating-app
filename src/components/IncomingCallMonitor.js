@@ -43,7 +43,16 @@ export default function IncomingCallMonitor() {
   const [callActionError, setCallActionError] = useState('');
 
   const answerIncomingCall = () => {
-    if (!incomingCall?.roomId) return;
+    if (!incomingCall?.roomId || callActionBusy) return;
+    // Carry the explicit Answer gesture into the chat route. ChatCallPanel will
+    // accept this exact call as soon as its authenticated call state is loaded.
+    try {
+      window.sessionStorage.setItem('dating-app-auto-answer-call', JSON.stringify({
+        callId: String(incomingCall._id),
+        roomId: String(incomingCall.roomId),
+        requestedAt: Date.now()
+      }));
+    } catch (_) {}
     window.location.assign(`/chat/${encodeURIComponent(incomingCall.roomId)}`);
   };
 
