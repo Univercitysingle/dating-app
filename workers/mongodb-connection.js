@@ -5503,6 +5503,71 @@ export class MongoDBConnection {
     }
   }
 
+
+  async savePushSubscription(uid, subscription) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        !subscription || typeof subscription !== "object" ||
+        typeof subscription.endpoint !== "string" || subscription.endpoint.length > 2048 ||
+        !subscription.keys || typeof subscription.keys.p256dh !== "string" ||
+        typeof subscription.keys.auth !== "string") {
+      return { status: 400, body: { error: "Invalid push subscription" } };
+    }
+    let endpoint;
+    try { endpoint = new URL(subscription.endpoint); }
+    catch { return { status: 400, body: { error: "Invalid push endpoint" } }; }
+    const host = endpoint.hostname.toLowerCase();
+    const allowedHost = host === "fcm.googleapis.com" || host === "web.push.apple.com" ||
+      host === "push.services.mozilla.com" || host.endsWith(".push.services.mozilla.com") ||
+      host.endsWith(".notify.windows.com");
+    if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.port ||
+        !allowedHost || !/^[A-Za-z0-9_-]{80,120}$/.test(subscription.keys.p256dh) ||
+        !/^[A-Za-z0-9_-]{20,40}$/.test(subscription.keys.auth)) {
+      return { status: 400, body: { error: "Unsupported or invalid push subscription" } };
+    }
+    try {
+      const collection = this.getDatabase(await this.getClient()).collection("pushSubscriptions");
+      await collection.updateOne(
+        { uid, endpoint: endpoint.toString() },
+        { $set: { uid, endpoint: endpoint.toString(), expirationTime: subscription.expirationTime || null,
+          keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth }, updatedAt: new Date() },
+          $setOnInsert: { createdAt: new Date() } },
+        { upsert: true }
+      );
+      return { status: 201, body: { success: true } };
+    } catch { return { status: 503, body: { error: "Could not save push subscription" } }; }
+  }
+
+  async removePushSubscription(uid, endpointValue) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        typeof endpointValue !== "string" || endpointValue.length > 2048) {
+      return { status: 400, body: { error: "Invalid push subscription" } };
+    }
+    try {
+      const endpoint = new URL(endpointValue);
+      const result = await this.getDatabase(await this.getClient()).collection("pushSubscriptions")
+        .deleteOne({ uid, endpoint: endpoint.toString() });
+      return { status: 200, body: { success: true, removed: result.deletedCount > 0 } };
+    } catch { return { status: 503, body: { error: "Could not remove push subscription" } }; }
+  }
+
+  async getPushSubscriptions(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const [subscriptions, user] = await Promise.all([
+        db.collection("pushSubscriptions").find({ uid }).sort({ updatedAt: -1 }).limit(10).toArray(),
+        db.collection("users").findOne({ uid }, { projection: { notificationPreferences: 1, _id: 0 } })
+      ]);
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      return { status: 200, body: {
+        subscriptions: subscriptions.map(item => ({ endpoint: item.endpoint, expirationTime: item.expirationTime || null, keys: item.keys })),
+        preferences: this.normalizeNotificationPreferences(user.notificationPreferences)
+      } };
+    } catch { return { status: 503, body: { error: "Push subscriptions unavailable" } }; }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
@@ -5695,6 +5760,18 @@ export class MongoDBConnection {
           ? await this.getPhotoVerificationEvidenceForAdmin(uid, match[1])
           : await this.reviewPhotoVerification(uid, match[1], body.payload || {});
       }
+      return json(result.body, result.status);
+    }
+
+
+    if (url.pathname.startsWith("/internal/push/")) {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
+      let result;
+      if (url.pathname === "/internal/push/subscribe") result = await this.savePushSubscription(body.claims.sub, body.subscription);
+      else if (url.pathname === "/internal/push/unsubscribe") result = await this.removePushSubscription(body.claims.sub, body.endpoint);
+      else if (url.pathname === "/internal/push/subscriptions" && typeof body.targetUid === "string") result = await this.getPushSubscriptions(body.targetUid);
+      else return json({ error: "Not found" }, 404);
       return json(result.body, result.status);
     }
 
