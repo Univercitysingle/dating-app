@@ -22,7 +22,7 @@ async function deliverPushToUser(env, actorClaims, targetUid, eventKey, notifica
       if (result.permanent) {
         await connection.fetch("https://internal.invalid/internal/push/unsubscribe", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims: actorClaims, endpoint: subscription.endpoint })
+          body: JSON.stringify({ claims: actorClaims, targetUid, endpoint: subscription.endpoint })
         }).catch(() => null);
       }
     }));
