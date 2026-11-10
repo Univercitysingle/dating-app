@@ -4315,3 +4315,73 @@ test("reciprocal likes create one match and repeated likes upsert notifications 
   ).length, 2);
   assert.ok(notificationDeletes.length >= 2);
 });
+
+
+test("call lifecycle records declined calls distinctly", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId();
+  const call = { _id: id, callerUid: "caller", receiverUid: "receiver", status: "ringing", createdAt: new Date() };
+  const calls = {
+    async findOne() { return call; },
+    async updateOne(_filter, update) { Object.assign(call, update.$set); return { modifiedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    if (name === "callSessions") return calls;
+    assert.fail("Unexpected collection: " + name);
+  }});
+  connection.isCallPairUnavailable = async () => false;
+  const result = await connection.updateCall("receiver", { callId: String(id), action: "decline" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call.status, "declined");
+  assert.equal(result.body.call.endReason, "declined");
+  assert.equal(result.body.call.endedByUid, "receiver");
+  assert.ok(result.body.call.endedAt instanceof Date);
+});
+
+test("normally ended accepted calls are recorded as completed with duration", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId();
+  const connectedAt = new Date(Date.now() - 6500);
+  const call = { _id: id, callerUid: "caller", receiverUid: "receiver", status: "accepted", connectedAt, createdAt: connectedAt };
+  const calls = {
+    async findOne() { return call; },
+    async updateOne(_filter, update) { Object.assign(call, update.$set); return { modifiedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    if (name === "callSessions") return calls;
+    assert.fail("Unexpected collection: " + name);
+  }});
+  connection.isCallPairUnavailable = async () => false;
+  const result = await connection.updateCall("caller", { callId: String(id), action: "end" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call.status, "ended");
+  assert.equal(result.body.call.endReason, "completed");
+  assert.equal(result.body.call.endedByUid, "caller");
+  assert.ok(result.body.call.durationSeconds >= 6);
+});
+
+test("caller cancellation before acceptance is not misreported as a completed call", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId();
+  const call = { _id: id, callerUid: "caller", receiverUid: "receiver", status: "ringing", createdAt: new Date() };
+  const calls = {
+    async findOne() { return call; },
+    async updateOne(_filter, update) { Object.assign(call, update.$set); return { modifiedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    if (name === "callSessions") return calls;
+    assert.fail("Unexpected collection: " + name);
+  }});
+  connection.isCallPairUnavailable = async () => false;
+  const result = await connection.updateCall("caller", { callId: String(id), action: "end" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call.status, "ended");
+  assert.equal(result.body.call.endReason, "cancelled");
+  assert.equal(result.body.call.durationSeconds, undefined);
+});
