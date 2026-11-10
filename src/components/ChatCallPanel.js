@@ -64,6 +64,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const videoBitrateRef = useRef(0);
 
   useEffect(() => { callRef.current = call; }, [call]);
+  useEffect(() => { setVideoMinimized(false); setAudioDevicesOpen(false); }, [call?.id, call?.status]);
   useEffect(() => {
     setHeaderTarget(typeof document !== 'undefined' ? document.getElementById(`chat-call-actions-${roomId}`) : null);
   }, [roomId]);
