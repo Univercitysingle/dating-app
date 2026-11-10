@@ -158,6 +158,7 @@ test("call creation rejects an unmatched pair before creating a call session", a
     collection(name) {
       if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
       if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
+      if (name === "chatmessages") return {};
       if (name === "callSessions") {
         callSessionAccessed = true;
         return { async findOne() { return null; }, async insertOne() { assert.fail("Must not create a call"); } };
