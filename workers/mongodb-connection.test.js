@@ -2556,13 +2556,17 @@ test("delivery receipts update only messages addressed to the authenticated reci
   const messageId = "abcdef0123456789abcdef01";
   let capturedFilter;
   const db = {
-    collection() {
-      return {
+    collection(name) {
+      if (name === "chatmessages") return {
+        async findOne() { return { senderUid: "alice", receiverUid: "bob" }; },
         async updateMany(filter) {
           capturedFilter = filter;
           return { modifiedCount: 1 };
         }
       };
+      if (name === "users") return { async findOne() { return { blocked: [] }; } };
+      if (name === "matches") return { async findOne() { return null; } };
+      assert.fail("Unexpected collection: " + name);
     }
   };
   const connection = new MongoDBConnection({}, {});
@@ -2591,14 +2595,18 @@ test("read receipts update only unread messages addressed to the authenticated r
   let capturedFilter;
   let capturedUpdate;
   const db = {
-    collection() {
-      return {
+    collection(name) {
+      if (name === "chatmessages") return {
+        async findOne() { return { senderUid: "alice", receiverUid: "bob" }; },
         async updateMany(filter, update) {
           capturedFilter = filter;
           capturedUpdate = update;
           return { modifiedCount: 1 };
         }
       };
+      if (name === "users") return { async findOne() { return { blocked: [] }; } };
+      if (name === "matches") return { async findOne() { return null; } };
+      assert.fail("Unexpected collection: " + name);
     }
   };
   const connection = new MongoDBConnection({}, {});
@@ -2623,6 +2631,32 @@ test("read receipts update only unread messages addressed to the authenticated r
     messageIds: Array.from({ length: 101 }, () => messageId)
   });
   assert.equal(oversized.status, 400);
+});
+
+test("delivery and read receipts are denied after unmatching or blocking", async () => {
+  const { ObjectId } = await import("mongodb");
+  const messageId = "abcdef0123456789abcdef01";
+  let receiptWrites = 0;
+  const db = {
+    collection(name) {
+      if (name === "chatmessages") return {
+        async findOne() { return { senderUid: "alice", receiverUid: "bob" }; },
+        async updateMany() { receiptWrites++; return { modifiedCount: 1 }; }
+      };
+      if (name === "users") return {
+        async findOne({ uid }) { return uid === "alice" ? { blocked: [] } : { blocked: []; }; }
+      };
+      if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => db });
+  const delivered = await connection.markChatDelivered("bob", { roomId: "alice-bob", messageIds: [messageId] });
+  const read = await connection.markChatRead("bob", { roomId: "alice-bob", messageIds: [messageId] });
+  assert.equal(delivered.status, 403);
+  assert.equal(read.status, 403);
+  assert.equal(receiptWrites, 0);
 });
 
 test("chat message creation persists a normalized message and returns its MongoDB ID", async () => {
