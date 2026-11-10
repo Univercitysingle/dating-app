@@ -868,6 +868,30 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const active = call && ['ringing', 'accepted'].includes(call.status);
   const videoCall = call?.type === 'video';
 
+  // A full-screen call must also take ownership of document scrolling.
+  // Restore the exact previous inline styles when the call is minimized or ends.
+  useEffect(() => {
+    if (!active || !videoCall || incoming || videoMinimized) return undefined;
+    const body = document.body;
+    const root = document.documentElement;
+    const previous = {
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+      rootOverflow: root.style.overflow,
+      rootOverscroll: root.style.overscrollBehavior,
+    };
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    root.style.overflow = 'hidden';
+    root.style.overscrollBehavior = 'none';
+    return () => {
+      body.style.overflow = previous.bodyOverflow;
+      body.style.overscrollBehavior = previous.bodyOverscroll;
+      root.style.overflow = previous.rootOverflow;
+      root.style.overscrollBehavior = previous.rootOverscroll;
+    };
+  }, [active, videoCall, incoming, videoMinimized]);
+
   useEffect(() => {
     if (!incoming || !call?._id) {
       stopRingtone();
