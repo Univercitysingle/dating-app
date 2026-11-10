@@ -4850,3 +4850,62 @@ html.dark .profile-appearance-control select {
   border-color: #49404c;
   color: #f4eff4;
 }
+
+
+
+/* WhatsApp-inspired, viewport-safe call experience */
+.wa-call-screen{position:fixed!important;inset:0!important;z-index:2147483000!important;width:100vw!important;height:100vh!important;height:100dvh!important;min-height:100svh;overflow:hidden!important;background:#07110f;color:#f7faf9;font-family:inherit;isolation:isolate;overscroll-behavior:none;touch-action:pan-x pan-y}
+.wa-call-screen--audio{background:radial-gradient(ellipse at 50% 36%,#263c35 0%,#14241f 38%,#07110f 78%)}
+.wa-call-screen--video{background:#050807}
+.wa-call-remote-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;background:#050807}
+.wa-call-video-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(ellipse at center,#263c35,#07110f 75%);padding:24px;text-align:center}
+.wa-call-avatar{width:clamp(84px,20vw,132px);height:clamp(84px,20vw,132px);border-radius:50%;display:grid;place-items:center;overflow:hidden;background:#52635c;border:3px solid rgba(255,255,255,.18);font-size:clamp(32px,8vw,54px);font-weight:600;box-shadow:0 14px 45px #0005}
+.wa-call-avatar img,.wa-call-header-avatar img{width:100%;height:100%;object-fit:cover}
+.wa-call-avatar--large{width:clamp(112px,30vw,176px);height:clamp(112px,30vw,176px);font-size:clamp(42px,10vw,68px);border:4px solid rgba(255,255,255,.12);box-shadow:0 0 0 12px rgba(255,255,255,.035),0 20px 60px #0007}
+.wa-call-audio-content{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:calc(env(safe-area-inset-top) + 76px) 22px calc(env(safe-area-inset-bottom) + 150px)}
+.wa-call-audio-content h2{margin:26px 0 6px;font-size:clamp(23px,5vw,32px);font-weight:600;letter-spacing:-.025em}
+.wa-call-audio-content p{margin:0;color:rgba(255,255,255,.72);font-size:15px}
+.wa-call-encryption{margin-top:22px;color:rgba(255,255,255,.42);font-size:12px}
+.wa-call-header{position:absolute;z-index:5;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) clamp(14px,4vw,30px) 16px;background:linear-gradient(180deg,rgba(0,0,0,.58),transparent)}
+.wa-call-header-user{display:flex;align-items:center;gap:12px;min-width:0}
+.wa-call-header-avatar{width:42px;height:42px;flex:0 0 42px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#52635c;font-weight:600}
+.wa-call-header-copy{display:flex;flex-direction:column;min-width:0;gap:3px}
+.wa-call-header-copy strong{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-call-header-copy small{font-size:12px;color:rgba(255,255,255,.72)}
+.wa-call-header-actions{display:flex;align-items:center;gap:14px}
+.wa-call-header-actions button,.wa-call-mini-bar button{width:40px;height:40px;border:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.15);color:#fff}
+.wa-call-header-actions svg,.wa-call-controls svg,.wa-call-mini-bar svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.wa-call-signal{display:flex;align-items:end;gap:3px;height:18px}
+.wa-call-signal span{width:4px;height:6px;border-radius:3px;background:#ffffff40}
+.wa-call-signal span:nth-child(2){height:9px}.wa-call-signal span:nth-child(3){height:13px}.wa-call-signal span:nth-child(4){height:17px}
+.wa-call-signal span.is-on{background:#42d77d}
+.wa-call-reconnecting{position:absolute;z-index:8;top:calc(env(safe-area-inset-top) + 76px);left:50%;transform:translateX(-50%);white-space:nowrap;border-radius:20px;padding:9px 14px;background:#101a17e8;font-size:12px}
+.wa-call-self-view{position:absolute;z-index:6;top:calc(env(safe-area-inset-top) + 76px);right:clamp(12px,3vw,28px);width:clamp(96px,25vw,160px);height:clamp(132px,29vh,220px);padding:0;border:1px solid #ffffff80;border-radius:16px;overflow:hidden;background:#26332e;box-shadow:0 8px 28px #0008}
+.wa-call-self-view video{width:100%;height:100%;object-fit:cover}
+.wa-call-self-view>span{position:absolute;inset:0;display:grid;place-items:center;background:#26332e;color:#fff;font-size:12px}
+.wa-call-self-view small{position:absolute;bottom:7px;left:8px;padding:3px 7px;border-radius:8px;background:#0009;color:white;font-size:10px}
+.wa-call-self-view.is-expanded{top:50%;left:50%;right:auto;width:min(82vw,520px);height:min(68vh,680px);transform:translate(-50%,-50%)}
+.wa-call-bottom{position:absolute;z-index:10;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;padding:22px clamp(12px,4vw,30px) calc(env(safe-area-inset-bottom) + 18px);background:linear-gradient(0deg,rgba(0,0,0,.78),rgba(0,0,0,.32) 68%,transparent);pointer-events:none}
+.wa-call-bottom>*{pointer-events:auto}
+.wa-call-controls{display:flex;align-items:center;justify-content:center;gap:clamp(10px,3.5vw,26px);width:min(100%,560px);padding:12px 14px;border-radius:28px;background:rgba(24,37,32,.88);border:1px solid rgba(255,255,255,.12);box-shadow:0 14px 45px #0007;backdrop-filter:blur(22px)}
+.wa-call-controls button{min-width:clamp(48px,13vw,68px);height:clamp(58px,12vw,76px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;border:0;border-radius:18px;background:transparent;color:#fff;font-size:11px;font-weight:500}
+.wa-call-controls button svg{width:23px;height:23px}
+.wa-call-controls button.is-active{background:#ffffff24}
+.wa-call-controls button.wa-call-end,.wa-call-mini-bar button.wa-call-mini-end{min-width:clamp(56px,14vw,76px);border-radius:22px;background:#e53945;color:#fff}
+.wa-call-error{max-width:min(92vw,520px);margin:0 0 12px;padding:9px 14px;border-radius:12px;background:#761d28;color:#fff;font-size:12px;text-align:center}
+.wa-call-device-panel{display:flex;flex-wrap:wrap;gap:10px;width:min(94vw,560px);margin-bottom:12px;padding:12px;border-radius:16px;background:#15211e;border:1px solid #ffffff24}
+.wa-call-device-panel label{display:flex;flex:1 1 190px;flex-direction:column;gap:6px;color:#fff;font-size:12px}
+.wa-call-device-panel select{width:100%;min-width:0;padding:9px;border:1px solid #ffffff30;border-radius:9px;background:#26352f;color:#fff}
+.wa-call-device-panel small{color:#ffffff9c}
+.wa-call-mini-bar{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#14201df2;cursor:grab;touch-action:none}
+.wa-call-mini-bar>span{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.wa-call-mini-bar strong,.wa-call-mini-bar small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-call-mini-bar strong{font-size:12px}.wa-call-mini-bar small{font-size:10px;color:#ffffffa6}
+.wa-call-mini-bar button{width:34px;height:34px;flex:0 0 34px}
+.wa-call-screen--mini{inset:auto!important;width:min(92vw,360px)!important;height:clamp(118px,24vh,190px)!important;min-height:118px!important;border:1px solid #ffffff40;border-radius:18px;box-shadow:0 12px 48px #0009;z-index:2147483000!important}
+.wa-call-screen--mini .wa-call-remote-video{border-radius:18px}
+.wa-call-screen--mini.wa-call-screen--audio{width:min(88vw,320px)!important;height:118px!important;min-height:118px!important}
+.wa-call-screen--mini.wa-call-screen--audio .wa-call-mini-bar{background:#14201df2}
+@media(max-width:520px){.wa-call-controls{gap:clamp(5px,2vw,12px);padding:10px 7px;border-radius:23px}.wa-call-controls button{min-width:0;flex:1;height:62px;border-radius:15px;font-size:10px}.wa-call-controls button.wa-call-end{flex:1.12}.wa-call-header{padding-left:14px;padding-right:14px}.wa-call-self-view{width:clamp(88px,25vw,116px);height:clamp(120px,24vh,166px);border-radius:13px}.wa-call-bottom{padding-left:8px;padding-right:8px}}
+@media(max-height:560px) and (orientation:landscape){.wa-call-audio-content{padding-top:62px;padding-bottom:112px}.wa-call-avatar--large{width:82px;height:82px}.wa-call-audio-content h2{margin-top:10px;font-size:20px}.wa-call-audio-content p{font-size:12px}.wa-call-encryption{display:none}.wa-call-bottom{padding-top:8px;padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}.wa-call-controls{padding:5px 8px}.wa-call-controls button{height:48px;gap:3px}.wa-call-controls button svg{width:19px;height:19px}.wa-call-self-view{top:calc(env(safe-area-inset-top) + 58px);height:clamp(90px,35vh,140px);width:clamp(72px,14vw,112px)}}
+@media(prefers-reduced-motion:no-preference){.wa-call-controls button,.wa-call-header-actions button{transition:background .16s ease,transform .16s ease}.wa-call-controls button:active,.wa-call-header-actions button:active{transform:scale(.95)}}
