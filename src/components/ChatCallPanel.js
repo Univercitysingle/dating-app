@@ -798,7 +798,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {status && status !== 'Incoming call' && <p className="mt-3 text-sm text-slate-300" role="status">{status}</p>}
       </div>
     </div>}
-    {active && <div className="fixed bottom-28 left-1/2 z-[10600] mx-auto flex w-[min(94vw,42rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-xl">
+    {active && createPortal(<div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-[10600] mx-auto flex w-[min(94vw,42rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-xl"> mx-auto flex w-[min(94vw,42rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-xl">
       <button type="button" onClick={() => setAudioDevicesOpen(value => !value)} className="call-utility-button" aria-expanded={audioDevicesOpen}>Audio devices</button>
       {audioDevicesOpen && <>
         <label className="flex min-w-0 flex-1 items-center gap-2">Microphone
@@ -813,10 +813,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         </label>
         {!remoteAudioRef.current?.setSinkId && !remoteVideoRef.current?.setSinkId && <span className="text-gray-500">Speaker selection is not supported by this browser.</span>}
       </>}
-    </div>}
+    </div>, document.body)}
     {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
-    {active && videoCall && call?.status === "accepted" && <div className="call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white" style={{ touchAction: "manipulation" }} role="dialog" aria-modal="true" aria-label="Video call">
+    {active && videoCall && call?.status === "accepted" && createPortal(<div className="call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white" style={{ touchAction: "manipulation" }} role="dialog" aria-modal="true" aria-label="Video call">
       <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" />
       {!remoteStream && <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-slate-900 to-[#07110e] px-6 pb-32 text-center">
         <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/10 text-3xl font-semibold">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
@@ -867,7 +867,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           </button>
         </div>
       </div>
-    </div>}
+    </div>, document.body)}
     {active && !(videoCall && call?.status === "accepted") && <div className="mt-3 grid gap-3">
       {call?.status === 'accepted' && <div className="call-live-status flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
         <span className="call-live-dot" aria-hidden="true" />
