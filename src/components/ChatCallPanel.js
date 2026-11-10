@@ -1000,7 +1000,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           <p className="mt-0.5 truncate text-xs text-white/75 sm:text-sm">{formatDuration(callDuration)} <span className="px-1 text-white/45">·</span> {status || (videoCall ? "Video connected" : "Voice connected")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-        <button type="button" onClick={() => { setAudioDevicesOpen(false); setVideoMinimized(true); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white shadow-lg backdrop-blur-xl" aria-label="Minimize video call" title="Minimize call"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button type="button" onClick={() => { setAudioDevicesOpen(false); setVideoMinimized(true); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white shadow-lg backdrop-blur-xl" aria-label={videoCall ? "Minimize video call" : "Minimize voice call"} title="Minimize call"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14"/></svg></button>
         <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-2.5 py-2 text-[10px] text-white/90 shadow-lg backdrop-blur-xl sm:gap-2 sm:px-3 sm:text-xs" aria-label={connectionQuality ? `Network signal quality ${connectionQuality} of 5` : "Network signal quality unavailable"}>
           <span className="flex items-end gap-0.5" aria-hidden="true">{Array.from({length:5},(_,index)=><span key={index} className={connectionQuality >= index+1 ? "w-1 rounded-sm bg-emerald-400" : "w-1 rounded-sm bg-white/30"} style={{height: 6+index*2}} />)}</span>
           <span>{connectionQuality ? "Good signal" : "Connecting"}</span>
@@ -1047,7 +1047,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           {videoCall && <button type="button" onClick={switchCamera} className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16" aria-label="Switch front or rear camera" title="Switch camera">
             <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 7h-3l-2-2H9L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><circle cx="12" cy="13" r="3"/></svg>
           </button>}
-          <button type="button" onClick={() => finishCall("end")} disabled={callActionInProgressRef.current} className="call-video-control-button call-video-end-button flex h-11 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 active:scale-95 disabled:cursor-wait disabled:opacity-50 min-[380px]:h-12 min-[380px]:w-14 sm:h-16 sm:w-20" aria-label="End video call" title="End call">
+          <button type="button" onClick={() => finishCall("end")} disabled={callActionInProgressRef.current} className="call-video-control-button call-video-end-button flex h-11 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 active:scale-95 disabled:cursor-wait disabled:opacity-50 min-[380px]:h-12 min-[380px]:w-14 sm:h-16 sm:w-20" aria-label={videoCall ? "End video call" : "End voice call"} title="End call">
             <svg viewBox="0 0 24 24" className="h-6 w-6 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 0 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
           </button>
         </div>
@@ -1061,7 +1061,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
             <p className="truncate text-xs font-semibold">{otherUser?.name || (videoCall ? 'Video call' : 'Voice call')}</p>
             <p className="text-[10px] text-white/75">{formatDuration(callDuration)} · {reconnecting ? 'Reconnecting' : 'Live'}</p>
           </div>
-          <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => setVideoMinimized(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white" aria-label="Restore full video call" title="Restore call">
+          <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => setVideoMinimized(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white" aria-label={videoCall ? "Restore full video call" : "Restore full voice call"} title="Restore call">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/></svg>
           </button>
         </div>
@@ -1069,7 +1069,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           <button type="button" onClick={toggleMute} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} title={muted ? 'Unmute' : 'Mute'}>
             {muted ? <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}
           </button>
-          <button type="button" onClick={() => finishCall('end')} className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white" aria-label="End video call" title="End call">
+          <button type="button" onClick={() => finishCall('end')} className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white" aria-label={videoCall ? "End video call" : "End voice call"} title="End call">
             <svg viewBox="0 0 24 24" className="h-5 w-5 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 1 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
           </button>
         </div>
