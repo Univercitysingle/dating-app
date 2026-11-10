@@ -101,6 +101,23 @@ jobs:
         working-directory: workers
         run: npm test
 
+      - name: Verify Turnix API token and credential issuance
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --max-time 10 -o /tmp/turnix-ice-response.json -w '%{http_code}' \
+            -X POST 'https://turnix.io/api/v1/credentials/ice' \
+            -H "Authorization: Bearer $TURNIX_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data '{"ttl":3600,"room":"dating-app-staging-validation","initiator_client":"github-actions-validation"}')"
+          count="$(jq -r 'if (.iceServers | type) == "array" then (.iceServers | length) else 0 end' /tmp/turnix-ice-response.json)"
+          echo "Turnix credential API status: $status; ICE server entries: $count"
+          if [[ "$status" != "200" || "$count" -lt 1 ]]; then
+            echo "::error::Turnix credential verification failed. Check TURNIX_API_TOKEN and Turnix project quota."
+            exit 1
+          fi
+          rm -f /tmp/turnix-ice-response.json
+
       - name: Deploy isolated staging Worker
         id: deploy
         shell: bash
