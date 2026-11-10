@@ -25,6 +25,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState('');
   const [selectedSpeakerId, setSelectedSpeakerId] = useState('');
   const [audioDevicesOpen, setAudioDevicesOpen] = useState(false);
+  const [videoMinimized, setVideoMinimized] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -647,28 +648,41 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     if (!stream || !peer || !navigator.mediaDevices?.getUserMedia) return;
     const currentTrack = stream.getVideoTracks()[0];
     if (!currentTrack) return;
-    const nextFacing = cameraFacingRef.current === 'user' ? 'environment' : 'user';
+    const currentDeviceId = currentTrack.getSettings?.().deviceId || '';
+    const facingNow = currentTrack.getSettings?.().facingMode || cameraFacingRef.current;
+    const nextFacing = facingNow === 'environment' ? 'user' : 'environment';
+    let replacementStream = null;
     try {
-      const replacementStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: nextFacing } }
-      });
+      try {
+        replacementStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { exact: nextFacing } }
+        });
+      } catch (facingError) {
+        const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device =>
+          device.kind === 'videoinput' && device.deviceId && device.deviceId !== currentDeviceId
+        );
+        if (!devices.length) throw facingError;
+        replacementStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { deviceId: { exact: devices[0].deviceId } }
+        });
+      }
       const replacementTrack = replacementStream.getVideoTracks()[0];
       const sender = peer.getSenders().find(item => item.track?.kind === 'video');
-      if (!replacementTrack || !sender) {
-        replacementStream.getTracks().forEach(track => track.stop());
-        throw new Error('Camera switching is not supported by this device.');
-      }
+      if (!replacementTrack || !sender) throw new Error('A second camera is not available on this device.');
       await sender.replaceTrack(replacementTrack);
       stream.removeTrack(currentTrack);
       stream.addTrack(replacementTrack);
-      currentTrack.stop();
       replacementTrack.enabled = !cameraOff;
-      cameraFacingRef.current = nextFacing;
+      currentTrack.stop();
+      localStreamRef.current = stream;
+      cameraFacingRef.current = replacementTrack.getSettings?.().facingMode || nextFacing;
       setLocalStream(new MediaStream(stream.getTracks()));
       setError('');
     } catch (err) {
-      setError(messageFor(err, 'Could not switch camera. Check camera permissions.'));
+      replacementStream?.getTracks().forEach(track => track.stop());
+      setError(messageFor(err, 'Could not switch camera. This device may not have another camera.'));
     }
   };
 
@@ -800,37 +814,40 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     </div>}
     {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
-    {active && videoCall && call?.status === "accepted" && createPortal(<div className="call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white" style={{ touchAction: "manipulation" }} role="dialog" aria-modal="true" aria-label="Video call">
-      <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" />
+    {active && videoCall && call?.status === "accepted" && createPortal(<div className={videoMinimized ? "call-video-overlay fixed bottom-3 right-3 z-[11000] h-[min(34vh,15rem)] w-[min(76vw,22rem)] overflow-hidden rounded-2xl border border-white/20 bg-[#07110e] text-white shadow-2xl sm:bottom-5 sm:right-5 sm:h-64 sm:w-96" : "call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white"} style={{ touchAction: "manipulation" }} role="dialog" aria-modal="true" aria-label="Video call">
+      <video ref={remoteVideoRef} autoPlay playsInline className={videoMinimized ? "absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" : "absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center"} />
       {!remoteStream && <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-slate-900 to-[#07110e] px-6 pb-32 text-center">
         <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/10 text-3xl font-semibold">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
         <p className="text-lg font-semibold">{otherUser?.name || "Video call"}</p><p className="text-sm text-white/70">Connecting video…</p>
       </div>}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-black/70 via-black/25 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+      {!videoMinimized && <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-black/70 via-black/25 to-transparent" />}
+      {!videoMinimized && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />}
 
-      <div className="absolute inset-x-0 z-20 flex items-start justify-between gap-2 px-3 sm:px-7" style={{ top: "max(0.65rem, env(safe-area-inset-top))" }}>
+      {!videoMinimized && <div className="absolute inset-x-0 z-20 flex items-start justify-between gap-2 px-3 sm:px-7" style={{ top: "max(0.65rem, env(safe-area-inset-top))" }}>
         <div className="min-w-0 max-w-[72%] rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 shadow-lg backdrop-blur-xl sm:max-w-[min(70vw,28rem)] sm:px-4 sm:py-3">
           <p className="truncate text-sm font-semibold sm:text-base">{otherUser?.name || "Video call"}</p>
           <p className="mt-0.5 truncate text-xs text-white/75 sm:text-sm">{formatDuration(callDuration)} <span className="px-1 text-white/45">·</span> {status || "Connected"}</p>
         </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+        <button type="button" onClick={() => { setAudioDevicesOpen(false); setVideoMinimized(true); }} className="rounded-full border border-white/15 bg-black/40 px-3 py-2 text-xs text-white shadow-lg backdrop-blur-xl" aria-label="Minimize video call">Minimize</button>
         <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-2.5 py-2 text-[10px] text-white/90 shadow-lg backdrop-blur-xl sm:gap-2 sm:px-3 sm:text-xs" aria-label={connectionQuality ? `Network signal quality ${connectionQuality} of 5` : "Network signal quality unavailable"}>
           <span className="flex items-end gap-0.5" aria-hidden="true">{Array.from({length:5},(_,index)=><span key={index} className={connectionQuality >= index+1 ? "w-1 rounded-sm bg-emerald-400" : "w-1 rounded-sm bg-white/30"} style={{height: 6+index*2}} />)}</span>
           <span>{connectionQuality ? "Good signal" : "Connecting"}</span>
         </div>
-      </div>
+        </div>
+      </div>}
 
       {reconnecting && <div className="absolute left-1/2 z-20 -translate-x-1/2 rounded-full border border-white/15 bg-black/70 px-3.5 py-2 text-xs font-medium text-white shadow-xl backdrop-blur-xl" style={{ top: "calc(env(safe-area-inset-top) + 4.35rem)" }} role="status">
         <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />{navigator.onLine ? "Reconnecting call…" : "Waiting for network…"}
       </div>}
 
-      <div className="call-video-self-view absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 shadow-2xl sm:right-7 sm:rounded-3xl" style={{ top: "calc(env(safe-area-inset-top) + 5.25rem)", width: "clamp(5.75rem, 25vw, 9rem)", height: "clamp(7.5rem, 19vh, 11rem)" }}>
+      {!videoMinimized && <div className="call-video-self-view absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 shadow-2xl sm:right-7 sm:rounded-3xl" style={{ top: "calc(env(safe-area-inset-top) + 5.25rem)", width: "clamp(5.75rem, 25vw, 9rem)", height: "clamp(7.5rem, 19vh, 11rem)" }}>
         <video ref={localVideoRef} autoPlay muted playsInline className={cameraOff ? "h-full w-full object-cover opacity-0" : "h-full w-full object-cover"} />
         {cameraOff && <div className="absolute inset-0 flex items-center justify-center bg-slate-800 px-1 text-center text-[11px] text-white/85">Camera off</div>}
         <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">You</span>
-      </div>
+      </div>}
 
-      <div className="absolute inset-x-0 z-20 flex flex-col items-center px-3 sm:px-4" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+      {!videoMinimized && <div className="absolute inset-x-0 z-20 flex flex-col items-center px-3 sm:px-4" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         {error && <p className="mb-3 max-w-md rounded-xl border border-rose-300/20 bg-rose-950/90 px-4 py-2.5 text-center text-xs text-rose-100 shadow-xl sm:text-sm" role="alert">{error}</p>}
         <div className="call-video-controls relative flex w-full max-w-[26rem] items-center justify-center gap-2 rounded-[2rem] border border-white/15 bg-[#111b19]/90 px-4 py-3 shadow-2xl backdrop-blur-2xl sm:max-w-lg sm:gap-4 sm:px-7 sm:py-4">
           {audioDevicesOpen && <div className="absolute bottom-full mb-3 flex w-[min(94vw,34rem)] flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-[#17211f]/95 p-3 text-xs text-white shadow-2xl backdrop-blur-2xl">
@@ -867,7 +884,8 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
             <span className="mt-1 text-[10px] font-semibold">End</span>
           </button>
         </div>
-      </div>
+      </div>}
+      {videoMinimized && <button type="button" onClick={() => setVideoMinimized(false)} className="absolute inset-x-0 bottom-0 z-30 bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur" aria-label="Restore video call">Return to call · {formatDuration(callDuration)}</button>}
     </div>, document.body)}
     {active && !(videoCall && call?.status === "accepted") && <div className="mt-3 grid gap-3">
       {call?.status === 'accepted' && <div className="call-live-status flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
