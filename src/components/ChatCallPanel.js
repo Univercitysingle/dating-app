@@ -798,22 +798,6 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {status && status !== 'Incoming call' && <p className="mt-3 text-sm text-slate-300" role="status">{status}</p>}
       </div>
     </div>}
-    {active && createPortal(<div className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 z-[10600] mx-auto flex w-[min(94vw,42rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-xl"> mx-auto flex w-[min(94vw,42rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-xl">
-      <button type="button" onClick={() => setAudioDevicesOpen(value => !value)} className="call-utility-button" aria-expanded={audioDevicesOpen}>Audio devices</button>
-      {audioDevicesOpen && <>
-        <label className="flex min-w-0 flex-1 items-center gap-2">Microphone
-          <select aria-label="Select microphone" value={selectedMicrophoneId} onChange={event => switchMicrophone(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-gray-300 bg-white px-2 py-1">
-            {audioInputs.map((device,index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Microphone ${index+1}`}</option>)}
-          </select>
-        </label>
-        <label className="flex min-w-0 flex-1 items-center gap-2">Speaker
-          <select aria-label="Select speaker" value={selectedSpeakerId} onChange={event => applySpeaker(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-gray-300 bg-white px-2 py-1">
-            {audioOutputs.map((device,index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Speaker ${index+1}`}</option>)}
-          </select>
-        </label>
-        {!remoteAudioRef.current?.setSinkId && !remoteVideoRef.current?.setSinkId && <span className="text-gray-500">Speaker selection is not supported by this browser.</span>}
-      </>}
-    </div>, document.body)}
     {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
     {active && videoCall && call?.status === "accepted" && createPortal(<div className="call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white" style={{ touchAction: "manipulation" }} role="dialog" aria-modal="true" aria-label="Video call">
@@ -849,6 +833,23 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       <div className="absolute inset-x-0 z-20 flex flex-col items-center px-3 sm:px-4" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         {error && <p className="mb-3 max-w-md rounded-xl border border-rose-300/20 bg-rose-950/90 px-4 py-2.5 text-center text-xs text-rose-100 shadow-xl sm:text-sm" role="alert">{error}</p>}
         <div className="call-video-controls flex w-full max-w-[22rem] items-center justify-center gap-3 rounded-[2rem] border border-white/15 bg-[#111b19]/90 px-4 py-3 shadow-2xl backdrop-blur-2xl sm:max-w-md sm:gap-6 sm:px-7 sm:py-4">
+          {audioDevicesOpen && <div className="absolute bottom-full mb-3 flex w-[min(94vw,34rem)] flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-[#17211f]/95 p-3 text-xs text-white shadow-2xl backdrop-blur-2xl">
+            <label className="flex min-w-0 flex-1 items-center gap-2">Microphone
+              <select aria-label="Select microphone" value={selectedMicrophoneId} onChange={event => switchMicrophone(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-white/20 bg-[#27332f] px-2 py-2 text-white">
+                {audioInputs.map((device,index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Microphone ${index+1}`}</option>)}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-1 items-center gap-2">Speaker
+              <select aria-label="Select speaker" value={selectedSpeakerId} onChange={event => applySpeaker(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-white/20 bg-[#27332f] px-2 py-2 text-white">
+                {audioOutputs.map((device,index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Speaker ${index+1}`}</option>)}
+              </select>
+            </label>
+            {!remoteAudioRef.current?.setSinkId && !remoteVideoRef.current?.setSinkId && <span className="text-white/60">Speaker selection is not supported by this browser.</span>}
+          </div>}
+          <button type="button" onClick={() => setAudioDevicesOpen(value => !value)} className={audioDevicesOpen ? "flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md sm:h-16 sm:w-14" : "flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 sm:h-16 sm:w-14"} aria-expanded={audioDevicesOpen} aria-label="Audio device settings" title="Audio device settings">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42m-9.88 9.88-1.42 1.42"/><circle cx="12" cy="12" r="4"/></svg>
+            <span className="mt-1 text-[9px] font-medium">Audio</span>
+          </button>
           <button type="button" onClick={toggleMute} className={muted ? "call-video-control-button flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 transition active:scale-95 sm:h-16 sm:w-16" : "flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16"} aria-label={muted ? "Unmute microphone" : "Mute microphone"} title={muted ? "Unmute microphone" : "Mute microphone"}>
             {muted ? <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}
             <span className="mt-1 text-[10px] font-medium">{muted ? "Unmute" : "Mute"}</span>
