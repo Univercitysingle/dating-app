@@ -95,3 +95,84 @@ test("opaque chat room IDs are authorized by persisted participant membership, n
   assert.ok(calls.some(call => call.collection === "chatTyping" && call.filter.roomId === roomId));
   assert.ok(calls.some(call => call.collection === "chatmessages" && call.filter.receiverUid === "bob"));
 });
+
+
+test("calls are denied after a participant blocks the other participant", async () => {
+  const usersByUid = {
+    alice: { uid: "alice", blocked: ["bob"] },
+    bob: { uid: "bob", blocked: [] }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  assert.equal(await connection.isCallPairUnavailable(db, "alice", "bob"), true);
+});
+
+test("calls are denied after either participant blocks the other participant", async () => {
+  const usersByUid = {
+    alice: { uid: "alice", blocked: [] },
+    bob: { uid: "bob", blocked: ["alice"] }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  assert.equal(await connection.isCallPairUnavailable(db, "alice", "bob"), true);
+});
+
+test("calls are denied when a persisted match has been unmatched", async () => {
+  const usersByUid = {
+    alice: { uid: "alice", blocked: [] },
+    bob: { uid: "bob", blocked: [] }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  assert.equal(await connection.isCallPairUnavailable(db, "alice", "bob"), true);
+});
+
+test("call creation rejects an unmatched pair before creating a call session", async () => {
+  const usersByUid = {
+    alice: { uid: "alice", blocked: [], accountStatus: "active" },
+    bob: { uid: "bob", blocked: [], accountStatus: "active" }
+  };
+  let callSessionAccessed = false;
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
+      if (name === "callSessions") {
+        callSessionAccessed = true;
+        return { async findOne() { return null; }, async insertOne() { assert.fail("Must not create a call"); } };
+      }
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createCall("alice", {
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    type: "audio",
+    offer: { type: "offer", sdp: "valid-offer" }
+  });
+
+  assert.equal(result.status, 403);
+  assert.equal(callSessionAccessed, false);
+});
