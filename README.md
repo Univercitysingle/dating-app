@@ -72,3 +72,7 @@ Proposed test progression: baseline, 100, 1,000, 2,500, 5,000, 10,000 and 15,000
 
 ## Definition of completion
 Every mindmap requirement must map to implementation, tests and staging evidence. Keep implementation status distinct from external approval and production readiness.
+
+### WebRTC TURN configuration (staging)
+
+The staging Worker requests short-lived ICE credentials from Turnix using the server-side GitHub Actions secret `TURNIX_API_TOKEN`. The deployment workflow transfers it to the Cloudflare staging Worker as a Worker secret. Never add the token to frontend environment variables, source code, or logs. The free Turnix plan currently includes 10 GB of TURN relay traffic per month; monitor usage in the Turnix dashboard. If the quota is exhausted, the API returns a service-unavailable response and calls may fall back only if the client has a usable direct network path.
