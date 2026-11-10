@@ -4552,7 +4552,7 @@ export class MongoDBConnection {
       } else {
         await calls.updateMany(
           { receiverUid: uid, status: "ringing", createdAt: { $lt: staleBefore } },
-          { $set: { status: "missed", endedAt: now, updatedAt: now } }
+          { $set: { status: "missed", endReason: "no_answer", endedAt: now, updatedAt: now } }
         );
       }
       const call = await calls.findOne(
