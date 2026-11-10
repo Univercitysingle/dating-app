@@ -27,6 +27,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [selectedSpeakerId, setSelectedSpeakerId] = useState('');
   const [audioDevicesOpen, setAudioDevicesOpen] = useState(false);
   const [videoMinimized, setVideoMinimized] = useState(false);
+  const [localPreviewExpanded, setLocalPreviewExpanded] = useState(false);
   const [floatingPosition, setFloatingPosition] = useState({ right: 16, bottom: 16 });
   const floatingDragRef = useRef(null);
 
@@ -84,7 +85,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, []);
 
   useEffect(() => { callRef.current = call; }, [call]);
-  useEffect(() => { setVideoMinimized(false); setAudioDevicesOpen(false); setFloatingPosition({ right: 16, bottom: 16 }); floatingDragRef.current = null; }, [call?.id, call?.status]);
+  useEffect(() => { setVideoMinimized(false); setLocalPreviewExpanded(false); setAudioDevicesOpen(false); setFloatingPosition({ right: 16, bottom: 16 }); floatingDragRef.current = null; }, [call?.id, call?.status]);
 
   // Keep the compact call window inside the visible viewport while allowing
   // the user to drag it by its title bar on touchscreens and desktop browsers.
@@ -946,10 +947,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {status && status !== 'Incoming call' && <p className="mt-3 text-sm text-slate-300" role="status">{status}</p>}
       </div>
     </div>}
-    {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
-    {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
-    {active && videoCall && call?.status === "accepted" && createPortal(<div className={videoMinimized ? "call-video-overlay fixed z-[11000] h-[min(38vh,19rem)] w-[min(88vw,25rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-white/25 bg-[#07110e] text-white shadow-2xl ring-1 ring-black/20" : "call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white"} style={videoMinimized ? { right: floatingPosition.right, bottom: floatingPosition.bottom, touchAction: "none" } : { touchAction: "manipulation" }} role="dialog" aria-modal={!videoMinimized} aria-label="Video call">
-      <video ref={remoteVideoRef} autoPlay playsInline className={videoMinimized ? "absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" : "absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center"} />
+    {!active || !videoCall ? status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p> : null}
+    {!active || !videoCall ? error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p> : null}
+    {active && videoCall && createPortal(<div className={videoMinimized ? "call-video-overlay fixed z-[11000] h-[min(38vh,19rem)] w-[min(88vw,25rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-white/25 bg-[#07110e] text-white shadow-2xl ring-1 ring-black/20" : "call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white"} style={videoMinimized ? { right: floatingPosition.right, bottom: floatingPosition.bottom, touchAction: "none" } : { touchAction: "manipulation" }} role="dialog" aria-modal={!videoMinimized} aria-label="Video call">
+      <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" />
       {!remoteStream && <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-slate-900 to-[#07110e] px-6 pb-32 text-center">
         <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/10 text-3xl font-semibold">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
         <p className="text-lg font-semibold">{otherUser?.name || "Video call"}</p><p className="text-sm text-white/70">Connecting video…</p>
@@ -975,11 +976,12 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />{navigator.onLine ? "Reconnecting call…" : "Waiting for network…"}
       </div>}
 
-      {!videoMinimized && <div className="call-video-self-view absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 shadow-2xl sm:right-7 sm:rounded-3xl" style={{ top: "calc(env(safe-area-inset-top) + 5.25rem)", width: "clamp(5.75rem, 25vw, 9rem)", height: "clamp(7.5rem, 19vh, 11rem)" }}>
+      {!videoMinimized && <button type="button" onClick={() => setLocalPreviewExpanded(value => !value)} className="call-video-self-view group absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 text-left shadow-2xl transition-all sm:right-7 sm:rounded-3xl" style={{ top: localPreviewExpanded ? "50%" : "calc(env(safe-area-inset-top) + 5.25rem)", right: localPreviewExpanded ? "50%" : undefined, transform: localPreviewExpanded ? "translate(50%, -50%)" : undefined, width: localPreviewExpanded ? "min(78vw, 34rem)" : "clamp(5.75rem, 25vw, 9rem)", height: localPreviewExpanded ? "min(70vh, 38rem)" : "clamp(7.5rem, 19vh, 11rem)" }} aria-label={localPreviewExpanded ? "Shrink your camera preview" : "Expand your camera preview"} title={localPreviewExpanded ? "Shrink preview" : "Expand preview"}>
         <video ref={attachLocalVideo} autoPlay muted playsInline className={cameraOff ? "h-full w-full object-cover opacity-0" : "h-full w-full object-cover"} />
         {cameraOff && <div className="absolute inset-0 flex items-center justify-center bg-slate-800 px-1 text-center text-[11px] text-white/85">Camera off</div>}
         <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">You</span>
-      </div>}
+        <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d={localPreviewExpanded ? "M8 4v4H4m16 8h-4v4M4 8l5-5m11 13-5 5" : "M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"}/></svg></span>
+      </button>}
 
       {!videoMinimized && <div className="absolute inset-x-0 z-20 flex flex-col items-center px-3 sm:px-4" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         {error && <p className="mb-3 max-w-md rounded-xl border border-rose-300/20 bg-rose-950/90 px-4 py-2.5 text-center text-xs text-rose-100 shadow-xl sm:text-sm" role="alert">{error}</p>}
@@ -1037,7 +1039,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         </div>
       </>}
     </div>, document.body)}
-    {active && !(videoCall && call?.status === "accepted") && <div className="mt-3 grid gap-3">
+    {active && !videoCall && <div className="mt-3 grid gap-3">
       {call?.status === 'accepted' && <div className="call-live-status flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
         <span className="call-live-dot" aria-hidden="true" />
         <span className="text-sm font-semibold text-gray-800">{formatDuration(callDuration)}</span>
