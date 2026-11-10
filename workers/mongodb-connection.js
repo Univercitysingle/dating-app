@@ -4480,6 +4480,15 @@ export class MongoDBConnection {
           await this.isChatMatchInactive(db, uid, receiverUid)) {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
       }
+      const calls = db.collection("callSessions");
+      // A user can participate in only one live call at a time, even if
+      // another conversation attempts to call them concurrently.
+      const active = await calls.findOne({
+        status: { $in: ["ringing", "accepted"] },
+        $or: [{ callerUid: uid }, { receiverUid: uid }]
+      }, { projection: { _id: 1 } });
+      if (active) return { status: 409, body: { error: "There is already an active call in this conversation" } };
+
       // Chat room IDs are opaque and must not be reconstructed from UIDs.
       // Resolve the peer from a persisted message in this exact room, then
       // require that it is the intended receiver before creating a call.
@@ -4493,14 +4502,6 @@ export class MongoDBConnection {
       if (roomPeerUid !== receiverUid) {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
       }
-      const calls = db.collection("callSessions");
-      // A user can participate in only one live call at a time, even if
-      // another conversation attempts to call them concurrently.
-      const active = await calls.findOne({
-        status: { $in: ["ringing", "accepted"] },
-        $or: [{ callerUid: uid }, { receiverUid: uid }]
-      }, { projection: { _id: 1 } });
-      if (active) return { status: 409, body: { error: "There is already an active call in this conversation" } };
       const call = {
         roomId, callerUid: uid, receiverUid, type, status: "ringing",
         offer: { type: "offer", sdp: offer.sdp }, answer: null, signals: [],
