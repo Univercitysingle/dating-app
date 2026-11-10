@@ -4736,6 +4736,20 @@ export class MongoDBConnection {
     }
   }
 
+  async isChatMatchInactive(db, uid, otherUid) {
+    const matches = db.collection("matches");
+    if (typeof matches.findOne !== "function") return false;
+    const match = await matches.findOne({
+      $or: [
+        { user1Uid: uid, user2Uid: otherUid },
+        { user1Uid: otherUid, user2Uid: uid }
+      ]
+    }, { projection: { status: 1 } });
+    // A missing match record is treated as a legacy conversation. Once a
+    // pair has a match record, only its active "matched" state grants access.
+    return Boolean(match && typeof match.status === "string" && match.status !== "matched");
+  }
+
   async getChatHistory(uid, roomId, limit = 50, skip = 0, after = null, before = null) {
     if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
@@ -4774,7 +4788,8 @@ export class MongoDBConnection {
         const otherUser = await db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } });
         if (!otherUser ||
             (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
-            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) {
+            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
+            await this.isChatMatchInactive(db, uid, otherUid)) {
           return { status: 403, body: { error: "Chat history is unavailable for this conversation." } };
         }
         query = participantQuery;
@@ -4899,7 +4914,8 @@ export class MongoDBConnection {
       for (const [roomId, item] of latestByRoom) {
         const otherUser = usersByUid.get(item.otherUid);
         if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(item.otherUid)) ||
-            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) continue;
+            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
+            await this.isChatMatchInactive(db, uid, item.otherUid)) continue;
         conversations.push({
           roomId,
           otherUser: sanitizePublicProfile(otherUser),
@@ -4952,7 +4968,8 @@ export class MongoDBConnection {
       ]);
       if (!currentUser || !otherUser ||
           (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(otherUid)) ||
-          (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) {
+          (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
+          await this.isChatMatchInactive(db, uid, otherUid)) {
         return { status: 403, body: { error: "Typing status is unavailable for this conversation" } };
       }
       const now = new Date();
@@ -4988,7 +5005,8 @@ export class MongoDBConnection {
       ]);
       if (!currentUser || !otherUser ||
           (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(otherUid)) ||
-          (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid))) {
+          (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
+          await this.isChatMatchInactive(db, uid, otherUid)) {
         return { status: 403, body: { error: "Typing status is unavailable for this conversation" } };
       }
       const presence = await db.collection("chatTyping").findOne({ roomId, uid: otherUid });
