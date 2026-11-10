@@ -20,6 +20,7 @@ test("chat message edits and deletes enforce sender ownership and preserve audit
         updateOne: async (_query, update) => { stored = { ...stored, ...update.$set }; return { matchedCount: 1 }; }
       };
       if (name === "auditlogs") return { insertOne: async entry => { audit.push(entry); return { insertedId: new ObjectId() }; } };
+      if (name === "matches") return { findOne: async () => null };
       assert.fail("Unexpected collection: " + name);
     }
   };
@@ -40,6 +41,78 @@ test("chat message edits and deletes enforce sender ownership and preserve audit
   assert.ok(stored.deletedAt instanceof Date);
   assert.equal(audit[1].eventType, "chat_message_deleted");
   assert.equal(audit[1].previousMessage, "Updated");
+});
+
+test("users cannot edit or delete chat messages after unmatching", async () => {
+  const { ObjectId } = await import("mongodb");
+  const messageId = new ObjectId();
+  const audit = [];
+  let writes = 0;
+  const stored = {
+    _id: messageId, senderUid: "chat-owner", receiverUid: "chat-peer",
+    roomId: "chat-room", messageContent: "Original", timestamp: new Date()
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        findOne: async ({ uid }) => ({ uid, role: "user", blocked: [] })
+      };
+      if (name === "chatmessages") return {
+        findOne: async () => stored,
+        updateOne: async () => { writes++; return { matchedCount: 1 }; }
+      };
+      if (name === "matches") return {
+        findOne: async () => ({ status: "unmatched" })
+      };
+      if (name === "auditlogs") return {
+        insertOne: async entry => { audit.push(entry); return { insertedId: new ObjectId() }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const edited = await connection.updateChatMessage("chat-owner", messageId.toHexString(), { messageContent: "Changed" });
+  const deleted = await connection.deleteChatMessage("chat-owner", messageId.toHexString());
+
+  assert.equal(edited.status, 403);
+  assert.equal(deleted.status, 403);
+  assert.equal(writes, 0);
+  assert.equal(audit.length, 0);
+});
+
+test("admins retain audited moderation access to messages after unmatching", async () => {
+  const { ObjectId } = await import("mongodb");
+  const messageId = new ObjectId();
+  const audit = [];
+  let stored = {
+    _id: messageId, senderUid: "chat-owner", receiverUid: "chat-peer",
+    roomId: "chat-room", messageContent: "Original", timestamp: new Date()
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { findOne: async () => ({ role: "admin", blocked: [] }) };
+      if (name === "chatmessages") return {
+        findOne: async () => stored,
+        updateOne: async (_query, update) => { stored = { ...stored, ...update.$set }; return { matchedCount: 1 }; }
+      };
+      if (name === "matches") return { findOne: async () => ({ status: "unmatched" }) };
+      if (name === "auditlogs") return {
+        insertOne: async entry => { audit.push(entry); return { insertedId: new ObjectId() }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const edited = await connection.updateChatMessage("moderator", messageId.toHexString(), { messageContent: "Moderated" });
+  assert.equal(edited.status, 200);
+  assert.equal(stored.messageContent, "Moderated");
+  assert.equal(audit[0].actorType, "admin");
 });
 
 test("chat message edits reject attempts to modify another participant's message", async () => {
