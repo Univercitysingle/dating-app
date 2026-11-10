@@ -2644,7 +2644,7 @@ test("delivery and read receipts are denied after unmatching or blocking", async
         async updateMany() { receiptWrites++; return { modifiedCount: 1 }; }
       };
       if (name === "users") return {
-        async findOne({ uid }) { return uid === "alice" ? { blocked: [] } : { blocked: []; }; }
+        async findOne({ uid }) { return uid === "alice" ? { blocked: [] } : { blocked: [] }; }
       };
       if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
       assert.fail("Unexpected collection: " + name);
