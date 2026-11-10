@@ -306,8 +306,25 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       const offer = await peer.createOffer({ iceRestart: true });
       await peer.setLocalDescription(offer);
       await sendDescription(String(activeCall._id), peer.localDescription);
-      reconnectingRef.current = false;
-      setReconnecting(false);
+
+      // Sending an ICE-restart offer is not proof of recovery. Keep the
+      // reconnect lock until the peer is connected or this attempt times out.
+      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (peerRef.current !== peer || peer.connectionState === 'connected') return;
+        reconnectingRef.current = false;
+        setReconnecting(false);
+        if (navigator.onLine && reconnectAttemptsRef.current < 5) {
+          const delay = Math.min(10000, 1200 * (2 ** reconnectAttemptsRef.current));
+          reconnectTimerRef.current = window.setTimeout(() => {
+            reconnectTimerRef.current = null;
+            restartConnection();
+          }, delay);
+        } else {
+          setStatus('Unable to reconnect. Check your network or end the call and try again.');
+        }
+      }, 9000);
     } catch (err) {
       setError(messageFor(err, 'Automatic reconnection failed. Please check your network.'));
       reconnectingRef.current = false;
@@ -315,12 +332,44 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       if (reconnectAttemptsRef.current < 5 && navigator.onLine) {
         const delay = Math.min(10000, 1200 * (2 ** reconnectAttemptsRef.current));
         if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = window.setTimeout(() => restartConnection(), delay);
+        reconnectTimerRef.current = window.setTimeout(() => {
+          reconnectTimerRef.current = null;
+          restartConnection();
+        }, delay);
       } else {
         setStatus('Unable to reconnect. Check your network or end the call and try again.');
       }
     }
   }, [sendDescription]);
+
+  useEffect(() => {
+    const onOffline = () => {
+      if (callRef.current?.status !== 'accepted') return;
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      setReconnecting(true);
+      setStatus('Network unavailable. Waiting for connection…');
+    };
+    const onOnline = () => {
+      const peer = peerRef.current;
+      if (callRef.current?.status !== 'accepted' || !peer || peer.connectionState === 'connected') return;
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      reconnectAttemptsRef.current = 0;
+      reconnectingRef.current = false;
+      restartConnection();
+    };
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [restartConnection]);
 
   const makePeer = useCallback(async type => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: selectedMicrophoneId ? { deviceId: { exact: selectedMicrophoneId } } : true, video: type === 'video' });
@@ -344,6 +393,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     };
     peer.onconnectionstatechange = () => {
       if (peer.connectionState === 'connected') {
+        if (reconnectTimerRef.current) {
+          window.clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
         reconnectAttemptsRef.current = 0;
         reconnectingRef.current = false;
         setReconnecting(false);
@@ -354,8 +407,12 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         setReconnecting(true);
         if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = window.setTimeout(() => {
-          if (peer.connectionState === 'failed' || peer.connectionState === 'disconnected') restartConnection();
-        }, peer.connectionState === 'failed' ? 500 : 1800);
+          reconnectTimerRef.current = null;
+          if (peerRef.current === peer &&
+              (peer.connectionState === 'failed' || peer.connectionState === 'disconnected')) {
+            restartConnection();
+          }
+        }, peer.connectionState === 'failed' ? 500 : 3000);
       } else if (peer.connectionState === 'connecting') {
         setStatus('Reconnecting…');
         setReconnecting(true);
