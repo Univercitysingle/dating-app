@@ -5769,7 +5769,7 @@ export class MongoDBConnection {
       if (!body || !body.claims || typeof body.claims.sub !== "string") return json({ error: "Invalid request" }, 400);
       let result;
       if (url.pathname === "/internal/push/subscribe") result = await this.savePushSubscription(body.claims.sub, body.subscription);
-      else if (url.pathname === "/internal/push/unsubscribe") result = await this.removePushSubscription(body.claims.sub, body.endpoint);
+      else if (url.pathname === "/internal/push/unsubscribe") result = await this.removePushSubscription(body.targetUid || body.claims.sub, body.endpoint);
       else if (url.pathname === "/internal/push/subscriptions" && typeof body.targetUid === "string") result = await this.getPushSubscriptions(body.targetUid);
       else return json({ error: "Not found" }, 404);
       return json(result.body, result.status);
