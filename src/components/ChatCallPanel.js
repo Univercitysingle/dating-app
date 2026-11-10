@@ -22,6 +22,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [callAlertEventEnabled, setCallAlertEventEnabled] = useState(true);
   const [audioInputs, setAudioInputs] = useState([]);
   const [audioOutputs, setAudioOutputs] = useState([]);
+  const [videoInputs, setVideoInputs] = useState([]);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState('');
   const [selectedSpeakerId, setSelectedSpeakerId] = useState('');
   const [audioDevicesOpen, setAudioDevicesOpen] = useState(false);
@@ -63,12 +64,35 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const cameraFacingRef = useRef('user');
   const videoBitrateRef = useRef(0);
 
+  // A callback ref attaches the local stream when the video element actually
+  // mounts. This avoids depending on effect timing when the call overlay is
+  // created after getUserMedia has already resolved.
+  const attachLocalVideo = useCallback(element => {
+    localVideoRef.current = element;
+    if (!element) return;
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    if (element.srcObject !== stream) element.srcObject = stream;
+    const playResult = element.play?.();
+    if (playResult && typeof playResult.catch === 'function') {
+      playResult.catch(() => {
+        // Autoplay may be blocked until the user interacts with the page.
+      });
+    }
+  }, []);
+
   useEffect(() => { callRef.current = call; }, [call]);
   useEffect(() => { setVideoMinimized(false); setAudioDevicesOpen(false); }, [call?.id, call?.status]);
   useEffect(() => {
     setHeaderTarget(typeof document !== 'undefined' ? document.getElementById(`chat-call-actions-${roomId}`) : null);
   }, [roomId]);
-  useEffect(() => { if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream; }, [localStream, call?.status]);
+  useEffect(() => {
+    const element = localVideoRef.current;
+    if (!element || !localStream) return;
+    if (element.srcObject !== localStream) element.srcObject = localStream;
+    const playResult = element.play?.();
+    if (playResult && typeof playResult.catch === 'function') playResult.catch(() => {});
+  }, [localStream, call?.status]);
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
     if (remoteAudioRef.current && remoteStream) remoteAudioRef.current.srcObject = remoteStream;
@@ -654,8 +678,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const inputs = devices.filter(device => device.kind === 'audioinput');
       const outputs = devices.filter(device => device.kind === 'audiooutput');
+      const cameras = devices.filter(device => device.kind === 'videoinput' && device.deviceId);
       setAudioInputs(inputs);
       setAudioOutputs(outputs);
+      setVideoInputs(cameras);
       setSelectedMicrophoneId(current => current && inputs.some(device => device.deviceId === current)
         ? current : (inputs.find(device => device.deviceId)?.deviceId || ''));
       setSelectedSpeakerId(current => current && outputs.some(device => device.deviceId === current)
@@ -725,19 +751,30 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     const nextFacing = facingNow === 'environment' ? 'user' : 'environment';
     let replacementStream = null;
     try {
+      // Refresh the full camera list after permission has been granted. Some
+      // browsers expose labels and device IDs only after getUserMedia succeeds.
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device =>
+        device.kind === 'videoinput' && device.deviceId
+      );
+      setVideoInputs(devices);
+      const alternatives = devices.filter(device => device.deviceId !== currentDeviceId);
+      const preferred = alternatives.find(device => {
+        const label = (device.label || '').toLowerCase();
+        return nextFacing === 'environment'
+          ? /back|rear|environment|world/.test(label)
+          : /front|user|facetime|integrated/.test(label);
+      }) || alternatives[0];
+
       try {
         replacementStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: { facingMode: { exact: nextFacing } }
         });
       } catch (facingError) {
-        const devices = (await navigator.mediaDevices.enumerateDevices()).filter(device =>
-          device.kind === 'videoinput' && device.deviceId && device.deviceId !== currentDeviceId
-        );
-        if (!devices.length) throw facingError;
+        if (!preferred) throw facingError;
         replacementStream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { deviceId: { exact: devices[0].deviceId } }
+          video: { deviceId: { exact: preferred.deviceId } }
         });
       }
       const replacementTrack = replacementStream.getVideoTracks()[0];
@@ -751,6 +788,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       localStreamRef.current = stream;
       cameraFacingRef.current = replacementTrack.getSettings?.().facingMode || nextFacing;
       setLocalStream(new MediaStream(stream.getTracks()));
+      await refreshAudioDevices();
       setError('');
     } catch (err) {
       replacementStream?.getTracks().forEach(track => track.stop());
@@ -914,7 +952,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       </div>}
 
       {!videoMinimized && <div className="call-video-self-view absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 shadow-2xl sm:right-7 sm:rounded-3xl" style={{ top: "calc(env(safe-area-inset-top) + 5.25rem)", width: "clamp(5.75rem, 25vw, 9rem)", height: "clamp(7.5rem, 19vh, 11rem)" }}>
-        <video ref={localVideoRef} autoPlay muted playsInline className={cameraOff ? "h-full w-full object-cover opacity-0" : "h-full w-full object-cover"} />
+        <video ref={attachLocalVideo} autoPlay muted playsInline className={cameraOff ? "h-full w-full object-cover opacity-0" : "h-full w-full object-cover"} />
         {cameraOff && <div className="absolute inset-0 flex items-center justify-center bg-slate-800 px-1 text-center text-[11px] text-white/85">Camera off</div>}
         <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">You</span>
       </div>}
@@ -936,7 +974,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
             {!remoteAudioRef.current?.setSinkId && !remoteVideoRef.current?.setSinkId && <span className="text-white/60">Speaker selection is not supported by this browser.</span>}
           </div>}
           <button type="button" onClick={() => setAudioDevicesOpen(value => !value)} className={audioDevicesOpen ? "flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md sm:h-16 sm:w-14" : "flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 sm:h-16 sm:w-14"} aria-expanded={audioDevicesOpen} aria-label="Audio device settings" title="Audio device settings">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42m-9.88 9.88-1.42 1.42"/><circle cx="12" cy="12" r="4"/></svg>
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 7h9m4 0h3M4 17h3m4 0h9M13 4v6M7 14v6"/></svg>
             <span className="mt-1 text-[9px] font-medium">Audio</span>
           </button>
           <button type="button" onClick={toggleMute} className={muted ? "call-video-control-button flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 transition active:scale-95 sm:h-16 sm:w-16" : "flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16"} aria-label={muted ? "Unmute microphone" : "Mute microphone"} title={muted ? "Unmute microphone" : "Mute microphone"}>
@@ -984,7 +1022,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           {!remoteStream && <span className="absolute inset-0 flex items-center justify-center text-sm text-white">Waiting for video…</span>}
         </div>
         <div className="min-h-32 overflow-hidden rounded-xl bg-black">
-          <video ref={localVideoRef} autoPlay muted playsInline className="h-full min-h-32 max-h-56 w-full object-cover" />
+          <video ref={attachLocalVideo} autoPlay muted playsInline className="h-full min-h-32 max-h-56 w-full object-cover" />
         </div>
       </div>}
       {localStream && <div className="flex flex-wrap gap-2">
