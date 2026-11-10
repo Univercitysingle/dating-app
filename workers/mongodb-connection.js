@@ -4470,8 +4470,8 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const [caller, receiver] = await Promise.all([
-        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } }),
-        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } })
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1, deletionRequestedAt: 1 } }),
+        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1, deletionRequestedAt: 1 } })
       ]);
       if (!caller || !receiver) return { status: 404, body: { error: "Call participant not found" } };
       const now = new Date();
@@ -4809,15 +4809,7 @@ export class MongoDBConnection {
     if (!conversation) return true;
     const otherUid = conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid;
     if (typeof otherUid !== "string" || !otherUid || otherUid === uid) return true;
-    const users = db.collection("users");
-    const [viewer, other] = await Promise.all([
-      users.findOne({ uid }, { projection: { blocked: 1 } }),
-      users.findOne({ uid: otherUid }, { projection: { blocked: 1 } })
-    ]);
-    if (!viewer || !other ||
-        (Array.isArray(viewer.blocked) && viewer.blocked.includes(otherUid)) ||
-        (Array.isArray(other.blocked) && other.blocked.includes(uid))) return true;
-    return this.isChatMatchInactive(db, uid, otherUid);
+    return this.isCallPairUnavailable(db, uid, otherUid);
   }
 
   async getChatHistory(uid, roomId, limit = 50, skip = 0, after = null, before = null) {
@@ -4844,8 +4836,13 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
-      const user = await db.collection("users").findOne({ uid }, { projection: { role: 1, blocked: 1 } });
+      const user = await db.collection("users").findOne({ uid }, { projection: {
+        role: 1, blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+      } });
       if (!user) return { status: 404, body: { error: "User not found" } };
+      if (user.role !== "superadmin" && isAccountRestricted(user)) {
+        return { status: 403, body: { error: "Messaging is unavailable for this account" } };
+      }
       let query = { roomId };
       if (user.role !== "superadmin") {
         const participantQuery = { roomId, $or: [{ senderUid: uid }, { receiverUid: uid }] };
@@ -4855,11 +4852,7 @@ export class MongoDBConnection {
         );
         if (!conversation) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
         const otherUid = conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid;
-        const otherUser = await db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } });
-        if (!otherUser ||
-            (Array.isArray(user.blocked) && user.blocked.includes(otherUid)) ||
-            (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
-            await this.isChatMatchInactive(db, uid, otherUid)) {
+        if (await this.isCallPairUnavailable(db, uid, otherUid)) {
           return { status: 403, body: { error: "Chat history is unavailable for this conversation." } };
         }
         query = participantQuery;
@@ -4948,7 +4941,9 @@ export class MongoDBConnection {
         });
       }
       const [user, messages, unreadCounts] = await Promise.all([
-        db.collection("users").findOne({ uid }, { projection: { _id: 1, uid: 1, blocked: 1 } }),
+        db.collection("users").findOne({ uid }, { projection: {
+          _id: 1, uid: 1, blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+        } }),
         chatMessages.aggregate([
           { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
           { $sort: { timestamp: -1, _id: -1 } },
@@ -4962,6 +4957,7 @@ export class MongoDBConnection {
         ], { maxTimeMS: 10000 }).toArray()
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "Messaging is unavailable for this account" } };
       const unreadCountByRoom = new Map(unreadCounts.map(item => [item._id, item.unreadCount]));
       const latestByRoom = new Map();
       for (const message of messages) {
@@ -4983,7 +4979,8 @@ export class MongoDBConnection {
       const conversations = [];
       for (const [roomId, item] of latestByRoom) {
         const otherUser = usersByUid.get(item.otherUid);
-        if (!otherUser || (Array.isArray(user.blocked) && user.blocked.includes(item.otherUid)) ||
+        if (!otherUser || isAccountRestricted(otherUser) ||
+            (Array.isArray(user.blocked) && user.blocked.includes(item.otherUid)) ||
             (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
             await this.isChatMatchInactive(db, uid, item.otherUid)) continue;
         conversations.push({
@@ -5033,10 +5030,10 @@ export class MongoDBConnection {
         : conversation.receiverUid === uid ? conversation.senderUid : null;
       if (!otherUid) return { status: 403, body: { error: "Not a participant in this conversation" } };
       const [currentUser, otherUser] = await Promise.all([
-        db.collection("users").findOne({ uid }, { projection: { blocked: 1 } }),
-        db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } })
+        db.collection("users").findOne({ uid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }),
+        db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } })
       ]);
-      if (!currentUser || !otherUser ||
+      if (!currentUser || !otherUser || isAccountRestricted(currentUser) || isAccountRestricted(otherUser) ||
           (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(otherUid)) ||
           (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
           await this.isChatMatchInactive(db, uid, otherUid)) {
@@ -5070,10 +5067,10 @@ export class MongoDBConnection {
         : conversation.receiverUid === uid ? conversation.senderUid : null;
       if (!otherUid) return { status: 403, body: { error: "Not a participant in this conversation" } };
       const [currentUser, otherUser] = await Promise.all([
-        db.collection("users").findOne({ uid }, { projection: { blocked: 1 } }),
-        db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1 } })
+        db.collection("users").findOne({ uid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }),
+        db.collection("users").findOne({ uid: otherUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } })
       ]);
-      if (!currentUser || !otherUser ||
+      if (!currentUser || !otherUser || isAccountRestricted(currentUser) || isAccountRestricted(otherUser) ||
           (Array.isArray(currentUser.blocked) && currentUser.blocked.includes(otherUid)) ||
           (Array.isArray(otherUser.blocked) && otherUser.blocked.includes(uid)) ||
           await this.isChatMatchInactive(db, uid, otherUid)) {
@@ -5152,8 +5149,8 @@ export class MongoDBConnection {
       const users = db.collection("users");
       const messages = db.collection("chatmessages");
       const [sender, receiver] = await Promise.all([
-        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } }),
-        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1 } })
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1, deletionRequestedAt: 1 } }),
+        users.findOne({ uid: receiverUid }, { projection: { _id: 1, blocked: 1, suspendedUntil: 1, accountStatus: 1, deletionRequestedAt: 1 } })
       ]);
       if (!sender || !receiver) return { status: 404, body: { error: "Chat participant not found" } };
       const now = new Date();
@@ -5251,13 +5248,16 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const { ObjectId } = await import("mongodb");
-      const actor = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      const actor = await db.collection("users").findOne({ uid }, { projection: {
+        role: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+      } });
       if (!actor) return { status: 404, body: { error: "User not found" } };
+      const isAdmin = ["admin", "superadmin"].includes(actor.role);
+      if (!isAdmin && isAccountRestricted(actor)) return { status: 403, body: { error: "Messaging is unavailable for this account" } };
       const messages = db.collection("chatmessages");
       const id = new ObjectId(messageId);
       const message = await messages.findOne({ _id: id });
       if (!message || message.deletedAt) return { status: 404, body: { error: "Message not found" } };
-      const isAdmin = ["admin", "superadmin"].includes(actor.role);
       if (!isAdmin && message.senderUid !== uid) return { status: 403, body: { error: "You can only edit your own messages" } };
       if (!isAdmin && await this.isChatPairUnavailable(db, uid, message.roomId)) {
         return { status: 403, body: { error: "This conversation is no longer available" } };
@@ -5275,13 +5275,16 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const { ObjectId } = await import("mongodb");
-      const actor = await db.collection("users").findOne({ uid }, { projection: { role: 1 } });
+      const actor = await db.collection("users").findOne({ uid }, { projection: {
+        role: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+      } });
       if (!actor) return { status: 404, body: { error: "User not found" } };
+      const isAdmin = ["admin", "superadmin"].includes(actor.role);
+      if (!isAdmin && isAccountRestricted(actor)) return { status: 403, body: { error: "Messaging is unavailable for this account" } };
       const messages = db.collection("chatmessages");
       const id = new ObjectId(messageId);
       const message = await messages.findOne({ _id: id });
       if (!message || message.deletedAt) return { status: 404, body: { error: "Message not found" } };
-      const isAdmin = ["admin", "superadmin"].includes(actor.role);
       if (!isAdmin && message.senderUid !== uid) return { status: 403, body: { error: "You can only delete your own messages" } };
       if (!isAdmin && await this.isChatPairUnavailable(db, uid, message.roomId)) {
         return { status: 403, body: { error: "This conversation is no longer available" } };
