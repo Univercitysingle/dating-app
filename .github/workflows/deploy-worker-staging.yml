@@ -87,7 +87,7 @@ jobs:
           test -n "$WEBXPAY_SECRET_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_SECRET_KEY"; exit 1; }
           test -n "$TURNIX_API_TOKEN" || { echo "::error::Missing GitHub secret TURNIX_API_TOKEN"; exit 1; }
           if [[ -n "$VAPID_PUBLIC_KEY" || -n "$VAPID_PRIVATE_KEY" || -n "$VAPID_SUBJECT" ]]; then
-            test -n "$VAPID_PUBLIC_KEY" && test -n "$VAPID_PRIVATE_KEY" && [[ "$VAPID_SUBJECT" =~ ^mailto:[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || { echo "::error::Set valid VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and mailto: VAPID_SUBJECT GitHub secrets together."; exit 1; }
+            test -n "$VAPID_PUBLIC_KEY" && test -n "$VAPID_PRIVATE_KEY" && [[ "$VAPID_PUBLIC_KEY" =~ ^[A-Za-z0-9_-]{80,100}$ ]] && [[ "$VAPID_PRIVATE_KEY" =~ ^[A-Za-z0-9_-]{40,50}$ ]] && [[ "$VAPID_SUBJECT" =~ ^mailto:[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || { echo "::error::Set valid base64url VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and mailto: VAPID_SUBJECT GitHub secrets together."; exit 1; }
           else
             echo "::warning::VAPID secrets are not available to this workflow. Browser-closed push will remain disabled."
           fi
