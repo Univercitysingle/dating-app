@@ -292,10 +292,24 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       // participants may initiate recovery; offer-collision handling below
       // deterministically selects the polite peer.
       const freshIce = await getCallIceConfig();
+      // Always replace the cached provider list. If the credential endpoint
+      // degrades to STUN-only, do not keep retrying with expired TURN credentials.
       if (Array.isArray(freshIce?.iceServerTiers) && freshIce.iceServerTiers.length) {
         iceProviderTiersRef.current = freshIce.iceServerTiers;
+      } else if (Array.isArray(freshIce?.iceServers) && freshIce.iceServers.length) {
+        iceProviderTiersRef.current = [{
+          name: freshIce.degraded ? 'direct-stun-fallback' : 'configured-turn',
+          iceServers: freshIce.iceServers,
+        }];
+      } else {
+        iceProviderTiersRef.current = [];
       }
-      const fallbackIndex = Math.min(reconnectAttemptsRef.current, Math.max(0, iceProviderTiersRef.current.length - 1));
+      // Attempts are one-based. Attempt 1 must actually use tier 0
+      // (ExpressTURN primary), not skip straight to the secondary provider.
+      const fallbackIndex = Math.min(
+        Math.max(0, reconnectAttemptsRef.current - 1),
+        Math.max(0, iceProviderTiersRef.current.length - 1)
+      );
       const fallbackTier = iceProviderTiersRef.current[fallbackIndex];
       const selectedIceServers = fallbackTier?.iceServers || freshIce?.iceServers;
       if (Array.isArray(selectedIceServers) && selectedIceServers.length &&
