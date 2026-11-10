@@ -54,6 +54,8 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const ringtoneTimerRef = useRef(null);
   const ringtoneContextRef = useRef(null);
   const notifiedCallIdRef = useRef(null);
+  const cameraFacingRef = useRef('user');
+  const videoBitrateRef = useRef(0);
 
   useEffect(() => { callRef.current = call; }, [call]);
   useEffect(() => {
@@ -110,6 +112,22 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         else if ((roundTripTime === null || roundTripTime < 0.25) && lossRate < 0.04) quality = 4;
         else if ((roundTripTime !== null && roundTripTime > 0.5) || lossRate > 0.1) quality = 1;
         else if ((roundTripTime !== null && roundTripTime > 0.3) || lossRate > 0.05) quality = 2;
+        // Adapt outbound video bitrate to measured packet loss and RTT.
+        // Keep audio unaffected and avoid repeatedly applying unchanged values.
+        if (quality && quality !== videoBitrateRef.current) {
+          const targetBitrate = ({ 1: 180000, 2: 350000, 3: 650000, 4: 1000000, 5: 1600000 })[quality];
+          const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video');
+          if (videoSender && typeof videoSender.getParameters === 'function') {
+            try {
+              const parameters = videoSender.getParameters();
+              parameters.encodings = parameters.encodings?.length ? parameters.encodings : [{}];
+              parameters.encodings[0].maxBitrate = targetBitrate;
+              parameters.degradationPreference = 'balanced';
+              await videoSender.setParameters(parameters);
+              videoBitrateRef.current = quality;
+            } catch (_) { /* Browser may not support runtime sender tuning. */ }
+          }
+        }
         if (!cancelled) setConnectionQuality(quality);
       } catch (_) {
         if (!cancelled) setConnectionQuality(0);
@@ -543,6 +561,56 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     setCameraOff(value => !value);
   };
 
+  const switchCamera = async () => {
+    const stream = localStreamRef.current;
+    const peer = peerRef.current;
+    if (!stream || !peer || !navigator.mediaDevices?.getUserMedia) return;
+    const currentTrack = stream.getVideoTracks()[0];
+    if (!currentTrack) return;
+    const nextFacing = cameraFacingRef.current === 'user' ? 'environment' : 'user';
+    try {
+      const replacementStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: nextFacing } }
+      });
+      const replacementTrack = replacementStream.getVideoTracks()[0];
+      const sender = peer.getSenders().find(item => item.track?.kind === 'video');
+      if (!replacementTrack || !sender) {
+        replacementStream.getTracks().forEach(track => track.stop());
+        throw new Error('Camera switching is not supported by this device.');
+      }
+      await sender.replaceTrack(replacementTrack);
+      stream.removeTrack(currentTrack);
+      stream.addTrack(replacementTrack);
+      currentTrack.stop();
+      replacementTrack.enabled = !cameraOff;
+      cameraFacingRef.current = nextFacing;
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setError('');
+    } catch (err) {
+      setError(messageFor(err, 'Could not switch camera. Check camera permissions.'));
+    }
+  };
+
+  useEffect(() => {
+    const stream = localStreamRef.current;
+    if (!stream) return undefined;
+    const handleDeviceChange = () => {
+      const tracks = stream.getTracks();
+      if (tracks.some(track => track.readyState === 'ended')) {
+        setError('A microphone or camera disconnected. Reconnect the device or switch it in your browser settings.');
+      }
+    };
+    stream.getTracks().forEach(track => {
+      track.onended = () => setError(`Your ${track.kind} device disconnected. Check the device and reconnect.`);
+    });
+    navigator.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange);
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange);
+      stream.getTracks().forEach(track => { track.onended = null; });
+    };
+  }, [localStream]);
+
   useEffect(() => {
     const onOnline = () => {
       if (callRef.current?.status === 'accepted') {
@@ -692,6 +760,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           <button type="button" onClick={toggleCamera} className={cameraOff ? "call-video-control-button flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 transition active:scale-95 sm:h-16 sm:w-16" : "flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16"} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} title={cameraOff ? "Turn camera on" : "Turn camera off"}>
             {cameraOff ? <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 3 18 18M10 6h5a2 2 0 0 1 2 2v1l4-2v10l-3-1.5M7 6.5A2 2 0 0 0 5 8v8a2 2 0 0 0 2 2h8"/></svg> : <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>}
             <span className="mt-1 text-[10px] font-medium">{cameraOff ? "Camera on" : "Camera"}</span>
+          </button>
+          <button type="button" onClick={switchCamera} className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16" aria-label="Switch front or rear camera" title="Switch camera">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 7h-3l-2-2H9L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><circle cx="12" cy="13" r="3"/></svg>
+            <span className="mt-1 text-[10px] font-medium">Flip</span>
           </button>
           <button type="button" onClick={() => finishCall("end")} disabled={callActionInProgressRef.current} className="call-video-control-button call-video-end-button flex h-14 w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 active:scale-95 disabled:cursor-wait disabled:opacity-50 sm:h-16 sm:w-20" aria-label="End video call" title="End call">
             <svg viewBox="0 0 24 24" className="h-6 w-6 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 0 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
