@@ -330,6 +330,7 @@ test("call history supports opaque chat room IDs and remains participant-scoped"
         async findOne({ uid }) { return { uid, blocked: [], accountStatus: "active" }; }
       };
       if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      if (name === "chatmessages") return { async findOne() { return null; } };
       assert.fail("Unexpected collection: " + name);
     }
   };
