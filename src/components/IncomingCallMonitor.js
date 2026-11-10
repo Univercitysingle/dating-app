@@ -195,7 +195,8 @@ export default function IncomingCallMonitor() {
       if (callInFlight) return;
       callInFlight = true;
       try {
-        if (document.visibilityState !== 'visible') return;
+        // Keep polling while the app is backgrounded so desktop notifications
+        // can still be raised. A closed browser requires Web Push delivery.
         const result = await apiClient.get('/calls/incoming');
         if (!mounted) return;
         const call = result?.call;
@@ -207,7 +208,8 @@ export default function IncomingCallMonitor() {
         }
         const callId = String(call._id);
         const category = call.type === 'video' ? 'videoCalls' : 'voiceCalls';
-        const isTargetChatOpen = window.location.pathname === `/chat/${encodeURIComponent(call.roomId)}`;
+        const isTargetChatOpen = document.visibilityState === 'visible' &&
+          window.location.pathname === `/chat/${encodeURIComponent(call.roomId)}`;
         if (isTargetChatOpen) {
           setIncomingCall(null);
           // ChatCallPanel owns the visible in-chat controls, but the global monitor
