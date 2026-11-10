@@ -20,6 +20,11 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const [connectionQuality, setConnectionQuality] = useState(0);
   const [callAlertsEnabled, setCallAlertsEnabled] = useState(true);
   const [callAlertEventEnabled, setCallAlertEventEnabled] = useState(true);
+  const [audioInputs, setAudioInputs] = useState([]);
+  const [audioOutputs, setAudioOutputs] = useState([]);
+  const [selectedMicrophoneId, setSelectedMicrophoneId] = useState('');
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState('');
+  const [audioDevicesOpen, setAudioDevicesOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -316,7 +321,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, [sendDescription]);
 
   const makePeer = useCallback(async type => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: selectedMicrophoneId ? { deviceId: { exact: selectedMicrophoneId } } : true, video: type === 'video' });
     localStreamRef.current = stream;
     setLocalStream(stream);
     const iceConfig = await getCallIceConfig();
@@ -355,7 +360,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       }
     };
     return peer;
-  }, [sendCandidate, restartConnection]);
+  }, [sendCandidate, restartConnection, selectedMicrophoneId]);
 
   const flushLocalCandidates = useCallback(async callId => {
     for (const candidate of queuedLocalRef.current.splice(0)) await sendCandidate(String(callId), candidate);
@@ -570,6 +575,68 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     setCameraOff(value => !value);
   };
 
+  const refreshAudioDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter(device => device.kind === 'audioinput');
+      const outputs = devices.filter(device => device.kind === 'audiooutput');
+      setAudioInputs(inputs);
+      setAudioOutputs(outputs);
+      setSelectedMicrophoneId(current => current && inputs.some(device => device.deviceId === current)
+        ? current : (inputs.find(device => device.deviceId)?.deviceId || ''));
+      setSelectedSpeakerId(current => current && outputs.some(device => device.deviceId === current)
+        ? current : (outputs.find(device => device.deviceId)?.deviceId || ''));
+    } catch (_) { /* Device enumeration is optional on restricted browsers. */ }
+  }, []);
+
+  useEffect(() => {
+    refreshAudioDevices();
+    const onDeviceChange = () => refreshAudioDevices();
+    navigator.mediaDevices?.addEventListener?.('devicechange', onDeviceChange);
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', onDeviceChange);
+  }, [refreshAudioDevices]);
+
+  const applySpeaker = useCallback(async deviceId => {
+    setSelectedSpeakerId(deviceId);
+    const targets = [remoteAudioRef.current, remoteVideoRef.current].filter(Boolean);
+    for (const target of targets) {
+      if (typeof target.setSinkId === 'function') {
+        try { await target.setSinkId(deviceId || ''); }
+        catch (_) { setError('Unable to switch speaker. Check browser audio permissions and device availability.'); }
+      }
+    }
+  }, []);
+
+  const switchMicrophone = async deviceId => {
+    setSelectedMicrophoneId(deviceId);
+    const peer = peerRef.current;
+    const stream = localStreamRef.current;
+    if (!peer || !stream || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const replacementStream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+        video: false
+      });
+      const replacementTrack = replacementStream.getAudioTracks()[0];
+      const currentTrack = stream.getAudioTracks()[0];
+      const sender = peer.getSenders().find(item => item.track?.kind === 'audio');
+      if (!replacementTrack || !sender) {
+        replacementStream.getTracks().forEach(track => track.stop());
+        throw new Error('Microphone switching is not supported by this browser.');
+      }
+      await sender.replaceTrack(replacementTrack);
+      if (currentTrack) { stream.removeTrack(currentTrack); currentTrack.stop(); }
+      stream.addTrack(replacementTrack);
+      localStreamRef.current = stream;
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setError('');
+    } catch (err) {
+      setError(messageFor(err, 'Unable to switch microphone. Check microphone permissions.'));
+      await refreshAudioDevices();
+    }
+  };
+
   const switchCamera = async () => {
     const stream = localStreamRef.current;
     const peer = peerRef.current;
@@ -726,6 +793,22 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {error && <p className="mt-8 rounded-xl bg-rose-950/70 px-4 py-3 text-sm text-rose-200" role="alert">{error}</p>}
         {status && status !== 'Incoming call' && <p className="mt-3 text-sm text-slate-300" role="status">{status}</p>}
       </div>
+    </div>}
+    {active && <div className="mx-auto mt-2 flex max-w-2xl flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-sm">
+      <button type="button" onClick={() => setAudioDevicesOpen(value => !value)} className="call-utility-button" aria-expanded={audioDevicesOpen}>Audio devices</button>
+      {audioDevicesOpen && <>
+        <label className="flex min-w-0 flex-1 items-center gap-2">Microphone
+          <select aria-label="Select microphone" value={selectedMicrophoneId} onChange={event => switchMicrophone(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-gray-300 bg-white px-2 py-1">
+            {audioInputs.map((device,index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Microphone ${index+1}`}</option>)}
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-1 items-center gap-2">Speaker
+          <select aria-label="Select speaker" value={selectedSpeakerId} onChange={event => applySpeaker(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-gray-300 bg-white px-2 py-1">
+            {audioOutputs.map((device,index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Speaker ${index+1}`}</option>)}
+          </select>
+        </label>
+        {!remoteAudioRef.current?.setSinkId && !remoteVideoRef.current?.setSinkId && <span className="text-gray-500">Speaker selection is not supported by this browser.</span>}
+      </>}
     </div>}
     {status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p>}
     {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
