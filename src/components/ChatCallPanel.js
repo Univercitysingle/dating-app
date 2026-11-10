@@ -871,7 +871,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   // A full-screen call must also take ownership of document scrolling.
   // Restore the exact previous inline styles when the call is minimized or ends.
   useEffect(() => {
-    if (!active || !videoCall || incoming || videoMinimized) return undefined;
+    if (!active || incoming || videoMinimized) return undefined;
     const body = document.body;
     const root = document.documentElement;
     const previous = {
@@ -890,7 +890,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       root.style.overflow = previous.rootOverflow;
       root.style.overscrollBehavior = previous.rootOverscroll;
     };
-  }, [active, videoCall, incoming, videoMinimized]);
+  }, [active, incoming, videoMinimized]);
 
   useEffect(() => {
     if (!incoming || !call?._id) {
@@ -973,19 +973,31 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     </div>}
     {!active || !videoCall ? status && <p className="mt-2 text-sm text-gray-600" role="status">{status}</p> : null}
     {!active || !videoCall ? error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p> : null}
-    {active && videoCall && !incoming && createPortal(<div className={videoMinimized ? "call-video-overlay fixed z-[11000] h-[min(38vh,19rem)] w-[min(88vw,25rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-white/25 bg-[#07110e] text-white shadow-2xl ring-1 ring-black/20" : "call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white"} style={videoMinimized ? { right: floatingPosition.right, bottom: floatingPosition.bottom, touchAction: "none" } : { touchAction: "manipulation" }} role="dialog" aria-modal={!videoMinimized} aria-label="Video call">
-      <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" />
-      {!remoteStream && <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-slate-900 to-[#07110e] px-6 pb-32 text-center">
-        <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/10 text-3xl font-semibold">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
-        <p className="text-lg font-semibold">{otherUser?.name || "Video call"}</p><p className="text-sm text-white/70">Connecting video…</p>
-      </div>}
+    {active && !incoming && createPortal(<div className={videoMinimized ? "call-video-overlay fixed z-[11000] h-[min(38vh,19rem)] w-[min(88vw,25rem)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-white/25 bg-[#07110e] text-white shadow-2xl ring-1 ring-black/20" : "call-video-overlay fixed inset-0 z-[10500] h-[100dvh] min-h-0 w-full overflow-hidden bg-[#07110e] text-white"} style={videoMinimized ? { right: floatingPosition.right, bottom: floatingPosition.bottom, touchAction: "none" } : { touchAction: "manipulation" }} role="dialog" aria-modal={!videoMinimized} aria-label={videoCall ? "Video call" : "Voice call"}>
+      {videoCall ? <>
+        <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full bg-[#07110e] object-cover object-center" />
+        {!remoteStream && <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-slate-900 to-[#07110e] px-6 pb-32 text-center">
+          <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white/10 text-3xl font-semibold">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
+          <p className="text-lg font-semibold">{otherUser?.name || "Video call"}</p><p className="text-sm text-white/70">Connecting video…</p>
+        </div>}
+      </> : <>
+        <audio ref={remoteAudioRef} autoPlay />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(ellipse_at_center,_#263a35_0%,_#101b18_48%,_#07110e_100%)] px-6 pb-28 text-center">
+          <div className="relative mb-7 flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 text-5xl font-semibold shadow-2xl sm:h-44 sm:w-44">
+            {otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}
+            <span className="absolute inset-0 rounded-full ring-4 ring-emerald-400/15" />
+          </div>
+          <p className="text-2xl font-semibold tracking-tight sm:text-3xl">{otherUser?.name || "Voice call"}</p>
+          <p className="mt-2 text-sm text-white/70">{call?.status === 'accepted' ? (reconnecting ? 'Reconnecting…' : 'Voice call') : (status || 'Calling…')}</p>
+        </div>
+      </>}
       {!videoMinimized && <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-black/70 via-black/25 to-transparent" />}
       {!videoMinimized && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />}
 
       {!videoMinimized && <div className="absolute inset-x-0 z-20 flex items-start justify-between gap-2 px-3 sm:px-7" style={{ top: "max(0.65rem, env(safe-area-inset-top))" }}>
         <div className="min-w-0 max-w-[72%] rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 shadow-lg backdrop-blur-xl sm:max-w-[min(70vw,28rem)] sm:px-4 sm:py-3">
-          <p className="truncate text-sm font-semibold sm:text-base">{otherUser?.name || "Video call"}</p>
-          <p className="mt-0.5 truncate text-xs text-white/75 sm:text-sm">{formatDuration(callDuration)} <span className="px-1 text-white/45">·</span> {status || "Connected"}</p>
+          <p className="truncate text-sm font-semibold sm:text-base">{otherUser?.name || (videoCall ? "Video call" : "Voice call")}</p>
+          <p className="mt-0.5 truncate text-xs text-white/75 sm:text-sm">{formatDuration(callDuration)} <span className="px-1 text-white/45">·</span> {status || (videoCall ? "Video connected" : "Voice connected")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
         <button type="button" onClick={() => { setAudioDevicesOpen(false); setVideoMinimized(true); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white shadow-lg backdrop-blur-xl" aria-label="Minimize video call" title="Minimize call"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 12h14"/></svg></button>
@@ -1000,7 +1012,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />{navigator.onLine ? "Reconnecting call…" : "Waiting for network…"}
       </div>}
 
-      {!videoMinimized && <button type="button" onClick={() => setLocalPreviewExpanded(value => !value)} className="call-video-self-view group absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 text-left shadow-2xl transition-all sm:right-7 sm:rounded-3xl" style={{ top: localPreviewExpanded ? "50%" : "calc(env(safe-area-inset-top) + 5.25rem)", right: localPreviewExpanded ? "50%" : undefined, transform: localPreviewExpanded ? "translate(50%, -50%)" : undefined, width: localPreviewExpanded ? "min(78vw, 34rem)" : "clamp(5.75rem, 25vw, 9rem)", height: localPreviewExpanded ? "min(70vh, 38rem)" : "clamp(7.5rem, 19vh, 11rem)" }} aria-label={localPreviewExpanded ? "Shrink your camera preview" : "Expand your camera preview"} title={localPreviewExpanded ? "Shrink preview" : "Expand preview"}>
+      {videoCall && !videoMinimized && <button type="button" onClick={() => setLocalPreviewExpanded(value => !value)} className="call-video-self-view group absolute right-3 z-10 overflow-hidden rounded-2xl border border-white/45 bg-slate-800 text-left shadow-2xl transition-all sm:right-7 sm:rounded-3xl" style={{ top: localPreviewExpanded ? "50%" : "calc(env(safe-area-inset-top) + 5.25rem)", right: localPreviewExpanded ? "50%" : undefined, transform: localPreviewExpanded ? "translate(50%, -50%)" : undefined, width: localPreviewExpanded ? "min(78vw, 34rem)" : "clamp(5.75rem, 25vw, 9rem)", height: localPreviewExpanded ? "min(70vh, 38rem)" : "clamp(7.5rem, 19vh, 11rem)" }} aria-label={localPreviewExpanded ? "Shrink your camera preview" : "Expand your camera preview"} title={localPreviewExpanded ? "Shrink preview" : "Expand preview"}>
         <video ref={attachLocalVideo} autoPlay muted playsInline className={cameraOff ? "h-full w-full object-cover opacity-0" : "h-full w-full object-cover"} />
         {cameraOff && <div className="absolute inset-0 flex items-center justify-center bg-slate-800 px-1 text-center text-[11px] text-white/85">Camera off</div>}
         <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">You</span>
@@ -1029,12 +1041,12 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           <button type="button" onClick={toggleMute} className={muted ? "call-video-control-button flex h-11 w-10 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 transition active:scale-95 min-[380px]:h-12 min-[380px]:w-12 sm:h-16 sm:w-16" : "flex h-11 w-10 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 min-[380px]:h-12 min-[380px]:w-12 sm:h-16 sm:w-16"} aria-label={muted ? "Unmute microphone" : "Mute microphone"} title={muted ? "Unmute microphone" : "Mute microphone"}>
             {muted ? <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}
           </button>
-          <button type="button" onClick={toggleCamera} className={cameraOff ? "call-video-control-button flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 transition active:scale-95 sm:h-16 sm:w-16" : "flex h-11 w-10 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 min-[380px]:h-12 min-[380px]:w-12 sm:h-16 sm:w-16"} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} title={cameraOff ? "Turn camera on" : "Turn camera off"}>
+          {videoCall && <button type="button" onClick={toggleCamera} className={cameraOff ? "call-video-control-button flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white text-slate-900 shadow-md ring-2 ring-white/20 transition active:scale-95 sm:h-16 sm:w-16" : "flex h-11 w-10 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 min-[380px]:h-12 min-[380px]:w-12 sm:h-16 sm:w-16"} aria-label={cameraOff ? "Turn camera on" : "Turn camera off"} title={cameraOff ? "Turn camera on" : "Turn camera off"}>
             {cameraOff ? <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 3 18 18M10 6h5a2 2 0 0 1 2 2v1l4-2v10l-3-1.5M7 6.5A2 2 0 0 0 5 8v8a2 2 0 0 0 2 2h8"/></svg> : <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>}
-          </button>
-          <button type="button" onClick={switchCamera} className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16" aria-label="Switch front or rear camera" title="Switch camera">
+          </button>}
+          {videoCall && <button type="button" onClick={switchCamera} className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition hover:bg-white/25 active:scale-95 sm:h-16 sm:w-16" aria-label="Switch front or rear camera" title="Switch camera">
             <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 7h-3l-2-2H9L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><circle cx="12" cy="13" r="3"/></svg>
-          </button>
+          </button>}
           <button type="button" onClick={() => finishCall("end")} disabled={callActionInProgressRef.current} className="call-video-control-button call-video-end-button flex h-11 w-12 shrink-0 flex-col items-center justify-center rounded-full bg-rose-600 text-white shadow-lg transition hover:bg-rose-500 active:scale-95 disabled:cursor-wait disabled:opacity-50 min-[380px]:h-12 min-[380px]:w-14 sm:h-16 sm:w-20" aria-label="End video call" title="End call">
             <svg viewBox="0 0 24 24" className="h-6 w-6 rotate-[135deg]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.79a2 2 0 0 1-.45 2.11L8.07 9.93a16 16 0 0 0 6 6l1.31-1.27a2 2 0 0 0 2.11-.45c.89.33 1.83.56 2.79.68A2 2 0 0 1 22 16.92z"/></svg>
           </button>
@@ -1046,7 +1058,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           floatingDragRef.current = { x: event.clientX, y: event.clientY, right: floatingPosition.right, bottom: floatingPosition.bottom };
         }} className="absolute inset-x-0 top-0 z-30 flex cursor-grab touch-none items-center justify-between gap-2 border-b border-white/15 bg-black/65 px-3 py-2 backdrop-blur active:cursor-grabbing">
           <div className="min-w-0">
-            <p className="truncate text-xs font-semibold">{otherUser?.name || 'Video call'}</p>
+            <p className="truncate text-xs font-semibold">{otherUser?.name || (videoCall ? 'Video call' : 'Voice call')}</p>
             <p className="text-[10px] text-white/75">{formatDuration(callDuration)} · {reconnecting ? 'Reconnecting' : 'Live'}</p>
           </div>
           <button type="button" onPointerDown={event => event.stopPropagation()} onClick={() => setVideoMinimized(false)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-white" aria-label="Restore full video call" title="Restore call">
@@ -1063,33 +1075,5 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         </div>
       </>}
     </div>, document.body)}
-    {active && !videoCall && <div className="mt-3 grid gap-3">
-      {call?.status === 'accepted' && <div className="call-live-status flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
-        <span className="call-live-dot" aria-hidden="true" />
-        <span className="text-sm font-semibold text-gray-800">{formatDuration(callDuration)}</span>
-        <span className="text-xs text-gray-500">{videoCall ? 'Video connected' : 'Voice connected'}</span>
-        <div className="flex items-center gap-2" aria-label={connectionQuality ? `Network signal quality ${connectionQuality} of 5` : 'Network signal quality unavailable'}>
-          <span className="text-xs text-gray-500">Signal</span>
-          <div className="call-signal-meter" aria-hidden="true">
-            {Array.from({ length: 5 }, (_, index) => <span key={index} className={connectionQuality >= index + 1 ? 'is-active' : ''} />)}
-          </div>
-        </div>
-        {localStream && <div className="ml-auto flex items-center gap-2" aria-label={`Microphone audio level ${Math.round(audioLevel * 100)} percent`}>
-          <span className="text-xs text-gray-500">Mic</span>
-          <div className="call-signal-meter" aria-hidden="true">
-            {Array.from({ length: 6 }, (_, index) => <span key={index} className={audioLevel >= (index + 1) / 6 ? 'is-active' : ''} />)}
-          </div>
-        </div>}
-      </div>}
-      {!videoCall && <audio ref={remoteAudioRef} autoPlay />}
-      {localStream && <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={toggleMute} className="call-utility-button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} title={muted ? 'Unmute microphone' : 'Mute microphone'}>
-          {muted ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}
-        </button>
-        {videoCall && <button type="button" onClick={toggleCamera} className="call-utility-button" aria-label={cameraOff ? 'Turn camera on' : 'Turn camera off'} title={cameraOff ? 'Turn camera on' : 'Turn camera off'}>
-          {cameraOff ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m3 3 18 18M10 6h5a2 2 0 0 1 2 2v1l4-2v10l-3-1.5M7 6.5A2 2 0 0 0 5 8v8a2 2 0 0 0 2 2h8"/></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="m15 10 6-3v10l-6-3z"/></svg>}
-        </button>}
-      </div>}
-    </div>}
   </section>;
 }
