@@ -69,6 +69,7 @@ test("opaque chat room IDs are authorized by persisted participant membership, n
           return { uid: filter.uid, blocked: [] };
         }
       };
+      if (name === "matches") return { async findOne() { return null; } };
       if (name === "chatTyping") return {
         async findOne(filter) { calls.push({ collection: name, filter }); return null; },
         async updateOne(filter, update, options) { calls.push({ collection: name, filter, update, options }); return { matchedCount: 1, modifiedCount: 1 }; }
