@@ -1058,15 +1058,6 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         </div>}
       </div>}
       {!videoCall && <audio ref={remoteAudioRef} autoPlay />}
-      {videoCall && <div className="grid gap-3 sm:grid-cols-2">
-        <div className="relative min-h-40 overflow-hidden rounded-xl bg-black">
-          <video ref={remoteVideoRef} autoPlay playsInline className="h-full min-h-40 max-h-72 w-full object-cover" />
-          {!remoteStream && <span className="absolute inset-0 flex items-center justify-center text-sm text-white">Waiting for video…</span>}
-        </div>
-        <div className="min-h-32 overflow-hidden rounded-xl bg-black">
-          <video ref={attachLocalVideo} autoPlay muted playsInline className="h-full min-h-32 max-h-56 w-full object-cover" />
-        </div>
-      </div>}
       {localStream && <div className="flex flex-wrap gap-2">
         <button type="button" onClick={toggleMute} className="call-utility-button" aria-label={muted ? 'Unmute microphone' : 'Mute microphone'} title={muted ? 'Unmute microphone' : 'Mute microphone'}>
           {muted ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 5.2 2M19 10v1a7 7 0 0 1-11.8 5M5 10v1a7 7 0 0 0 1 3.5M12 18v4m-4 0h8M3 3l18 18"/></svg> : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4m-4 0h8"/></svg>}
