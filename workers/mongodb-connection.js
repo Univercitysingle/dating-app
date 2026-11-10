@@ -4477,7 +4477,8 @@ export class MongoDBConnection {
       const now = new Date();
       if (isAccountRestricted(caller, now) || isAccountRestricted(receiver, now) ||
           (Array.isArray(caller.blocked) && caller.blocked.includes(receiverUid)) ||
-          (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid))) {
+          (Array.isArray(receiver.blocked) && receiver.blocked.includes(uid)) ||
+          await this.isChatMatchInactive(db, uid, receiverUid)) {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
       }
       const calls = db.collection("callSessions");
@@ -4546,6 +4547,12 @@ export class MongoDBConnection {
         { sort: { createdAt: -1 } }
       );
       if (!call) return { status: 200, body: { call: null } };
+      if (await this.isCallPairUnavailable(db, uid, call.callerUid)) {
+        await calls.updateOne({ _id: call._id, status: "ringing" }, {
+          $set: { status: "ended", endedAt: now, updatedAt: now, endReason: "conversation_unavailable" }
+        });
+        return { status: 200, body: { call: null } };
+      }
       await calls.updateOne(
         { _id: call._id, status: "ringing" },
         { $set: { receiverLastSeenAt: now } }
@@ -4581,6 +4588,13 @@ export class MongoDBConnection {
       const calls = await callsCollection.find({
         roomId, $or: [{ callerUid: uid }, { receiverUid: uid }]
       }).sort({ createdAt: -1 }).limit(30).toArray();
+      if (calls.length) {
+        const latest = calls[0];
+        const otherUid = latest.callerUid === uid ? latest.receiverUid : latest.callerUid;
+        if (await this.isCallPairUnavailable(db, uid, otherUid)) {
+          return { status: 403, body: { error: "Call history is unavailable for this conversation" } };
+        }
+      }
       return { status: 200, body: { calls: calls.map(call => {
         const safe = { ...call };
         delete safe.offer;
@@ -4608,6 +4622,13 @@ export class MongoDBConnection {
       }, { sort: { createdAt: -1 } });
       if (call) {
         const now = new Date();
+        const otherUid = call.callerUid === uid ? call.receiverUid : call.callerUid;
+        if (await this.isCallPairUnavailable(db, uid, otherUid)) {
+          await calls.updateOne({ _id: call._id, status: { $in: ["ringing", "accepted"] } }, {
+            $set: { status: "ended", endedAt: now, updatedAt: now, endReason: "conversation_unavailable" }
+          });
+          return { status: 200, body: { call: null, signals: [] } };
+        }
         const heartbeatField = call.callerUid === uid ? "callerLastSeenAt" : "receiverLastSeenAt";
         const otherHeartbeatField = call.callerUid === uid ? "receiverLastSeenAt" : "callerLastSeenAt";
         await calls.updateOne(
@@ -4669,6 +4690,12 @@ export class MongoDBConnection {
       if (call.callerUid === uid) toUid = call.receiverUid;
       else if (call.receiverUid === uid) toUid = call.callerUid;
       else return { status: 403, body: { error: "Not a participant in this call" } };
+      if (await this.isCallPairUnavailable(db, uid, toUid)) {
+        await calls.updateOne({ _id: call._id, status: { $in: ["ringing", "accepted"] } }, {
+          $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "conversation_unavailable" }
+        });
+        return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
+      }
 
       // Keep only the most recent signaling candidates. ICE can emit several
       // candidates per peer and the same call document is polled repeatedly.
@@ -4705,6 +4732,13 @@ export class MongoDBConnection {
       if (!call) return { status: 404, body: { error: "Call not found" } };
       if (call.callerUid !== uid && call.receiverUid !== uid) {
         return { status: 403, body: { error: "Not a participant in this call" } };
+      }
+      const otherUid = call.callerUid === uid ? call.receiverUid : call.callerUid;
+      if (await this.isCallPairUnavailable(db, uid, otherUid)) {
+        await calls.updateOne({ _id: call._id, status: { $in: ["ringing", "accepted"] } }, {
+          $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "conversation_unavailable" }
+        });
+        return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
       }
       if (!["ringing", "accepted"].includes(call.status)) {
         return { status: 200, body: { call, alreadyFinished: true } };
@@ -4750,6 +4784,20 @@ export class MongoDBConnection {
     // A missing match record is treated as a legacy conversation. Once a
     // pair has a match record, only its active "matched" state grants access.
     return Boolean(match && typeof match.status === "string" && match.status !== "matched");
+  }
+
+  async isCallPairUnavailable(db, uid, otherUid) {
+    if (typeof uid !== "string" || !uid || typeof otherUid !== "string" || !otherUid || uid === otherUid) return true;
+    const users = db.collection("users");
+    const [viewer, other] = await Promise.all([
+      users.findOne({ uid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }),
+      users.findOne({ uid: otherUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } })
+    ]);
+    const now = new Date();
+    if (!viewer || !other || isAccountRestricted(viewer, now) || isAccountRestricted(other, now) ||
+        (Array.isArray(viewer.blocked) && viewer.blocked.includes(otherUid)) ||
+        (Array.isArray(other.blocked) && other.blocked.includes(uid))) return true;
+    return this.isChatMatchInactive(db, uid, otherUid);
   }
 
   async isChatPairUnavailable(db, uid, roomId) {
