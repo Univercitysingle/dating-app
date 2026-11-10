@@ -106,6 +106,7 @@ test("calls are denied after a participant blocks the other participant", async 
     collection(name) {
       if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
       if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      if (name === "chatmessages") return {};
       assert.fail("Unexpected collection: " + name);
     }
   };
@@ -122,6 +123,7 @@ test("calls are denied after either participant blocks the other participant", a
     collection(name) {
       if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
       if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      if (name === "chatmessages") return {};
       assert.fail("Unexpected collection: " + name);
     }
   };
@@ -138,6 +140,7 @@ test("calls are denied when a persisted match has been unmatched", async () => {
     collection(name) {
       if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
       if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
+      if (name === "chatmessages") return {};
       assert.fail("Unexpected collection: " + name);
     }
   };
