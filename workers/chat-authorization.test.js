@@ -201,3 +201,30 @@ test("chat and calling are denied when either account is suspended or deletion-p
   usersByUid.bob = { uid: "bob", blocked: [], accountStatus: "active", deletionRequestedAt: new Date() };
   assert.equal(await connection.isCallPairUnavailable(db, "alice", "bob"), true);
 });
+
+
+test("chat history is denied before message access for a suspended account", async () => {
+  let messageCollectionAccessed = false;
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          assert.equal(uid, "alice");
+          return { uid: "alice", accountStatus: "permanently_banned" };
+        }
+      };
+      if (name === "chatmessages") {
+        messageCollectionAccessed = true;
+        assert.fail("Suspended account must be rejected before reading chat messages");
+      }
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getChatHistory("alice", "alice-bob");
+
+  assert.equal(result.status, 403);
+  assert.equal(messageCollectionAccessed, false);
+});
