@@ -2803,6 +2803,7 @@ test("typing status resolves hyphenated participant IDs from persisted message i
       if (name === "users") return { async findOne(filter) {
         return { uid: filter.uid, blocked: [] };
       } };
+      if (name === "matches") return { async findOne() { return null; } };
       if (name === "chatTyping") return {
         async findOne(filter) {
           presenceQueries.push(filter);
@@ -2843,6 +2844,7 @@ test("typing status is denied after either participant blocks the other", async 
         if (name === "users") return {
           async findOne(filter) { return { uid: filter.uid, blocked: filter.uid === "alice-west-01" && blockedUid === "bob-east-02" || filter.uid === "bob-east-02" && blockedUid === "alice-west-01" ? [blockedUid] : [] }; }
         };
+        if (name === "matches") return { async findOne() { return null; } };
         if (name === "chatTyping") return {
           async updateOne() { writeCount++; return { modifiedCount: 1 }; },
           async findOne() { assert.fail("Blocked typing presence must not be read"); }
