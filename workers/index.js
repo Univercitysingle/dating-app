@@ -344,6 +344,71 @@ function verifyWebXPayCallback(payment, signature, configuredPublicKey) {
   return paymentBytes.toString("utf8");
 }
 
+
+
+export async function requestTurnixIceConfig(request, env, claims, fetchImpl = fetch) {
+  const token = String(env.TURNIX_API_TOKEN || "").trim();
+  if (!token) throw Object.assign(new Error("TURNIX_API_TOKEN is not configured"), { status: 503 });
+  const uid = String(claims?.sub || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 96);
+  if (!uid) throw Object.assign(new Error("Authenticated user identifier is invalid"), { status: 400 });
+  const requestUrl = new URL(request.url);
+  const requestedRoom = requestUrl.searchParams.get("room") || "dating-app-calls";
+  const room = requestedRoom.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 96) || "dating-app-calls";
+  const headers = { "authorization": "Bearer " + token, "content-type": "application/json" };
+  // Cloudflare overwrites this edge header, so it is a trusted client-IP source here.
+  const clientIp = String(request.headers.get("cf-connecting-ip") || "").trim();
+  if (clientIp && clientIp.length <= 64 && /^[0-9a-fA-F:.]+$/.test(clientIp)) {
+    headers["X-TURN-CLIENT-IP"] = clientIp;
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetchImpl("https://turnix.io/api/v1/credentials/ice", {
+      method: "POST", headers,
+      body: JSON.stringify({ ttl: 3600, room, initiator_client: uid }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      // Do not retain or forward the provider body because it may contain sensitive diagnostics.
+      throw Object.assign(new Error("Turnix credentials request failed"), { status: response.status });
+    }
+    const payload = await response.json();
+    if (!Array.isArray(payload?.iceServers) || payload.iceServers.length === 0) {
+      throw Object.assign(new Error("Turnix returned an invalid ICE server list"), { status: 502 });
+    }
+    const expiresAt = typeof payload.expiresAt === "string" && Number.isFinite(Date.parse(payload.expiresAt))
+      ? payload.expiresAt : new Date(Date.now() + 3600 * 1000).toISOString();
+    return { iceServers: payload.iceServers, expiresAt };
+  } catch (error) {
+    if (error?.status) throw error;
+    throw Object.assign(new Error("Turnix credentials service is unavailable"), { status: 502 });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function buildTurnixIceServerTiers(iceServers) {
+  const stun = [];
+  const turn = [];
+  for (const server of Array.isArray(iceServers) ? iceServers : []) {
+    const urls = (Array.isArray(server.urls) ? server.urls : [server.urls]).filter(value => typeof value === "string");
+    const stunUrls = urls.filter(value => /^stuns?:/i.test(value));
+    const turnUrls = urls.filter(value => /^turns?:/i.test(value));
+    if (stunUrls.length) stun.push({ ...server, urls: stunUrls });
+    if (turnUrls.length) turn.push({ ...server, urls: turnUrls });
+  }
+  const tiers = [{ name: "direct-stun", iceServers: stun }];
+  for (const [name, matcher] of [
+    ["turn-udp", value => /transport=udp/i.test(value) || !/transport=/i.test(value)],
+    ["turn-tcp", value => /transport=tcp/i.test(value)],
+    ["turn-tls", value => /^turns:/i.test(value)]
+  ]) {
+    const servers = turn.map(server => ({ ...server, urls: server.urls.filter(matcher) })).filter(server => server.urls.length);
+    if (servers.length) tiers.push({ name, iceServers: servers });
+  }
+  return tiers;
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
@@ -2144,6 +2209,15 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (env.TURNIX_API_TOKEN) {
+          try {
+            const turnix = await requestTurnixIceConfig(request, env, claims);
+            return json({ iceServers: turnix.iceServers, iceTransportPolicy: "all", turnConfigured: turnix.iceServers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(value => /^turns?:/i.test(value))), credentialExpiresAt: Math.floor(Date.parse(turnix.expiresAt) / 1000), expiresAt: turnix.expiresAt });
+          } catch (error) {
+            console.warn("Turnix call ICE credentials unavailable", { status: error?.status || 502 });
+            return json({ error: error?.status === 429 ? "TURN usage limit reached" : "Call ICE configuration unavailable" }, error?.status === 429 ? 503 : (error?.status === 401 ? 502 : (error?.status || 502)));
+          }
+        }
         const stunServers = [
           { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
           { urls: ["stun:global.stun.twilio.com:3478"] }
@@ -2189,6 +2263,17 @@ export default {
         if (!accessResponse.ok) return json(access, accessResponse.status);
         if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
         if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
+
+        if (env.TURNIX_API_TOKEN) {
+          try {
+            const turnix = await requestTurnixIceConfig(request, env, claims);
+            const credentialExpiresAt = Math.floor(Date.parse(turnix.expiresAt) / 1000);
+            return json({ iceServers: turnix.iceServers, iceServerTiers: buildTurnixIceServerTiers(turnix.iceServers), iceTransportPolicy: "all", turnConfigured: turnix.iceServers.some(server => (Array.isArray(server.urls) ? server.urls : [server.urls]).some(value => /^turns?:/i.test(value))), credentialExpiresAt, expiresAt: turnix.expiresAt });
+          } catch (error) {
+            console.warn("Turnix Video Rooms ICE credentials unavailable", { status: error?.status || 502 });
+            return json({ error: error?.status === 429 ? "TURN usage limit reached" : "ICE configuration unavailable" }, error?.status === 429 ? 503 : (error?.status === 401 ? 502 : (error?.status || 502)));
+          }
+        }
 
         const stunServers = [
           { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
