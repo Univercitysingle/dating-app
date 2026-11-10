@@ -832,7 +832,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
 
       <div className="absolute inset-x-0 z-20 flex flex-col items-center px-3 sm:px-4" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         {error && <p className="mb-3 max-w-md rounded-xl border border-rose-300/20 bg-rose-950/90 px-4 py-2.5 text-center text-xs text-rose-100 shadow-xl sm:text-sm" role="alert">{error}</p>}
-        <div className="call-video-controls flex w-full max-w-[22rem] items-center justify-center gap-3 rounded-[2rem] border border-white/15 bg-[#111b19]/90 px-4 py-3 shadow-2xl backdrop-blur-2xl sm:max-w-md sm:gap-6 sm:px-7 sm:py-4">
+        <div className="call-video-controls relative flex w-full max-w-[26rem] items-center justify-center gap-2 rounded-[2rem] border border-white/15 bg-[#111b19]/90 px-4 py-3 shadow-2xl backdrop-blur-2xl sm:max-w-lg sm:gap-4 sm:px-7 sm:py-4">
           {audioDevicesOpen && <div className="absolute bottom-full mb-3 flex w-[min(94vw,34rem)] flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-[#17211f]/95 p-3 text-xs text-white shadow-2xl backdrop-blur-2xl">
             <label className="flex min-w-0 flex-1 items-center gap-2">Microphone
               <select aria-label="Select microphone" value={selectedMicrophoneId} onChange={event => switchMicrophone(event.target.value)} className="min-w-0 max-w-48 rounded-lg border border-white/20 bg-[#27332f] px-2 py-2 text-white">
