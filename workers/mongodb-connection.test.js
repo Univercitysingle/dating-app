@@ -632,6 +632,52 @@ test("confirmed Matches responses expose only sanitized public profile fields", 
   assert.equal(profile.bio, "Public biography");
 });
 
+test("unmatched pairs cannot read history or typing presence while legacy chats remain supported", async () => {
+  const roomId = "alice-bob";
+  let typingAccessed = false;
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          if (uid === "alice") return { uid, role: "user", blocked: [] };
+          if (uid === "bob") return { uid, blocked: [] };
+          return null;
+        }
+      };
+      if (name === "chatmessages") return {
+        async findOne() { return { senderUid: "alice", receiverUid: "bob" }; },
+        find() { assert.fail("Unmatched history must not be queried"); }
+      };
+      if (name === "matches") return {
+        async findOne(filter) {
+          assert.deepEqual(filter.$or, [
+            { user1Uid: "alice", user2Uid: "bob" },
+            { user1Uid: "bob", user2Uid: "alice" }
+          ]);
+          return { status: "unmatched" };
+        }
+      };
+      if (name === "chatTyping") return {
+        async findOne() { typingAccessed = true; return null; },
+        async updateOne() { typingAccessed = true; return { modifiedCount: 1 }; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const history = await connection.getChatHistory("alice", roomId);
+  const typingRead = await connection.getTypingStatus("alice", roomId);
+  const typingWrite = await connection.updateTypingStatus("alice", { roomId, isTyping: true });
+
+  assert.equal(history.status, 403);
+  assert.equal(typingRead.status, 403);
+  assert.equal(typingWrite.status, 403);
+  assert.equal(typingAccessed, false, "typing presence must not be read or written after unmatch");
+});
+
 test("chat history is denied when either participant has blocked the other", async () => {
   for (const blockedBy of ["current-user", "other-user"]) {
     const users = {
