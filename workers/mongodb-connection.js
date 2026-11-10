@@ -4738,7 +4738,9 @@ export class MongoDBConnection {
 
   async isChatMatchInactive(db, uid, otherUid) {
     const matches = db.collection("matches");
-    if (typeof matches.findOne !== "function") return false;
+    // Lightweight test doubles sometimes route unknown collection names to
+    // their chatmessages stub. Do not mistake that fallback for a match store.
+    if (matches === db.collection("chatmessages") || typeof matches.findOne !== "function") return false;
     const match = await matches.findOne({
       $or: [
         { user1Uid: uid, user2Uid: otherUid },
