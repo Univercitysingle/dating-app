@@ -120,8 +120,12 @@ jobs:
           count="$(jq -r 'if (.iceServers | type) == "array" then (.iceServers | length) else 0 end' /tmp/turnix-ice-response.json)"
           echo "Turnix credential API status: $status; ICE server entries: $count"
           if [[ "$status" != "200" || "$count" -lt 1 ]]; then
-            echo "::error::Turnix credential verification failed. Check TURNIX_API_TOKEN and Turnix project quota."
-            exit 1
+            if [[ -n "$EXPRESSTURN_USERNAME" && -n "$EXPRESSTURN_PASSWORD" ]]; then
+              echo "::warning::Turnix credential verification failed (HTTP $status). Proceeding with ExpressTURN primary; Turnix fallback is unavailable until TURNIX_API_TOKEN is corrected."
+            else
+              echo "::error::Turnix credential verification failed and no ExpressTURN credentials are configured. Check TURNIX_API_TOKEN and provider quota."
+              exit 1
+            fi
           fi
           rm -f /tmp/turnix-ice-response.json
 
