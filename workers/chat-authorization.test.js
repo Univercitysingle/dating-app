@@ -180,3 +180,24 @@ test("call creation rejects an unmatched pair before creating a call session", a
   assert.equal(result.status, 403);
   assert.equal(callSessionAccessed, false);
 });
+
+
+test("chat and calling are denied when either account is suspended or deletion-pending", async () => {
+  const usersByUid = {
+    alice: { uid: "alice", blocked: [], accountStatus: "active" },
+    bob: { uid: "bob", blocked: [], accountStatus: "temporarily_suspended", suspendedUntil: new Date(Date.now() + 60_000) }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne({ uid }) { return usersByUid[uid] || null; } };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      if (name === "chatmessages") return {};
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  assert.equal(await connection.isCallPairUnavailable(db, "alice", "bob"), true);
+
+  usersByUid.bob = { uid: "bob", blocked: [], accountStatus: "active", deletionRequestedAt: new Date() };
+  assert.equal(await connection.isCallPairUnavailable(db, "alice", "bob"), true);
+});
