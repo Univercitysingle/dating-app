@@ -256,22 +256,38 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     const peer = peerRef.current;
     const activeCall = callRef.current;
     if (!peer || !activeCall || activeCall.status !== 'accepted' ||
-        activeCall.callerUid !== currentUser?.uid || reconnectingRef.current ||
-        !navigator.onLine || reconnectAttemptsRef.current >= 3) return;
+        reconnectingRef.current || !navigator.onLine || reconnectAttemptsRef.current >= 5) return;
     reconnectingRef.current = true;
     setReconnecting(true);
     setStatus('Network interrupted. Reconnecting…');
     try {
       reconnectAttemptsRef.current += 1;
+      // Refresh short-lived TURN credentials before an ICE restart. Both call
+      // participants may initiate recovery; offer-collision handling below
+      // deterministically selects the polite peer.
+      const freshIce = await getCallIceConfig();
+      if (Array.isArray(freshIce?.iceServers) && freshIce.iceServers.length &&
+          typeof peer.setConfiguration === 'function') {
+        peer.setConfiguration({ iceServers: freshIce.iceServers, iceTransportPolicy: 'all', iceCandidatePoolSize: 2 });
+      }
       const offer = await peer.createOffer({ iceRestart: true });
       await peer.setLocalDescription(offer);
       await sendDescription(String(activeCall._id), peer.localDescription);
+      reconnectingRef.current = false;
+      setReconnecting(false);
     } catch (err) {
       setError(messageFor(err, 'Automatic reconnection failed. Please check your network.'));
       reconnectingRef.current = false;
       setReconnecting(false);
+      if (reconnectAttemptsRef.current < 5 && navigator.onLine) {
+        const delay = Math.min(10000, 1200 * (2 ** reconnectAttemptsRef.current));
+        if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = window.setTimeout(() => restartConnection(), delay);
+      } else {
+        setStatus('Unable to reconnect. Check your network or end the call and try again.');
+      }
     }
-  }, [currentUser?.uid, sendDescription]);
+  }, [sendDescription]);
 
   const makePeer = useCallback(async type => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
@@ -393,6 +409,20 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     }
   };
 
+  useEffect(() => {
+    if (!call?._id || call.status !== 'ringing' || call.receiverUid !== currentUser?.uid) return;
+    let request;
+    try {
+      request = JSON.parse(window.sessionStorage.getItem('dating-app-auto-answer-call') || 'null');
+    } catch (_) { request = null; }
+    if (!request || String(request.callId) !== String(call._id) ||
+        String(request.roomId) !== String(roomId) || Date.now() - Number(request.requestedAt || 0) > 60000) return;
+    try { window.sessionStorage.removeItem('dating-app-auto-answer-call'); } catch (_) {}
+    // The user explicitly pressed Answer in the global incoming-call surface.
+    // Start media acquisition and signaling directly, without a second click.
+    acceptCall();
+  }, [call?._id, call?.status, currentUser?.uid, roomId]);
+
   const finishCall = async action => {
     if (callActionInProgressRef.current) return;
     callActionInProgressRef.current = true;
@@ -453,6 +483,12 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           const peer = peerRef.current;
           if (signal.description && peer) {
             try {
+              if (signal.description.type === 'offer' && peer.signalingState !== 'stable') {
+                const active = callRef.current || next;
+                const polite = String(currentUser.uid) > String(active.callerUid || '');
+                if (!polite) continue;
+                await peer.setLocalDescription({ type: 'rollback' });
+              }
               await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
               remoteReadyRef.current = true;
               if (signal.description.type === 'offer') {
