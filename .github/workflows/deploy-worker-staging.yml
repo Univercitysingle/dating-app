@@ -41,6 +41,9 @@ jobs:
       TURNIX_API_TOKEN: ${{ secrets.TURNIX_API_TOKEN }}
       EXPRESSTURN_USERNAME: ${{ secrets.EXPRESSTURN_USERNAME }}
       EXPRESSTURN_PASSWORD: ${{ secrets.EXPRESSTURN_PASSWORD }}
+      VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
       FRONTEND_URL: ${{ secrets.STAGING_FRONTEND_URL || 'https://dating-app-staging.pages.dev' }}
       FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL || secrets.REACT_APP_FIREBASE_REALTIME_DATABASE || secrets.REACT_APP_FIREBASE_DATABASE_URL }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
@@ -83,6 +86,11 @@ jobs:
           test -n "$WEBXPAY_PUBLIC_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_PUBLIC_KEY"; exit 1; }
           test -n "$WEBXPAY_SECRET_KEY" || { echo "::error::Missing GitHub secret WEBXPAY_SECRET_KEY"; exit 1; }
           test -n "$TURNIX_API_TOKEN" || { echo "::error::Missing GitHub secret TURNIX_API_TOKEN"; exit 1; }
+          if [[ -n "$VAPID_PUBLIC_KEY" || -n "$VAPID_PRIVATE_KEY" || -n "$VAPID_SUBJECT" ]]; then
+            test -n "$VAPID_PUBLIC_KEY" && test -n "$VAPID_PRIVATE_KEY" && [[ "$VAPID_SUBJECT" =~ ^mailto:[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || { echo "::error::Set valid VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and mailto: VAPID_SUBJECT GitHub secrets together."; exit 1; }
+          else
+            echo "::warning::VAPID secrets are not available to this workflow. Browser-closed push will remain disabled."
+          fi
           if [[ -n "$EXPRESSTURN_USERNAME" || -n "$EXPRESSTURN_PASSWORD" ]]; then
             test -n "$EXPRESSTURN_USERNAME" && test -n "$EXPRESSTURN_PASSWORD" || { echo "::error::Set both EXPRESSTURN_USERNAME and EXPRESSTURN_PASSWORD GitHub secrets."; exit 1; }
           else
@@ -187,6 +195,19 @@ jobs:
             echo "ExpressTURN primary credentials configured on the staging Worker."
           else
             echo "ExpressTURN credentials were not supplied; preserving any existing Worker secrets."
+          fi
+
+      - name: Configure optional Web Push VAPID secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$VAPID_PUBLIC_KEY" && -n "$VAPID_PRIVATE_KEY" && -n "$VAPID_SUBJECT" ]]; then
+            printf '%s' "$VAPID_PUBLIC_KEY" | npx --yes wrangler@4 secret put VAPID_PUBLIC_KEY --config wrangler.jsonc --env staging
+            printf '%s' "$VAPID_PRIVATE_KEY" | npx --yes wrangler@4 secret put VAPID_PRIVATE_KEY --config wrangler.jsonc --env staging
+            printf '%s' "$VAPID_SUBJECT" | npx --yes wrangler@4 secret put VAPID_SUBJECT --config wrangler.jsonc --env staging
+            echo "Web Push VAPID secrets configured on the staging Worker."
+          else
+            echo "VAPID secrets were not supplied; preserving any existing staging Worker secrets."
           fi
 
       - name: Configure Turnix API token
