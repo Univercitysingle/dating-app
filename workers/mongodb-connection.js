@@ -4752,6 +4752,26 @@ export class MongoDBConnection {
     return Boolean(match && typeof match.status === "string" && match.status !== "matched");
   }
 
+  async isChatPairUnavailable(db, uid, roomId) {
+    const messages = db.collection("chatmessages");
+    const conversation = await messages.findOne({
+      roomId,
+      $or: [{ senderUid: uid }, { receiverUid: uid }]
+    }, { projection: { senderUid: 1, receiverUid: 1 } });
+    if (!conversation) return true;
+    const otherUid = conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid;
+    if (typeof otherUid !== "string" || !otherUid || otherUid === uid) return true;
+    const users = db.collection("users");
+    const [viewer, other] = await Promise.all([
+      users.findOne({ uid }, { projection: { blocked: 1 } }),
+      users.findOne({ uid: otherUid }, { projection: { blocked: 1 } })
+    ]);
+    if (!viewer || !other ||
+        (Array.isArray(viewer.blocked) && viewer.blocked.includes(otherUid)) ||
+        (Array.isArray(other.blocked) && other.blocked.includes(uid))) return true;
+    return this.isChatMatchInactive(db, uid, otherUid);
+  }
+
   async getChatHistory(uid, roomId, limit = 50, skip = 0, after = null, before = null) {
     if (!this.parseChatRoom(roomId) || typeof uid !== "string" || !uid) return { status: 400, body: { error: "Invalid room ID" } };
     limit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 50;
@@ -5029,6 +5049,9 @@ export class MongoDBConnection {
       const ids = messageIds.filter(id => typeof id === "string" && /^[a-fA-F0-9]{24}$/.test(id)).map(id => new ObjectId(id));
       if (!ids.length) return { status: 200, body: { deliveredCount: 0 } };
       const db = this.getDatabase(await this.getClient());
+      if (await this.isChatPairUnavailable(db, uid, roomId)) {
+        return { status: 403, body: { error: "Chat receipts are unavailable for this conversation" } };
+      }
       const result = await db.collection("chatmessages").updateMany(
         { _id: { $in: ids }, roomId, receiverUid: uid, status: "sent" },
         { $set: { status: "delivered", deliveredAt: new Date() } }
@@ -5052,6 +5075,9 @@ export class MongoDBConnection {
         .map(id => new ObjectId(id));
       if (!ids.length) return { status: 200, body: { readCount: 0 } };
       const db = this.getDatabase(await this.getClient());
+      if (await this.isChatPairUnavailable(db, uid, roomId)) {
+        return { status: 403, body: { error: "Chat receipts are unavailable for this conversation" } };
+      }
       const now = new Date();
       const result = await db.collection("chatmessages").updateMany(
         { _id: { $in: ids }, roomId, receiverUid: uid, status: { $in: ["sent", "delivered"] } },
