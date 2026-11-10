@@ -1,7 +1,35 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
 import { Buffer } from "node:buffer";
+import { sendWebPush } from "./push-notifications.js";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
 
+
+async function deliverPushToUser(env, actorClaims, targetUid, eventKey, notification) {
+  if (!targetUid || !env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return;
+  try {
+    const id = env.MONGODB_CONNECTION.idFromName("mongo-primary");
+    const connection = env.MONGODB_CONNECTION.get(id);
+    const response = await connection.fetch("https://internal.invalid/internal/push/subscriptions", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ claims: actorClaims, targetUid })
+    });
+    if (!response.ok) return;
+    const stored = await response.json();
+    if (stored.preferences?.channels?.desktop !== true || stored.preferences?.events?.[eventKey] !== true) return;
+    const data = { title: notification.title, body: notification.body, url: notification.url || "/conversations", tag: notification.tag || eventKey };
+    await Promise.all((stored.subscriptions || []).map(async subscription => {
+      const result = await sendWebPush(subscription, data, env);
+      if (result.permanent) {
+        await connection.fetch("https://internal.invalid/internal/push/unsubscribe", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims: actorClaims, endpoint: subscription.endpoint })
+        }).catch(() => null);
+      }
+    }));
+  } catch (error) {
+    console.warn("Push delivery was not completed", { message: String(error?.message || "Push error").slice(0, 160) });
+  }
+}
 
 function isCdnConfigured(env) {
   return Boolean(String(env.CDN_HOSTNAME || "").trim());
@@ -507,7 +535,7 @@ export class RateLimiter {
 export { MongoDBConnection } from "./mongodb-connection.js";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Apply a per-client edge limit to API traffic. Cloudflare supplies
@@ -2243,6 +2271,35 @@ export default {
 
 
 
+
+    if (url.pathname === "/api/push/vapid-public-key") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) return json({ error: "Browser push notifications are not configured" }, 503);
+      return json({ publicKey: env.VAPID_PUBLIC_KEY });
+    }
+
+    if (url.pathname === "/api/push/subscriptions") {
+      if (!["POST", "DELETE"].includes(request.method)) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Push subscription service unavailable" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({ error: "Invalid push subscription request" }, 400);
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName("mongo-primary"));
+        const internalPath = request.method === "POST" ? "/internal/push/subscribe" : "/internal/push/unsubscribe";
+        const body = request.method === "POST" ? { claims, subscription: payload } : { claims, endpoint: payload.endpoint };
+        const response = await connection.fetch("https://internal.invalid" + internalPath, {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+        });
+        const result = await response.json().catch(() => ({ error: "Push subscription service unavailable" }));
+        return json(result, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Push subscription service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/calls/ice-config") {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
@@ -2476,6 +2533,17 @@ export default {
           body: JSON.stringify({ claims, payload })
         });
         const result = await response.json().catch(() => ({ error: "Calling service unavailable" }));
+        if (response.ok && action === "start" && result.receiverUid) {
+          const task = deliverPushToUser(env, claims, result.receiverUid,
+            result.type === "video" ? "videoCalls" : "voiceCalls", {
+              title: result.type === "video" ? "Incoming video call" : "Incoming voice call",
+              body: "Open Hart2Hart to answer.",
+              url: "/chat/" + encodeURIComponent(result.roomId || ""),
+              tag: "incoming-call-" + String(result._id || Date.now())
+            });
+          if (ctx?.waitUntil) ctx.waitUntil(task);
+          else await task;
+        }
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
@@ -2598,6 +2666,14 @@ export default {
         });
         const result = await response.json().catch(() => ({ error: "Unable to send chat message" }));
         if (!response.ok) return json(result, response.status);
+        if (result.receiverUid && result.roomId) {
+          const task = deliverPushToUser(env, claims, result.receiverUid, "newMessages", {
+            title: "New message", body: "You have a new message on Hart2Hart.",
+            url: "/chat/" + encodeURIComponent(result.roomId), tag: "new-message-" + String(result.roomId)
+          });
+          if (ctx?.waitUntil) ctx.waitUntil(task);
+          else await task;
+        }
         const authorization = request.headers.get("authorization") || "";
         const idToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
         // MongoDB is the source of truth. Realtime Database is a best-effort
