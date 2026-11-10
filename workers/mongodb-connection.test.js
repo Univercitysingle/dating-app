@@ -2269,6 +2269,57 @@ test("a user cannot start or receive overlapping calls in different chat rooms",
 });
 
 
+test("an active call is ended when the participants unmatch", async () => {
+  const call = {
+    _id: "call-object-id",
+    roomId: "alice-bob",
+    callerUid: "alice",
+    receiverUid: "bob",
+    status: "accepted",
+    createdAt: new Date(),
+    connectedAt: new Date(),
+    callerLastSeenAt: new Date(),
+    receiverLastSeenAt: new Date(),
+    signals: []
+  };
+  let endedUpdate = null;
+  const calls = {
+    async findOne(filter) {
+      assert.equal(filter.roomId, "alice-bob");
+      return call;
+    },
+    async updateOne(filter, update) {
+      endedUpdate = { filter, update };
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const users = {
+    async findOne({ uid }) {
+      return { uid, blocked: [], accountStatus: "active" };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "callSessions") return calls;
+      if (name === "users") return users;
+      if (name === "matches") return { async findOne() { return { status: "unmatched" }; } };
+      if (name === "chatmessages") return {};
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getCallState("alice", "alice-bob");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.call, null);
+  assert.deepEqual(result.body.signals, []);
+  assert.equal(endedUpdate.filter._id, call._id);
+  assert.equal(endedUpdate.update.$set.status, "ended");
+  assert.equal(endedUpdate.update.$set.endReason, "conversation_unavailable");
+});
+
 test("global incoming call lookup returns only the authenticated receiver's live ringing call", async () => {
   const now = new Date();
   const call = {
