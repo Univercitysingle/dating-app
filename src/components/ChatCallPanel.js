@@ -794,7 +794,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {status && status !== 'Incoming call' && <p className="mt-3 text-sm text-slate-300" role="status">{status}</p>}
       </div>
     </div>}
-    {active && <div className="mx-auto mt-2 flex max-w-2xl flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-sm">
+    {active && <div className="fixed bottom-28 left-1/2 z-[10600] mx-auto flex w-[min(94vw,42rem)] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/95 p-2 text-xs text-gray-700 shadow-xl">
       <button type="button" onClick={() => setAudioDevicesOpen(value => !value)} className="call-utility-button" aria-expanded={audioDevicesOpen}>Audio devices</button>
       {audioDevicesOpen && <>
         <label className="flex min-w-0 flex-1 items-center gap-2">Microphone
