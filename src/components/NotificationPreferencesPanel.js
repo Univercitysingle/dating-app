@@ -117,6 +117,66 @@ export default function NotificationPreferencesPanel() {
   const [permission, setPermission] = useState(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return undefined;
+    navigator.serviceWorker.getRegistration('/')
+      .then(registration => registration?.pushManager.getSubscription())
+      .then(subscription => { if (active) setPushEnabled(Boolean(subscription)); })
+      .catch(() => { if (active) setPushEnabled(false); });
+    return () => { active = false; };
+  }, []);
+
+  const decodeApplicationServerKey = value => {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
+    const raw = window.atob(padded);
+    return Uint8Array.from(raw, character => character.charCodeAt(0));
+  };
+
+  const togglePushSubscription = async () => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        toast.info('This browser does not support background push notifications.');
+        return;
+      }
+      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      const existing = await registration.pushManager.getSubscription();
+      if (existing && pushEnabled) {
+        await apiClient.delete('/push/subscriptions', { endpoint: existing.endpoint });
+        await existing.unsubscribe();
+        setPushEnabled(false);
+        toast.success('Background push notifications disabled on this device.');
+        return;
+      }
+      let currentPermission = Notification.permission;
+      if (currentPermission === 'default') currentPermission = await Notification.requestPermission();
+      setPermission(currentPermission);
+      if (currentPermission !== 'granted') {
+        toast.info(currentPermission === 'denied'
+          ? 'Allow notifications for this site in your browser settings, then try again.'
+          : 'Notification permission was not granted.');
+        return;
+      }
+      const keyResponse = await apiClient.get('/push/vapid-public-key');
+      if (!keyResponse?.publicKey) throw new Error('Push notifications are not configured on the server yet.');
+      const subscription = existing || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodeApplicationServerKey(keyResponse.publicKey)
+      });
+      await apiClient.post('/push/subscriptions', subscription.toJSON());
+      setPushEnabled(true);
+      toast.success('Background push notifications enabled on this device.');
+    } catch (error) {
+      toast.error(error?.message || 'Could not update background push notifications.');
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -288,6 +348,28 @@ export default function NotificationPreferencesPanel() {
             </button>
           </div>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Background push on this device</h4>
+            <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+              Receive enabled call and message alerts when Hart2Hart is not open. Browser permission is required.
+            </p>
+            <p className="mt-1 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+              {pushEnabled ? 'Enabled on this device' : 'Not enabled on this device'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={togglePushSubscription}
+            disabled={pushBusy || loading || permission === 'unsupported'}
+            className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {pushBusy ? 'Updating…' : pushEnabled ? 'Disable on this device' : 'Enable on this device'}
+          </button>
+        </div>
       </section>
 
       <div className="space-y-4">
