@@ -597,6 +597,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     return () => navigator.mediaDevices?.removeEventListener?.('devicechange', onDeviceChange);
   }, [refreshAudioDevices]);
 
+  useEffect(() => {
+    if (localStream) refreshAudioDevices();
+  }, [localStream, refreshAudioDevices]);
+
   const applySpeaker = useCallback(async deviceId => {
     setSelectedSpeakerId(deviceId);
     const targets = [remoteAudioRef.current, remoteVideoRef.current].filter(Boolean);
