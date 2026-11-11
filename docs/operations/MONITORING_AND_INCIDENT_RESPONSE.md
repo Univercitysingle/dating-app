@@ -15,3 +15,10 @@ This defines an operating model, not proof that alerting/on-call staffing is con
 ## Current operational readiness (2026-11-11)
 
 This runbook defines required monitoring, not proof that alerting, dashboards or on-call coverage are configured. Confirm Cloudflare Worker/Pages logs and alerts, Durable Object errors, Atlas connection/slow-query metrics, Firebase denials, payment callback failures, CDN proxy health and TURN relay metrics in the relevant provider consoles. Do not log tokens, message content, PII or verification evidence. GitHub Actions quota exhaustion is a current delivery/validation blocker; track it as a CI capacity incident and do not claim a deployment until the exact SHA is confirmed in Cloudflare.
+
+
+## Operational evidence gaps and controls (2026-11-11)
+
+For each control or procedure, identify the owner, prerequisites, exact command or dashboard path where safe, expected result, failure handling, evidence location, last verified commit, and review cadence. Never document a procedure as proven until it has been exercised in the intended environment. Keep production and staging instructions distinct.
+
+Required evidence areas to maintain: route-level API authorization and error-contract tests; MongoDB schema/index/TTL and migration/rollback checks; Firebase RTDB rule tests and push notification lifecycle; MongoDB backup/restore and Firebase recovery exercises with approved RPO/RTO; payment callback replay/idempotency/reconciliation/refund and stale-checkout tests; moderation and support-ticket message permissions with immutable audit history; account export/deletion and backup retention; browser/device/PWA/offline and notification-permission matrix; keyboard, screen-reader, contrast and form accessibility; localization, timezone and RTL checks. Capacity targets, service objectives and recovery objectives remain proposed until measured and approved.
