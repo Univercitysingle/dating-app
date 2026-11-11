@@ -29,3 +29,10 @@ When network conditions deteriorate, reduce video bitrate/resolution/frame rate 
 Initial automatic quality control is committed on `migrate-to-serverless` at `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`. GitHub Actions quota is reported exhausted and the associated Cloudflare Pages workflow failed, so deployment, browser compatibility, real-device behaviour, TURN relay and measured data savings are not yet verified.
 
 Test unauthorized join, block, expired booking, duplicate join, reconnect, host exit, TURN relay, poor network, permission denial, timeout and billing failure on real devices.
+
+
+## Verification and governance gaps (2026-11-11)
+
+This document is not evidence of legal approval, provider certification, production deployment, or operational acceptance. Record the responsible owner, implementation state, test evidence, staging evidence, last verified commit, data classification, retention rule, dependency, and release approval for each requirement.
+
+Explicitly track applicable gaps: payment/provider callback replay and reconciliation, refunds, duplicate settlement and stale pending recovery; verification evidence access controls, encryption, review audit and deletion/retention; user-data export and deletion propagation across MongoDB, Firebase, media storage and backups; documented backup/restore exercises and approved RPO/RTO; moderator access and ticket/chat message edit/delete policy with immutable audit history; notification opt-in/revocation and delivery failures; accessibility, supported browsers/devices, PWA/offline behaviour, localization, timezone and RTL. Do not mark an item complete without reproducible evidence and an assigned approver.
