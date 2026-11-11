@@ -9,7 +9,6 @@ on:
       - "package.json"
       - "package-lock.json"
       - "wrangler.jsonc"
-      - ".github/workflows/deploy-worker-staging.yml"
       - "scripts/staging-account-deletion-acceptance.sh"
   workflow_dispatch:
 
