@@ -1,9 +1,9 @@
 # Deployment and Rollback Runbook
 Last reviewed: 2026-11-11. This applies to migration-branch staging, not production cutover.
 
-Pre-deploy: confirm migrate-to-serverless branch; review diff; no secrets/CDN Worker changes; run Worker/frontend/security tests; verify bindings without printing values; confirm Mongo readiness and database migration compatibility.
+Pre-deploy: confirm `migrate-to-serverless`; review the exact diff; preserve secrets and the existing CDN Worker; run frontend, backend, and Worker tests; verify bindings without printing values; confirm MongoDB readiness and migration compatibility.
 
-Deploy through repository GitHub Actions Cloudflare Worker and Pages workflows. Inspect exact commit SHA and job results.
+**Current release path:** GitHub Actions CI/CD is intentionally skipped because the project operator reported that the Actions quota is exhausted. Deploy directly to the dedicated Cloudflare staging Worker and Pages project from an authenticated local checkout, using the procedure below. Do not push deployment-triggering changes to `main`.
 
 ## GitHub Actions quota exhausted
 
@@ -11,7 +11,7 @@ The project operator reported exhausted GitHub Actions quota on 2026-11-11. When
 
 For the call-quality revision `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`, the Cloudflare Pages workflow did not succeed and its step logs were unavailable during the documentation update. The revision is committed, but staging deployment is unverified.
 
-After Actions quota is restored, rerun the existing Cloudflare Pages workflow for the branch and verify the exact SHA. Then run frontend build/tests, staging smoke checks, and two-device audio/video acceptance. Validate adaptive video quality under constrained networks, audio continuity, TURN relay selection and measured bytes sent/received. A manual deployment path should only be used if separately approved and documented, with the same secret-handling and post-deployment checks.
+Do not resume GitHub Actions deployment unless the operator explicitly changes this instruction. The direct Cloudflare procedure below is the active staging path. Verify the deployed source SHA and run frontend/build, API smoke, and two-device audio/video acceptance. Validate adaptive video quality under constrained networks, audio continuity, TURN relay selection, and measured bytes sent/received.
 
 Post-deploy: check Worker liveness/readiness, route smoke tests, actual Pages deployment URL, login, authenticated API, media, Firebase chat and admin journeys. Confirm frontend and Worker SHAs are compatible.
 
@@ -36,7 +36,7 @@ This procedure is for an operator with an authenticated Cloudflare account and t
 - Confirm `git branch --show-current` returns `migrate-to-serverless` and `git status --short` is clean.
 - Confirm the Cloudflare account selected by Wrangler is the account that owns the dedicated `dating-app-staging` Pages project and `dating-app-api-staging` Worker.
 - Authenticate locally with `npx wrangler@4 login` or use a least-privilege API token in the local shell. Do not print token values.
-- Confirm the staging Worker already has all required secrets configured. The manual deployment commands below deliberately do not replace or print Worker secrets.
+- Prepare the full Worker secret inventory listed below. A direct Wrangler deployment does not automatically import GitHub Actions secrets. Verify required secrets are already configured in the staging Worker or set them interactively from a secure local shell before deployment. Never paste secret values into chat, terminal transcripts, or source control.
 - Confirm the existing `CDN_PROXY` service binding and Durable Object bindings/migrations are present in the staging environment. Do not modify the CDN Worker.
 
 ### Worker deployment
@@ -55,7 +55,19 @@ npx wrangler@4 deploy --config wrangler.jsonc --env staging \
   --var "FRONTEND_URL:https://dating-app-staging.pages.dev"
 ```
 
-The command deploys the Worker code/config only. It does not provision secrets. If required secrets are missing, stop and configure them locally through Wrangler using the secret names in the Worker deployment workflow. Do not overwrite existing secrets with blank values. Never run `wrangler secret list` output into a public log.
+The command deploys the Worker code/config only. It does not provision secrets. The Firebase project ID above matches the current Worker staging workflow's literal configuration; confirm it against the intended Firebase project in the Firebase Console before deploying, because a wrong project ID can route authentication or database calls to the wrong project.
+
+#### Worker secrets and bindings
+
+The Worker staging workflow currently requires these values to be present in its deployment environment: `MONGODB_URI`, `VERIFICATION_ENCRYPTION_KEY` (64 hexadecimal characters), `JWT_SECRET` (at least 32 characters and matching the existing CDN Worker's JWT secret), `WEBXPAY_PUBLIC_KEY`, `WEBXPAY_SECRET_KEY`, and `TURNIX_API_TOKEN`. Preserve the existing WebXPay configuration. ExpressTURN primary credentials are optional as a pair: `EXPRESSTURN_USERNAME` and `EXPRESSTURN_PASSWORD`. The workflow also supports optional push secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; optional Firebase RTDB/service-account secrets; optional `TURN_URLS` plus `TURN_SHARED_SECRET`; and optional `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD_HASH`, and `CRON_SECRET`.
+
+Set any missing secret from a secure local shell, for example:
+
+```bash
+printf '%s' "$MONGODB_URI" | npx wrangler@4 secret put MONGODB_URI --config wrangler.jsonc --env staging
+```
+
+The shell variable must be populated from the approved secret manager or local secure environment, not from a value pasted into chat. Repeat only for secrets that are genuinely missing. Do not print secret values or overwrite known-good credentials. Confirm the existing `CDN_PROXY`, `MONGODB_CONNECTION`, and `RATE_LIMITER` bindings and Durable Object migrations in the Cloudflare dashboard. Never change the CDN Worker as part of this deployment.
 
 ### Pages deployment
 
@@ -66,7 +78,7 @@ npx wrangler@4 pages deploy build \
   --branch migrate-to-serverless
 ```
 
-The Pages project must already have its `API_ORIGIN` secret set to `https://dating-app-api-staging.enadoctemp.workers.dev`. If it is absent, set it locally with `printf '%s' 'https://dating-app-api-staging.enadoctemp.workers.dev' | npx wrangler@4 pages secret put API_ORIGIN --project-name dating-app-staging`.
+The Pages workflow injects Firebase configuration as `REACT_APP_FIREBASE_*` build-time environment variables and sets `API_ORIGIN` as a Pages secret for the API proxy. A direct build must supply the same Firebase values before `npm run build`; otherwise the built frontend may not initialize Firebase correctly. Do not use placeholder values. If the Firebase values are not available from the approved secret manager, stop before building.
 
 ### Post-deployment verification
 
@@ -82,3 +94,8 @@ Then verify anonymous protected routes return 401, sign-in and authenticated pro
 ### Safety gate
 
 The staging Wrangler configuration explicitly keeps Dark Fantasy disabled. Do not enable it or use a wildcard country allowlist until region gating is consistent across all handlers, legal/age-assurance/payment/moderation approvals are recorded, and negative access tests pass. The direct deployment path does not bypass these release gates.
+
+
+## Direct deployment acceptance record
+
+For each manual deployment, append an entry to the release record containing: source Git SHA, operator, Cloudflare account/project names (never account tokens), Worker deployment ID and timestamp, Pages deployment ID and timestamp, health/readiness HTTP results, smoke-test outcomes, and rollback reference. Mark a step **not run** when no evidence exists. Do not infer deployment success from a Git commit or a successful build alone.
