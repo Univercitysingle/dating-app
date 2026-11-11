@@ -50,3 +50,19 @@ The existing CDN Worker and WebXPay/payment implementation were not modified. Al
 ## Next review
 
 After API/schema/source inventory and staging access are available, replace the evidence-pending items with source-backed route and collection inventories, then run the relevant acceptance tests. Revisit the Word document with a binary-safe DOCX editing and upload method.
+
+
+## Source inventory progress (2026-11-11)
+
+Two source-backed catalogues have now been added:
+- [Active Worker API catalogue](./architecture/WORKER_API_CATALOG.md), based on `workers/index.js` source blob `f11fd484cf79dc56cb09474254640e9d635cfa54`.
+- [Active Worker database catalogue](./architecture/WORKER_DATABASE_CATALOG.md), based on `workers/mongodb-connection.js` source blob `641b7851e107be99d3f55fbfabcf34595b40e888`.
+
+This closes the first static source-inventory pass, not the live verification gaps. The API catalogue still needs request/response schemas and contract tests. The database catalogue still needs a live Atlas collection/index export and deployed database-name confirmation.
+
+Additional source findings to track:
+- Worker source still exposes admin purchase approve/reject/record-refund routes. Reconcile with the intended gateway-authoritative payment workflow before exposing manual approval.
+- `/api/calls/*` is excluded from the generic Worker IP rate limiter. Verify dedicated call abuse controls.
+- Wrangler staging sets Dark Fantasy enabled with wildcard country configuration. Some route handlers accept wildcard globally, while the catalogue handler rejects it. Treat this as a configuration/security inconsistency and keep the feature gated until corrected.
+- Mongoose model schemas are legacy definitions and are not automatically enforced by direct MongoDB Worker writes.
+
