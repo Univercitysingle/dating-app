@@ -24,3 +24,17 @@ MongoDB Atlas remains the primary application database. The currently documented
 Treat this specification as a living contract. For each item, record implementation status, automated test, staging evidence, last verified commit, owner, dependency, and rollback/retention impact. Distinguish documented design from verified runtime behaviour. Reconcile against source and staging before release.
 
 Cross-cutting gaps requiring explicit closure: a complete API route/method/authz/schema/error catalogue; MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback definitions; Firebase RTDB rules and push subscription/delivery/retry lifecycle; tested backup/restore with RPO/RTO; payment replay/idempotency/reconciliation/refund and stale-pending recovery; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; supported browser/device, PWA/offline and notification permission matrix; accessibility checks for keyboard, screen readers, contrast and forms; localization, timezone and RTL readiness. Do not imply these are implemented unless backed by evidence.
+
+
+## Source-backed Worker collection inventory (2026-11-11)
+
+Use [WORKER_DATABASE_CATALOG.md](./WORKER_DATABASE_CATALOG.md) for the active direct-Worker collection list, observed fields, source-created indexes and legacy Mongoose model comparison. The reviewed Worker source blob was `641b7851e107be99d3f55fbfabcf34595b40e888`.
+
+Important implementation distinction:
+- The Worker uses the MongoDB driver directly through the `MongoDBConnection` Durable Object.
+- The legacy `models/*.js` files define Mongoose schemas and indexes for the Express code path. Those validators and indexes are not automatically applied to direct Worker writes.
+- `MONGODB_DATABASE` overrides the database embedded in `MONGODB_URI`; otherwise the URI default is used. Confirm deployed configuration without exposing the URI.
+- Source-created indexes are only a partial inventory. Export actual Atlas indexes and collection metadata before release.
+
+Do not run schema/index migrations based solely on this document. Confirm duplicate data, backup/restore readiness and rollback first.
+
