@@ -90,3 +90,12 @@ Keep Firebase Realtime Database listeners for realtime updates. The Worker API v
 ## Documentation refresh (2026-11-07)
 
 The product and engineering documentation set is now organised under docs/product, docs/architecture, docs/features, docs/operations, docs/governance and docs/security. The root README links to the maintained catalogue. Use docs/architecture/SYSTEM_ARCHITECTURE.md for the current target architecture and this file for historical migration sequencing. Historical phase notes and dates below are retained as migration history, not necessarily current deployment state. Verify current Worker routes, bindings and workflows before acting on older instructions.
+
+
+## Current migration status correction (2026-11-11)
+
+This section supersedes any older statement above that implies current deployment or provider validation. The active source branch is `migrate-to-serverless`; production cutover is not approved. GitHub Actions quota is exhausted, so the latest application source cannot currently be treated as deployed or validated from a new workflow run. The call-quality implementation is present in source revision `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`; browser, two-device, restrictive-network, TURN relay and data-usage acceptance remain outstanding. The documentation refresh commit is not an application deployment. Keep the legacy service as rollback until all migration gates pass. Do not change `main`, CDN Worker, or production routing as part of this work.
+
+Current infrastructure constraints: Cloudflare Pages and Workers only; MongoDB Atlas is the primary application database; Firebase Authentication and the existing Firebase Realtime Database chat integration are retained; existing CDN Worker remains unchanged. Redis is a preferred future secondary cache, not a confirmed deployed dependency. Do not describe 1,000 concurrent users as certified until a repeatable load test demonstrates it.
+
+Before resuming deployment, restore Actions quota or use an explicitly approved deployment path, inspect the exact workflow and commit SHA, run build and Worker tests, deploy staging, and complete provider and multi-account smoke tests. Treat each earlier dated status section as historical evidence only.
