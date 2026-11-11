@@ -29,3 +29,8 @@ Authorised create/join, signalling, STUN/TURN, reconnect, leave/timeout and clea
 Request deletion, revoke access/entitlements, process linked data and document lawful retention exceptions.
 
 Record branch, SHA, environment, test case, result and request ID. Never record credentials, tokens or raw evidence.
+
+
+## Current execution status (2026-11-11)
+
+Use this journey list as the staging acceptance checklist, not as a claim that every journey currently passes. The call/video journey specifically still requires two real devices, responsive viewport checks, camera switching, minimize/restore, reconnect, restrictive-network/TURN relay validation, audio continuity and measured data usage. Chat realtime security requires deployed Firebase RTDB rule verification. Payment requires a real provider sandbox callback. GitHub Actions quota exhaustion currently prevents a fresh automated workflow run. Record exact commit SHA and evidence for each journey.
