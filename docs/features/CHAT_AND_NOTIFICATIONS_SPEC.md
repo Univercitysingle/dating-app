@@ -10,3 +10,8 @@ Required behaviours: send/receive, ordering, read/unread where supported, typing
 Notifications originate from trusted server events, respect preferences and avoid duplicates on retries. Prefer event-driven updates; fallback polling must be bounded and backoff-capable. Client notification reads must be scoped to the authenticated recipient.
 
 Acceptance: member send/receive, third-party denial, block/unmatch denial, duplicate retry, reconnect, unread state, preference enforcement, rate limits, unauthenticated RTDB denial, cross-room RTDB denial, cross-user notification denial, and revocation after unmatch/block/suspension/deletion.
+
+
+## Current validation note (2026-11-11)
+
+Firebase RTDB client rules and IAM remain externally unverified as recorded in the security review dated 2026-11-10. Keep direct client realtime sync disabled until unauthenticated, non-member, blocked/unmatched and cross-user notification tests pass against deployed rules. Worker-side authorization does not protect direct RTDB listeners. GitHub Actions quota exhaustion currently prevents a fresh automated deployment/acceptance run. Do not mark realtime chat security as complete based solely on Worker unit tests.
