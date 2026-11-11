@@ -18,3 +18,10 @@ Post-deploy: check Worker liveness/readiness, route smoke tests, actual Pages de
 Rollback: stop rollout; preserve correlation IDs; revert/redeploy last known-good staging commit through approved workflow; do not reverse destructive DB migration without recovery plan; disable safe feature flags; verify health and critical journeys; document incident.
 
 Production cutover requires separate approval, traffic/DNS strategy, observation window and tested rollback.
+
+
+## Operational evidence gaps and controls (2026-11-11)
+
+For each control or procedure, identify the owner, prerequisites, exact command or dashboard path where safe, expected result, failure handling, evidence location, last verified commit, and review cadence. Never document a procedure as proven until it has been exercised in the intended environment. Keep production and staging instructions distinct.
+
+Required evidence areas to maintain: route-level API authorization and error-contract tests; MongoDB schema/index/TTL and migration/rollback checks; Firebase RTDB rule tests and push notification lifecycle; MongoDB backup/restore and Firebase recovery exercises with approved RPO/RTO; payment callback replay/idempotency/reconciliation/refund and stale-checkout tests; moderation and support-ticket message permissions with immutable audit history; account export/deletion and backup retention; browser/device/PWA/offline and notification-permission matrix; keyboard, screen-reader, contrast and form accessibility; localization, timezone and RTL checks. Capacity targets, service objectives and recovery objectives remain proposed until measured and approved.
