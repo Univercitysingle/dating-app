@@ -51,3 +51,8 @@ Set Worker DARK_FANTASY_ENABLED=false (or remove it), set Pages REACT_APP_DARK_F
 - All three private-gallery purchase SKUs are currently rejected server-side with HTTP 503. The UI marks them as unavailable. No new checkout or entitlement is created for these products.
 - These planned products are separate from the existing Dark Fantasy matching add-on and ordinary Premium. Browsing the Dark Fantasy Store does not require a subscription.
 - Do not re-enable these SKUs until private media upload, per-creator and per-buyer authorization, short-lived delivery, consent/expiry revocation, creator gallery management, and authenticated security tests are implemented. Sensitive media must never be exposed through public object URLs.
+
+
+## Current launch decision (2026-11-11)
+
+Dark Fantasy remains disabled by default and is not approved for production launch by this document. Keep feature, country and payment approval controls fail-closed. The age check described above is not robust age assurance. Written payment processor approval, legal review for operator and target jurisdictions, privacy impact assessment, staffed moderation, authenticated end-to-end tests and secure private-media controls remain prerequisites. Planned creator/gallery/unlimited-pass SKUs remain unavailable as documented. Do not infer approval from code or documentation changes.
