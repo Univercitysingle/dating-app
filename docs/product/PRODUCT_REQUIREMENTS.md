@@ -24,3 +24,8 @@ Every requirement must map to source, tests and staging evidence. Status vocabul
 
 ## Decisions requiring product approval
 Age/jurisdiction rules, supported countries, catalogue/prices/currencies, refund policy, verification service level, video pricing, retention periods and analytics consent.
+
+
+## Current status clarification (2026-11-11)
+
+Use the status vocabulary above rigorously. The latest call-quality code includes automatic bitrate/resolution/FPS adaptation and audio-first degradation, but its deployment and real-device behaviour remain unverified. The target of 1,000 concurrent users is not capacity-certified. Firebase RTDB rules, WebXPay sandbox settlement, upload lifecycle, mobile/desktop call responsiveness and full core-journey regression require evidence. GitHub Actions quota is exhausted, so the latest source cannot be assumed deployed. Production release and DNS cutover require separate approval.
