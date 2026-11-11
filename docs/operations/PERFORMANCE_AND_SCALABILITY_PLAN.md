@@ -8,3 +8,8 @@ Progressive stages: baseline/100, 1,000, 2,500, 5,000, 10,000 and then 15,000 co
 Workload includes auth, discovery, swipes, inbox, chat, notifications, media reads/uploads and payment sandbox. Test read-heavy, write-heavy and bursts with realistic think time.
 
 Use staging data and non-production payments. Coordinate quotas and cost. Stop on sustained errors or saturation. Record scripts, SHA, configuration, throughput, percentiles, errors, bottlenecks and fixes. Set SLOs before testing; never infer capacity from pool arithmetic.
+
+
+## Current capacity status (2026-11-11)
+
+The target remains support for approximately 1,000 concurrent users, but this is a target, not a measured capacity claim. No concurrency, latency or cost certification is made here. Run repeatable staging load tests with realistic authentication, discovery, chat, media and call traffic. Include MongoDB connection pressure, Durable Object serialization, Firebase operations, CDN traffic and TURN relay bandwidth. The call implementation now contains adaptive sender profiles and WebRTC-stat-based quality adjustment at source revision `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`; actual bitrate, bytes transferred and user data savings remain unmeasured. GitHub Actions quota exhaustion blocks a fresh CI/deployment validation run.
