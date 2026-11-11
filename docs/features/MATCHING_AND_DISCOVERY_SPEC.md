@@ -11,3 +11,10 @@ Acceptance: preference combinations including Other/everyone where supported; re
 ## Current acceptance status (2026-11-11)
 
 This document defines required behaviour, not a claim that every edge case has passed. The current release priority remains authentication/profile management first, discovery/likes/matching second, then conversations/messaging. Require multi-account staging tests for reciprocal preference combinations, blocked pairs in both directions, duplicate/concurrent likes, pagination, unmatch and access revocation. GitHub Actions quota is exhausted, so no new automated acceptance run is available. Record exact source SHA and evidence before changing statuses to complete.
+
+
+## Operational completeness and acceptance gaps (2026-11-11)
+
+Maintain a feature-level matrix with owner, implementation status, test coverage, staging evidence, last verified commit, operational dependency, and explicit release gate. Source presence alone is not completion. Verify API and frontend behaviour against the active Worker and deployed client, and keep planned capabilities labelled as planned.
+
+The following cross-cutting acceptance items must be explicitly covered where relevant: API route/method/authentication/authorization and error contracts; MongoDB schema/index/uniqueness/TTL and migration behaviour; Firebase RTDB security rules and push notification subscription, delivery, retry and revocation; backup/restore drills with RPO/RTO; payment callback replay, idempotency, reconciliation, refunds and stale pending checkout recovery; moderation permissions for editing/deleting user and admin ticket/chat messages plus immutable audit records; account export/deletion propagation and backup retention; browser/device/PWA/offline/notification permission coverage; keyboard/screen-reader/contrast/form accessibility; localization, timezone and RTL support. Any unverified dependency remains a release blocker or documented limitation.
