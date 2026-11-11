@@ -25,3 +25,60 @@ Production cutover requires separate approval, traffic/DNS strategy, observation
 For each control or procedure, identify the owner, prerequisites, exact command or dashboard path where safe, expected result, failure handling, evidence location, last verified commit, and review cadence. Never document a procedure as proven until it has been exercised in the intended environment. Keep production and staging instructions distinct.
 
 Required evidence areas to maintain: route-level API authorization and error-contract tests; MongoDB schema/index/TTL and migration/rollback checks; Firebase RTDB rule tests and push notification lifecycle; MongoDB backup/restore and Firebase recovery exercises with approved RPO/RTO; payment callback replay/idempotency/reconciliation/refund and stale-checkout tests; moderation and support-ticket message permissions with immutable audit history; account export/deletion and backup retention; browser/device/PWA/offline and notification-permission matrix; keyboard, screen-reader, contrast and form accessibility; localization, timezone and RTL checks. Capacity targets, service objectives and recovery objectives remain proposed until measured and approved.
+
+
+## Direct Cloudflare staging deployment without GitHub Actions
+
+This procedure is for an operator with an authenticated Cloudflare account and the repository checked out locally. It does not invoke GitHub Actions. Run only from the `migrate-to-serverless` branch and record the exact Git commit SHA before deploying. Never paste API tokens, MongoDB URIs, JWT secrets, payment keys, TURN credentials, Firebase service-account JSON, or verification keys into chat or commit them.
+
+### Preconditions
+
+- Confirm `git branch --show-current` returns `migrate-to-serverless` and `git status --short` is clean.
+- Confirm the Cloudflare account selected by Wrangler is the account that owns the dedicated `dating-app-staging` Pages project and `dating-app-api-staging` Worker.
+- Authenticate locally with `npx wrangler@4 login` or use a least-privilege API token in the local shell. Do not print token values.
+- Confirm the staging Worker already has all required secrets configured. The manual deployment commands below deliberately do not replace or print Worker secrets.
+- Confirm the existing `CDN_PROXY` service binding and Durable Object bindings/migrations are present in the staging environment. Do not modify the CDN Worker.
+
+### Worker deployment
+
+```bash
+git switch migrate-to-serverless
+git status --short
+git rev-parse HEAD
+npm ci --no-audit --no-fund
+cd workers && npm ci --no-audit --no-fund && npm test
+cd ..
+npx wrangler@4 deploy --config wrangler.jsonc --env staging \
+  --var "FIREBASE_PROJECT_ID:it-services-1841e" \
+  --var "MONGODB_DATABASE:test" \
+  --var "CDN_HOSTNAME:https://dateme.enadoctemp.workers.dev" \
+  --var "FRONTEND_URL:https://dating-app-staging.pages.dev"
+```
+
+The command deploys the Worker code/config only. It does not provision secrets. If required secrets are missing, stop and configure them locally through Wrangler using the secret names in the Worker deployment workflow. Do not overwrite existing secrets with blank values. Never run `wrangler secret list` output into a public log.
+
+### Pages deployment
+
+```bash
+npm run build
+npx wrangler@4 pages deploy build \
+  --project-name dating-app-staging \
+  --branch migrate-to-serverless
+```
+
+The Pages project must already have its `API_ORIGIN` secret set to `https://dating-app-api-staging.enadoctemp.workers.dev`. If it is absent, set it locally with `printf '%s' 'https://dating-app-api-staging.enadoctemp.workers.dev' | npx wrangler@4 pages secret put API_ORIGIN --project-name dating-app-staging`.
+
+### Post-deployment verification
+
+```bash
+curl --fail --silent --show-error https://dating-app-api-staging.enadoctemp.workers.dev/health
+curl --fail --silent --show-error https://dating-app-api-staging.enadoctemp.workers.dev/ready
+curl --fail --silent --show-error https://dating-app-api-staging.enadoctemp.workers.dev/api/status
+curl --fail --silent --show-error https://dating-app-staging.pages.dev/manifest.json
+```
+
+Then verify anonymous protected routes return 401, sign-in and authenticated profile/discovery journeys, chat history/send, support ticket access, media upload/retrieval through the unchanged CDN, push subscription lifecycle, and two-device audio/video calls including TURN relay selection. Check the deployed Worker and Pages deployment details in Cloudflare and record their deployment IDs, timestamps, and source SHA. A successful upload command alone is not acceptance.
+
+### Safety gate
+
+The staging Wrangler configuration explicitly keeps Dark Fantasy disabled. Do not enable it or use a wildcard country allowlist until region gating is consistent across all handlers, legal/age-assurance/payment/moderation approvals are recorded, and negative access tests pass. The direct deployment path does not bypass these release gates.
