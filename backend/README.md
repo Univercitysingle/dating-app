@@ -19,3 +19,8 @@ This directory belongs to the legacy Node/Express deployment lineage. The active
 Use this backend as a migration reference and for explicitly approved compatibility/testing tasks. Review legacy dependencies and static-analysis findings before any reuse. Never commit secrets or production data.
 
 See the root README, MIGRATION_PLAN.md and docs/architecture/SYSTEM_ARCHITECTURE.md for current direction.
+
+
+## Current status (2026-11-11)
+
+This directory is legacy reference code, not the active Cloudflare staging API. GitHub Actions quota exhaustion currently prevents a fresh CI/deployment confirmation of the latest application source. Do not deploy this Docker/Hugging Face lineage, revive legacy hosts, or treat its environment metadata as current configuration. Cloudflare Pages/Workers on `migrate-to-serverless` remain the only approved hosting direction. Keep Firebase chat and the existing CDN integration unchanged unless separately authorized.
