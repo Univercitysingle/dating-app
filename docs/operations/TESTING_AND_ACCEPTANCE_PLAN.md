@@ -8,3 +8,8 @@ Critical journeys: registration, profile/privacy, reciprocal discovery, mutual m
 For each run record branch, SHA, environment, timestamp, test case, result, workflow URL, request ID and defect. Never record credentials, tokens or raw verification media.
 
 Release gate: critical tests pass, no unresolved critical/high security issue, rollback documented, staging deploy/smoke passes and external integrations complete or safely disabled. Green build alone is not acceptance.
+
+
+## Current release gate status (2026-11-11)
+
+GitHub Actions quota is exhausted. The latest call-quality source revision is `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`, but deployment and browser/two-device acceptance are not confirmed. Outstanding evidence includes responsive mobile/desktop call UI, camera/microphone permissions, call lifecycle, reconnect, weak-network adaptation, TURN relay candidate selection, audio continuity, actual bytes sent/received, Firebase RTDB deployed-rule tests, WebXPay sandbox settlement and media upload/read/delete. Do not mark these passed based on source inspection or mocked unit tests. Once CI capacity is restored, record exact SHA, workflow URLs, environment, test accounts and results.
