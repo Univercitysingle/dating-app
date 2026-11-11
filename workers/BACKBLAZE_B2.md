@@ -26,3 +26,8 @@ The CDN proxy must accept `PUT`, `GET`, and `DELETE` on generated `photos-...` o
 ## Current operational status (2026-11-11)
 
 This guide documents the existing private-media proxy contract. The dating-app API uses `CDN_HOSTNAME` and the Cloudflare service binding to reach the separate CDN Worker; Backblaze credentials remain exclusively in that proxy. The CDN Worker, B2 bucket configuration, object naming and proxy authentication are outside this documentation update and must not be changed as part of ordinary app work. Source-level tests and workflow checks do not prove the live CDN deployment is healthy. Validate authenticated upload, read, delete, cross-user denial and support-attachment access against staging before marking media acceptance complete. Do not expose private bucket credentials, object authorization tokens or user media URLs in logs.
+
+
+## Evidence freshness and closure criteria (2026-11-11)
+
+Findings and operational statements remain open until a named owner supplies reproducible evidence, the reviewer confirms the result, and the exact commit/deployment revision is recorded. Classify findings by severity and exploitability, document affected component and preconditions, provide a safe reproduction or test identifier, remediation, compensating control, residual risk, due date, and retest outcome. Do not include secrets, raw user evidence, payment credentials, or private object URLs. A code fix without a deployed retest is not a closed finding. For storage/CDN operations, preserve the existing CDN Worker boundary and do not change CDN behaviour under this documentation update.
