@@ -40,3 +40,8 @@ The API fails closed and does not accept evidence unless the secret is exactly 6
 
 ## Library maintenance
 `@vladmandic/face-api` is archived and no longer actively maintained. It is pinned for this interim staging implementation and should be replaced with a maintained inference stack before relying on it for a production verification feature.
+
+
+## Operational status (2026-11-11)
+
+This guide describes the intended/current source workflow, not proof of production readiness. Before enabling broadly, validate encryption-key configuration and recovery procedures, superadmin-only evidence access, audit events, TTL expiry, immediate deletion, backup retention and consent withdrawal in staging. The optional browser inference is attacker-controlled and must never decide verification outcomes. Review the archived face-api dependency and biometric/privacy obligations before production use. Current GitHub Actions quota exhaustion prevents fresh workflow validation.
