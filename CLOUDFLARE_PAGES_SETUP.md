@@ -36,3 +36,8 @@ The workflow fails closed when required credentials are missing, the Cloudflare 
 ## Documentation and deployment ownership (2026-11-07)
 
 The current product documentation catalogue is linked from the root README. This setup guide remains specific to Cloudflare Pages deployment. Use docs/operations/DEPLOYMENT_AND_ROLLBACK_RUNBOOK.md for staging release gates and rollback. A successful Pages deployment must be checked against the exact frontend commit SHA and paired Worker deployment; do not infer current deployment from an older successful run. Production DNS and main remain unchanged absent a separate approved cutover.
+
+
+## Current deployment status (2026-11-11)
+
+GitHub Actions quota is currently exhausted. Do not assume that a branch push or successful historical workflow means the latest frontend is deployed. The current call-quality source revision is `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`; deployment of that revision is not confirmed. Once quota is restored, run the Pages workflow from `migrate-to-serverless`, verify the exact checked-out SHA and deployment URL in Cloudflare Pages, then test login, profile, discovery, same-origin API proxy and chat with staging accounts. Keep production DNS and `main` unchanged. Do not modify the CDN Worker as part of Pages deployment.
