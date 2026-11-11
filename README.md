@@ -91,6 +91,15 @@ ExpressTURN is the primary TURN relay when both `EXPRESSTURN_USERNAME` and `EXPR
 This document must distinguish source implementation, automated test coverage, staging deployment, live-provider validation, and production acceptance. For every requirement, record an owner, status, evidence link or test identifier, last verified commit, dependencies, rollback impact, and next action. Never mark an item complete solely because it appears in source or a unit test. Reconcile this document against the live route registrations, Worker configuration, database schema/indexes, frontend call sites, and deployment workflow before release.
 
 Open cross-document gaps to close and track: (1) full API route/method/authentication/authorization/request/response/error contract; (2) MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback rules; (3) Firebase RTDB path/rule matrix and push notification subscription/delivery/retry lifecycle; (4) MongoDB backup/restore and Firebase recovery drills with approved RPO/RTO; (5) payment callback replay, reconciliation, refunds, stale-pending recovery and duplicate settlement evidence; (6) moderation case lifecycle, user/admin message edit/delete permissions and immutable audit events; (7) account export/deletion propagation and backup retention; (8) supported browser/device, PWA/offline and notification-permission matrix; (9) keyboard, screen-reader, contrast and form-accessibility checks; (10) localization, timezone and RTL readiness. These are tracked requirements, not claims that the features are implemented.
+
+
+## Additional operational specifications
+- [Documentation completeness register](./docs/DOCUMENTATION_GAP_REGISTER.md)
+- [Disaster recovery and backup](./docs/operations/DISASTER_RECOVERY_AND_BACKUP.md)
+- [Push notifications](./docs/features/PUSH_NOTIFICATIONS_SPEC.md)
+- [Accessibility, browser compatibility and localization](./docs/operations/ACCESSIBILITY_BROWSER_LOCALIZATION.md)
+- [Data subject requests and account lifecycle](./docs/governance/DATA_SUBJECT_REQUESTS.md)
+
 ## Documentation governance and unresolved evidence
 
 The documentation catalogue is not a substitute for live verification. Before each release, reconcile route inventory, Worker bindings/secrets (names only), database indexes, scheduled triggers, Firebase RTDB rules, payment callbacks, TURN provider configuration, and Pages/Worker deployment SHAs against the actual staging environment. Record each item as implemented, tested, deployed, or production-accepted. Do not publish secrets, personal data, raw payment payloads, or verification evidence. Outstanding work includes a complete route-by-route API contract, verified collection/index catalogue, push delivery lifecycle, backup/restore exercise with RPO/RTO, privacy export/deletion proof, accessibility and browser matrix, localization/RTL review, and moderator/support-message permission tests. The linked operational and feature documents own these checklists.
