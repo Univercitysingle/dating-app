@@ -55,7 +55,7 @@ npx wrangler@4 deploy --config wrangler.jsonc --env staging \
   --var "FRONTEND_URL:https://dating-app-staging.pages.dev"
 ```
 
-The command deploys the Worker code/config only. It does not provision secrets. The Firebase project ID above matches the current Worker staging workflow's literal configuration; confirm it against the intended Firebase project in the Firebase Console before deploying, because a wrong project ID can route authentication or database calls to the wrong project.
+The command deploys the Worker code/config only. It does not provision secrets. **Release blocker:** the repository's current Worker workflow hardcodes `FIREBASE_PROJECT_ID=it-services-1841e`, while earlier project configuration records `it-services-1841`. Do not copy either value blindly. Confirm the canonical Firebase project ID in Firebase Console and compare it with the frontend `REACT_APP_FIREBASE_PROJECT_ID`, Firebase Auth tenant, and Realtime Database URL. Export the confirmed value as `FIREBASE_PROJECT_ID` in the local shell, use it for the Worker `--var`, and use the identical value for the Pages build. Abort if they do not match. Do not modify the existing production Firebase project or migrate user data as part of this check.
 
 #### Worker secrets and bindings
 
@@ -86,6 +86,8 @@ Optional when configured for this Firebase project: `REACT_APP_FIREBASE_DATABASE
 ```bash
 # Export the values above from the approved local secret manager.
 export API_ORIGIN="https://dating-app-api-staging.enadoctemp.workers.dev"
+# Set FIREBASE_PROJECT_ID only after verifying the canonical project in Firebase Console.
+export REACT_APP_FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
 export REACT_APP_ENABLE_SOCKET="false"
 npm run build
 printf '%s' "$API_ORIGIN" | npx wrangler@4 pages secret put API_ORIGIN --project-name dating-app-staging
