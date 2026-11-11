@@ -100,3 +100,16 @@ These are living specifications and acceptance baselines. They do not certify th
 This document must distinguish source implementation, automated test coverage, staging deployment, live-provider validation, and production acceptance. For every requirement, record an owner, status, evidence link or test identifier, last verified commit, dependencies, rollback impact, and next action. Never mark an item complete solely because it appears in source or a unit test. Reconcile this document against the live route registrations, Worker configuration, database schema/indexes, frontend call sites, and deployment workflow before release.
 
 Open cross-document gaps to close and track: (1) full API route/method/authentication/authorization/request/response/error contract; (2) MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback rules; (3) Firebase RTDB path/rule matrix and push notification subscription/delivery/retry lifecycle; (4) MongoDB backup/restore and Firebase recovery drills with approved RPO/RTO; (5) payment callback replay, reconciliation, refunds, stale-pending recovery and duplicate settlement evidence; (6) moderation case lifecycle, user/admin message edit/delete permissions and immutable audit events; (7) account export/deletion propagation and backup retention; (8) supported browser/device, PWA/offline and notification-permission matrix; (9) keyboard, screen-reader, contrast and form-accessibility checks; (10) localization, timezone and RTL readiness. These are tracked requirements, not claims that the features are implemented.
+
+
+## Source inventory audit update (2026-11-11)
+
+The active Worker route and direct MongoDB collection inventories have been added:
+- `docs/architecture/WORKER_API_CATALOG.md`
+- `docs/architecture/WORKER_DATABASE_CATALOG.md`
+
+The API catalogue is based on `workers/index.js` blob `f11fd484cf79dc56cb09474254640e9d635cfa54`; the database catalogue is based on `workers/mongodb-connection.js` blob `641b7851e107be99d3f55fbfabcf34595b40e888`. These are source inventories only. The deployed Worker SHA, route parity, API contract schemas, and live Atlas schema/index export have not been verified in this documentation pass.
+
+The audit identified three material source/configuration issues requiring engineering follow-up: (1) the generic edge IP rate limiter excludes `/api/calls/*`, so call-specific abuse controls need explicit verification; (2) admin purchase approve/reject routes remain in Worker source and must be reconciled with the intended payment-gateway-authoritative workflow; and (3) Dark Fantasy country gating is inconsistent because some handlers accept wildcard configuration while the catalogue gate rejects it. Keep the feature gated until the policy and implementation are aligned and tested.
+
+The legacy Mongoose schemas must not be treated as the authoritative schema for direct Worker writes. Confirm actual Atlas indexes, database selection, uniqueness constraints and TTL policies from the live environment before any migration or destructive DDL.
