@@ -103,3 +103,8 @@ Open cross-document gaps to close and track: (1) full API route/method/authentic
 ## Documentation governance and unresolved evidence
 
 The documentation catalogue is not a substitute for live verification. Before each release, reconcile route inventory, Worker bindings/secrets (names only), database indexes, scheduled triggers, Firebase RTDB rules, payment callbacks, TURN provider configuration, and Pages/Worker deployment SHAs against the actual staging environment. Record each item as implemented, tested, deployed, or production-accepted. Do not publish secrets, personal data, raw payment payloads, or verification evidence. Outstanding work includes a complete route-by-route API contract, verified collection/index catalogue, push delivery lifecycle, backup/restore exercise with RPO/RTO, privacy export/deletion proof, accessibility and browser matrix, localization/RTL review, and moderator/support-message permission tests. The linked operational and feature documents own these checklists.
+
+## Source-backed technical catalogues
+- [Active Worker API catalogue](./docs/architecture/WORKER_API_CATALOG.md)
+- [Active Worker MongoDB collection catalogue](./docs/architecture/WORKER_DATABASE_CATALOG.md)
+
