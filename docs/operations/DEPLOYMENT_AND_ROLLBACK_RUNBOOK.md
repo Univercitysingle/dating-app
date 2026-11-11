@@ -71,15 +71,30 @@ The shell variable must be populated from the approved secret manager or local s
 
 ### Pages deployment
 
+The Pages workflow injects Firebase configuration as build-time environment variables. A direct build must load the same values from the approved local secret manager before running the build. Do not use placeholders or commit a local `.env` file.
+
+Required build variables:
+- `REACT_APP_CDN_HOSTNAME`
+- `REACT_APP_FIREBASE_API_KEY`
+- `REACT_APP_FIREBASE_PROJECT_ID`
+- `REACT_APP_FIREBASE_AUTH_DOMAIN`
+- `REACT_APP_FIREBASE_APP_ID`
+- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
+
+Optional when configured for this Firebase project: `REACT_APP_FIREBASE_DATABASE_URL` and `REACT_APP_FIREBASE_STORAGE_BUCKET`. Keep `REACT_APP_ENABLE_SOCKET=false` for the serverless staging build. `API_ORIGIN` is the Pages API proxy secret, not a substitute for the Firebase build variables.
+
 ```bash
+# Export the values above from the approved local secret manager.
+export API_ORIGIN="https://dating-app-api-staging.enadoctemp.workers.dev"
+export REACT_APP_ENABLE_SOCKET="false"
 npm run build
+printf '%s' "$API_ORIGIN" | npx wrangler@4 pages secret put API_ORIGIN --project-name dating-app-staging
 npx wrangler@4 pages deploy build \
   --project-name dating-app-staging \
   --branch migrate-to-serverless
 ```
 
-The Pages workflow injects Firebase configuration as `REACT_APP_FIREBASE_*` build-time environment variables and sets `API_ORIGIN` as a Pages secret for the API proxy. A direct build must supply the same Firebase values before `npm run build`; otherwise the built frontend may not initialize Firebase correctly. Do not use placeholder values. If the Firebase values are not available from the approved secret manager, stop before building.
-
+Stop if any required Firebase build variable is unavailable. The deployed frontend may otherwise build but fail to initialize Firebase authentication.
 ### Post-deployment verification
 
 ```bash
