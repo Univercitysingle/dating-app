@@ -2,7 +2,7 @@
 
 A dating platform for profiles, discovery, matching, conversations, real-time communication, verification, monetisation, trust and safety, and administration.
 
-**Documentation last updated:** 2026-11-07  
+**Documentation last updated:** 2026-11-11  
 **Active migration branch:** migrate-to-serverless
 
 > Documentation describes scope and observed implementation. Planned or documented functionality is not automatically implemented, tested or production-ready.
@@ -58,6 +58,14 @@ A dating platform for profiles, discovery, matching, conversations, real-time co
 | CI/CD | GitHub Actions |
 
 MongoDB Atlas remains primary. Firebase chat remains. The existing CDN Worker must not be modified as part of ordinary app changes. Redis is not assumed deployed. No Vercel. Do not use the retired DuckDNS URL.
+
+## Calls: current implementation and validation status
+
+One-to-one voice and video calls share the responsive call interface. The current call controller applies automatic video bitrate, frame-rate and resolution scaling based on WebRTC connection statistics. Audio capture requests mono voice processing (echo cancellation, noise suppression and automatic gain control) and requests a low outgoing Opus bitrate where the browser exposes sender controls. Audio remains active when video quality is reduced. These are adaptive targets, not guaranteed data caps; browser and codec support vary.
+
+**Latest call-quality source revision:** `bf5c435553c6f18cc5a80e5b14df68e1c69249ca` on `migrate-to-serverless`.
+
+**Deployment status:** GitHub Actions quota is exhausted according to the project operator. The Cloudflare Pages workflow for this revision did not complete successfully, and the latest call-quality changes are not confirmed deployed. Do not infer live availability from the committed source. Build, browser, two-device, TURN-relay and measured data-usage validation remain outstanding until Actions capacity is restored or an approved manual validation path is used.
 
 ## Staging
 - Frontend: https://dating-app-staging.pages.dev
