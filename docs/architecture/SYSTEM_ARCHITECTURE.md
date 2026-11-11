@@ -12,3 +12,10 @@ MongoDB remains primary; Firebase chat remains; existing CDN Worker is not chang
 
 ## External validation
 Verify RTDB rules, Atlas network/roles, CDN staging isolation, TURN configuration and payment callback credentials. A staging deploy is not production approval.
+
+
+## Current implementation and verification status (2026-11-11)
+
+The approved hosting target remains Cloudflare Pages for the frontend and Cloudflare Workers for API routes. MongoDB Atlas is the primary application database. Firebase Authentication and the existing Firebase Realtime Database chat integration remain. The existing CDN Worker/private Backblaze B2 path is retained and is outside the current change scope. Redis is a preferred secondary cache, not a verified deployed component. Durable Object bindings must be checked against the active Wrangler configuration and Cloudflare environment before relying on them.
+
+GitHub Actions quota is exhausted. The latest call-quality source change is recorded at `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`, but its deployment and browser-level behaviour are not confirmed. No production cutover is approved. Validate Firebase RTDB rules externally, MongoDB Atlas access controls, TURN relay allocation, and end-to-end integrations before release. A configured integration is not proof of successful live connectivity.
