@@ -1,6 +1,6 @@
 # Dating App Platform: Complete Product Mindmap
 
-**Last updated:** 2026-11-07  
+**Last updated:** 2026-11-11  
 **Repository branch:** `migrate-to-serverless`  
 **Document status:** Product and architecture blueprint. This document describes the target product and architecture; it does not assert that every capability is implemented or production-validated.
 
@@ -75,7 +75,11 @@ mindmap
       Host and participant controls
       WebRTC signalling
       STUN and TURN
-      Bandwidth adaptation
+      Automatic bandwidth adaptation
+      Audio-first degradation
+      Adaptive video bitrate, resolution and frame rate
+      WebRTC statistics and quality monitoring
+      Call data-usage measurement and validation
       Paid sessions
       Room moderation
     Trust and Verification
@@ -262,6 +266,15 @@ flowchart TB
 - **Payments:** WebXPay payment state must be verified server-side and processed idempotently.
 - **Calls:** WebRTC requires signalling plus suitable STUN/TURN connectivity. TURN capacity and cost must be tested separately.
 - **Cache:** Start with safe Cloudflare-native caching and request reduction. Do not cache private or user-specific data in a shared cache. Redis is not assumed to be deployed.
+
+### One-to-one call quality policy
+
+- Automatic quality is the default. Do not require users to choose a quality profile.
+- Preserve intelligible audio as the highest priority when bandwidth degrades.
+- Adapt video bitrate, frame rate and resolution using WebRTC statistics, with hysteresis to avoid oscillation.
+- Reduce or pause video before intentionally interrupting audio.
+- Treat bitrate settings as targets, not hard data caps. Validate real bytes sent/received on representative devices and networks.
+- Current source includes an initial automatic controller; end-to-end and data-usage acceptance is pending. GitHub Actions quota exhaustion currently blocks the normal CI/deployment evidence path.
 
 ## 5. Functional module requirements
 
