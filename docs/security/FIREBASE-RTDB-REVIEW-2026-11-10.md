@@ -52,3 +52,8 @@ No RTDB rules file was invented or deployed because the authoritative membership
 - Firebase project IAM/service-account review.
 - Results of the negative tests above.
 - Confirmation whether `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC` is enabled in the staging and production Pages environments.
+
+
+## Follow-up status (2026-11-11)
+
+No external Firebase Console evidence has been added since this review. Deployed RTDB rules, project IAM and negative-test results remain unverified. Keep `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC` disabled in production until the evidence listed above is collected and reviewed. Do not create permissive rules based only on a client-supplied room ID or message fields. GitHub Actions quota exhaustion does not change this security conclusion.
