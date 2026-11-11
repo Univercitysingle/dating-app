@@ -23,3 +23,18 @@ This file is a route-domain and contract checklist, not an exhaustive verified e
 Treat this specification as a living contract. For each item, record implementation status, automated test, staging evidence, last verified commit, owner, dependency, and rollback/retention impact. Distinguish documented design from verified runtime behaviour. Reconcile against source and staging before release.
 
 Cross-cutting gaps requiring explicit closure: a complete API route/method/authz/schema/error catalogue; MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback definitions; Firebase RTDB rules and push subscription/delivery/retry lifecycle; tested backup/restore with RPO/RTO; payment replay/idempotency/reconciliation/refund and stale-pending recovery; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; supported browser/device, PWA/offline and notification permission matrix; accessibility checks for keyboard, screen readers, contrast and forms; localization, timezone and RTL readiness. Do not imply these are implemented unless backed by evidence.
+
+
+## Source-backed Worker route inventory (2026-11-11)
+
+The active route dispatch is implemented in `workers/index.js`. Use [WORKER_API_CATALOG.md](./WORKER_API_CATALOG.md) for the source-derived method/path/access inventory. The reviewed source blob was `f11fd484cf79dc56cb09474254640e9d635cfa54`. This is a static source inventory, not an OpenAPI contract and not proof that the same revision is deployed.
+
+Notable route-level findings:
+- Chat message edit/delete routes exist: `PATCH/DELETE /api/chat/messages/:messageId`.
+- Support-ticket message edit/delete routes exist for users and admins.
+- Call routes are excluded from the generic Worker IP rate limiter, so independent call abuse controls require verification.
+- The admin purchase approve/reject/record-refund route family remains in Worker source. Confirm product policy before exposing manual approval as an operational workflow.
+- Dark Fantasy route gating is inconsistent across catalogue, community and core feature handlers when wildcard country configuration is used. Keep this feature unavailable until corrected and reviewed.
+
+Exact request/response JSON schemas, per-route error contracts and generated OpenAPI remain outstanding. The source catalogue must be regenerated/reviewed whenever route dispatch changes.
+
