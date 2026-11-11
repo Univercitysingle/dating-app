@@ -21,3 +21,8 @@ The staging workflow performs a temporary JPEG write/read/delete check against `
 - unauthenticated upload attempts and cross-user photo operations remain rejected.
 
 The CDN proxy must accept `PUT`, `GET`, and `DELETE` on generated `photos-...` object paths. Keep the B2 bucket private and keep all B2 credentials inside the proxy service only.
+
+
+## Current operational status (2026-11-11)
+
+This guide documents the existing private-media proxy contract. The dating-app API uses `CDN_HOSTNAME` and the Cloudflare service binding to reach the separate CDN Worker; Backblaze credentials remain exclusively in that proxy. The CDN Worker, B2 bucket configuration, object naming and proxy authentication are outside this documentation update and must not be changed as part of ordinary app work. Source-level tests and workflow checks do not prove the live CDN deployment is healthy. Validate authenticated upload, read, delete, cross-user denial and support-attachment access against staging before marking media acceptance complete. Do not expose private bucket credentials, object authorization tokens or user media URLs in logs.
