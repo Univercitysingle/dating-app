@@ -47,3 +47,8 @@ For each resolved item, record:
 - Relevant sanitized logs or evidence link.
 - Residual risk and reviewer approval.
 - Closure date.
+
+
+## Evidence freshness and closure criteria (2026-11-11)
+
+Findings and operational statements remain open until a named owner supplies reproducible evidence, the reviewer confirms the result, and the exact commit/deployment revision is recorded. Classify findings by severity and exploitability, document affected component and preconditions, provide a safe reproduction or test identifier, remediation, compensating control, residual risk, due date, and retest outcome. Do not include secrets, raw user evidence, payment credentials, or private object URLs. A code fix without a deployed retest is not a closed finding. For storage/CDN operations, preserve the existing CDN Worker boundary and do not change CDN behaviour under this documentation update.
