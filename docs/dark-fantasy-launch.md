@@ -56,3 +56,10 @@ Set Worker DARK_FANTASY_ENABLED=false (or remove it), set Pages REACT_APP_DARK_F
 ## Current launch decision (2026-11-11)
 
 Dark Fantasy remains disabled by default and is not approved for production launch by this document. Keep feature, country and payment approval controls fail-closed. The age check described above is not robust age assurance. Written payment processor approval, legal review for operator and target jurisdictions, privacy impact assessment, staffed moderation, authenticated end-to-end tests and secure private-media controls remain prerequisites. Planned creator/gallery/unlimited-pass SKUs remain unavailable as documented. Do not infer approval from code or documentation changes.
+
+
+## Operational completeness and acceptance gaps (2026-11-11)
+
+Maintain a feature-level matrix with owner, implementation status, test coverage, staging evidence, last verified commit, operational dependency, and explicit release gate. Source presence alone is not completion. Verify API and frontend behaviour against the active Worker and deployed client, and keep planned capabilities labelled as planned.
+
+The following cross-cutting acceptance items must be explicitly covered where relevant: API route/method/authentication/authorization and error contracts; MongoDB schema/index/uniqueness/TTL and migration behaviour; Firebase RTDB security rules and push notification subscription, delivery, retry and revocation; backup/restore drills with RPO/RTO; payment callback replay, idempotency, reconciliation, refunds and stale pending checkout recovery; moderation permissions for editing/deleting user and admin ticket/chat messages plus immutable audit records; account export/deletion propagation and backup retention; browser/device/PWA/offline/notification permission coverage; keyboard/screen-reader/contrast/form accessibility; localization, timezone and RTL support. Any unverified dependency remains a release blocker or documented limitation.
