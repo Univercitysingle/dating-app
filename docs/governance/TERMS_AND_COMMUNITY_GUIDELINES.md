@@ -6,3 +6,8 @@ Decisions required: eligibility/minimum age and age assurance; account accuracy/
 Explain how users report concerns, block members and appeal decisions. Do not promise continuous moderation coverage unless staffed and operationally supported.
 
 Qualified counsel must review consumer, privacy, payment and country-specific requirements before publication. This is an internal checklist, not a contract.
+
+
+## Publication status (2026-11-11)
+
+This remains an internal policy checklist and is not approved legal terms or a published community standard. Before launch, resolve minimum age and age assurance, operator and market jurisdiction, user content and consent, prohibited content, report/block/unmatch enforcement, moderation response coverage, appeals, billing/cancellation/refunds, privacy and deletion. Dark Fantasy must remain disabled until its separate legal, age-assurance, processor and moderation gates are approved. Do not publish this outline as a binding contract.
