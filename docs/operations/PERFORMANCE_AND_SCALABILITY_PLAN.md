@@ -13,3 +13,10 @@ Use staging data and non-production payments. Coordinate quotas and cost. Stop o
 ## Current capacity status (2026-11-11)
 
 The target remains support for approximately 1,000 concurrent users, but this is a target, not a measured capacity claim. No concurrency, latency or cost certification is made here. Run repeatable staging load tests with realistic authentication, discovery, chat, media and call traffic. Include MongoDB connection pressure, Durable Object serialization, Firebase operations, CDN traffic and TURN relay bandwidth. The call implementation now contains adaptive sender profiles and WebRTC-stat-based quality adjustment at source revision `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`; actual bitrate, bytes transferred and user data savings remain unmeasured. GitHub Actions quota exhaustion blocks a fresh CI/deployment validation run.
+
+
+## Operational evidence gaps and controls (2026-11-11)
+
+For each control or procedure, identify the owner, prerequisites, exact command or dashboard path where safe, expected result, failure handling, evidence location, last verified commit, and review cadence. Never document a procedure as proven until it has been exercised in the intended environment. Keep production and staging instructions distinct.
+
+Required evidence areas to maintain: route-level API authorization and error-contract tests; MongoDB schema/index/TTL and migration/rollback checks; Firebase RTDB rule tests and push notification lifecycle; MongoDB backup/restore and Firebase recovery exercises with approved RPO/RTO; payment callback replay/idempotency/reconciliation/refund and stale-checkout tests; moderation and support-ticket message permissions with immutable audit history; account export/deletion and backup retention; browser/device/PWA/offline and notification-permission matrix; keyboard, screen-reader, contrast and form accessibility; localization, timezone and RTL checks. Capacity targets, service objectives and recovery objectives remain proposed until measured and approved.
