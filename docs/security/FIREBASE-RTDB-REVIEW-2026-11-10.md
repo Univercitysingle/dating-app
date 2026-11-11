@@ -57,3 +57,10 @@ No RTDB rules file was invented or deployed because the authoritative membership
 ## Follow-up status (2026-11-11)
 
 No external Firebase Console evidence has been added since this review. Deployed RTDB rules, project IAM and negative-test results remain unverified. Keep `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC` disabled in production until the evidence listed above is collected and reviewed. Do not create permissive rules based only on a client-supplied room ID or message fields. GitHub Actions quota exhaustion does not change this security conclusion.
+
+
+## Traceability and outstanding verification (2026-11-11)
+
+Every requirement, metric, journey and finding must map to an implementation reference, test, staging evidence, owner, status, last verified commit, and release decision. Do not infer feature adoption, reliability, security, or capacity from source code or analytics instrumentation alone. Define metric event names, properties, privacy classification, sampling, retention, denominator, exclusion rules, and dashboard ownership before using metrics for decisions.
+
+Keep the following open until supported by evidence: complete API contract and authorization matrix; MongoDB schema/index/TTL and migration inventory; Firebase RTDB rules and push subscription/delivery/revocation tests; backup/restore exercises with RPO/RTO; payment replay/reconciliation/refund/stale-pending tests; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; browser/device/PWA/offline/notification coverage; keyboard/screen-reader/contrast/form accessibility; localization, timezone and RTL readiness.
