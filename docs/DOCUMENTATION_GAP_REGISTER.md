@@ -7,13 +7,13 @@
 
 ## Scope completed in this pass
 
-All 33 Markdown documents present in the branch tree at the start of this pass were updated with document-specific traceability, evidence, ownership, acceptance or governance controls. Four new specifications were added:
+All 33 Markdown documents present in the branch tree at the start of the first pass were updated with document-specific traceability, evidence, ownership, acceptance or governance controls. Seven new Markdown documents have since been added:
 - `docs/operations/DISASTER_RECOVERY_AND_BACKUP.md`
 - `docs/features/PUSH_NOTIFICATIONS_SPEC.md`
 - `docs/operations/ACCESSIBILITY_BROWSER_LOCALIZATION.md`
 - `docs/governance/DATA_SUBJECT_REQUESTS.md`
 
-The existing CDN Worker and WebXPay/payment implementation were not modified. All edits were committed to `migrate-to-serverless`; `main` was not targeted.
+The existing CDN Worker and WebXPay/payment implementation were not modified. All edits were committed to `migrate-to-serverless`; `main` was not targeted. The current branch tree contains 40 Markdown documents.
 
 ## Gap register
 
@@ -66,3 +66,8 @@ Additional source findings to track:
 - Wrangler staging sets Dark Fantasy enabled with wildcard country configuration. Some route handlers accept wildcard globally, while the catalogue handler rejects it. Treat this as a configuration/security inconsistency and keep the feature gated until corrected.
 - Mongoose model schemas are legacy definitions and are not automatically enforced by direct MongoDB Worker writes.
 
+
+
+## API and database source inventory follow-up
+
+The active Worker API and database catalogues are now documented in `docs/architecture/WORKER_API_CATALOG.md` and `docs/architecture/WORKER_DATABASE_CATALOG.md`. They were generated from source files at blobs `f11fd484cf79dc56cb09474254640e9d635cfa54` and `641b7851e107be99d3d55fbfabcf34595b40e888`, respectively. Their source-backed static inventory is complete for this review pass. Live deployment parity, OpenAPI request/response schemas, Atlas index export, and staging integration evidence remain open.
