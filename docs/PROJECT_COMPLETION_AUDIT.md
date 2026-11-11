@@ -1,9 +1,9 @@
 # Project Completion Audit
 
-**Audit date:** 2026-11-07  
+**Audit date:** 2026-11-11  
 **Repository:** `Univercitysingle/dating-app`  
 **Branch:** `migrate-to-serverless`  
-**Audited application revision:** `f65d1175982c71ed8a2bbc668de7c89b381295d1`  
+**Audited application revision:** `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`  
 **Documentation revision:** `ecc45e0cf7193eedfad5c36e47b8e3bc7e16c4e7`
 
 ## Scope and confidence
@@ -39,13 +39,21 @@ Statuses:
 | Payments and subscriptions | WebXPay checkout, pending records, status routes, subscription index migration and same-tab checkout in store UI | Partial | Verify signed provider callbacks, replay protection, amount/currency/order binding, idempotency, entitlements, expiry, cancellation, refunds and failed payment recovery |
 | Store purchases | Store checkout UI and purchase endpoints exist | Partial | Verify each SKU grants exactly one entitlement only after trusted payment confirmation; reject duplicate and forged callbacks |
 | Photo verification | Encrypted selfie-video submission, manual superadmin review, expiry and withdrawal paths | Partial | Complete reviewer workflow and retention checks; do not claim automated liveness or face matching, which are not evidenced |
-| Video and live rooms | WebRTC ICE configuration and failover helper exist | Partial | Validate room creation/join/leave, public/private permissions, signaling, TURN relay, booking, billing, moderation and cleanup on real devices |
+| Video and live rooms | Shared responsive one-to-one call UI; automatic WebRTC video bitrate/frame-rate/resolution adaptation; audio-first capture and sender preferences; ICE configuration and failover helper | Partial, validation blocked | Validate real-device audio/video, adaptive changes, audio continuity, TURN relay, reconnect, measured data usage, room creation/join/leave, permissions, booking, billing, moderation and cleanup |
 | Photo and support media | WebP conversion, authenticated API upload/delete, content-signature checks, CDN service binding and metadata cleanup | Implemented, validation outstanding | Verify staging PUT/GET/DELETE and support attachments against the unchanged CDN Worker; test 404/1042 handling, rollback and orphan cleanup |
 | Admin operations | Admin moderation, verification, purchases and subscriptions pages/routes exist | Implemented, validation outstanding | Test superadmin authorization, audit completeness, pagination, exports and destructive action safeguards |
 | Performance and scaling | Mongo pool bounds, four Durable Object connection shards, indexes and polling reductions exist | Partial | Measure baseline and test 1k, 2.5k, 5k and higher concurrent sessions; monitor Mongo pool pressure, DO latency, Firebase and request volume |
 | Security and privacy | Authorization tests, response sanitization, rate limits and passive ZAP baseline in deployment workflow | Implemented, validation outstanding | Authenticated DAST, two-user isolation tests, privacy review, secret/config audit and remediation of all high-risk findings |
 | Compliance and governance | Verification consent, limited retention and regional feature gates are present | Partial | Confirm age/jurisdiction controls, privacy notice, deletion/export, consent records, moderation policy and payment-provider approvals |
 | Analytics and growth | Admin analytics and export routes are present | Partial | Validate event definitions, data accuracy, privacy controls, attribution and operational dashboards |
+
+## Current CI/CD quota and call-quality status (2026-11-11)
+
+The project operator reports that the GitHub Actions quota is exhausted. The Cloudflare Pages workflow associated with application revision `bf5c435553c6f18cc5a80e5b14df68e1c69249ca` completed with failure; job-step output was not available during this review. Therefore the latest frontend source is committed to `migrate-to-serverless`, but deployment is not verified. Do not mark the call-quality work as live or accepted.
+
+The latest call-quality source introduces automatic quality selection only. It requests mono speech capture with browser audio processing, asks the audio sender for a low bitrate/high priority where supported, and adapts video sender bitrate, frame rate and resolution scaling using available outgoing bitrate, RTT and remote video packet loss. Profile transitions use sample hysteresis. Browser support and network measurements vary, so these settings are not guaranteed usage caps. Outstanding evidence includes a successful frontend build, staging deployment, two-device call, weak-network adaptation, audio continuity, TURN relay behaviour, and measured bytes sent/received.
+
+Until Actions capacity is restored or an approved alternative validation path is available, documentation changes and source commits must not be represented as a successful deployment.
 
 ## Deployment evidence
 
