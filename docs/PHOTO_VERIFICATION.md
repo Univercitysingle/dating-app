@@ -45,3 +45,10 @@ The API fails closed and does not accept evidence unless the secret is exactly 6
 ## Operational status (2026-11-11)
 
 This guide describes the intended/current source workflow, not proof of production readiness. Before enabling broadly, validate encryption-key configuration and recovery procedures, superadmin-only evidence access, audit events, TTL expiry, immediate deletion, backup retention and consent withdrawal in staging. The optional browser inference is attacker-controlled and must never decide verification outcomes. Review the archived face-api dependency and biometric/privacy obligations before production use. Current GitHub Actions quota exhaustion prevents fresh workflow validation.
+
+
+## Completeness, ownership and verification gaps (2026-11-11)
+
+Treat this specification as a living contract. For each item, record implementation status, automated test, staging evidence, last verified commit, owner, dependency, and rollback/retention impact. Distinguish documented design from verified runtime behaviour. Reconcile against source and staging before release.
+
+Cross-cutting gaps requiring explicit closure: a complete API route/method/authz/schema/error catalogue; MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback definitions; Firebase RTDB rules and push subscription/delivery/retry lifecycle; tested backup/restore with RPO/RTO; payment replay/idempotency/reconciliation/refund and stale-pending recovery; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; supported browser/device, PWA/offline and notification permission matrix; accessibility checks for keyboard, screen readers, contrast and forms; localization, timezone and RTL readiness. Do not imply these are implemented unless backed by evidence.
