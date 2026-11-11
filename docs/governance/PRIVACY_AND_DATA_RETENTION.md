@@ -8,3 +8,8 @@ Collect minimum necessary data. Explain use before collection. Protect data in t
 Define access/export, correction, consent withdrawal, account deletion, retention exceptions and legal holds. Deletion must revoke access and entitlements consistently.
 
 This is not a legal privacy notice. Obtain qualified review for operating entity and each market, including biometric/sensitive data and cross-border transfers.
+
+
+## Current implementation considerations (2026-11-11)
+
+The photo-verification guide documents encrypted MongoDB evidence with a seven-day TTL target and immediate deletion on review; confirm actual TTL execution, backup expiry and key recovery before treating deletion as complete. Chat, reports, support messages, login/security events, location and sensitive add-on preferences need documented retention periods and access controls. The existing CDN Worker remains unchanged and is outside this documentation scope. This document remains a design baseline, not a legally approved privacy notice. Obtain qualified review for UAE/operator jurisdiction and each launch market, especially biometric and other sensitive personal data.
