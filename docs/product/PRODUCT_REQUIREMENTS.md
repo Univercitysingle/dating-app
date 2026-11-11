@@ -29,3 +29,10 @@ Age/jurisdiction rules, supported countries, catalogue/prices/currencies, refund
 ## Current status clarification (2026-11-11)
 
 Use the status vocabulary above rigorously. The latest call-quality code includes automatic bitrate/resolution/FPS adaptation and audio-first degradation, but its deployment and real-device behaviour remain unverified. The target of 1,000 concurrent users is not capacity-certified. Firebase RTDB rules, WebXPay sandbox settlement, upload lifecycle, mobile/desktop call responsiveness and full core-journey regression require evidence. GitHub Actions quota is exhausted, so the latest source cannot be assumed deployed. Production release and DNS cutover require separate approval.
+
+
+## Traceability and outstanding verification (2026-11-11)
+
+Every requirement, metric, journey and finding must map to an implementation reference, test, staging evidence, owner, status, last verified commit, and release decision. Do not infer feature adoption, reliability, security, or capacity from source code or analytics instrumentation alone. Define metric event names, properties, privacy classification, sampling, retention, denominator, exclusion rules, and dashboard ownership before using metrics for decisions.
+
+Keep the following open until supported by evidence: complete API contract and authorization matrix; MongoDB schema/index/TTL and migration inventory; Firebase RTDB rules and push subscription/delivery/revocation tests; backup/restore exercises with RPO/RTO; payment replay/reconciliation/refund/stale-pending tests; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; browser/device/PWA/offline/notification coverage; keyboard/screen-reader/contrast/form accessibility; localization, timezone and RTL readiness.
