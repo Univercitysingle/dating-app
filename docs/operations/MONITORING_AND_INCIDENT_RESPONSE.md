@@ -10,3 +10,8 @@ Severity: SEV-1 broad outage/data exposure/payment integrity/urgent safety; SEV-
 Response: acknowledge/assign; scope impact; preserve safe logs/request IDs; mitigate by rollback or feature disablement; verify recovery; communicate; complete root cause and corrective actions.
 
 This defines an operating model, not proof that alerting/on-call staffing is configured. Assign owners and validate tooling before launch.
+
+
+## Current operational readiness (2026-11-11)
+
+This runbook defines required monitoring, not proof that alerting, dashboards or on-call coverage are configured. Confirm Cloudflare Worker/Pages logs and alerts, Durable Object errors, Atlas connection/slow-query metrics, Firebase denials, payment callback failures, CDN proxy health and TURN relay metrics in the relevant provider consoles. Do not log tokens, message content, PII or verification evidence. GitHub Actions quota exhaustion is a current delivery/validation blocker; track it as a CI capacity incident and do not claim a deployment until the exact SHA is confirmed in Cloudflare.
