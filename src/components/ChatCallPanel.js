@@ -139,49 +139,93 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   useEffect(() => {
     if (call?.status !== 'accepted' || !peerRef.current) {
       setConnectionQuality(0);
+      videoBitrateRef.current = 0;
       return undefined;
     }
     let cancelled = false;
+    let pendingQuality = 0;
+    let pendingSamples = 0;
+    const qualityProfiles = {
+      1: { bitrate: 160000, frameRate: 10, scale: 4 },
+      2: { bitrate: 300000, frameRate: 15, scale: 3 },
+      3: { bitrate: 550000, frameRate: 20, scale: 2 },
+      4: { bitrate: 950000, frameRate: 24, scale: 1.5 },
+      5: { bitrate: 1400000, frameRate: 30, scale: 1 }
+    };
     const readConnectionQuality = async () => {
       const peer = peerRef.current;
       if (!peer || peer.connectionState !== 'connected') return;
       try {
         const stats = await peer.getStats();
-        let packetsReceived = 0;
-        let packetsLost = 0;
         let roundTripTime = null;
+        let availableOutgoingBitrate = null;
+        let packetLoss = null;
         stats.forEach(report => {
-          if (report.type === 'inbound-rtp' && !report.isRemote) {
-            packetsReceived += report.packetsReceived || 0;
-            packetsLost += Math.max(0, report.packetsLost || 0);
-          }
           if (report.type === 'candidate-pair' && report.state === 'succeeded' &&
               (report.nominated || report.selected)) {
             if (typeof report.currentRoundTripTime === 'number') roundTripTime = report.currentRoundTripTime;
+            if (typeof report.availableOutgoingBitrate === 'number') {
+              availableOutgoingBitrate = report.availableOutgoingBitrate;
+            }
+          }
+          if (report.type === 'remote-inbound-rtp' && report.kind === 'video' &&
+              typeof report.fractionLost === 'number') {
+            packetLoss = Math.max(packetLoss ?? 0, report.fractionLost);
           }
         });
-        const totalPackets = packetsReceived + packetsLost;
-        const lossRate = totalPackets ? packetsLost / totalPackets : 0;
+
         let quality = 3;
-        if (roundTripTime !== null && roundTripTime < 0.15 && lossRate < 0.02) quality = 5;
-        else if ((roundTripTime === null || roundTripTime < 0.25) && lossRate < 0.04) quality = 4;
-        else if ((roundTripTime !== null && roundTripTime > 0.5) || lossRate > 0.1) quality = 1;
-        else if ((roundTripTime !== null && roundTripTime > 0.3) || lossRate > 0.05) quality = 2;
-        // Adapt outbound video bitrate to measured packet loss and RTT.
-        // Keep audio unaffected and avoid repeatedly applying unchanged values.
-        if (quality && quality !== videoBitrateRef.current) {
-          const targetBitrate = ({ 1: 180000, 2: 350000, 3: 650000, 4: 1000000, 5: 1600000 })[quality];
+        if (availableOutgoingBitrate !== null) {
+          if (availableOutgoingBitrate < 220000) quality = 1;
+          else if (availableOutgoingBitrate < 420000) quality = 2;
+          else if (availableOutgoingBitrate < 800000) quality = 3;
+          else if (availableOutgoingBitrate < 1300000) quality = 4;
+          else quality = 5;
+        } else if (roundTripTime !== null) {
+          if (roundTripTime > 0.6) quality = 1;
+          else if (roundTripTime > 0.38) quality = 2;
+          else if (roundTripTime > 0.25) quality = 3;
+          else if (roundTripTime > 0.15) quality = 4;
+          else quality = 5;
+        }
+        if (roundTripTime !== null) {
+          if (roundTripTime > 0.65) quality = Math.min(quality, 1);
+          else if (roundTripTime > 0.4) quality = Math.min(quality, 2);
+          else if (roundTripTime > 0.28) quality = Math.min(quality, 3);
+        }
+        if (packetLoss !== null) {
+          if (packetLoss > 0.12) quality = Math.min(quality, 1);
+          else if (packetLoss > 0.07) quality = Math.min(quality, 2);
+          else if (packetLoss > 0.04) quality = Math.min(quality, 3);
+        }
+
+        // Require two consistent samples before changing profiles. Degradation
+        // is still fast, while recovery is deliberately gradual to avoid swings.
+        if (quality === pendingQuality) pendingSamples += 1;
+        else {
+          pendingQuality = quality;
+          pendingSamples = 1;
+        }
+        const currentQuality = videoBitrateRef.current || 3;
+        const shouldApply = quality < currentQuality ? pendingSamples >= 1 : pendingSamples >= 2;
+        if (shouldApply && quality !== currentQuality) {
+          const profile = qualityProfiles[quality];
           const videoSender = peer.getSenders().find(sender => sender.track?.kind === 'video');
           if (videoSender && typeof videoSender.getParameters === 'function') {
             try {
               const parameters = videoSender.getParameters();
               parameters.encodings = parameters.encodings?.length ? parameters.encodings : [{}];
-              parameters.encodings[0].maxBitrate = targetBitrate;
-              parameters.degradationPreference = 'balanced';
+              parameters.encodings[0].maxBitrate = profile.bitrate;
+              parameters.encodings[0].maxFramerate = profile.frameRate;
+              parameters.encodings[0].scaleResolutionDownBy = profile.scale;
+              parameters.degradationPreference = 'maintain-framerate';
               await videoSender.setParameters(parameters);
-              videoBitrateRef.current = quality;
-            } catch (_) { /* Browser may not support runtime sender tuning. */ }
+            } catch (_) {
+              // Unsupported sender parameters are ignored; WebRTC congestion
+              // control remains active as a browser-managed fallback.
+            }
           }
+          videoBitrateRef.current = quality;
         }
         if (!cancelled) setConnectionQuality(quality);
       } catch (_) {
@@ -189,7 +233,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       }
     };
     readConnectionQuality();
-    const interval = window.setInterval(readConnectionQuality, 2000);
+    const interval = window.setInterval(readConnectionQuality, 3000);
     return () => { cancelled = true; window.clearInterval(interval); };
   }, [call?.status, call?._id]);
 
@@ -434,7 +478,26 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   }, [restartConnection]);
 
   const makePeer = useCallback(async type => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: selectedMicrophoneId ? { deviceId: { exact: selectedMicrophoneId } } : true, video: type === 'video' });
+    const audioConstraints = {
+      channelCount: { ideal: 1 },
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      ...(selectedMicrophoneId ? { deviceId: { exact: selectedMicrophoneId } } : {})
+    };
+    const videoConstraints = type === 'video' ? {
+      width: { ideal: 640, max: 1280 },
+      height: { ideal: 360, max: 720 },
+      frameRate: { ideal: 24, max: 30 },
+      facingMode: cameraFacingRef.current
+    } : false;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraints,
+      video: videoConstraints
+    });
+    stream.getAudioTracks().forEach(track => {
+      try { track.contentHint = 'speech'; } catch (_) { /* Hint is not supported in every browser. */ }
+    });
     localStreamRef.current = stream;
     setLocalStream(stream);
     const iceConfig = await getCallIceConfig();
@@ -445,7 +508,25 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       iceCandidatePoolSize: 2,
     });
     peerRef.current = peer;
-    stream.getTracks().forEach(track => peer.addTrack(track, stream));
+    stream.getTracks().forEach(track => {
+      const sender = peer.addTrack(track, stream);
+      if (track.kind === 'audio') {
+        // Keep voice intelligible and prioritised while limiting Opus bandwidth.
+        try { track.contentHint = 'speech'; } catch (_) {}
+        if (sender?.getParameters && sender?.setParameters) {
+          try {
+            const parameters = sender.getParameters();
+            parameters.encodings = parameters.encodings?.length ? parameters.encodings : [{}];
+            parameters.encodings[0].maxBitrate = 24000;
+            parameters.encodings[0].priority = 'high';
+            parameters.encodings[0].networkPriority = 'high';
+            sender.setParameters(parameters).catch(() => {});
+          } catch (_) { /* Browser defaults remain available as fallback. */ }
+        }
+      } else if (track.kind === 'video') {
+        videoBitrateRef.current = 3;
+      }
+    });
     peer.ontrack = event => { if (event.streams?.[0]) setRemoteStream(event.streams[0]); };
     peer.onicecandidate = event => {
       if (!event.candidate) return;
