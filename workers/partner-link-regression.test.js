@@ -114,7 +114,9 @@ test("partner-link list marks invitations as incoming only for the invitee", asy
   const outgoing = await connection.managePartnerLink("partner-a", "list");
   assert.equal(incoming.status, 200);
   assert.equal(incoming.body.links[0].isIncoming, true);
-  assert.deepEqual(outgoing.body.links, []);
+  assert.equal(outgoing.status, 200);
+  assert.equal(outgoing.body.links.length, 1);
+  assert.equal(outgoing.body.links[0].isIncoming, false);
 });
 
 test("only the invited member can accept a pending partner link", async () => {
