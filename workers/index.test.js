@@ -78,13 +78,18 @@ test("superadmin login issues a Firebase custom token with root-level role claim
   assert.equal(payload.claims, undefined);
 });
 
-test("restricted features reject wildcard country configuration and require an explicit allowlist", async () => {
-  const response = await worker.fetch(request("/api/video-rooms/ice-config"), {
-    DARK_FANTASY_ENABLED: "true",
-    DARK_FANTASY_ALLOWED_COUNTRIES: "*"
-  });
-  assert.equal(response.status, 404);
-  assert.deepEqual(await response.json(), { error: "Dark Fantasy is not available in this region." });
+test("restricted features reject wildcard country configuration on every route family", async () => {
+  const env = { DARK_FANTASY_ENABLED: "true", DARK_FANTASY_ALLOWED_COUNTRIES: "*" };
+  for (const path of [
+    "/api/video-rooms/ice-config",
+    "/api/dark-fantasy/communities",
+    "/api/dark-fantasy/profile",
+    "/api/dark-fantasy/catalog"
+  ]) {
+    const response = await worker.fetch(request(path), env);
+    assert.equal(response.status, 404, path + " must reject wildcard access");
+    assert.deepEqual(await response.json(), { error: "Dark Fantasy is not available in this region." });
+  }
 });
 
 test("GET / returns API metadata without pretending to serve the login UI", async () => {
