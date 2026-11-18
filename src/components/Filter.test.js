@@ -156,4 +156,39 @@ describe('Filter component', () => {
     expect(apiClient.put).not.toHaveBeenCalled();
   });
 
+
+  it('refreshes an expired GPS location before allowing nearby discovery', async () => {
+    const getCurrentPosition = jest.fn();
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition }
+    });
+    apiClient.get.mockResolvedValue({ enabled: true, stale: true });
+    const onApply = jest.fn();
+    render(<Filter onApply={onApply} />);
+    fireEvent.change(screen.getByLabelText('Discovery location'), { target: { value: 'nearby' } });
+
+    expect(await screen.findByText(/older than 24 hours/i)).toBeInTheDocument();
+    const refreshButton = await screen.findByRole('button', { name: 'Refresh my location' });
+    fireEvent.click(refreshButton);
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      getCurrentPosition.mock.calls[0][0]({
+        coords: { latitude: 25.21, longitude: 55.28, accuracy: 25 }
+      });
+    });
+
+    expect(apiClient.put).toHaveBeenCalledWith('/users/me/location', {
+      latitude: 25.21, longitude: 55.28, accuracyMeters: 25
+    });
+    expect(screen.queryByText(/older than 24 hours/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Apply Filters/ }));
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({
+      maxDistance: 100,
+      minAge: 18,
+      maxAge: 100
+    }));
+  });
+
 });
