@@ -268,3 +268,7 @@ Coarse profile-location filtering is now implemented independently of GPS consen
 - The distance filter remains opt-in and only uses fresh, consented GPS data; coarse city/country search does not imply GPS permission.
 
 Travel-mode preferences and location-aware compatibility scoring are not yet implemented. Any future proximity ranking must be transparent, optional, and avoid exposing exact distance or coordinates.
+
+## 2026-11-18 Travel-aware discovery controls
+
+Discover filters offer four location modes: **Anywhere / international**, **Near my current location**, **Explore a specific city**, and **Explore a specific country**. Nearby mode requires member-initiated GPS consent and a fresh location; destination modes match only city/country fields members have listed on their profiles, and do not request GPS. Anywhere mode sends no location restriction. City/country input is required for the corresponding mode, capped at 100 characters, and server-side regex escaping prevents metacharacter injection. These are discovery-session filters only: the app does not persist or publish travel destinations, infer travel plans, or track movement in the background.
