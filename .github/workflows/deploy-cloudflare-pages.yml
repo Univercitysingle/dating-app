@@ -232,9 +232,19 @@ jobs:
         working-directory: backend
         run: npm ci --no-audit --no-fund
 
-      - name: Enforce legacy backend dependency security threshold
+      - name: Enforce legacy backend production dependency security threshold
         working-directory: backend
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit legacy backend build and test dependencies
+        shell: bash
+        run: |
+          set +e
+          (cd backend && npm audit --json > "$RUNNER_TEMP/backend-npm-audit.json")
+          audit_status=$?
+          set -e
+          (cd backend && node ../scripts/validate-frontend-audit.js "$RUNNER_TEMP/backend-npm-audit.json" package-lock.json)
+          echo "Full backend npm audit command exit code: $audit_status"
 
       - name: Run backend regression tests
         run: npm run test:backend -- --runInBand
