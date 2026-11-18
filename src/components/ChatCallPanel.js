@@ -7,6 +7,8 @@ const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
 
 export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
+  const firstOtherPhoto = otherUser?.photos?.[0];
+  const otherPhotoUrl = typeof firstOtherPhoto === 'string' ? firstOtherPhoto : firstOtherPhoto?.url;
   const [call, setCall] = useState(null);
   const [headerTarget, setHeaderTarget] = useState(null);
   const [status, setStatus] = useState('');
@@ -1026,8 +1028,8 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
     {incoming && <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-5 py-8 text-white" role="dialog" aria-modal="true" aria-label={videoCall ? 'Incoming video call' : 'Incoming voice call'}>
       <div className="flex w-full max-w-sm flex-col items-center text-center">
         <div className="mb-5 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white/15 bg-slate-700 text-4xl font-semibold shadow-2xl">
-          {otherUser?.photos?.[0]?.url
-            ? <img src={otherUser.photos[0].url} alt="" className="h-full w-full object-cover" />
+          {otherPhotoUrl
+            ? <img src={otherPhotoUrl} alt="" className="h-full w-full object-cover" />
             : (otherUser?.name || '♡').trim().charAt(0).toUpperCase()}
         </div>
         <p className="mb-2 text-sm font-medium uppercase tracking-[0.22em] text-emerald-300">Incoming {videoCall ? 'video' : 'voice'} call</p>
@@ -1061,7 +1063,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {videoCall ? <>
           <video ref={remoteVideoRef} autoPlay playsInline className="wa-call-remote-video" />
           {!remoteStream && <div className="wa-call-video-placeholder">
-            <div className="wa-call-avatar">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
+            <div className="wa-call-avatar">{otherPhotoUrl ? <img src={otherPhotoUrl} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
             <strong>{otherUser?.name || "Video call"}</strong>
             <span>{reconnecting ? "Reconnecting…" : status || "Connecting video…"}</span>
           </div>}
@@ -1069,7 +1071,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           <audio ref={remoteAudioRef} autoPlay />
           <div className="wa-call-audio-content">
             <div className="wa-call-avatar wa-call-avatar--large">
-              {otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}
+              {otherPhotoUrl ? <img src={otherPhotoUrl} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}
             </div>
             <h2>{otherUser?.name || "Voice call"}</h2>
             <p>{call?.status === 'accepted' ? (reconnecting ? 'Reconnecting…' : formatDuration(callDuration)) : (status || 'Calling…')}</p>
@@ -1078,7 +1080,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         </>}
         {!videoMinimized && <header className="wa-call-header">
           <div className="wa-call-header-user">
-            <span className="wa-call-header-avatar">{otherUser?.photos?.[0]?.url ? <img src={otherUser.photos[0].url} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</span>
+            <span className="wa-call-header-avatar">{otherPhotoUrl ? <img src={otherPhotoUrl} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</span>
             <span className="wa-call-header-copy"><strong>{otherUser?.name || (videoCall ? "Video call" : "Voice call")}</strong><small>{call?.status === 'accepted' ? formatDuration(callDuration) : status || "Calling…"}</small></span>
           </div>
           <div className="wa-call-header-actions">
