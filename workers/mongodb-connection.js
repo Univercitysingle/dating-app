@@ -1358,6 +1358,16 @@ export class MongoDBConnection {
       for (const key of ["sexualOrientation", "familyStatus", "relationshipGoals"]) {
         if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery[key] = filters[key];
       }
+      // Coarse location filtering is independent from GPS consent. City/country
+      // values are user/profile supplied and are never treated as exact location.
+      for (const key of ["city", "country"]) {
+        const value = filters[key];
+        if (typeof value === "string" && value.trim() && value.trim().length <= 100) {
+          baseMatchQuery["location." + key] = { $regex: value.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\      for (const key of ["sexualOrientation", "familyStatus", "relationshipGoals"]) {
+        if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery[key] = filters[key];
+      }"), $options: "i" };
+        }
+      }
       const lifestyleKeys = ["drinking", "smoking", "exercise", "diet", "lookingFor", "pets", "religion", "politicalLeaning"];
       for (const key of lifestyleKeys) {
         if (typeof filters[key] === "string" && filters[key].length <= 100) baseMatchQuery["lifestyle." + key] = filters[key];
