@@ -70,3 +70,12 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Source commit:** `b95de00790a11ee6ec24fa2f11223836e5ae9129`
 - **Regression-test commit:** `160f3bfefe7a179527e4f0d8fc389b94757f0fe9`
 - **Evidence status:** Test cases added for independent scopes, configured thresholds and fail-closed behaviour. Tests have not been executed in this environment. Staging deployment, real call setup/reconnect testing and provider usage verification remain outstanding. This is a source-level remediation, not a closed security finding.
+
+
+## Firebase signing-key retrieval hardening (2026-11-18)
+
+- **Finding:** Firebase ID-token verification fetched Google's signing-key set on every authenticated request and had no explicit request timeout. This increased authentication latency and exposed protected routes to unbounded key-service waits.
+- **Change:** Added bounded in-isolate JWKS caching using the provider Cache-Control max-age where available, a five-minute fallback TTL, a six-hour maximum cache lifetime, concurrent-fetch coalescing, and a five-second fetch timeout. Failed or malformed key responses are not cached, and stale keys are not used after expiry.
+- **Source commit:** a426f5c13ad4bbc5170dcc957da33534bb013c7a
+- **Regression-test commit:** b26e3bbc2042ee9de9bffb9ead3cd01632ae9f02
+- **Evidence status:** Cache reuse and malformed-response tests added. Tests have not been executed in this environment. Google key rotation, timeout behaviour and cold-start performance still require staging verification. This is not a substitute for email-verification policy, token revocation checks, or Firebase RTDB rules review.
