@@ -3369,9 +3369,14 @@ export class MongoDBConnection {
         if (existing) {
           return { status: 409, body: { error: "One of these members already has a pending or active partner link." } };
         }
-        const previousPair = await links.findOne({ memberUids: { $all: [uid, targetUid] } });
+        const previousPair = await links.findOne(
+          { memberUids: { $all: [uid, targetUid] } },
+          { sort: { updatedAt: -1, createdAt: -1 } }
+        );
+        const pairCooldownStartedAt = previousPair?.declinedAt || previousPair?.revokedAt ||
+          previousPair?.updatedAt || previousPair?.createdAt;
         if (previousPair && ["declined", "revoked"].includes(previousPair.status) &&
-            previousPair.createdAt instanceof Date && previousPair.createdAt.getTime() > now.getTime() - 30 * 24 * 60 * 60 * 1000) {
+            pairCooldownStartedAt && new Date(pairCooldownStartedAt).getTime() > now.getTime() - 30 * 24 * 60 * 60 * 1000) {
           return { status: 429, body: { error: "A partner-link request for this pair cannot be repeated for 30 days after decline or revocation." } };
         }
         const document = {
@@ -3402,6 +3407,31 @@ export class MongoDBConnection {
       if (action === "accept" || action === "decline") {
         if (link.inviteeUid !== uid) return { status: 403, body: { error: "Only the invited member can respond to this request." } };
         if (link.status !== "pending") return { status: 409, body: { error: "This partner-link request is no longer pending." } };
+        if (action === "accept") {
+          const users = db.collection("users");
+          const [inviter, invitee] = await Promise.all([
+            users.findOne({ uid: link.inviterUid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1, blocked: 1 } }),
+            users.findOne({ uid: link.inviteeUid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1, blocked: 1 } })
+          ]);
+          const isAdult = user => {
+            const birthday = user?.birthday ? new Date(user.birthday) : null;
+            if (!birthday || Number.isNaN(birthday.getTime())) return false;
+            let age = now.getFullYear() - birthday.getFullYear();
+            if (now.getMonth() < birthday.getMonth() ||
+                (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+            return age >= 18;
+          };
+          if (!inviter || !invitee || isAccountRestricted(inviter) || isAccountRestricted(invitee) ||
+              !isAdult(inviter) || !isAdult(invitee)) {
+            return { status: 403, body: { error: "Both members must remain eligible adults to accept a partner link." } };
+          }
+          if ((Array.isArray(inviter.blocked) && inviter.blocked.includes(link.inviteeUid)) ||
+              (Array.isArray(invitee.blocked) && invitee.blocked.includes(link.inviterUid)) ||
+              inviter.relationshipPreferences?.boundaries?.includes("no_partner_linking") ||
+              invitee.relationshipPreferences?.boundaries?.includes("no_partner_linking")) {
+            return { status: 403, body: { error: "Partner-link consent is no longer available for these members." } };
+          }
+        }
         const update = action === "accept"
           ? { $set: { status: "accepted", acceptedAt: now, updatedAt: now } }
           : { $set: { status: "declined", declinedAt: now, updatedAt: now }, $unset: { activeKey: "" } };
