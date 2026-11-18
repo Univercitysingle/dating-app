@@ -5,6 +5,7 @@ const DEFAULTS = {
   minAge: 18,
   maxAge: 100,
   maxDistance: 100,
+  travelMode: 'anywhere',
   lookingFor: '',
   sexualOrientation: '',
   city: '',
@@ -28,6 +29,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [minAge, setMinAge] = useState(initialFilters.minAge ?? DEFAULTS.minAge);
   const [maxAge, setMaxAge] = useState(initialFilters.maxAge ?? DEFAULTS.maxAge);
   const [maxDistance, setMaxDistance] = useState(initialFilters.maxDistance ?? DEFAULTS.maxDistance);
+  const [travelMode, setTravelMode] = useState(initialFilters.travelMode || (initialFilters.city ? 'city' : initialFilters.country ? 'country' : 'anywhere'));
   const [lookingFor, setLookingFor] = useState(initialFilters.lookingFor || DEFAULTS.lookingFor);
   const [sexualOrientation, setSexualOrientation] = useState(initialFilters.sexualOrientation || DEFAULTS.sexualOrientation);
   const [city, setCity] = useState(initialFilters.city || DEFAULTS.city);
@@ -100,6 +102,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     setMinAge(DEFAULTS.minAge);
     setMaxAge(DEFAULTS.maxAge);
     setMaxDistance(DEFAULTS.maxDistance);
+    setTravelMode(DEFAULTS.travelMode);
     setLookingFor(DEFAULTS.lookingFor);
     setSexualOrientation(DEFAULTS.sexualOrientation);
     setCity(DEFAULTS.city);
@@ -112,12 +115,15 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     const filters = {
       minAge,
       maxAge,
-      ...(locationEnabled && !locationStale ? { maxDistance: Number(maxDistance) } : {}),
+      ...(travelMode === 'nearby' && locationEnabled && !locationStale ? { maxDistance: Number(maxDistance) } : {}),
       lookingFor,
       preference,
-      ...(city.trim() ? { city: city.trim() } : {}),
-      ...(country.trim() ? { country: country.trim() } : {}),
+      ...(travelMode === 'city' && city.trim() ? { city: city.trim() } : {}),
+      ...(travelMode === 'country' && country.trim() ? { country: country.trim() } : {}),
     };
+    if (travelMode === 'city' && !city.trim()) { setLocationMessage('Enter a destination city to search there.'); return; }
+    if (travelMode === 'country' && !country.trim()) { setLocationMessage('Enter a destination country to search there.'); return; }
+    if (travelMode === 'nearby' && (!locationEnabled || locationStale)) { setLocationMessage('Enable or refresh GPS location before using nearby discovery.'); return; }
     if (lookingFor === 'Casual (FWB)' && sexualOrientation) {
       filters.sexualOrientation = sexualOrientation;
     }
@@ -136,7 +142,8 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
 
   const activeCount = [
     minAge !== DEFAULTS.minAge || maxAge !== DEFAULTS.maxAge,
-    locationEnabled && maxDistance !== DEFAULTS.maxDistance,
+    travelMode !== DEFAULTS.travelMode,
+    travelMode === 'nearby' && maxDistance !== DEFAULTS.maxDistance,
     Boolean(lookingFor),
     Boolean(sexualOrientation),
     Boolean(city.trim()),
@@ -217,20 +224,39 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
 
           <section className="filter-section" aria-labelledby="location-search-title">
             <div className="filter-section-heading">
-              <h3 id="location-search-title">Explore a place</h3>
-              <span>City or country</span>
+              <h3 id="location-search-title">Where would you like to discover?</h3>
+              <span>Travel & location</span>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="filter-field">
-                <label htmlFor="discovery-city" className="filter-label">City</label>
-                <input id="discovery-city" type="text" value={city} maxLength={100} onChange={event => setCity(event.target.value)} placeholder="Any city" className="filter-select" autoComplete="off" />
+            <SelectField id="travel-mode" label="Discovery location" value={travelMode} onChange={(event) => { setTravelMode(event.target.value); setLocationMessage(''); }} options={[["anywhere", "Anywhere / international"], ["nearby", "Near my current location"], ["city", "Explore a specific city"], ["country", "Explore a specific country"]]} hint="This only filters profiles by their listed city or country, or by opted-in GPS distance. It does not track travel." />
+            {travelMode === 'city' && <div className="filter-field">
+              <label htmlFor="discovery-city" className="filter-label">Destination city</label>
+              <input id="discovery-city" type="text" value={city} maxLength={100} onChange={event => setCity(event.target.value)} placeholder="Enter city" className="filter-select" autoComplete="off" />
+            </div>}
+            {travelMode === 'country' && <div className="filter-field">
+              <label htmlFor="discovery-country" className="filter-label">Destination country</label>
+              <input id="discovery-country" type="text" value={country} maxLength={100} onChange={event => setCountry(event.target.value)} placeholder="Enter country" className="filter-select" autoComplete="off" />
+            </div>}
+            {travelMode === 'nearby' && <div className="filter-field filter-distance-field">
+              <div className="filter-range-heading">
+                <label htmlFor="max-distance" className="filter-label">Maximum distance</label>
+                <output>Up to {maxDistance} km</output>
               </div>
-              <div className="filter-field">
-                <label htmlFor="discovery-country" className="filter-label">Country</label>
-                <input id="discovery-country" type="text" value={country} maxLength={100} onChange={event => setCountry(event.target.value)} placeholder="Any country" className="filter-select" autoComplete="off" />
+              <input id="max-distance" aria-label="Maximum distance" type="range" min="1" max="100" value={maxDistance} disabled={!locationEnabled || locationStale || locationBusy} onChange={(event) => setMaxDistance(Number(event.target.value))} />
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-neutral-500">Your exact coordinates are private and are never shown to members.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={enableLocation} disabled={locationBusy} className="rounded-full border border-primary px-4 py-2 text-sm font-medium text-primary disabled:opacity-50">{locationBusy ? 'Updating location...' : locationEnabled ? 'Refresh my location' : 'Use my current location'}</button>
+                  {locationEnabled && <button type="button" onClick={disableLocation} disabled={locationBusy} className="rounded-full border border-neutral-300 px-4 py-2 text-sm disabled:opacity-50">Turn off</button>}
+                </div>
+                {locationMessage && <p className="text-xs text-neutral-600" role="status">{locationMessage}</p>}
+                {!locationEnabled && <p className="text-xs text-amber-700">Enable location to apply this distance filter.</p>}
+                {locationStale && <p className="text-xs text-amber-700">Your GPS update is older than 24 hours. Refresh before applying.</p>}
               </div>
-            </div>
-            <p className="filter-hint">These filters use the city and country listed on profiles. GPS distance filtering is separate and optional.</p>
+              <div className="filter-range-scale"><span>1 km</span><span>100 km</span></div>
+            </div>}
+            {travelMode === 'anywhere' && <p className="filter-hint">Explore internationally. No city, country or GPS distance filter is applied.</p>}
+            {(travelMode === 'city' || travelMode === 'country') && <p className="filter-hint">Matches against the city or country members have listed on their profiles. GPS is not used.</p>}
+            {locationMessage && travelMode !== 'nearby' && <p className="filter-hint" role="status">{locationMessage}</p>}
           </section>
 
           <section className="filter-section" aria-labelledby="intent-title">
