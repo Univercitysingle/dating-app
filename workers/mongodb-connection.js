@@ -3657,10 +3657,6 @@ export class MongoDBConnection {
         }
       }
 
-      // Match the legacy profile sanitizer: contact details are private even
-      // on the account owner's own profile. Only a superadmin may retrieve them.
-      if (user.role !== "superadmin") stripPrivateContactFields(user);
-
       return { status: 200, body: user };
     } catch {
       return { status: 503, body: { error: "Profile service unavailable" } };
