@@ -102,3 +102,13 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Runtime checks:** Liveness, readiness/MongoDB connectivity, protected-route anonymous rejection, legacy route inventory and OWASP ZAP passive baseline all completed successfully.
 - **Branch alignment:** Current branch HEAD before this correction was `63da714cc5421ea084e732da2cfd3f595a6ab5e7`. Comparing it with deployed source `630f352` shows six documentation-only commits touching `README.md` and this tracker. No application source changed after the successful Worker deployment.
 - **Remaining:** Real authenticated phone-account journeys and broader browser acceptance remain outstanding. Cloudflare Pages frontend deployment is not verified. Do not close findings solely on this deployment run.
+
+
+## Cloudflare Pages dependency gate failure (2026-11-18)
+
+- **Run:** [42995531214](https://github.com/Univercitysingle/dating-app/actions/runs/42995531214), retry of the older Pages workflow run. It checked out SHA `41860e09010a477144c95c6b05135cf84e498d28`, not the latest branch HEAD.
+- **Result:** Failed at `npm audit --audit-level=high` after `npm ci` succeeded. Frontend tests, backend tests, SEO validation, build, Pages deployment and post-deployment checks were skipped.
+- **Audit totals:** 75 findings: 1 low, 6 moderate, 68 high. The repeated high findings resolve to the `picomatch` ReDoS advisory GHSA-fc5q-39xc-vjpf, affecting versions through 4.0.7. As of this review, the advisory does not specify a patched release. It appears in the build/test dependency tree through CRA/Tailwind and glob/file-watch tooling. Do not pin to 4.0.7 or older, because the advisory explicitly includes those versions.
+- **Other findings:** Moderate `glob` and `minimatch` dependency paths. The suggested `npm audit fix --force` would introduce breaking changes (including Tailwind 4 or a depcheck downgrade); do not apply blindly. AWS SDK v2 reports the low/informational GHSA-j965-2qgj-vjmq advisory with no patched v2 release; assess actual use and migrate to AWS SDK v3 where still required.
+- **Required remediation:** Reproduce audit against current branch; fix non-breaking vulnerable transitive dependencies; inventory actual runtime use of AWS SDK v2; test dependency changes; then decide whether the remaining no-fix build-tool advisory warrants a narrowly scoped, time-limited risk acceptance. Do not lower or bypass the high-severity gate without explicit evidence, owner, mitigation, and review date.
+- **Release status:** Cloudflare Pages deployment remains blocked and unverified. Worker staging remains deployed at source `630f3522914f31325364d98e0ecac9c15c5ff8d3`. No production change was made.
