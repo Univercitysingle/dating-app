@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload, enforceCallIceRateLimit } from "./index.js";
 import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
@@ -1066,6 +1066,34 @@ test("unblocking removes the target and preserves legacy message shape", async (
   assert.deepEqual(result.body, { message: "User user-2 successfully unblocked." });
 });
 
+
+test("call ICE credential requests use an isolated per-account limiter", async () => {
+  let observedName = "";
+  let observedPayload = null;
+  const env = {
+    RATE_LIMITER: {
+      idFromName(name) { observedName = name; return name; },
+      get() {
+        return { async fetch(_url, options) {
+          observedPayload = JSON.parse(options.body);
+          return new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 60000 }), { status: 200 });
+        }};
+      }
+    }
+  };
+  assert.equal(await enforceCallIceRateLimit(env, { sub: "user-123" }), null);
+  assert.equal(observedName, "call-ice-config:user-123");
+  assert.deepEqual(observedPayload, { key: "call-ice-config", limit: 20, windowMs: 60000 });
+  assert.equal(await enforceCallIceRateLimit(env, { sub: "user-123" }, "video-room-ice-config"), null);
+  assert.equal(observedName, "video-room-ice-config:user-123");
+  assert.deepEqual(observedPayload, { key: "video-room-ice-config", limit: 20, windowMs: 60000 });
+});
+
+test("call ICE credential limiter fails closed when abuse protection is unavailable", async () => {
+  const response = await enforceCallIceRateLimit({}, { sub: "user-123" });
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /abuse protection/i);
+});
 
 test("photo upload rate limiting fails closed when the limiter binding is missing", async () => {
   const response = await enforceAccountRateLimit(
