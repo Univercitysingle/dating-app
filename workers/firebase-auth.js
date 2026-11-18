@@ -15,7 +15,7 @@ function getJwksCache(fetchImpl) {
 
 function getJwksTtl(response) {
   const cacheControl = response.headers?.get?.("cache-control") || "";
-  const match = cacheControl.match(/(?:^|,)\\s*max-age=(\\d+)/i);
+  const match = cacheControl.match(/(?:^|,)\s*max-age=(\d+)/i);
   if (!match) return DEFAULT_JWKS_TTL_MS;
   return Math.min(Number(match[1]) * 1000, MAX_JWKS_TTL_MS);
 }
