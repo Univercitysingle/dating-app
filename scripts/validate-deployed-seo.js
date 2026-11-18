@@ -41,11 +41,20 @@ function assertPresent(value, label) {
 }
 
 async function main() {
-  const homepageResponse = await fetch(new URL('/', siteOrigin), {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(15000),
-    headers: { 'user-agent': 'dating-app-staging-security-validator/1.0' },
-  });
+  // Pages deployments can briefly return edge 5xx responses while routing and
+  // Functions propagate. Retry transient server errors, but never mask a
+  // persistent failure or accept a non-5xx response with an incorrect status.
+  let homepageResponse;
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    homepageResponse = await fetch(new URL('/', siteOrigin), {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+      headers: { 'user-agent': 'dating-app-staging-security-validator/1.0' },
+    });
+    if (homepageResponse.status < 500 || attempt === 5) break;
+    console.warn('Homepage returned HTTP ' + homepageResponse.status + '; retrying after deployment propagation (' + attempt + '/5).');
+    await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+  }
   if (!homepageResponse.ok) throw new Error('Homepage returned HTTP ' + homepageResponse.status);
   const requiredHeaders = [
     ['x-content-type-options', /^nosniff$/i],
