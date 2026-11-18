@@ -12,7 +12,7 @@ const statusLabel = {
 
 export default function PartnerLinkPanel({ targetUid = null }) {
   const [links, setLinks] = useState([]);
-  const [loading, setLoading] = useState(!targetUid);
+  const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -29,8 +29,8 @@ export default function PartnerLinkPanel({ targetUid = null }) {
   }, []);
 
   useEffect(() => {
-    if (!targetUid) loadLinks();
-  }, [targetUid, loadLinks]);
+    loadLinks();
+  }, [loadLinks]);
 
   const invite = async () => {
     if (!targetUid || sending) return;
@@ -61,15 +61,21 @@ export default function PartnerLinkPanel({ targetUid = null }) {
   };
 
   if (targetUid) {
+    const existingLink = links.find(link => link.inviterUid === targetUid || link.inviteeUid === targetUid);
+    const targetLinkLabel = existingLink ? (existingLink.status === 'pending'
+      ? (existingLink.isIncoming ? 'This member has invited you.' : 'You already invited this member.')
+      : existingLink.status === 'accepted' ? 'You already have an active partner link with this member.'
+        : `Previous request status: ${statusLabel[existingLink.status] || existingLink.status}.`) : '';
     return (
       <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900" aria-label="Partner link invitation">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="font-semibold text-neutral-900 dark:text-white">Partner link</h3>
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Invite this person to establish a partner link. No profile details are shared unless a separate feature explicitly allows it.</p>
+            {loading ? <p className="mt-2 text-xs text-neutral-500">Checking partner-link status…</p> : existingLink ? <p className="mt-2 text-sm text-neutral-500" role="status">{targetLinkLabel}</p> : null}
           </div>
-          <button type="button" onClick={invite} disabled={sending} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {sending ? 'Sending…' : 'Invite to partner link'}
+          <button type="button" onClick={invite} disabled={sending || loading || Boolean(existingLink)} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+            {sending ? 'Sending…' : existingLink ? 'Partner link request exists' : 'Invite to partner link'}
           </button>
         </div>
       </section>
