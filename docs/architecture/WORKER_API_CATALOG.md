@@ -38,7 +38,7 @@ Do not treat this classification as a substitute for checking each handler's cur
 | GET, PUT, DELETE | `/api/users/me/desires` | Firebase-authenticated, adult account, explicit opt-in for writes | Read, save or withdraw private relationship-intention, desire, curiosity and boundary preferences |
 | GET, PUT, DELETE | `/api/users/me/location` | Firebase-authenticated, adult account; explicit browser permission for GPS writes | Read location-sharing status, update private GPS location, or revoke location sharing |
 | GET | `/api/users/:uid` | Firebase-authenticated | Read public profile with allowlisted fields |
-| GET | `/api/users/discover` | Firebase-authenticated | Discovery feed with age, gender, relationship, optional city/country and consented GPS distance filters |
+| GET | `/api/users/discover` | Firebase-authenticated | Discovery feed with age, gender, relationship, international/anywhere mode, optional city/country destination filters and consented GPS distance filters |
 | GET | `/api/users/me/subscriptions` | Firebase-authenticated | Current user's subscription history |
 | GET | `/api/users/likes` | Firebase-authenticated | Likes/admirers view |
 | POST | `/api/users/photos` | Firebase-authenticated | Upload photo through existing CDN service binding |
