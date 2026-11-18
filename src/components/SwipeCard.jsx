@@ -99,11 +99,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
     };
   }, [isExpanded]);
 
-  if (!user) {
-    return null;
-  }
-
-  const { name, age, photos } = user;
+  const { name, age, photos } = user || {};
   const rawImageSources = Array.isArray(photos)
     ? photos.map(photo => typeof photo === 'string' ? photo : photo?.url).filter(Boolean)
     : [];
@@ -126,6 +122,10 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
       preloadedImage.onerror = null;
     };
   }, [currentImageIndex, photos]);
+
+  if (!user) {
+    return null;
+  }
 
   const handleDragEnd = (event, info) => {
     if (info.offset.x > 100) {
