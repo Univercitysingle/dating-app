@@ -5586,6 +5586,9 @@ export class MongoDBConnection {
       const phoneSignIn = claims.firebase?.sign_in_provider === "phone" &&
         typeof claims.phone_number === "string" &&
         /^\+[1-9][0-9]{7,14}$/.test(claims.phone_number);
+      if (claims.email_verified !== true && !phoneSignIn) {
+        return json({ error: "Email verification is required to use this service." }, 403);
+      }
       try {
         const account = await this.getDatabase(await this.getClient()).collection("users").findOne(
           { uid: authenticatedUid },
@@ -5593,9 +5596,6 @@ export class MongoDBConnection {
         );
         if (phoneSignIn && !account) {
           return json({ error: "Phone sign-in is available only for existing accounts." }, 403);
-        }
-        if (claims.email_verified !== true && !(phoneSignIn && account)) {
-          return json({ error: "Email verification is required to use this service." }, 403);
         }
         if (account && isAccountRestricted(account)) {
           return json({ error: "This account is unavailable." }, 403);
