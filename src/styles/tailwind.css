@@ -5618,7 +5618,7 @@ html.dark .profile-page .profile-settings-group { border-color: var(--app-border
 /* Public landing page: premium editorial rhythm and responsive conversion path. */
 .hart-landing {
   background-color:#211923;
-  background-image:linear-gradient(110deg,rgba(27,18,30,.9) 0%,rgba(38,22,35,.76) 48%,rgba(45,24,39,.5) 100%),url('/bg.webp');
+  background-image:linear-gradient(110deg,rgba(27,18,30,.9) 0%,rgba(38,22,35,.76) 48%,rgba(45,24,39,.5) 100%),url('../../public/bg.webp');
   background-position:center,center;
   background-size:cover;
   background-attachment:fixed;
