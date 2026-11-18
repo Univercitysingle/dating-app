@@ -1397,7 +1397,10 @@ export class MongoDBConnection {
       }
       if (hasLocation) {
         baseMatchQuery["locationSharing.enabled"] = true;
-        baseMatchQuery["locationSharing.updatedAt"] = { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
+        baseMatchQuery["locationSharing.updatedAt"] = {
+          $gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          $lte: new Date()
+        };
         // $geoNear requires a 2dsphere index. Ensure it exists in MongoDB
         // instead of turning every distance-filtered Discover request into 503.
         phase = "ensure-location-index";
