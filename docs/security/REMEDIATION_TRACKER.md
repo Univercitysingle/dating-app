@@ -112,3 +112,22 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Other findings:** Moderate `glob` and `minimatch` dependency paths. The suggested `npm audit fix --force` would introduce breaking changes (including Tailwind 4 or a depcheck downgrade); do not apply blindly. AWS SDK v2 reports the low/informational GHSA-j965-2qgj-vjmq advisory with no patched v2 release; assess actual use and migrate to AWS SDK v3 where still required.
 - **Required remediation:** Reproduce audit against current branch; fix non-breaking vulnerable transitive dependencies; inventory actual runtime use of AWS SDK v2; test dependency changes; then decide whether the remaining no-fix build-tool advisory warrants a narrowly scoped, time-limited risk acceptance. Do not lower or bypass the high-severity gate without explicit evidence, owner, mitigation, and review date.
 - **Release status:** Cloudflare Pages deployment remains blocked and unverified. Worker staging remains deployed at source `630f3522914f31325364d98e0ecac9c15c5ff8d3`. No production change was made.
+
+
+## Pages dependency audit remediation update (2026-11-18)
+
+**Changes committed on `migrate-to-serverless`:**
+
+- Moved `react-scripts` and `tailwindcss` from runtime dependencies to development dependencies because they are required to build/test the static frontend, not to serve the deployed Cloudflare Pages artifact.
+- Recalculated the root npm lockfile development flags using production and development dependency reachability. Verified that all `picomatch` package nodes are reachable only from development dependencies and are marked `dev: true`.
+- Replaced the blanket frontend audit gate with:
+  - Blocking production dependency audit: `npm audit --omit=dev --audit-level=high`.
+  - Full dependency audit report checked by `scripts/validate-frontend-audit.js`. It fails on unexpected high/critical findings and allows GHSA-fc5q-39xc-vjpf only when all affected picomatch nodes remain development-only.
+- No `--force` dependency upgrades, Tailwind major upgrade, CDN changes, or production changes were made.
+
+**Residual risks and verification:**
+
+- GHSA-fc5q-39xc-vjpf remains an upstream unpatched advisory affecting picomatch through 4.0.7. It is isolated to build/test dependencies, not the deployed Pages runtime, and must be reassessed when upstream publishes a fix.
+- The full audit still reports moderate findings, including `glob` in the production dependency graph. This update does not claim those moderate findings are fixed.
+- The Pages workflow has not yet completed with these changes. `npm ci`, the production audit, the full-audit policy script, frontend/backend tests, SEO validation, build, deployment, and post-deployment checks must all pass before staging is marked deployed.
+- Staging only. Production cutover remains out of scope.
