@@ -1,6 +1,6 @@
 # Security Remediation Tracker
 
-**Last reviewed:** 2026-11-11  
+**Last reviewed:** 2026-11-18  
 **Branch:** `migrate-to-serverless`  
 **Status:** Working remediation register. This is not a fresh penetration test or security certification.
 
@@ -13,7 +13,7 @@ Track each finding from reproducible evidence through a code/configuration fix, 
 | Priority | Area | Required action and closure evidence | Status |
 |---|---|---|---|
 | Critical gate | Firebase Realtime Database | Verify deployed RTDB rules and project IAM. Test unauthenticated access, non-member reads/writes, blocked/unmatched users, stale membership and cross-user notification access. Keep direct browser realtime sync disabled until negative tests pass. | Open, external console evidence required |
-| High | Authentication and authorization | Run two-user and admin/ordinary-user IDOR, role escalation, token expiry/revocation and resource ownership tests against staging. | Regression coverage exists; staging evidence pending |
+| High | Email verification enforcement | Enforce verified-email policy server-side for password-authenticated accounts while preserving the registration profile-bootstrap endpoint, phone OTP accounts, trusted federated sign-in and super-admin access. Add negative tests for every protected route and positive tests for permitted onboarding flows. | Open, route-wide policy and tests required |\n| High | Authentication and authorization | Run two-user and admin/ordinary-user IDOR, role escalation, token expiry/revocation and resource ownership tests against staging. | Regression coverage exists; staging evidence pending |
 | High | Payment callbacks | Verify provider signature, order/amount/currency binding, replay/idempotency, duplicate callbacks, failed checkout recovery and entitlement revocation with provider sandbox evidence. | Partial, provider acceptance pending |
 | High | Media access | Validate upload/read/delete ownership and support attachment access through the existing CDN proxy. Do not modify the CDN Worker under this tracker. | Staging acceptance pending |
 | High | Moderation | Verify report, block, unmatch, ticket-message edit/delete permissions, admin audit history and abuse/rate-limit enforcement. | Implementation and role-specific acceptance require confirmation |
@@ -82,3 +82,13 @@ Findings and operational statements remain open until a named owner supplies rep
 
 
 - **Follow-up correction:** Cache-Control max-age parsing was corrected and a zero-second TTL regression case was added. Corrective source commit: af12cabaf88e3e3cd968f9f76ff4a20e417308d8. Latest regression-test commit: 51647abc6ec5116dbbbb67723e1a08b0f46a3c5c. Tests remain unexecuted.
+
+
+## Email verification enforcement review (2026-11-18)
+
+- **Finding:** Firebase ID tokens are cryptographically verified, but the Worker does not consistently enforce `email_verified` at the API boundary. `/api/auth/verify` reports the claim, while other protected handlers generally authenticate the token without applying a verified-email policy.
+- **Observed frontend flow:** `src/pages/Login.js` blocks unverified email/password login in the browser, but the Google and phone OTP flows do not apply the same client-side check. `src/pages/Register.js` creates the Firebase account, writes the initial profile through `PUT /api/users/me`, sends the verification email, and signs out. Therefore, a blanket Worker-level rejection would break the existing registration bootstrap flow.
+- **Required policy before implementation:** Enforce verification on normal application actions for password-provider accounts; retain a narrowly scoped exception for the initial profile bootstrap and verification-status route; do not reject phone-authenticated users merely because they have no verified email claim; verify the trusted federated-provider claim semantics; and preserve the dedicated super-admin custom-token flow. Avoid trusting client-supplied role or verification fields.
+- **Required tests:** Unverified password token denied on discover, swipe, matches, chat, support, purchases and other normal application routes; unverified password token permitted only for the minimum profile bootstrap operations; verified password and federated users allowed; phone-authenticated users remain supported; super-admin remains limited to admin authorization; missing or malformed provider claims fail safely.
+- **Evidence:** Worker source blob `7bd723fa2796adda3fb694ea26232fdcf662e8b8`; Firebase token verifier blob `281aa0522fd15beda6fc17c5f733b5d01744211e`; frontend Login blob `3075541a6f476c5ce91452ebcf2a51783280265b`; Register blob `5179f4216d139f995431789dfcba02354b476fad`.
+- **Status:** Open. No policy change has been deployed. Implement only after route inventory and existing test coverage are mapped, then verify with staging negative and positive tests.
