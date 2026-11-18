@@ -545,8 +545,8 @@ export class RateLimiter {
       return current;
     };
     // RATE_LIMITER is a SQLite-backed Durable Object. Its transaction callback
-    // operates on this.state.storage directly; the legacy txn argument is not
-    // the storage interface for SQLite-backed classes.
+    // operates on this.state.storage directly; do not depend on the legacy txn
+    // argument, which is not the storage interface for SQLite-backed classes.
     const current = typeof this.state.storage.transaction === "function"
       ? await this.state.storage.transaction(increment)
       : await increment();
