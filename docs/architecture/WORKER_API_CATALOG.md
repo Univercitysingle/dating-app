@@ -28,13 +28,14 @@ Do not treat this classification as a substitute for checking each handler's cur
 | GET | `/api/auth/test` | Public diagnostic | Non-sensitive route diagnostic |
 | POST | `/api/auth/logout` | Firebase-authenticated | Logout/session endpoint |
 | GET | `/api/auth/verify` | Firebase-authenticated | Verify token and return safe identity claims |
-| GET | `/api/geolocation` | Public/conditional | Geolocation helper; confirm privacy and provider behaviour before use |
+| GET | `/api/geolocation` | Firebase-authenticated | Coarse Cloudflare network location only; does not return visitor IP or IP-derived coordinates |
 
 ## Profile, discovery, matching and notifications
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| GET, PUT | `/api/users/me` | Firebase-authenticated | Read/update current profile |\n| GET, PUT, DELETE | `/api/users/me/desires` | Firebase-authenticated, adult account, explicit opt-in for writes | Read, save or withdraw private relationship-intention, desire, curiosity and boundary preferences |
+| GET, PUT | `/api/users/me` | Firebase-authenticated | Read/update current profile |
+| GET, PUT, DELETE | `/api/users/me/desires` | Firebase-authenticated, adult account, explicit opt-in for writes | Read, save or withdraw private relationship-intention, desire, curiosity and boundary preferences |
 | GET, PUT, DELETE | `/api/users/me/location` | Firebase-authenticated, adult account; explicit browser permission for GPS writes | Read location-sharing status, update private GPS location, or revoke location sharing |
 | GET | `/api/users/:uid` | Firebase-authenticated | Read public profile with allowlisted fields |
 | GET | `/api/users/discover` | Firebase-authenticated | Discovery feed and filters |
