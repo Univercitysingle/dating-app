@@ -46,7 +46,9 @@ describe('PartnerLinkPanel', () => {
     apiClient.post.mockResolvedValue({ status: 'pending' });
     render(<PartnerLinkPanel targetUid="member-target" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Invite to partner link' }));
+    const inviteButton = await screen.findByRole('button', { name: 'Invite to partner link' });
+    await waitFor(() => expect(inviteButton).toBeEnabled());
+    fireEvent.click(inviteButton);
 
     await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/users/me/partner-link', {
       targetUid: 'member-target'
