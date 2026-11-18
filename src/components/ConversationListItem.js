@@ -15,11 +15,11 @@ const ConversationListItem = ({ conversation }) => {
   const workerFallbackUrl = resolveWorkerPhotoUrl(photoValue);
 
   return (
-    <Link to={`/chat/${conversation.roomId}`} className={`conversation-row flex items-center gap-3 p-4 transition-colors ${hasUnread ? "is-unread" : ""}`} aria-label={`${otherUser.name || 'Conversation'}${hasUnread ? `, ${unreadCount} unread messages` : ''}`}>
+    <Link to={`/chat/${conversation.roomId}`} className={`conversation-row flex items-center gap-3 p-4 transition-colors ${hasUnread ? "bg-rose-50/70 ring-1 ring-inset ring-rose-100 is-unread" : ""}`} aria-label={`${otherUser.name || 'Conversation'}${hasUnread ? `, ${unreadCount} unread messages` : ''}`}>
       <img
         src={avatarUrl}
         alt={otherUser?.name || 'Profile photo'}
-        className={`conversation-avatar h-14 w-14 flex-shrink-0 rounded-full object-cover ${hasUnread ? "is-unread" : ""}`}
+        className={`conversation-avatar h-14 w-14 flex-shrink-0 rounded-full object-cover ${hasUnread ? "ring-2 ring-rose-400 ring-offset-2 is-unread" : ""}`}
         onError={(event) => {
           const image = event.currentTarget;
           if (workerFallbackUrl && image.src !== workerFallbackUrl) {
