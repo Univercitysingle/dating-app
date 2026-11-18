@@ -19,7 +19,7 @@ Track each finding from reproducible evidence through a code/configuration fix, 
 | High | Moderation | Verify report, block, unmatch, ticket-message edit/delete permissions, admin audit history and abuse/rate-limit enforcement. | Implementation and role-specific acceptance require confirmation |
 | High | Verification evidence | Verify encryption-key availability without revealing its value, reviewer-only access, audit trail, expiry, deletion, backup retention and consent withdrawal. | Operational/privacy review pending |
 | Medium | WebRTC/TURN | Verify ExpressTURN primary and Turnix fallback credentials, actual relay candidate selection, credential expiry, network fallback and abuse controls on real devices. | Unit tests present; live relay evidence pending |
-| Medium | Secrets and CI/CD | Review GitHub Actions and Cloudflare secret scopes, prevent secret exposure in logs/build artifacts, and restore CI capacity before claiming latest-source validation. | Actions quota reported exhausted |
+| Medium | Secrets and CI/CD | Review GitHub Actions and Cloudflare secret scopes, prevent secret exposure in logs/build artifacts, and retain exact-SHA deployment evidence. | Latest Pages and Worker staging workflows succeeded on 2026-11-18; production workflow and production environment remain unconfigured |
 | Medium | Monitoring | Confirm alerting for Worker errors, Durable Object failures, MongoDB pressure, Firebase denials, payment callbacks, media proxy and TURN usage. | Provider-console evidence pending |
 | Medium | Capacity | Load-test realistic auth, discovery, chat, media and calls; record latency, error rates, dependency saturation and cost. | 1,000 concurrent users remains an unverified target |
 
@@ -34,7 +34,7 @@ Track each finding from reproducible evidence through a code/configuration fix, 
 
 ## Current CI and source caveat (2026-11-11)
 
-The project operator reports that GitHub Actions quota is exhausted. This prevents a fresh workflow run from being treated as available evidence. Re-run the repository's approved tests, dependency/security checks and staging acceptance once capacity is restored. The VAPT report dated 2026-11-05 remains a historical snapshot and must not be represented as a new assessment.
+Historical note: Actions capacity was previously reported exhausted. It was available for the successful Pages run [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) and Worker run [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558) on 2026-11-18. These are staging validations, not production acceptance. The VAPT report dated 2026-11-05 remains a historical snapshot and must not be represented as a new assessment.
 
 ## Closure template
 
@@ -163,3 +163,14 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Audit interpretation:** Both production high-severity gates passed. The two moderate advisories above remain reported and are not fixed by the current deployment. The existing development-only `picomatch` high-severity exception remains separately scoped and must be revisited when upstream publishes a fix.
 - **Dependabot visibility:** The exact open Dependabot alert inventory was not accessible through the connected GitHub interface. The npm audit output above is verified workflow evidence, not a claim that every GitHub Dependabot alert has been closed.
 - **Scope:** No changes to `main`, production, Worker staging, the existing CDN Worker or payment-provider configuration.
+
+
+## Latest Worker staging deployment and production release gate (2026-11-18)
+
+- **Worker run:** [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), source commit `f4fd891027c8b486f5f8609e9e7db1051988d56c`, completed successfully.
+- **Worker checks passed:** dependency installation and high-severity production audit; Worker tests; Turnix credential issuance; staging deployment; runtime secret configuration; liveness and readiness/MongoDB checks; anonymous rejection for authentication, support, migrated chat, status/admin reports, purchases and refunds; legacy route inventory; passive OWASP ZAP baseline.
+- **Worker scan observation:** ZAP reported no new FAIL findings. It reported one warning for non-storable content, including the API `/sitemap.xml` path returning 404. Review whether this API path is expected to exist; the frontend sitemap is separately verified.
+- **Pages run:** [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520), same application source commit, completed successfully. It passed dependency gates, frontend/backend tests, SEO checks, build, staging deployment, asset/API-routing checks and passive ZAP. ZAP reported warnings for cache-control, external script inclusion, timestamp disclosure, SRI and COEP observations, with no new FAIL findings.
+- **Dependency status:** Both root and backend full audits still report six moderate findings each for `glob` and nested `minimatch`. The high findings are subject to the documented development-only `picomatch` exception. This is not a zero-vulnerability result. Firebase Admin remains pinned at `14.5.0` pending a tested lockfile update.
+- **Production gate:** Current Pages workflow explicitly selects and enforces the `dating-app-staging` Pages project. `wrangler.jsonc` defines a staging environment but no production environment. No production deployment workflow is present in the active branch. Do not promote or claim production readiness until a production target, secrets/bindings, rollback plan and release acceptance are configured and verified.
+- **Governance gate:** Branch protection and required status checks are disabled for `migrate-to-serverless`. The open PR #31 is draft and GitHub reports it as not mergeable. Do not merge it or modify `main` as part of this remediation.
