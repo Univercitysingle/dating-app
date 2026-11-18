@@ -3460,3 +3460,22 @@ test("admin support ticket updates validate priority and category before databas
   assert.equal(invalidCategory.status, 400);
   assert.equal(emptyUpdate.status, 400);
 });
+
+
+test("superadmin profile retains contact fields while regular profiles hide them", async () => {
+  const superadmin = {
+    _id: "superadmin-id", uid: "superadmin-uid", role: "superadmin",
+    email: "admin@example.com", mobileNumber: "+971501234567"
+  };
+  const users = { findOne: async () => ({ ...superadmin }) };
+  const subscriptions = { findOne: async () => null };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({
+    db: () => ({ collection: name => name === "users" ? users : subscriptions })
+  });
+
+  const result = await connection.getCurrentUserProfile("superadmin-uid");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.email, "admin@example.com");
+  assert.equal(result.body.mobileNumber, "+971501234567");
+});
