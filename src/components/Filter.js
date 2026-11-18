@@ -7,6 +7,8 @@ const DEFAULTS = {
   maxDistance: 100,
   lookingFor: '',
   sexualOrientation: '',
+  city: '',
+  country: '',
   preference: 'everyone',
 };
 
@@ -28,6 +30,8 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [maxDistance, setMaxDistance] = useState(initialFilters.maxDistance ?? DEFAULTS.maxDistance);
   const [lookingFor, setLookingFor] = useState(initialFilters.lookingFor || DEFAULTS.lookingFor);
   const [sexualOrientation, setSexualOrientation] = useState(initialFilters.sexualOrientation || DEFAULTS.sexualOrientation);
+  const [city, setCity] = useState(initialFilters.city || DEFAULTS.city);
+  const [country, setCountry] = useState(initialFilters.country || DEFAULTS.country);
   const [preference, setPreference] = useState(initialFilters.preference || DEFAULTS.preference);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locationStale, setLocationStale] = useState(false);
@@ -98,6 +102,8 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     setMaxDistance(DEFAULTS.maxDistance);
     setLookingFor(DEFAULTS.lookingFor);
     setSexualOrientation(DEFAULTS.sexualOrientation);
+    setCity(DEFAULTS.city);
+    setCountry(DEFAULTS.country);
     setPreference(DEFAULTS.preference);
   };
 
@@ -109,6 +115,8 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
       ...(locationEnabled && !locationStale ? { maxDistance: Number(maxDistance) } : {}),
       lookingFor,
       preference,
+      ...(city.trim() ? { city: city.trim() } : {}),
+      ...(country.trim() ? { country: country.trim() } : {}),
     };
     if (lookingFor === 'Casual (FWB)' && sexualOrientation) {
       filters.sexualOrientation = sexualOrientation;
@@ -131,6 +139,8 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     locationEnabled && maxDistance !== DEFAULTS.maxDistance,
     Boolean(lookingFor),
     Boolean(sexualOrientation),
+    Boolean(city.trim()),
+    Boolean(country.trim()),
     preference !== DEFAULTS.preference,
   ].filter(Boolean).length;
 
@@ -203,6 +213,24 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
               </div>
               <div className="filter-range-scale"><span>1 km</span><span>100 km</span></div>
             </div>
+          </section>
+
+          <section className="filter-section" aria-labelledby="location-search-title">
+            <div className="filter-section-heading">
+              <h3 id="location-search-title">Explore a place</h3>
+              <span>City or country</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="filter-field">
+                <label htmlFor="discovery-city" className="filter-label">City</label>
+                <input id="discovery-city" type="text" value={city} maxLength={100} onChange={event => setCity(event.target.value)} placeholder="Any city" className="filter-select" autoComplete="off" />
+              </div>
+              <div className="filter-field">
+                <label htmlFor="discovery-country" className="filter-label">Country</label>
+                <input id="discovery-country" type="text" value={country} maxLength={100} onChange={event => setCountry(event.target.value)} placeholder="Any country" className="filter-select" autoComplete="off" />
+              </div>
+            </div>
+            <p className="filter-hint">These filters use the city and country listed on profiles. GPS distance filtering is separate and optional.</p>
           </section>
 
           <section className="filter-section" aria-labelledby="intent-title">
