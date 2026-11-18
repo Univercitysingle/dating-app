@@ -502,6 +502,21 @@ export async function enforceAccountRateLimit(env, scope, uid, limit, windowMs, 
   }
 }
 
+export function enforceCallIceRateLimit(env, claims, scope = "call-ice-config") {
+  const uid = typeof claims?.sub === "string" ? claims.sub : "";
+  if (!uid) return json({ error: "Unauthorized" }, 401);
+  // Credential fetches are bounded independently from signalling and call polling.
+  // This allows normal call setup/retries without globally throttling the call UX.
+  return enforceAccountRateLimit(
+    env,
+    scope,
+    uid,
+    20,
+    60 * 1000,
+    "Too many call connection requests. Please wait before trying again."
+  );
+}
+
 export class RateLimiter {
   constructor(state) { this.state = state; }
 
@@ -2295,6 +2310,8 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const callLimit = await enforceCallIceRateLimit(env, claims, "call-ice-config");
+        if (callLimit) return callLimit;
         if ((env.EXPRESSTURN_USERNAME && env.EXPRESSTURN_PASSWORD) || env.TURNIX_API_TOKEN) {
           let turnix = null;
           if (env.TURNIX_API_TOKEN) {
@@ -2344,6 +2361,8 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const callLimit = await enforceCallIceRateLimit(env, claims, "video-room-ice-config");
+        if (callLimit) return callLimit;
         const connection = env.MONGODB_CONNECTION?.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
         if (!connection) return json({ error: "Video Rooms service unavailable" }, 503);
         const accessResponse = await connection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
