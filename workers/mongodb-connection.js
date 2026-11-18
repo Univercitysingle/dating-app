@@ -3300,6 +3300,120 @@ export class MongoDBConnection {
     }
   }
 
+  async managePartnerLink(uid, action, payload = {}) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        !["list", "invite", "accept", "decline", "revoke"].includes(action) ||
+        !payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return { status: 400, body: { error: "Invalid partner-link request" } };
+    }
+
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const links = db.collection("partnerLinks");
+      await links.createIndex({ memberUids: 1 }, {
+        unique: true,
+        partialFilterExpression: { activeKey: { $exists: true } },
+        name: "one_active_partner_link_per_member"
+      });
+      if (action === "list") {
+        const items = await links.find({ memberUids: uid })
+          .sort({ updatedAt: -1, createdAt: -1 }).limit(20).toArray();
+        return { status: 200, body: { links: items.map(item => ({
+          id: String(item._id),
+          status: item.status,
+          inviterUid: item.inviterUid,
+          inviteeUid: item.inviteeUid,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          acceptedAt: item.acceptedAt || null,
+          revokedAt: item.revokedAt || null
+        })) } };
+      }
+
+      const now = new Date();
+      if (action === "invite") {
+        const targetUid = payload.targetUid;
+        if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 || targetUid === uid) {
+          return { status: 400, body: { error: "Choose another valid member to invite." } };
+        }
+        const users = db.collection("users");
+        const [inviter, invitee] = await Promise.all([
+          users.findOne({ uid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }),
+          users.findOne({ uid: targetUid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } })
+        ]);
+        if (!inviter || !invitee) return { status: 404, body: { error: "Member not found." } };
+        if (isAccountRestricted(inviter) || isAccountRestricted(invitee)) {
+          return { status: 403, body: { error: "Both members must have eligible accounts." } };
+        }
+        const isAdult = user => {
+          const birthday = user.birthday ? new Date(user.birthday) : null;
+          if (!birthday || Number.isNaN(birthday.getTime())) return false;
+          let age = now.getFullYear() - birthday.getFullYear();
+          if (now.getMonth() < birthday.getMonth() ||
+              (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+          return age >= 18;
+        };
+        if (!isAdult(inviter) || !isAdult(invitee)) {
+          return { status: 403, body: { error: "Partner linking is available only to verified adults aged 18 or older." } };
+        }
+        if (inviter.relationshipPreferences?.boundaries?.includes("no_partner_linking") ||
+            invitee.relationshipPreferences?.boundaries?.includes("no_partner_linking")) {
+          return { status: 403, body: { error: "Partner linking is unavailable because a member has disabled partner-link requests." } };
+        }
+        const linkKey = JSON.stringify([uid, targetUid].sort());
+        const existing = await links.findOne({ memberUids: { $in: [uid, targetUid] }, activeKey: { $exists: true } });
+        if (existing) {
+          return { status: 409, body: { error: "One of these members already has a pending or active partner link." } };
+        }
+        const document = {
+          activeKey: linkKey,
+          memberUids: [uid, targetUid],
+          inviterUid: uid,
+          inviteeUid: targetUid,
+          status: "pending",
+          createdAt: now,
+          updatedAt: now
+        };
+        try {
+          const inserted = await links.insertOne(document);
+          return { status: 201, body: { id: String(inserted.insertedId), status: "pending", inviteeUid: targetUid } };
+        } catch (error) {
+          if (error?.code === 11000) return { status: 409, body: { error: "One of these members already has a pending or active partner link." } };
+          throw error;
+        }
+      }
+
+      const linkId = payload.linkId;
+      if (typeof linkId !== "string" || !/^[a-f0-9]{24}$/i.test(linkId)) {
+        return { status: 400, body: { error: "A valid partner-link ID is required." } };
+      }
+      const { ObjectId } = await import("mongodb");
+      const link = await links.findOne({ _id: new ObjectId(linkId), memberUids: uid });
+      if (!link) return { status: 404, body: { error: "Partner link not found." } };
+      if (action === "accept" || action === "decline") {
+        if (link.inviteeUid !== uid) return { status: 403, body: { error: "Only the invited member can respond to this request." } };
+        if (link.status !== "pending") return { status: 409, body: { error: "This partner-link request is no longer pending." } };
+        const update = action === "accept"
+          ? { $set: { status: "accepted", acceptedAt: now, updatedAt: now } }
+          : { $set: { status: "declined", declinedAt: now, updatedAt: now }, $unset: { activeKey: "" } };
+        const result = await links.updateOne({ _id: link._id, inviteeUid: uid, status: "pending" }, update);
+        if (!result.modifiedCount) return { status: 409, body: { error: "This partner-link request has already changed." } };
+        return { status: 200, body: { id: linkId, status: action === "accept" ? "accepted" : "declined" } };
+      }
+      if (!["pending", "accepted"].includes(link.status)) {
+        return { status: 409, body: { error: "This partner link is no longer active." } };
+      }
+      const result = await links.updateOne(
+        { _id: link._id, memberUids: uid, status: link.status },
+        { $set: { status: "revoked", revokedByUid: uid, revokedAt: now, updatedAt: now }, $unset: { activeKey: "" } }
+      );
+      if (!result.modifiedCount) return { status: 409, body: { error: "This partner link has already changed." } };
+      return { status: 200, body: { id: linkId, status: "revoked", revoked: true } };
+    } catch {
+      return { status: 503, body: { error: "Partner-link service is unavailable." } };
+    }
+  }
+
   async getUserProfile(targetUid, viewerUid) {
     if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
         typeof viewerUid !== "string" || !viewerUid || viewerUid.length > 128) {
