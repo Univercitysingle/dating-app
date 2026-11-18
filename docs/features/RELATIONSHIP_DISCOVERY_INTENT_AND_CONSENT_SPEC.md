@@ -1,7 +1,7 @@
 # Relationship Discovery, Intent and Consent Specification
 
 **Last reviewed:** 2026-11-18  
-**Status:** Proposed product design. No implementation is implied by this document.  
+**Status:** Product design baseline with partial implementation. Source presence is not release acceptance; see the implementation and release-gate status below.  
 **Product direction:** A unified dating platform combining fast swipe discovery, intentional conversation controls, and inclusive relationship/identity exploration.
 
 ## 1. Product proposition
@@ -272,3 +272,19 @@ Travel-mode preferences and location-aware compatibility scoring are not yet imp
 ## 2026-11-18 Travel-aware discovery controls
 
 Discover filters offer four location modes: **Anywhere / international**, **Near my current location**, **Explore a specific city**, and **Explore a specific country**. Nearby mode requires member-initiated GPS consent and a fresh location; destination modes match only city/country fields members have listed on their profiles, and do not request GPS. Anywhere mode sends no location restriction. City/country input is required for the corresponding mode, capped at 100 characters, and server-side regex escaping prevents metacharacter injection. These are discovery-session filters only: the app does not persist or publish travel destinations, infer travel plans, or track movement in the background.
+
+
+## 10. Implementation status and release gates (2026-11-18)
+
+The following baseline exists on `migrate-to-serverless` at commit `23fe494112f57870878221f9ba7da9ba2a29eac5`:
+
+- The authenticated Desires & Discovery panel is integrated into the owner's profile only.
+- Relationship intent, relationship styles, desires, curiosities and boundaries are stored as owner-private preferences. Saving requires explicit consent; deletion withdraws consent and removes the saved preferences.
+- The Worker exposes authenticated GET/PUT/DELETE routes for the owner's preferences. Writes are rate-limited when the configured limiter is available.
+- Server-side validation enforces the supported catalogue, selection limits and adult-account eligibility.
+- Public profile serialization excludes the private relationship-preference object. Preferences are not currently used to rank or filter other members.
+- Browser GPS sharing is opt-in, can be revoked, expires for nearby filtering after 24 hours, and must not expose exact coordinates in profile responses.
+
+**Not release-ready:** mutual intent compatibility ranking, per-field public visibility, compatibility explanations, linked partner profiles, group discovery and multi-account consent acceptance. Do not expose or use private desires, curiosities or boundaries in another member's discovery response until a separate explicit visibility model, mutual eligibility checks, consent revocation behaviour and privacy regression tests are implemented.
+
+**Next implementation sequence:** (1) define and persist per-field visibility separately from private preferences, defaulting every sensitive field to private; (2) expose only explicitly public fields through a narrowly scoped public-profile serializer; (3) add mutual intent compatibility as a ranking signal after hard eligibility gates; (4) add explainability and multi-account tests; (5) verify staging before enabling the feature. No exact GPS coordinate or sensitive preference may be returned in discovery cards.
