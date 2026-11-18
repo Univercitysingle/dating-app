@@ -30,13 +30,14 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [sexualOrientation, setSexualOrientation] = useState(initialFilters.sexualOrientation || DEFAULTS.sexualOrientation);
   const [preference, setPreference] = useState(initialFilters.preference || DEFAULTS.preference);
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationStale, setLocationStale] = useState(false);
   const [locationBusy, setLocationBusy] = useState(false);
   const [locationMessage, setLocationMessage] = useState('');
 
   useEffect(() => {
     let active = true;
     apiClient.get('/users/me/location').then(status => {
-      if (active) setLocationEnabled(status?.enabled === true);
+      if (active) { setLocationEnabled(status?.enabled === true); setLocationStale(status?.stale === true); }
     }).catch(() => {
       if (active) setLocationEnabled(false);
     });
@@ -58,6 +59,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
           accuracyMeters: position.coords.accuracy
         });
         setLocationEnabled(true);
+        setLocationStale(false);
         setLocationMessage('Your current location is enabled for distance-based discovery. It is never shown as a pin or exact address.');
       } catch (error) {
         setLocationMessage(error?.data?.error || error?.message || 'Your location could not be saved.');
@@ -81,6 +83,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     try {
       await apiClient.delete('/users/me/location');
       setLocationEnabled(false);
+      setLocationStale(false);
       setLocationMessage('Location sharing is off. Distance filtering is disabled.');
     } catch (error) {
       setLocationMessage(error?.data?.error || error?.message || 'Location sharing could not be disabled.');
@@ -100,6 +103,10 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
 
   const handleApply = (event) => {
     event.preventDefault();
+    if (locationEnabled && locationStale) {
+      setLocationMessage('Your saved location is more than 24 hours old. Refresh it before using distance filters.');
+      return;
+    }
     const filters = {
       minAge,
       maxAge,
@@ -196,6 +203,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
                 </div>
                 {locationMessage && <p className="text-xs text-neutral-600" role="status">{locationMessage}</p>}
                 {!locationEnabled && <p className="text-xs text-amber-700">Enable location to apply this distance filter. Without it, discovery will not use GPS distance.</p>}
+                {locationStale && <p className="text-xs text-amber-700">Your last GPS update is older than 24 hours. Refresh it before applying distance filters.</p>}
               </div>
               <div className="filter-range-scale"><span>1 km</span><span>100 km</span></div>
             </div>
