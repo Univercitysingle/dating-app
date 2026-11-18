@@ -125,3 +125,16 @@ The documentation catalogue is not a substitute for live verification. Before ea
 ## Cloudflare Pages deployment blocker (2026-11-18)
 
 The retry of Pages workflow run [42995531214](https://github.com/Univercitysingle/dating-app/actions/runs/42995531214) failed at the frontend dependency security gate before tests, build, or deployment. It checked out commit `41860e09010a477144c95c6b05135cf84e498d28`; the current branch has since advanced through documentation-only commits, and the package manifest/lockfile were not changed by those commits. The audit reported 75 findings (1 low, 6 moderate, 68 high). The high-severity findings are repeated dependency paths to `picomatch`, which is pulled into the build/test toolchain through packages including `react-scripts`, Tailwind, and file-watching/globbing utilities. GitHub advisory [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) reports affected picomatch versions through 4.0.7 and currently provides no patched version. Do not force-upgrade Tailwind 3 to Tailwind 4 or downgrade other packages simply to make the audit pass. The audit also reports moderate `glob`/`minimatch` paths and the low/informational AWS SDK v2 region-validation advisory [GHSA-j965-2qgj-vjmq](https://github.com/advisories/GHSA-j965-2qgj-vjmq). Resolve the fixable transitive findings, assess whether legacy AWS SDK v2 is still used, and document any narrowly scoped no-fix exception with an owner and review date before changing the release gate. Pages has not deployed this revision.
+
+
+### Pages dependency audit remediation update (2026-11-18)
+
+The frontend package classification and Pages audit gate have been corrected without forcing major-version upgrades:
+
+- `react-scripts` and `tailwindcss` are build-time tools and are now declared as development dependencies.
+- The root lockfile's dependency flags were recalculated from the production and development dependency graphs. Both installed `picomatch` copies are now explicitly marked development-only.
+- Pages now runs a blocking audit against shipped production dependencies using `npm audit --omit=dev --audit-level=high`.
+- The complete dependency tree is still audited. `scripts/validate-frontend-audit.js` fails on any high/critical finding other than GHSA-fc5q-39xc-vjpf, and permits that advisory only while every affected `picomatch` lockfile node remains development-only.
+- The remaining `picomatch` advisory is not patched upstream as of this update. It remains tracked for reassessment when a fixed release is published. The moderate `glob` finding in the production dependency graph is still reported by the full audit and requires follow-up.
+
+This changes the security gate's scope, not the advisory status. The frontend still must pass regression tests, SEO validation, build, and Cloudflare Pages post-deployment checks before staging is considered deployed. No production deployment is authorized by this change.
