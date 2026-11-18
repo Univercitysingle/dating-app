@@ -201,3 +201,14 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Risk:** A connected Vercel GitHub integration may create preview deployments independently of GitHub Actions workflow cleanup. This conflicts with the Cloudflare-only hosting requirement until disabled and verified.
 - **Required action:** Disable Vercel automatic deployments for this repository and disconnect the GitHub repository integration in the Vercel project/account. Verify that a subsequent commit no longer receives a Vercel status or deployment. The available repository interface cannot perform this external account-level change, so this remains an operator action.
 - **Scope:** No Vercel deployment was intentionally triggered by this remediation. No `main`, production, Cloudflare, or CDN configuration was changed by this observation.
+
+
+## GPS and relationship-discovery consent follow-up (2026-11-18)
+
+- **GPS consent timestamp:** Location refresh now preserves the original `locationSharing.consentAt`; `updatedAt` continues to record coordinate freshness. This prevents routine refreshes from rewriting the original opt-in time.
+- **Frontend acceptance coverage:** Added a regression test requiring a stale location to be explicitly refreshed before nearby filters can be applied.
+- **Relationship preference withdrawal:** Added a regression test confirming withdrawal unsets the complete sensitive `relationshipPreferences` document.
+- **Source commit:** `1b1ba5d35b4b38b7584f3ed7ef8f110c4552691a`.
+- **Worker test commit:** `f77305650f1d19414f5786fd2b62c7a26168b3ab`.
+- **Frontend test commit:** `a1c9354ce1511f380d5b11a0e8d50207ffb5fa67`.
+- **Evidence status:** Source and regression tests are committed on `migrate-to-serverless`. Automated execution and Cloudflare staging deployment for these exact revisions are not yet verified. Keep the items open until Worker/frontend suites pass and the deployed SHA is confirmed. No CDN Worker or production configuration was changed.
