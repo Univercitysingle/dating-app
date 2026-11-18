@@ -25,7 +25,7 @@ const vulnerabilities = Object.values(report.vulnerabilities || {});
 const blocking = vulnerabilities.filter((item) => ['high', 'critical'].includes(item.severity));
 const allowedAdvisory = 'GHSA-fc5q-39xc-vjpf';
 const packageEntries = Object.entries(lock.packages || {});
-const picomatchEntries = packageEntries.filter(([path]) => /(^|\\/)node_modules\\/picomatch$/.test(path));
+const picomatchEntries = packageEntries.filter(([path]) => path === 'node_modules/picomatch' || path.endsWith('/node_modules/picomatch'));
 
 if (picomatchEntries.length === 0) {
   console.error('Expected picomatch entries were not found in package-lock.json.');
