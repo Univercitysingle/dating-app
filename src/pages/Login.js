@@ -440,15 +440,11 @@ function Login({ initialSignUp = false }) {
             <div>
               {isSignUp ? 'Already have an account?' : 'New user?'}{' '}
               <button
-                className="text-indigo-400 hover:text-indigo-300 hover:underline"
-                onClick={() => {
-                  setError('');
-                  setSuccessMessage('');
-                  setIsSignUp((s) => !s);
-                }}
+                className="login-create-account-link"
+                onClick={() => navigate('/register')}
                 disabled={isLoading}
               >
-                {isSignUp ? 'Login' : 'Sign Up'}
+                Create an account
               </button>
             </div>
           )}
