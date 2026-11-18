@@ -124,3 +124,8 @@ For each manual deployment, append an entry to the release record containing: so
 - Worker workflow [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558): successful, same source revision.
 - Automated tests, build, deployment and post-deployment checks passed as described in the remediation tracker. Passive ZAP produced warnings but no new FAIL findings.
 - Production remains out of scope for these staging workflows. No production Pages project/domain, production Worker environment, production secret inventory or production rollback evidence is established by these runs.
+
+
+## Deployment source integrity (2026-11-18)
+
+Both Cloudflare staging workflows now check out `${{ github.sha }}` rather than resolving the mutable branch name at job execution time. Each workflow verifies `git rev-parse HEAD` equals `GITHUB_SHA` before dependency installation or deployment. A mismatch stops the release. This prevents a queued deployment from silently deploying a later branch head than the commit that triggered and was reviewed for that workflow run.
