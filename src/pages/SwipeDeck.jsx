@@ -156,12 +156,25 @@ const SwipeDeck = () => {
       preference: user.preference || restored.preference || 'everyone',
     };
     setActiveFilters(filters);
-    // Legacy saved filters may contain maxDistance from before GPS consent was
-    // introduced. Keep the value in the filter UI, but do not send it until the
-    // member explicitly enables and refreshes their current location.
-    const initialRequestFilters = { ...filters };
-    delete initialRequestFilters.maxDistance;
-    fetchUsersToSwipe(initialRequestFilters);
+    // Restore a previously selected nearby radius only when the server confirms
+    // that location sharing is still enabled and the GPS fix is fresh. This keeps
+    // the preference useful across reloads without trusting stale browser storage.
+    const loadInitialProfiles = async () => {
+      let locationStatus = null;
+      if (filters.travelMode === 'nearby' && filters.maxDistance !== undefined) {
+        try {
+          locationStatus = await apiClient.get('/users/me/location');
+        } catch (locationError) {
+          console.warn('Could not verify saved GPS consent. Loading without distance filtering.', locationError);
+        }
+      }
+      const initialRequestFilters = { ...filters };
+      if (locationStatus?.enabled !== true || locationStatus?.stale === true) {
+        delete initialRequestFilters.maxDistance;
+      }
+      fetchUsersToSwipe(initialRequestFilters);
+    };
+    loadInitialProfiles();
   }, [fetchUsersToSwipe, user?.uid, user?.preference]);
 
   useEffect(() => {
