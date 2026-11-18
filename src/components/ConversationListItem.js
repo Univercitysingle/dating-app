@@ -9,16 +9,17 @@ const ConversationListItem = ({ conversation }) => {
   const unreadCountValue = Number(conversation?.unreadCount);
   const unreadCount = Number.isFinite(unreadCountValue) ? Math.max(0, unreadCountValue) : 0;
   const hasUnread = unreadCount > 0;
-  const photoValue = otherUser.photos?.[0]?.url;
+  const firstPhoto = otherUser.photos?.[0];
+  const photoValue = typeof firstPhoto === 'string' ? firstPhoto : firstPhoto?.url;
   const avatarUrl = resolvePhotoUrl(photoValue);
   const workerFallbackUrl = resolveWorkerPhotoUrl(photoValue);
 
   return (
-    <Link to={`/chat/${conversation.roomId}`} className={`conversation-row flex items-center gap-3 p-4 transition-colors ${hasUnread ? "bg-rose-50/70 ring-1 ring-inset ring-rose-100" : ""}`} aria-label={`${otherUser.name || 'Conversation'}${hasUnread ? `, ${unreadCount} unread messages` : ''}`}>
+    <Link to={`/chat/${conversation.roomId}`} className={`conversation-row flex items-center gap-3 p-4 transition-colors ${hasUnread ? "is-unread" : ""}`} aria-label={`${otherUser.name || 'Conversation'}${hasUnread ? `, ${unreadCount} unread messages` : ''}`}>
       <img
         src={avatarUrl}
         alt={otherUser?.name || 'Profile photo'}
-        className={`conversation-avatar h-14 w-14 flex-shrink-0 rounded-full object-cover ${hasUnread ? "ring-2 ring-rose-400 ring-offset-2" : ""}`}
+        className={`conversation-avatar h-14 w-14 flex-shrink-0 rounded-full object-cover ${hasUnread ? "is-unread" : ""}`}
         onError={(event) => {
           const image = event.currentTarget;
           if (workerFallbackUrl && image.src !== workerFallbackUrl) {
