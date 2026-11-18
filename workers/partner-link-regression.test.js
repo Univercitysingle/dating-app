@@ -82,3 +82,62 @@ test("partner-link cooldown starts at revocation rather than the original invita
   assert.equal(result.status, 429);
   assert.equal(inserted, false);
 });
+
+
+test("partner-link list marks invitations as incoming only for the invitee", async () => {
+  const now = new Date();
+  const record = {
+    _id: "partner-link-record",
+    memberUids: ["partner-a", "partner-b"],
+    inviterUid: "partner-a",
+    inviteeUid: "partner-b",
+    status: "pending",
+    createdAt: now,
+    updatedAt: now
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection: () => ({
+      find: query => ({
+        sort: () => ({
+          limit: () => ({
+            toArray: async () => query.memberUids === "partner-b" ? [record] : []
+          })
+        })
+      })
+    })
+  });
+
+  const incoming = await connection.managePartnerLink("partner-b", "list");
+  const outgoing = await connection.managePartnerLink("partner-a", "list");
+  assert.equal(incoming.status, 200);
+  assert.equal(incoming.body.links[0].isIncoming, true);
+  assert.deepEqual(outgoing.body.links, []);
+});
+
+test("only the invited member can accept a pending partner link", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId();
+  const record = {
+    _id: id,
+    memberUids: ["partner-a", "partner-b"],
+    inviterUid: "partner-a",
+    inviteeUid: "partner-b",
+    status: "pending"
+  };
+  let writes = 0;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection: () => ({
+      createIndex: async () => "index",
+      findOne: async () => record,
+      updateOne: async () => { writes++; return { modifiedCount: 1 }; }
+    })
+  });
+
+  const result = await connection.managePartnerLink("partner-a", "accept", { linkId: String(id) });
+  assert.equal(result.status, 403);
+  assert.equal(writes, 0);
+});
