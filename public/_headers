@@ -10,12 +10,12 @@
   Cross-Origin-Opener-Policy: same-origin-allow-popups
 
 /login
-  Cache-Control: private, no-store, max-age=0
   X-Robots-Tag: noindex, nofollow, noarchive
+  Cache-Control: private, no-store, max-age=0
 
 /register
-  Cache-Control: private, no-store, max-age=0
   X-Robots-Tag: noindex, nofollow, noarchive
+  Cache-Control: private, no-store, max-age=0
 
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
