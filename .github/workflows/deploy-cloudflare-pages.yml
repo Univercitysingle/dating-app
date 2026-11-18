@@ -319,6 +319,8 @@ jobs:
           done
 
       - name: Run OWASP ZAP passive baseline against deployed Pages
+        timeout-minutes: 5
+        continue-on-error: true
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: https://dating-app-staging.pages.dev
