@@ -36,3 +36,19 @@ Use the status vocabulary above rigorously. The latest call-quality code include
 Every requirement, metric, journey and finding must map to an implementation reference, test, staging evidence, owner, status, last verified commit, and release decision. Do not infer feature adoption, reliability, security, or capacity from source code or analytics instrumentation alone. Define metric event names, properties, privacy classification, sampling, retention, denominator, exclusion rules, and dashboard ownership before using metrics for decisions.
 
 Keep the following open until supported by evidence: complete API contract and authorization matrix; MongoDB schema/index/TTL and migration inventory; Firebase RTDB rules and push subscription/delivery/revocation tests; backup/restore exercises with RPO/RTO; payment replay/reconciliation/refund/stale-pending tests; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; browser/device/PWA/offline/notification coverage; keyboard/screen-reader/contrast/form accessibility; localization, timezone and RTL readiness.
+
+
+
+## Intent-first dating requirements (2026-11-18)
+
+The product shall combine fast swipe discovery, intentional conversation initiation and flexible relationship exploration through one eligibility, consent and safety model. Detailed specification: [Relationship Discovery, Intent and Consent](../features/RELATIONSHIP_DISCOVERY_INTENT_AND_CONSENT_SPEC.md).
+
+- Optional profile identity, relationship-intention, interest and desire fields must have clear definitions and user-controlled visibility. Sensitive fields must never be required for basic membership or exposed through public profile APIs by default.
+- Discovery must apply mutual eligibility, age, visibility, block, account-status and group-consent gates before ranking. Ranking cannot override safety or consent.
+- First-move rules must be configurable and non-gender-stereotyped. Pings and notes must respect recipient settings, moderation, rate limits and blocks.
+- Linked profiles require independent accounts and explicit acceptance by every participant. Group matches require each member's explicit acceptance. Revocation must propagate to discovery, chat, calls and media.
+- Private photos require owner-approved, revocable grants. Exact location and verification evidence must never appear in public profiles. Do not promise screenshot prevention.
+- The platform is 18+ and must complete jurisdiction-specific legal and app-store review before enabling sensitive catalogues or media features in a launch market.
+- Baseline safety, reporting, blocking, unmatching, consent revocation, account deletion and privacy controls remain free. Sensitive data must not be sold or used for ad targeting.
+
+These are proposed requirements, not claims of implementation. Every capability requires source references, tests, staging evidence and privacy/security review before status can be upgraded.
