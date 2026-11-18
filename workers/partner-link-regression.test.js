@@ -183,3 +183,38 @@ test("either linked member can revoke an active partner link and the active rese
   assert.deepEqual(updateDocument.$unset, { activeKey: "" });
 });
 
+test("duplicate partner-link invitations are rejected without inserting another record", async () => {
+  const now = new Date();
+  const adult = uid => ({
+    uid,
+    birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()),
+    accountStatus: "active",
+    relationshipPreferences: { boundaries: [] },
+    blocked: []
+  });
+  const existing = {
+    memberUids: ["partner-a", "partner-b"],
+    inviterUid: "partner-b",
+    inviteeUid: "partner-a",
+    status: "pending",
+    activeKey: JSON.stringify(["partner-a", "partner-b"])
+  };
+  let inserts = 0;
+  const links = {
+    createIndex: async () => "index",
+    findOne: async query => query.activeKey?.$exists ? existing : null,
+    insertOne: async () => { inserts++; return { insertedId: "unexpected" }; }
+  };
+  const users = [adult("partner-a"), adult("partner-b")];
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => name === "users"
+    ? { findOne: async ({ uid }) => users.find(user => user.uid === uid) || null }
+    : links
+  });
+
+  const result = await connection.managePartnerLink("partner-a", "invite", { targetUid: "partner-b" });
+  assert.equal(result.status, 409);
+  assert.equal(inserts, 0);
+});
+
