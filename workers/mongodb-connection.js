@@ -1545,7 +1545,8 @@ export class MongoDBConnection {
             const haversine = Math.sin(latitudeDelta / 2) ** 2 +
               Math.cos(radians(viewerLatitude)) * Math.cos(radians(candidateLatitude)) *
               Math.sin(longitudeDelta / 2) ** 2;
-            const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+            const boundedHaversine = Math.min(1, Math.max(0, haversine));
+            const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(boundedHaversine), Math.sqrt(1 - boundedHaversine));
             safeProfile.distanceBand = distanceKm < 5 ? "Within 5 km"
               : distanceKm < 15 ? "5 to 15 km"
                 : distanceKm < 30 ? "15 to 30 km"
