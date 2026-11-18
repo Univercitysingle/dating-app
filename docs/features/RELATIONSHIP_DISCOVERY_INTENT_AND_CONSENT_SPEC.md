@@ -288,3 +288,27 @@ The following baseline exists on `migrate-to-serverless` at commit `23fe494112f5
 **Not release-ready:** mutual intent compatibility ranking, per-field public visibility, compatibility explanations, linked partner profiles, group discovery and multi-account consent acceptance. Do not expose or use private desires, curiosities or boundaries in another member's discovery response until a separate explicit visibility model, mutual eligibility checks, consent revocation behaviour and privacy regression tests are implemented.
 
 **Next implementation sequence:** (1) define and persist per-field visibility separately from private preferences, defaulting every sensitive field to private; (2) expose only explicitly public fields through a narrowly scoped public-profile serializer; (3) add mutual intent compatibility as a ranking signal after hard eligibility gates; (4) add explainability and multi-account tests; (5) verify staging before enabling the feature. No exact GPS coordinate or sensitive preference may be returned in discovery cards.
+
+
+## 11. Partner-link API foundation status (2026-11-18)
+
+The first two-person partner-link lifecycle is implemented on the migration branch as an API foundation. It is not yet a complete user-facing feature and must not be marketed as available until the UI, notifications and staging acceptance gates below pass.
+
+- Authenticated endpoint: `/api/users/me/partner-link`.
+- `GET` lists the caller's latest partner-link records.
+- `POST` sends an invitation using `targetUid`.
+- `PATCH` supports `accept`, `decline` and `revoke` actions using a link ID.
+- Both accounts must exist, be eligible and have a valid adult birthday. A request is blocked if either member has blocked the other or either has selected the `no_partner_linking` boundary.
+- The invited member alone can accept or decline. Either participant can revoke a pending or accepted link.
+- A unique MongoDB multikey index enforces one pending or accepted link per member. Revocation and decline release the active membership key.
+- Invitation creation is rate-limited to five per account per day. Declined or revoked pairs have a 30-day re-invitation cooldown.
+- Partner-link records are stored separately from user profile documents. No partner association is added to public profile output.
+- Existing private desires, curiosities and boundaries are not returned by this API.
+
+### Release gates still open
+
+1. Build the account settings UI for invitation, pending request, acceptance, decline and revoke, with clear consent copy.
+2. Add notifications for invitation lifecycle events without leaking relationship data into push previews by default.
+3. Add integration tests for concurrent invitations, duplicate requests, blocked pairs in both directions, underage or restricted accounts, cooldown expiry, and database index migration behaviour.
+4. Verify that revocation removes any linked-profile visibility and future group actions. No shared profile, chat access, media access or group discovery is enabled by this API.
+5. Run multi-account staging acceptance tests before enabling the feature for international users.
