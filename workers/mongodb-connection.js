@@ -1518,10 +1518,41 @@ export class MongoDBConnection {
       const usersByUid = new Map(candidateUsers.map(user => [user.uid, user]));
       const superLikedBy = new Set(superLikeMatches.map(match => match.user1Uid));
       const result = [];
+      const viewerRelationshipPreferences = currentUser.relationshipPreferences;
+      const publicRelationshipDiscovery = preferences => {
+        if (!preferences || preferences.consent !== true) return {};
+        const visibility = preferences.visibility || {};
+        const exposed = {};
+        for (const field of ["relationshipIntent", "relationshipStyles"]) {
+          if (visibility[field] !== "public" || !Array.isArray(preferences[field])) continue;
+          const values = [...new Set(preferences[field]
+            .filter(value => typeof value === "string")
+            .map(value => value.trim().toLowerCase())
+            .filter(Boolean))];
+          if (values.length) exposed[field] = values;
+        }
+        return exposed;
+      };
+      const viewerPublicRelationshipDiscovery = publicRelationshipDiscovery(viewerRelationshipPreferences);
+      const relationshipCompatibilityScore = candidate => {
+        let score = 0;
+        const candidatePublic = publicRelationshipDiscovery(candidate.relationshipPreferences);
+        for (const field of ["relationshipIntent", "relationshipStyles"]) {
+          const viewerValues = viewerPublicRelationshipDiscovery[field] || [];
+          const candidateValues = candidatePublic[field] || [];
+          if (!viewerValues.length || !candidateValues.length) continue;
+          const overlap = candidateValues.filter(value => viewerValues.includes(value)).length;
+          if (overlap) score += Math.min(20, overlap * 10);
+        }
+        return score;
+      };
       for (const candidateUid of orderedUids) {
         const user = usersByUid.get(candidateUid);
         if (!user) continue;
         const profile = { ...user };
+        const relationshipDiscovery = publicRelationshipDiscovery(user.relationshipPreferences);
+        if (Object.keys(relationshipDiscovery).length) profile.relationshipDiscovery = relationshipDiscovery;
+        else delete profile.relationshipDiscovery;
         delete profile.password;
         delete profile.lastLoginIp;
         if (profile._id !== undefined) profile.id = String(profile._id);
@@ -1562,9 +1593,22 @@ export class MongoDBConnection {
                   : distanceKm < 50 ? "30 to 50 km" : "50+ km";
           }
         }
-        result.push(safeProfile);
+        result.push({
+          profile: safeProfile,
+          compatibilityScore: relationshipCompatibilityScore(user),
+          boosted: Boolean(user.boostExpiresAt && new Date(user.boostExpiresAt) > new Date()),
+          originalOrder: result.length
+        });
       }
-      return { status: 200, body: result };
+      // Compatibility is a soft ranking signal only. Existing paid boosts keep
+      // their precedence, and all eligibility, consent, visibility and safety
+      // filters have already been applied by the server-side discovery query.
+      result.sort((a, b) =>
+        Number(b.boosted) - Number(a.boosted) ||
+        b.compatibilityScore - a.compatibilityScore ||
+        a.originalOrder - b.originalOrder
+      );
+      return { status: 200, body: result.map(item => item.profile) };
     } catch (error) {
       console.error("MongoDB discovery query failed", {
         phase,
