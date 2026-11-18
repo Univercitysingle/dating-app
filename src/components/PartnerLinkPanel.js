@@ -66,7 +66,7 @@ export default function PartnerLinkPanel({ targetUid = null }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="font-semibold text-neutral-900 dark:text-white">Partner link</h3>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Invite this person to connect partner profiles. Nothing is linked unless they accept.</p>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Invite this person to establish a partner link. No profile details are shared unless a separate feature explicitly allows it.</p>
           </div>
           <button type="button" onClick={invite} disabled={sending} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
             {sending ? 'Sending…' : 'Invite to partner link'}
@@ -80,7 +80,7 @@ export default function PartnerLinkPanel({ targetUid = null }) {
     <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900" aria-labelledby="partner-link-title">
       <div className="mb-3">
         <h3 id="partner-link-title" className="font-semibold text-neutral-900 dark:text-white">Partner links</h3>
-        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Review invitations and manage connections. Either member can revoke an active link at any time.</p>
+        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Review invitations and manage partner-link status. Either member can revoke an active link at any time. A link does not merge profiles or expose private preferences.</p>
       </div>
       {loading ? <p className="text-sm text-neutral-500">Loading partner links…</p> : links.length === 0 ? (
         <p className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">You do not have any partner-link invitations or connections.</p>
