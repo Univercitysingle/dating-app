@@ -283,13 +283,17 @@ function escapeHtml(value) {
 }
 
 function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") {
-  if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
+  if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL || !env.WEBXPAY_CHECKOUT_URL) {
     throw new Error("WebXPay payment configuration is incomplete");
   }
   const publicKey = createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
   const frontend = new URL(env.FRONTEND_URL);
   if (frontend.protocol !== "https:" && frontend.hostname !== "localhost") {
     throw new Error("FRONTEND_URL must use HTTPS");
+  }
+  const checkoutUrl = new URL(env.WEBXPAY_CHECKOUT_URL);
+  if (checkoutUrl.protocol !== "https:" || checkoutUrl.username || checkoutUrl.password || checkoutUrl.hash) {
+    throw new Error("WEBXPAY_CHECKOUT_URL must be a valid HTTPS checkout endpoint");
   }
   const returnUrl = new URL(returnPath, frontend);
   returnUrl.searchParams.set("purchaseId", order.orderId);
@@ -319,14 +323,14 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
   ).join("\n");
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Redirecting to secure payment</title></head><body>' +
     '<p>Redirecting to WebXPay securely…</p>' +
-    '<form action="https://stagingxpay.info/index.php?route=checkout/billing" id="webxpay-form" data-order-id="' + escapeHtml(order.orderId) + '" method="post">' +
+    '<form action="' + escapeHtml(checkoutUrl.toString()) + '" id="webxpay-form" data-order-id="' + escapeHtml(order.orderId) + '" method="post">' +
     inputs + '</form><script nonce="' + nonce + '">document.getElementById("webxpay-form").submit();</script></body></html>';
   return new Response(html, {
     status: 200,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      "content-security-policy": "default-src 'none'; form-action https://stagingxpay.info; script-src 'nonce-" + nonce + "'; base-uri 'none'; frame-ancestors 'none'",
+      "content-security-policy": "default-src 'none'; form-action " + checkoutUrl.origin + "; script-src 'nonce-" + nonce + "'; base-uri 'none'; frame-ancestors 'none'",
       "x-content-type-options": "nosniff",
       "cross-origin-resource-policy": "same-origin"
     }
