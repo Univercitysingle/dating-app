@@ -245,7 +245,7 @@ The first location slice uses browser geolocation only after the member selects 
 - The existing users.location 2dsphere index is reused. No new collection or CDN change is required.
 - Public profile serialization does not return GPS coordinates. The legacy /api/geolocation helper now returns only coarse Cloudflare network location fields and no longer returns the visitor IP or IP-derived coordinates.
 
-This is a foreground, user-triggered location refresh, not continuous background tracking. Browser permission and device location availability remain under the member's control. Exact coordinates remain private; no map pin, address, or exact distance is exposed. The first release uses GPS for distance eligibility/filtering only. Approximate distance bands, travel-mode/commute preferences, city search, country/region fallback and privacy-preserving compatibility ranking remain follow-up work.
+This is a foreground, user-triggered location refresh, not continuous background tracking. Browser permission and device location availability remain under the member's control. Exact coordinates remain private; no map pin, address, or exact distance is exposed. The first release uses GPS for distance eligibility/filtering and returns only coarse distance bands on discovery cards (for example, within 5 km or 15 to 30 km). Exact distances and coordinates are never returned. Travel-mode/commute preferences, city search, country/region fallback and privacy-preserving compatibility ranking remain follow-up work.
 
 ### Location safety requirements
 
