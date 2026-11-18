@@ -3087,7 +3087,7 @@ export class MongoDBConnection {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const user = await users.findOne(
         { uid },
-        { projection: { location: 1, birthday: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }
+        { projection: { location: 1, locationSharing: 1, birthday: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }
       );
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
@@ -3110,7 +3110,11 @@ export class MongoDBConnection {
             enabled: true,
             source: "browser_geolocation",
             accuracyMeters,
-            consentAt: updatedAt,
+            // Keep the original opt-in timestamp across GPS refreshes. The
+            // updatedAt field records freshness; consentAt records consent.
+            consentAt: user.locationSharing?.enabled === true && user.locationSharing.consentAt
+              ? user.locationSharing.consentAt
+              : updatedAt,
             updatedAt
           }
         }
