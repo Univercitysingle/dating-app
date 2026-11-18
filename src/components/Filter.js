@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import apiClient from '../api/apiClient';
 
 const DEFAULTS = {
   minAge: 18,
@@ -28,6 +29,65 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [lookingFor, setLookingFor] = useState(initialFilters.lookingFor || DEFAULTS.lookingFor);
   const [sexualOrientation, setSexualOrientation] = useState(initialFilters.sexualOrientation || DEFAULTS.sexualOrientation);
   const [preference, setPreference] = useState(initialFilters.preference || DEFAULTS.preference);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    apiClient.get('/users/me/location').then(status => {
+      if (active) setLocationEnabled(status?.enabled === true);
+    }).catch(() => {
+      if (active) setLocationEnabled(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const enableLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage('This browser does not support GPS location.');
+      return;
+    }
+    setLocationBusy(true);
+    setLocationMessage('');
+    navigator.geolocation.getCurrentPosition(async position => {
+      try {
+        await apiClient.put('/users/me/location', {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracyMeters: position.coords.accuracy
+        });
+        setLocationEnabled(true);
+        setLocationMessage('Your current location is enabled for distance-based discovery. It is never shown as a pin or exact address.');
+      } catch (error) {
+        setLocationMessage(error?.data?.error || error?.message || 'Your location could not be saved.');
+      } finally {
+        setLocationBusy(false);
+      }
+    }, error => {
+      const messages = {
+        1: 'Location permission was denied. You can enable it in your browser settings.',
+        2: 'Your current location is unavailable. Try again when GPS is available.',
+        3: 'Location request timed out. Please try again.'
+      };
+      setLocationMessage(messages[error.code] || 'Could not read your current location.');
+      setLocationBusy(false);
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  };
+
+  const disableLocation = async () => {
+    setLocationBusy(true);
+    setLocationMessage('');
+    try {
+      await apiClient.delete('/users/me/location');
+      setLocationEnabled(false);
+      setLocationMessage('Location sharing is off. Distance filtering is disabled.');
+    } catch (error) {
+      setLocationMessage(error?.data?.error || error?.message || 'Location sharing could not be disabled.');
+    } finally {
+      setLocationBusy(false);
+    }
+  };
 
   const resetFilters = () => {
     setMinAge(DEFAULTS.minAge);
@@ -43,7 +103,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     const filters = {
       minAge,
       maxAge,
-      maxDistance: Number(maxDistance),
+      ...(locationEnabled ? { maxDistance: Number(maxDistance) } : {}),
       lookingFor,
       preference,
     };
@@ -65,7 +125,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
 
   const activeCount = [
     minAge !== DEFAULTS.minAge || maxAge !== DEFAULTS.maxAge,
-    maxDistance !== DEFAULTS.maxDistance,
+    locationEnabled && maxDistance !== DEFAULTS.maxDistance,
     Boolean(lookingFor),
     Boolean(sexualOrientation),
     preference !== DEFAULTS.preference,
@@ -126,6 +186,17 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
                 <output>Up to {maxDistance} km</output>
               </div>
               <input id="max-distance" aria-label="Maximum distance" type="range" min="1" max="100" value={maxDistance} onChange={(event) => setMaxDistance(Number(event.target.value))} />
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-neutral-500">Use your device's GPS to filter by distance. Your exact coordinates are stored privately and are not displayed to other members.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={enableLocation} disabled={locationBusy} className="rounded-full border border-primary px-4 py-2 text-sm font-medium text-primary disabled:opacity-50">
+                    {locationBusy ? 'Updating location...' : locationEnabled ? 'Refresh my location' : 'Use my current location'}
+                  </button>
+                  {locationEnabled && <button type="button" onClick={disableLocation} disabled={locationBusy} className="rounded-full border border-neutral-300 px-4 py-2 text-sm disabled:opacity-50">Turn off</button>}
+                </div>
+                {locationMessage && <p className="text-xs text-neutral-600" role="status">{locationMessage}</p>}
+                {!locationEnabled && <p className="text-xs text-amber-700">Enable location to apply this distance filter. Without it, discovery will not use GPS distance.</p>}
+              </div>
               <div className="filter-range-scale"><span>1 km</span><span>100 km</span></div>
             </div>
           </section>
