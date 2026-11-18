@@ -2,7 +2,7 @@
 
 A dating platform for profiles, discovery, matching, conversations, real-time communication, verification, monetisation, trust and safety, and administration.
 
-**Documentation last updated:** 2026-11-11  
+**Documentation last updated:** 2026-11-18  
 **Active migration branch:** migrate-to-serverless
 
 > Documentation describes scope and observed implementation. Planned or documented functionality is not automatically implemented, tested or production-ready.
@@ -66,6 +66,14 @@ One-to-one voice and video calls share the responsive call interface. The curren
 **Latest call-quality source revision:** `bf5c435553c6f18cc5a80e5b14df68e1c69249ca` on `migrate-to-serverless`.
 
 **Deployment status:** GitHub Actions quota is exhausted according to the project operator. The Cloudflare Pages workflow for this revision did not complete successfully, and the latest call-quality changes are not confirmed deployed. Do not infer live availability from the committed source. Build, browser, two-device, TURN-relay and measured data-usage validation remain outstanding until Actions capacity is restored or an approved manual validation path is used.
+
+## Latest deployment verification (2026-11-18)
+
+- Latest reviewed authentication source changes are committed on `migrate-to-serverless`; the latest known documentation commit is `aea09399`.
+- The staging Pages, API Worker and existing CDN hostnames could not be resolved from the verification environment. This is an inconclusive network/DNS check, not proof that the services are offline.
+- No successful Cloudflare deployment record or live deployed revision was verified for the latest source changes.
+- Worker and frontend automated tests have not been executed in this environment. Committed tests are not evidence of a passing test run.
+- Do not mark the latest source changes as deployed. Once network access is available, verify the Pages deployment SHA, Worker version/deployment SHA, `/health` response and authenticated smoke-test journeys before proceeding to production.
 
 ## Staging
 - Frontend: https://dating-app-staging.pages.dev
