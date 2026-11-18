@@ -210,5 +210,5 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Relationship preference withdrawal:** Added a regression test confirming withdrawal unsets the complete sensitive `relationshipPreferences` document.
 - **Source commit:** `1b1ba5d35b4b38b7584f3ed7ef8f110c4552691a`.
 - **Worker test commit:** `f77305650f1d19414f5786fd2b62c7a26168b3ab`.
-- **Frontend test commit:** `a1c9354ce1511f380d5b11a0e8d50207ffb5fa67`.
+- **Frontend test commit:** `f0a19818f3739a91dca5427d69b204e91ac4f7dc`.
 - **Evidence status:** Source and regression tests are committed on `migrate-to-serverless`. Automated execution and Cloudflare staging deployment for these exact revisions are not yet verified. Keep the items open until Worker/frontend suites pass and the deployed SHA is confirmed. No CDN Worker or production configuration was changed.
