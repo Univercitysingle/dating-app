@@ -255,3 +255,16 @@ This is a foreground, user-triggered location refresh, not continuous background
 - Revoke must immediately remove GPS coordinates from the active profile record and disable distance-based discovery.
 - Treat location as sensitive personal data and include it in account export/deletion and retention reviews.
 - Before international rollout, review location consent copy, retention and data-protection requirements for each launch jurisdiction.
+
+## 2026-11-18 Location Intelligence phase
+
+Coarse profile-location filtering is now implemented independently of GPS consent:
+
+- Discover filters accept optional city and country values, using case-insensitive literal substring matching against profile location metadata.
+- These fields can be used without GPS sharing and do not change or retrieve the member's precise location.
+- Search input is bounded to 100 characters and regex metacharacters are escaped so user input is treated literally.
+- City and country filters combine with existing age, gender preference, relationship intent and other discovery filters.
+- Discovery UI exposes city and country inputs and persists them through the existing per-user filter preference mechanism.
+- The distance filter remains opt-in and only uses fresh, consented GPS data; coarse city/country search does not imply GPS permission.
+
+Travel-mode preferences and location-aware compatibility scoring are not yet implemented. Any future proximity ranking must be transparent, optional, and avoid exposing exact distance or coordinates.
