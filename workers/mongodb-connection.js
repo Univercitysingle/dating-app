@@ -2979,9 +2979,13 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
       const sharing = user.locationSharing || {};
+      const updatedAt = sharing.updatedAt ? new Date(sharing.updatedAt) : null;
+      const stale = !updatedAt || Number.isNaN(updatedAt.getTime()) ||
+        Date.now() - updatedAt.getTime() > 24 * 60 * 60 * 1000;
       return { status: 200, body: {
         enabled: sharing.enabled === true,
-        updatedAt: sharing.updatedAt || null,
+        stale: sharing.enabled === true && stale,
+        updatedAt: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : null,
         accuracyMeters: Number.isFinite(sharing.accuracyMeters) ? sharing.accuracyMeters : null
       } };
     } catch {
