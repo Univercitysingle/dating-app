@@ -69,11 +69,14 @@ One-to-one voice and video calls share the responsive call interface. The curren
 
 ## Latest deployment verification (2026-11-18)
 
-- Latest reviewed authentication source changes are committed on `migrate-to-serverless`; the latest known documentation commit is `aea09399`.
-- The staging Pages, API Worker and existing CDN hostnames could not be resolved from the verification environment. This is an inconclusive network/DNS check, not proof that the services are offline.
-- No successful Cloudflare deployment record or live deployed revision was verified for the latest source changes.
-- Worker and frontend automated tests have not been executed in this environment. Committed tests are not evidence of a passing test run.
-- Do not mark the latest source changes as deployed. Once network access is available, verify the Pages deployment SHA, Worker version/deployment SHA, `/health` response and authenticated smoke-test journeys before proceeding to production.
+- Active branch: `migrate-to-serverless`; current branch HEAD at verification: `6f7a118526d42b876e01c09a030c808859e30dcd`.
+- **Cloudflare Worker staging:** deployment workflow run [44252947736](https://github.com/Univercitysingle/dating-app/actions/runs/44252947736) completed successfully on source revision `51647abc6ec5116dbbbb67723e1a08b0f46a3c5c`. Its job completed Worker tests, deployed the isolated staging Worker, configured the required staging secrets, passed `/health` and `/ready` checks, verified unauthenticated access is rejected on protected auth/support/chat/admin routes, checked the legacy route inventory, and completed the OWASP ZAP passive baseline. This is verified workflow evidence for that Worker revision, not a fresh live probe from this environment.
+- **Cloudflare Pages staging:** no successful Pages deployment was found for the current branch HEAD. The latest Pages workflow runs visible in the repository history are failures from 2026-11-11 that did not allocate a runner (job runner ID 0, no steps). The last successful Pages deployment visible in the run history is older, from 2026-11-10. The frontend revision currently served by staging is therefore unverified.
+- **External Vercel check:** GitHub reports a failed Vercel status check on HEAD `6f7a118`. Vercel is not an approved deployment target for this project. This is a repository integration/status check, not evidence of a Cloudflare deployment. Remove or disable the Vercel GitHub integration/status publisher in repository or Vercel settings; do not use Vercel to deploy.
+- Live requests to the staging Pages, API Worker and existing CDN hostnames failed DNS resolution from this verification environment. This is inconclusive and does not establish that the services are offline.
+- Do not mark the frontend as deployed or production-ready. The Worker staging deployment is verified by its successful workflow run, but frontend deployment and end-to-end browser journeys remain unverified.
+- GitHub Actions deployment workflows are still present in the branch. If Actions quota remains exhausted, use an authorized manual Cloudflare deployment path after validating the Pages and Worker builds. Do not use any non-Cloudflare host. No direct Cloudflare dashboard/API deployment was performed in this verification.
+- Before release, verify the Pages deployment SHA, Worker version/deployment SHA, `/health`, `/ready`, authenticated smoke-test journeys, media CDN integration, and rollback readiness. Production cutover requires separate approval.
 
 ## Staging
 - Frontend: https://dating-app-staging.pages.dev
