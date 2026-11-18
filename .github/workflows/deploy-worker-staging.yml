@@ -5,6 +5,7 @@ on:
     branches:
       - migrate-to-serverless
     paths:
+      - ".github/workflows/deploy-worker-staging.yml"
       - "workers/**"
       - "package.json"
       - "package-lock.json"
