@@ -1,13 +1,13 @@
 # Deployment and Rollback Runbook
-Last reviewed: 2026-11-11. This applies to migration-branch staging, not production cutover.
+Last reviewed: 2026-11-18. This applies to migration-branch staging, not production cutover.
 
 Pre-deploy: confirm `migrate-to-serverless`; review the exact diff; preserve secrets and the existing CDN Worker; run frontend, backend, and Worker tests; verify bindings without printing values; confirm MongoDB readiness and migration compatibility.
 
 **Current release path:** The approved GitHub Actions workflows are available and have successfully deployed the latest application source to the dedicated Cloudflare staging Worker and Pages project on 2026-11-18. Use those staging workflows as the primary release path. The direct Wrangler procedure below is a documented fallback only. Do not push deployment-triggering changes to `main`.
 
-## GitHub Actions quota exhausted
+## GitHub Actions deployment status
 
-The project operator reported exhausted GitHub Actions quota on 2026-11-11. When quota is exhausted, do not repeatedly dispatch workflows or describe a commit as deployed. Keep changes on `migrate-to-serverless`, document the exact source SHA, and mark deployment/acceptance as blocked or pending. Do not modify `main` or bypass the Cloudflare-only deployment boundary.
+GitHub Actions quota exhaustion was reported on 2026-11-11 and is retained here as historical context. The latest verified paired staging deployments completed successfully on 2026-11-18. Do not infer that a later branch head is deployed merely because an earlier workflow passed. Keep changes on `migrate-to-serverless`, record the exact source SHA, and verify the actual deployment revision before acceptance. Do not modify `main` or bypass the Cloudflare-only deployment boundary.
 
 The latest paired successful staging deployments are Pages run [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) and Worker run [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), both for application source `f4fd891027c8b486f5f8609e9e7db1051988d56c`. Their automated checks are recorded in `docs/security/REMEDIATION_TRACKER.md`. Real authenticated user journeys, payment-provider settlement, real-device WebRTC and load acceptance remain outstanding.
 
@@ -129,3 +129,11 @@ For each manual deployment, append an entry to the release record containing: so
 ## Deployment source integrity (2026-11-18)
 
 Both Cloudflare staging workflows now check out `${{ github.sha }}` rather than resolving the mutable branch name at job execution time. Each workflow verifies `git rev-parse HEAD` equals `GITHUB_SHA` before dependency installation or deployment. A mismatch stops the release. This prevents a queued deployment from silently deploying a later branch head than the commit that triggered and was reviewed for that workflow run.
+
+
+## Branch and deployment alignment review (2026-11-18)
+
+- Current PR #31 head at review: `75ad9be983bc65c7dbf424e02835dac3df2178fe` on `migrate-to-serverless`. PR #31 remains open and draft, targets `main`, and GitHub reports `mergeable: false`. Do not merge it or modify `main` as part of staging work.
+- Latest paired successful staging evidence currently recorded: Pages run [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) and Worker run [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), both deploying application source `f4fd891027c8b486f5f8609e9e7db1051988d56c`. This is not the current PR head. Treat the newer branch head as not yet deployment-verified until a successful deployment records its exact SHA.
+- Confirmed current Cloudflare staging workflow files: `.github/workflows/deploy-cloudflare-pages.yml` and `.github/workflows/deploy-worker-staging.yml`. Both are scoped to `migrate-to-serverless`. Legacy Cloud Run, Vercel and Hugging Face workflow files checked during this review were absent from the branch.
+- `wrangler.jsonc` defines the staging environment only. No production Worker environment is configured in that file. Keep production cutover blocked pending the production Pages project/domain, Worker hostname, production secrets and bindings, MongoDB/Firebase configuration, payment-provider live endpoint and credentials, rollback/recovery evidence, and explicit release approval.
