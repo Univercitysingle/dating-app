@@ -120,3 +120,8 @@ The documentation catalogue is not a substitute for live verification. Before ea
 - [Active Worker API catalogue](./docs/architecture/WORKER_API_CATALOG.md)
 - [Active Worker MongoDB collection catalogue](./docs/architecture/WORKER_DATABASE_CATALOG.md)
 
+
+
+## Cloudflare Pages deployment blocker (2026-11-18)
+
+The retry of Pages workflow run [42995531214](https://github.com/Univercitysingle/dating-app/actions/runs/42995531214) failed at the frontend dependency security gate before tests, build, or deployment. It checked out commit `41860e09010a477144c95c6b05135cf84e498d28`; the current branch has since advanced through documentation-only commits, and the package manifest/lockfile were not changed by those commits. The audit reported 75 findings (1 low, 6 moderate, 68 high). The high-severity findings are repeated dependency paths to `picomatch`, which is pulled into the build/test toolchain through packages including `react-scripts`, Tailwind, and file-watching/globbing utilities. GitHub advisory [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) reports affected picomatch versions through 4.0.7 and currently provides no patched version. Do not force-upgrade Tailwind 3 to Tailwind 4 or downgrade other packages simply to make the audit pass. The audit also reports moderate `glob`/`minimatch` paths and the low/informational AWS SDK v2 region-validation advisory [GHSA-j965-2qgj-vjmq](https://github.com/advisories/GHSA-j965-2qgj-vjmq). Resolve the fixable transitive findings, assess whether legacy AWS SDK v2 is still used, and document any narrowly scoped no-fix exception with an owner and review date before changing the release gate. Pages has not deployed this revision.
