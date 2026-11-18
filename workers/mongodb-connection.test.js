@@ -4811,3 +4811,39 @@ test("Discover rejects future-dated GPS timestamps before running a distance que
   assert.equal(result.status, 409);
   assert.equal(aggregateCalled, false);
 });
+
+
+test("Discover excludes candidates with future-dated GPS timestamps from distance results", async () => {
+  let capturedPipeline;
+  const currentUser = {
+    uid: "location-viewer", gender: "Male", preference: "everyone", blocked: [],
+    location: { type: "Point", coordinates: [55.27, 25.2] },
+    locationSharing: { enabled: true, updatedAt: new Date() }
+  };
+  const users = {
+    findOne: async () => currentUser,
+    createIndex: async () => "index-created",
+    aggregate: pipeline => {
+      capturedPipeline = pipeline;
+      return { toArray: async () => [] };
+    }
+  };
+  const matches = { createIndex: async () => "index-created" };
+  const db = { collection: name => {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    assert.fail("Unexpected collection: " + name);
+  } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers("location-viewer", { maxDistance: 25 });
+
+  assert.equal(result.status, 200);
+  const freshness = capturedPipeline[0].$geoNear.query["locationSharing.updatedAt"];
+  assert.ok(freshness.$gte instanceof Date);
+  assert.ok(freshness.$lte instanceof Date);
+  assert.ok(freshness.$lte.getTime() <= Date.now());
+});
