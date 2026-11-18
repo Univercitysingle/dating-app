@@ -1363,7 +1363,7 @@ export class MongoDBConnection {
       for (const key of ["city", "country"]) {
         const value = filters[key];
         if (typeof value === "string" && value.trim() && value.trim().length <= 100) {
-          const escaped = value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\          const escaped = value.trim().replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");');
+          const escaped = value.trim().split("").map(ch => "\\.^$*+?()[]{}|".includes(ch) ? "\\" + ch : ch).join("");
           baseMatchQuery["location." + key] = { $regex: escaped, $options: "i" };
         }
       }
