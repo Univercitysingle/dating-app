@@ -4526,3 +4526,27 @@ test("disabling GPS location removes coordinates while preserving approximate ci
   assert.equal("coordinates" in update.$set.location, false);
   assert.equal(update.$set.locationSharing.enabled, false);
 });
+
+test("profile APIs hide precise GPS coordinates and location consent metadata from administrators", async () => {
+  const target = {
+    uid: "gps-target", name: "Target", isProfileVisible: true, blocked: [],
+    location: { type: "Point", coordinates: [55.27, 25.2], city: "Dubai", country: "United Arab Emirates" },
+    locationSharing: { enabled: true, updatedAt: new Date() },
+    relationshipPreferences: { consent: true, desires: ["adventure"] }
+  };
+  const admin = { uid: "gps-admin", role: "superadmin", blocked: [] };
+  const db = { collection: name => {
+    assert.equal(name, "users");
+    return { findOne: async query => query.uid === "gps-target" ? target : admin };
+  } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getUserProfile("gps-target", "gps-admin");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.location.city, "Dubai");
+  assert.equal(result.body.location.coordinates, undefined);
+  assert.equal(result.body.location.type, undefined);
+  assert.equal(result.body.locationSharing, undefined);
+  assert.equal(result.body.relationshipPreferences, undefined);
+});
