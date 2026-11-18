@@ -3338,12 +3338,16 @@ export class MongoDBConnection {
         }
         const users = db.collection("users");
         const [inviter, invitee] = await Promise.all([
-          users.findOne({ uid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }),
-          users.findOne({ uid: targetUid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } })
+          users.findOne({ uid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1, blocked: 1 } }),
+          users.findOne({ uid: targetUid }, { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1, blocked: 1 } })
         ]);
         if (!inviter || !invitee) return { status: 404, body: { error: "Member not found." } };
         if (isAccountRestricted(inviter) || isAccountRestricted(invitee)) {
           return { status: 403, body: { error: "Both members must have eligible accounts." } };
+        }
+        if ((Array.isArray(inviter.blocked) && inviter.blocked.includes(targetUid)) ||
+            (Array.isArray(invitee.blocked) && invitee.blocked.includes(uid))) {
+          return { status: 404, body: { error: "Member not found." } };
         }
         const isAdult = user => {
           const birthday = user.birthday ? new Date(user.birthday) : null;
@@ -3364,6 +3368,11 @@ export class MongoDBConnection {
         const existing = await links.findOne({ memberUids: { $in: [uid, targetUid] }, activeKey: { $exists: true } });
         if (existing) {
           return { status: 409, body: { error: "One of these members already has a pending or active partner link." } };
+        }
+        const previousPair = await links.findOne({ memberUids: { $all: [uid, targetUid] } });
+        if (previousPair && ["declined", "revoked"].includes(previousPair.status) &&
+            previousPair.createdAt instanceof Date && previousPair.createdAt.getTime() > now.getTime() - 30 * 24 * 60 * 60 * 1000) {
+          return { status: 429, body: { error: "A partner-link request for this pair cannot be repeated for 30 days after decline or revocation." } };
         }
         const document = {
           activeKey: linkKey,
