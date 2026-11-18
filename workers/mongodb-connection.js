@@ -6575,6 +6575,16 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if (url.pathname === "/internal/users/me/partner-link") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          !["list", "invite", "accept", "decline", "revoke"].includes(body.action)) {
+        return json({ error: "Invalid partner-link request" }, 400);
+      }
+      const result = await this.managePartnerLink(body.claims.sub, body.action, body.payload || {});
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/users/me/desires") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string" ||
