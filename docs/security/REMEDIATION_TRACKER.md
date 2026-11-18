@@ -79,3 +79,6 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Source commit:** a426f5c13ad4bbc5170dcc957da33534bb013c7a
 - **Regression-test commit:** b26e3bbc2042ee9de9bffb9ead3cd01632ae9f02
 - **Evidence status:** Cache reuse and malformed-response tests added. Tests have not been executed in this environment. Google key rotation, timeout behaviour and cold-start performance still require staging verification. This is not a substitute for email-verification policy, token revocation checks, or Firebase RTDB rules review.
+
+
+- **Follow-up correction:** Cache-Control max-age parsing was corrected and a zero-second TTL regression case was added. Corrective source commit: af12cabaf88e3e3cd968f9f76ff4a20e417308d8. Latest regression-test commit: 51647abc6ec5116dbbbb67723e1a08b0f46a3c5c. Tests remain unexecuted.
