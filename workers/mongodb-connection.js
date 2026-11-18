@@ -3055,8 +3055,10 @@ export class MongoDBConnection {
       if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
       const sharing = user.locationSharing || {};
       const updatedAt = sharing.updatedAt ? new Date(sharing.updatedAt) : null;
+      const now = Date.now();
       const stale = !updatedAt || Number.isNaN(updatedAt.getTime()) ||
-        Date.now() - updatedAt.getTime() > 24 * 60 * 60 * 1000;
+        updatedAt.getTime() > now ||
+        now - updatedAt.getTime() > 24 * 60 * 60 * 1000;
       return { status: 200, body: {
         enabled: sharing.enabled === true,
         stale: sharing.enabled === true && stale,
