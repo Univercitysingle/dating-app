@@ -775,7 +775,8 @@ test("profile updates whitelist fields and preserve legacy response shape", asyn
   assert.equal(stored.password, undefined);
   assert.deepEqual(updateDoc.$set.socialMediaLinks, { instagram: "@ok" });
   assert.equal(result.body.id, "mongo-id");
-  assert.equal(result.body.email, "user@example.com");
+  assert.equal(result.body.email, undefined);
+  assert.equal(result.body.mobileNumber, undefined);
   assert.equal(result.body.bio, "Hello");
 });
 
