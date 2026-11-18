@@ -39,28 +39,40 @@ if (invalidPicomatchEntries.length > 0) {
   process.exit(1);
 }
 
-const unexpected = [];
-for (const item of blocking) {
-  const advisoryMatches = (item.via || []).some((via) =>
-    typeof via === 'object' && typeof via.url === 'string' && via.url.includes(allowedAdvisory)
-  );
-  const nodes = item.nodes || [];
-  const nodesAreDevelopmentOnly =
-    item.name === 'picomatch' &&
-    nodes.length > 0 &&
-    nodes.every((path) => lock.packages?.[path]?.dev === true);
+const picomatchAdvisoryPresent = (report.vulnerabilities?.picomatch?.via || []).some(
+  (via) => typeof via === 'object' && typeof via.url === 'string' && via.url.includes(allowedAdvisory)
+);
 
-  if (item.name !== 'picomatch' || !advisoryMatches || !nodesAreDevelopmentOnly) {
-    unexpected.push(item);
-  }
+function tracesOnlyToAllowedPicomatch(name, visited = new Set()) {
+  if (name === 'picomatch') return picomatchAdvisoryPresent;
+  if (visited.has(name)) return false;
+  const item = report.vulnerabilities?.[name];
+  if (!item || !Array.isArray(item.via) || item.via.length === 0) return false;
+
+  const nextVisited = new Set(visited);
+  nextVisited.add(name);
+  return item.via.every((via) => {
+    if (typeof via === 'string') return tracesOnlyToAllowedPicomatch(via, nextVisited);
+    return (
+      typeof via === 'object' &&
+      via.name === 'picomatch' &&
+      typeof via.url === 'string' &&
+      via.url.includes(allowedAdvisory)
+    );
+  });
 }
 
-if (unexpected.length > 0) {
-  console.error('Unexpected high or critical frontend dependency findings:');
-  for (const item of unexpected) {
-    console.error(` - ${item.name}: ${item.severity}; nodes: ${(item.nodes || []).join(', ')}`);
+const unexpected = [];
+for (const item of blocking) {
+  const nodes = item.nodes || [];
+  const nodesAreDevelopmentOnly =
+    nodes.length > 0 &&
+    nodes.every((path) => lock.packages?.[path]?.dev === true);
+  const hasOnlyAllowedAdvisory = tracesOnlyToAllowedPicomatch(item.name);
+
+  if (!nodesAreDevelopmentOnly || !hasOnlyAllowedAdvisory) {
+    unexpected.push(item);
   }
-  process.exit(1);
 }
 
 const counts = report.metadata?.vulnerabilities || {};
