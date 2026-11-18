@@ -281,3 +281,38 @@ test("only the invited member can decline and only a linked member can revoke", 
   assert.equal(writes, 0);
 });
 
+test("a member with an existing active partner link cannot reserve a second partner", async () => {
+  const now = new Date();
+  const adult = uid => ({
+    uid,
+    birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()),
+    accountStatus: "active",
+    relationshipPreferences: { boundaries: [] },
+    blocked: []
+  });
+  const existing = {
+    memberUids: ["partner-a", "partner-b"],
+    inviterUid: "partner-a",
+    inviteeUid: "partner-b",
+    status: "accepted",
+    activeKey: JSON.stringify(["partner-a", "partner-b"])
+  };
+  let inserts = 0;
+  const links = {
+    createIndex: async () => "index",
+    findOne: async query => query.activeKey?.$exists ? existing : null,
+    insertOne: async () => { inserts++; return { insertedId: "unexpected" }; }
+  };
+  const users = [adult("partner-a"), adult("partner-b"), adult("partner-c")];
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => name === "users"
+    ? { findOne: async ({ uid }) => users.find(user => user.uid === uid) || null }
+    : links
+  });
+
+  const result = await connection.managePartnerLink("partner-a", "invite", { targetUid: "partner-c" });
+  assert.equal(result.status, 409);
+  assert.equal(inserts, 0);
+});
+
