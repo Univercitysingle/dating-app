@@ -87,8 +87,7 @@ export default function PartnerLinkPanel({ targetUid = null }) {
       ) : (
         <ul className="space-y-3">
           {links.map(link => {
-            const incoming = link.inviteeUid && link.inviteeUid !== link.inviterUid;
-            const isIncoming = incoming && link.inviteeUid === (link.currentUid || link.viewerUid);
+            const isIncoming = link.isIncoming === true;
             const actionable = link.status === 'pending' && isIncoming;
             return (
               <li key={link.id} className="flex flex-col gap-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700 sm:flex-row sm:items-center sm:justify-between">
