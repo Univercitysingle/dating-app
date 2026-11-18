@@ -56,7 +56,7 @@ jobs:
       - name: Check out migration branch only
         uses: actions/checkout@v4
         with:
-          ref: migrate-to-serverless
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
