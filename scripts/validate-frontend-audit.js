@@ -6,8 +6,9 @@
 const fs = require('node:fs');
 
 const reportPath = process.argv[2];
+const lockfilePath = process.argv[3] || 'package-lock.json';
 if (!reportPath) {
-  console.error('Usage: node scripts/validate-frontend-audit.js <npm-audit-json>');
+  console.error('Usage: node scripts/validate-frontend-audit.js <npm-audit-json> [package-lock-path]');
   process.exit(2);
 }
 
@@ -15,7 +16,7 @@ let report;
 let lock;
 try {
   report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-  lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+  lock = JSON.parse(fs.readFileSync(lockfilePath, 'utf8'));
 } catch (error) {
   console.error(`Unable to read npm audit report or package-lock.json: ${error.message}`);
   process.exit(2);
