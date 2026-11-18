@@ -1594,7 +1594,8 @@ test("WebXPay checkout form includes the documented CMS and encryption mechanism
     WEBXPAY_PUBLIC_KEY: publicKey,
     WEBXPAY_SECRET_KEY: "test-secret",
     FRONTEND_URL: "https://dating-app-staging.pages.dev",
-    WEBXPAY_CHECKOUT_URL: "https://stagingxpay.info/index.php?route=checkout/billing"
+    WEBXPAY_CHECKOUT_URL: "https://stagingxpay.info/index.php?route=checkout/billing",
+    MIGRATION_STAGE: "staging"
   }, "/premium", "Monthly Subscription");
   const html = await response.text();
   assert.match(html, /name="cms" value="PHP"/);
@@ -1623,6 +1624,11 @@ test("WebXPay checkout rejects missing or insecure checkout endpoint instead of 
     ...baseEnv,
     WEBXPAY_CHECKOUT_URL: "http://untrusted.example/checkout"
   }, "/premium"), /must be a valid HTTPS checkout endpoint/i);
+  assert.throws(() => buildWebXPayCheckoutForm(order, {
+    ...baseEnv,
+    WEBXPAY_CHECKOUT_URL: "https://stagingxpay.info/index.php?route=checkout/billing",
+    MIGRATION_STAGE: "production"
+  }, "/premium"), /cannot be used outside the staging environment/i);
 });
 
 test("WebXPay callback verifies the signed response before asking MongoDB to settle", async () => {
