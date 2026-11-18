@@ -5585,7 +5585,7 @@ export class MongoDBConnection {
       const claims = guardBody.claims;
       const phoneSignIn = claims.firebase?.sign_in_provider === "phone" &&
         typeof claims.phone_number === "string" &&
-        /^\\+[1-9][0-9]{7,14}$/.test(claims.phone_number);
+        /^\+[1-9][0-9]{7,14}$/.test(claims.phone_number);
       try {
         const account = await this.getDatabase(await this.getClient()).collection("users").findOne(
           { uid: authenticatedUid },
