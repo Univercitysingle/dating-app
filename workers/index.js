@@ -2018,11 +2018,8 @@ export default {
 
     if (url.pathname === "/api/dark-fantasy/communities" || url.pathname.startsWith("/api/dark-fantasy/communities/")) {
       if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") return json({ error: "Dark Fantasy is not currently available." }, 404);
-      const countrySetting = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").trim().toUpperCase();
-      const globalAccess = countrySetting === "*";
-      const allowedCountries = countrySetting.split(",").map(country => country.trim()).filter(country => /^[A-Z]{2}$/.test(country));
-      const requestCountry = String(request.cf?.country || "").toUpperCase();
-      if (!globalAccess && (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry))) return json({ error: "Dark Fantasy is not available in this region." }, 404);
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
@@ -2059,15 +2056,8 @@ export default {
       if (String(env.DARK_FANTASY_ENABLED || "").toLowerCase() !== "true") {
         return json({ error: "Dark Fantasy is not currently available." }, 404);
       }
-      // Fail closed unless an operator configures an approved ISO country allowlist.
-      // Cloudflare's country signal is a coarse access control, not proof of residence.
-      const countrySetting = String(env.DARK_FANTASY_ALLOWED_COUNTRIES || "").trim().toUpperCase();
-      const globalAccess = countrySetting === "*";
-      const allowedCountries = countrySetting.split(",").map(country => country.trim()).filter(country => /^[A-Z]{2}$/.test(country));
-      const requestCountry = String(request.cf?.country || "").toUpperCase();
-      if (!globalAccess && (!allowedCountries.length || !requestCountry || !allowedCountries.includes(requestCountry))) {
-        return json({ error: "Dark Fantasy is not available in this region." }, 404);
-      }
+      const regionBlock = darkFantasyRegionGate(request, env);
+      if (regionBlock) return regionBlock;
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       const route = url.pathname.replace(/\/+$/, "");
       const method = request.method;
