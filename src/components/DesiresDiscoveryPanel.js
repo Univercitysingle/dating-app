@@ -75,7 +75,8 @@ const EMPTY_PREFERENCES = {
   relationshipStyles: [],
   desires: [],
   curiosities: [],
-  boundaries: []
+  boundaries: [],
+  visibility: { relationshipIntent: 'private', relationshipStyles: 'private', desires: 'private', curiosities: 'private', boundaries: 'private' }
 };
 
 const DesiresDiscoveryPanel = () => {
@@ -132,7 +133,11 @@ const DesiresDiscoveryPanel = () => {
         relationshipStyles: preferences.relationshipStyles,
         desires: preferences.desires,
         curiosities: preferences.curiosities,
-        boundaries: preferences.boundaries
+        boundaries: preferences.boundaries,
+        visibility: {
+          relationshipIntent: preferences.visibility?.relationshipIntent === 'public' ? 'public' : 'private',
+          relationshipStyles: preferences.visibility?.relationshipStyles === 'public' ? 'public' : 'private'
+        }
       };
       const saved = await apiClient.put('/users/me/desires', payload);
       setPreferences({ ...EMPTY_PREFERENCES, ...saved });
@@ -171,12 +176,33 @@ const DesiresDiscoveryPanel = () => {
         Every selection is optional. Curiosity is not consent.
       </p>
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-        These answers are private and are not shown on public profiles or discovery cards in this release.
-        You can delete them and withdraw consent at any time.
+        Desires, curiosities and boundaries always remain private. Relationship intent and relationship styles are private by default. You can separately choose to show either of those two categories on your profile. You can change visibility or withdraw consent at any time.
       </div>
       {GROUPS.map(group => (
         <fieldset key={group.key} className="space-y-2">
-          <legend className="font-semibold text-neutral-800 dark:text-neutral-100">{group.title}</legend>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <legend className="font-semibold text-neutral-800 dark:text-neutral-100">{group.title}</legend>
+            {['relationshipIntent', 'relationshipStyles'].includes(group.key) ? (
+              <label className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300">
+                <span>Profile visibility</span>
+                <select
+                  aria-label={group.title + ' profile visibility'}
+                  value={preferences.visibility?.[group.key] === 'public' ? 'public' : 'private'}
+                  onChange={event => setPreferences(current => ({
+                    ...current,
+                    visibility: { ...current.visibility, [group.key]: event.target.value }
+                  }))}
+                  disabled={saving}
+                  className="rounded-md border border-neutral-300 bg-white px-2 py-1 dark:border-neutral-600 dark:bg-neutral-800"
+                >
+                  <option value="private">Private</option>
+                  <option value="public">Show on my profile</option>
+                </select>
+              </label>
+            ) : (
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">Always private</span>
+            )}
+          </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">{group.description}</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {group.options.map(([value, label]) => (
