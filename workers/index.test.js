@@ -1217,7 +1217,9 @@ test("rate limiter uses a storage transaction when supported", async () => {
     put: async (key, value) => values.set(key, value),
     transaction: async (callback) => {
       transactionCalls++;
-      return callback(storage);
+      // SQLite-backed Durable Object transactions use this.state.storage
+      // inside the callback, rather than a legacy transaction argument.
+      return callback();
     }
   };
   const limiter = new RateLimiter({ storage });
