@@ -3359,7 +3359,7 @@ export class MongoDBConnection {
           return age >= 18;
         };
         if (!isAdult(inviter) || !isAdult(invitee)) {
-          return { status: 403, body: { error: "Partner linking is available only to verified adults aged 18 or older." } };
+          return { status: 403, body: { error: "Partner linking is available only to members whose recorded birthday indicates they are at least 18." } };
         }
         if (inviter.relationshipPreferences?.boundaries?.includes("no_partner_linking") ||
             invitee.relationshipPreferences?.boundaries?.includes("no_partner_linking")) {
