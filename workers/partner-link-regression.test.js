@@ -218,3 +218,37 @@ test("duplicate partner-link invitations are rejected without inserting another 
   assert.equal(inserts, 0);
 });
 
+test("simultaneous partner-link invitation loses the unique-index race with a conflict response", async () => {
+  const now = new Date();
+  const adult = uid => ({
+    uid,
+    birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()),
+    accountStatus: "active",
+    relationshipPreferences: { boundaries: [] },
+    blocked: []
+  });
+  let insertAttempts = 0;
+  const links = {
+    createIndex: async () => "index",
+    findOne: async () => null,
+    insertOne: async () => {
+      insertAttempts++;
+      const error = new Error("duplicate key");
+      error.code = 11000;
+      throw error;
+    }
+  };
+  const users = [adult("partner-a"), adult("partner-b")];
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => name === "users"
+    ? { findOne: async ({ uid }) => users.find(user => user.uid === uid) || null }
+    : links
+  });
+
+  const result = await connection.managePartnerLink("partner-a", "invite", { targetUid: "partner-b" });
+  assert.equal(insertAttempts, 1);
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /already has a pending or active partner link/i);
+});
+
