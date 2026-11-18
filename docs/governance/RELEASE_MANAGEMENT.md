@@ -23,7 +23,7 @@
 
 ## Current release status (2026-11-11)
 
-GitHub Actions quota is reported exhausted. No fresh workflow run or deployment should be assumed from a source commit alone. The latest call-quality source revision recorded in the project documentation is `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`; its latest deployment and real-device acceptance are not confirmed. Restore Actions capacity or obtain explicit approval for a documented alternative validation path before release.
+Historical note: GitHub Actions quota was previously reported exhausted. Capacity was available for successful staging Pages run [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) and Worker run [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), both for application source `f4fd891027c8b486f5f8609e9e7db1051988d56c`. These runs establish staging deployment only. Real authenticated user journeys, payment-provider acceptance, real-device WebRTC, load testing and production cutover remain separate gates.
 
 ## Rollback
 
@@ -54,3 +54,12 @@ Never use “complete” without stating which evidence level was reached.
 This document is not evidence of legal approval, provider certification, production deployment, or operational acceptance. Record the responsible owner, implementation state, test evidence, staging evidence, last verified commit, data classification, retention rule, dependency, and release approval for each requirement.
 
 Explicitly track applicable gaps: payment/provider callback replay and reconciliation, refunds, duplicate settlement and stale pending recovery; verification evidence access controls, encryption, review audit and deletion/retention; user-data export and deletion propagation across MongoDB, Firebase, media storage and backups; documented backup/restore exercises and approved RPO/RTO; moderator access and ticket/chat message edit/delete policy with immutable audit history; notification opt-in/revocation and delivery failures; accessibility, supported browsers/devices, PWA/offline behaviour, localization, timezone and RTL. Do not mark an item complete without reproducible evidence and an assigned approver.
+
+
+## Current release evidence (2026-11-18)
+
+- Staging Pages: [workflow 44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520), successful.
+- Staging Worker: [workflow 44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), successful.
+- Application source SHA: `f4fd891027c8b486f5f8609e9e7db1051988d56c`.
+- Both workflows passed their configured automated checks and passive OWASP ZAP scans. The scans reported warnings, not new FAIL findings. Dependency audit retains six moderate `glob`/`minimatch` findings in each root/backend audit and the documented development-only `picomatch` exception.
+- No production deployment was performed. The Pages workflow only deploys to `dating-app-staging`; the Wrangler configuration has no production environment and the branch contains no production deployment workflow. Production release therefore requires a separately configured target, secrets/bindings, rollback plan, approval and full acceptance evidence.
