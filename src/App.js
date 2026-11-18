@@ -12,6 +12,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastContainer } from 'react-toastify/unstyled';
 import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import LandingPage from './pages/LandingPage';
 import Profile from './pages/Profile';
 import Chat from './pages/Chat';
@@ -194,7 +195,7 @@ function App() {
           />
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Login initialSignUp />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route
               path="/set-initial-password"
