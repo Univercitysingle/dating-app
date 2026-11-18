@@ -64,7 +64,8 @@ const ChatMessage = ({ message, currentUser, otherUser, onEdit, onDelete }) => {
   if (message?.messageType === 'call') return <CallHistoryMessage call={message.call} currentUser={currentUser} />;
   const isSender = currentUser && message.senderUid === currentUser.uid;
   const userProfile = isSender ? currentUser : otherUser;
-  const photoValue = userProfile?.photos?.[0]?.url;
+  const firstPhoto = userProfile?.photos?.[0];
+  const photoValue = typeof firstPhoto === 'string' ? firstPhoto : firstPhoto?.url;
   const avatarUrl = resolvePhotoUrl(photoValue);
   const workerFallbackUrl = resolveWorkerPhotoUrl(photoValue);
 
