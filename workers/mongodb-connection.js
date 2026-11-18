@@ -48,9 +48,13 @@ const PRIVATE_NESTED_PROFILE_FIELDS = new Set([
 function stripPreciseLocation(profile) {
   if (!profile || typeof profile !== "object") return profile;
   delete profile.locationSharing;
+  for (const key of ["coordinates", "latitude", "longitude", "lat", "lng", "exactLocation", "accuracyMeters"]) {
+    delete profile[key];
+  }
   if (profile.location && typeof profile.location === "object" && !Array.isArray(profile.location)) {
-    delete profile.location.coordinates;
-    delete profile.location.type;
+    for (const key of ["coordinates", "type", "latitude", "longitude", "lat", "lng", "exactLocation", "accuracyMeters"]) {
+      delete profile.location[key];
+    }
     if (Object.keys(profile.location).length === 0) delete profile.location;
   }
   return profile;
@@ -3438,7 +3442,7 @@ export class MongoDBConnection {
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const [items, totalUsers] = await Promise.all([
-        users.find(query, { projection: { password: 0, lastLoginIp: 0, relationshipPreferences: 0, location: 0, locationSharing: 0 } })
+        users.find(query, { projection: { password: 0, lastLoginIp: 0, relationshipPreferences: 0, location: 0, locationSharing: 0, coordinates: 0, latitude: 0, longitude: 0, lat: 0, lng: 0 } })
           .sort({ [sortField]: sortDirection, _id: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
         users.countDocuments(query)
       ]);
