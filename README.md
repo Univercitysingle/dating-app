@@ -146,3 +146,9 @@ This changes the security gate's scope, not the advisory status. The frontend st
 - The OWASP ZAP passive baseline was still running when this historical status was recorded. A later complete Pages staging run, 44266691520, passed the passive baseline.
 - Deployment target: `https://dating-app-staging.pages.dev`. The Worker remains the previously verified staging deployment. Production cutover was not performed.
 - Residual dependency findings at that time: the upstream picomatch advisory remained limited to development/build dependencies under the documented scoped exception. AWS SDK v2 and transitive uuid dependency cleanup was completed later in commit `f4fd891`; moderate `glob`/`minimatch` findings remain open.
+
+
+
+### Product expansion: intent-first dating
+
+The planned product direction combines fast swipe discovery, intentional first-move controls, and flexible relationship exploration. See the [Relationship Discovery, Intent and Consent Specification](./docs/features/RELATIONSHIP_DISCOVERY_INTENT_AND_CONSENT_SPEC.md) and [Feature Roadmap](./docs/product/FEATURE_ROADMAP.md). These are planned capabilities, not implementation claims.
