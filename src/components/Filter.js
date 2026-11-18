@@ -103,14 +103,10 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
 
   const handleApply = (event) => {
     event.preventDefault();
-    if (locationEnabled && locationStale) {
-      setLocationMessage('Your saved location is more than 24 hours old. Refresh it before using distance filters.');
-      return;
-    }
     const filters = {
       minAge,
       maxAge,
-      ...(locationEnabled ? { maxDistance: Number(maxDistance) } : {}),
+      ...(locationEnabled && !locationStale ? { maxDistance: Number(maxDistance) } : {}),
       lookingFor,
       preference,
     };
@@ -192,7 +188,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
                 <label htmlFor="max-distance" className="filter-label">Maximum distance</label>
                 <output>Up to {maxDistance} km</output>
               </div>
-              <input id="max-distance" aria-label="Maximum distance" type="range" min="1" max="100" value={maxDistance} onChange={(event) => setMaxDistance(Number(event.target.value))} />
+              <input id="max-distance" aria-label="Maximum distance" type="range" min="1" max="100" value={maxDistance} disabled={!locationEnabled || locationStale || locationBusy} onChange={(event) => setMaxDistance(Number(event.target.value))} />
               <div className="mt-3 space-y-2">
                 <p className="text-xs text-neutral-500">Use your device's GPS to filter by distance. Your exact coordinates are stored privately and are not displayed to other members.</p>
                 <div className="flex flex-wrap gap-2">
