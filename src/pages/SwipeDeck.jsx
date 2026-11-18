@@ -156,7 +156,12 @@ const SwipeDeck = () => {
       preference: user.preference || restored.preference || 'everyone',
     };
     setActiveFilters(filters);
-    fetchUsersToSwipe(filters);
+    // Legacy saved filters may contain maxDistance from before GPS consent was
+    // introduced. Keep the value in the filter UI, but do not send it until the
+    // member explicitly enables and refreshes their current location.
+    const initialRequestFilters = { ...filters };
+    delete initialRequestFilters.maxDistance;
+    fetchUsersToSwipe(initialRequestFilters);
   }, [fetchUsersToSwipe, user?.uid, user?.preference]);
 
   useEffect(() => {
