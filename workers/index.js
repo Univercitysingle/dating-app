@@ -737,7 +737,14 @@ export default {
           const token = await createSuperadminCustomToken(env, payload.email, payload.password);
           if (!token) return json({ error: "Invalid credentials" }, 401);
           if (!env.MONGODB_CONNECTION) return json({ error: "Superadmin account service unavailable" }, 503);
-          const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+          // The Firebase custom token carries uid=superadmin_uid. Route
+          // provisioning to the same deterministic shard used after Firebase
+          // exchanges it for an ID token (whose sub is superadmin_uid).
+          const shardRequest = new Request(request.url, {
+            method: "GET",
+            headers: { authorization: "Bearer " + token }
+          });
+          const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(shardRequest, env));
           const connection = env.MONGODB_CONNECTION.get(id);
           const provisionResponse = await connection.fetch("https://internal.invalid/internal/superadmin-provision", {
             method: "POST",
