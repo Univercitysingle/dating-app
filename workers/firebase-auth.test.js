@@ -123,3 +123,19 @@ test("does not cache malformed Firebase signing key responses", async () => {
   await assert.rejects(verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache }), FirebaseKeyServiceError);
   assert.equal(fetchCount, 2);
 });
+
+
+test("honours a zero-second Firebase signing-key cache lifetime", async () => {
+  let fetchCount = 0;
+  const fetchImpl = async () => {
+    fetchCount += 1;
+    return new Response(JSON.stringify({ keys: [jwk] }), {
+      status: 200,
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=0" }
+    });
+  };
+  const jwksCache = new Map();
+  await verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache });
+  await verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache });
+  assert.equal(fetchCount, 2);
+});
