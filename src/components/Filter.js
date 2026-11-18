@@ -200,27 +200,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
                 </div>
               </div>
             </div>
-            <div className="filter-field filter-distance-field">
-              <div className="filter-range-heading">
-                <label htmlFor="max-distance" className="filter-label">Maximum distance</label>
-                <output>Up to {maxDistance} km</output>
-              </div>
-              <input id="max-distance" aria-label="Maximum distance" type="range" min="1" max="100" value={maxDistance} disabled={!locationEnabled || locationStale || locationBusy} onChange={(event) => setMaxDistance(Number(event.target.value))} />
-              <div className="mt-3 space-y-2">
-                <p className="text-xs text-neutral-500">Use your device's GPS to filter by distance. Your exact coordinates are stored privately and are not displayed to other members.</p>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={enableLocation} disabled={locationBusy} className="rounded-full border border-primary px-4 py-2 text-sm font-medium text-primary disabled:opacity-50">
-                    {locationBusy ? 'Updating location...' : locationEnabled ? 'Refresh my location' : 'Use my current location'}
-                  </button>
-                  {locationEnabled && <button type="button" onClick={disableLocation} disabled={locationBusy} className="rounded-full border border-neutral-300 px-4 py-2 text-sm disabled:opacity-50">Turn off</button>}
-                </div>
-                {locationMessage && <p className="text-xs text-neutral-600" role="status">{locationMessage}</p>}
-                {!locationEnabled && <p className="text-xs text-amber-700">Enable location to apply this distance filter. Without it, discovery will not use GPS distance.</p>}
-                {locationStale && <p className="text-xs text-amber-700">Your last GPS update is older than 24 hours. Refresh it before applying distance filters.</p>}
-              </div>
-              <div className="filter-range-scale"><span>1 km</span><span>100 km</span></div>
-            </div>
-          </section>
+                     </section>
 
           <section className="filter-section" aria-labelledby="location-search-title">
             <div className="filter-section-heading">
