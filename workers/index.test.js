@@ -1631,6 +1631,28 @@ test("WebXPay checkout rejects missing or insecure checkout endpoint instead of 
   }, "/premium"), /cannot be used outside the staging environment/i);
 });
 
+test("WebXPay checkout uses the configured merchant endpoint for production", async () => {
+  const { publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 1024,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const response = buildWebXPayCheckoutForm({
+    orderId: "0123456789abcdef01234567",
+    price: 3000,
+    user: { name: "Production Test", email: "test@example.com" }
+  }, {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    WEBXPAY_SECRET_KEY: "test-secret",
+    FRONTEND_URL: "https://dating-app.example",
+    WEBXPAY_CHECKOUT_URL: "https://merchant.example/checkout",
+    MIGRATION_STAGE: "production"
+  }, "/premium", "Monthly Subscription");
+  const html = await response.text();
+  assert.match(html, /form action="https:\/\/merchant\.example\/checkout"/);
+  assert.match(response.headers.get("content-security-policy"), /form-action https:\/\/merchant\.example/);
+});
+
 test("WebXPay callback verifies the signed response before asking MongoDB to settle", async () => {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
