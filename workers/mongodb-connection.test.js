@@ -4475,3 +4475,54 @@ test("relationship preferences are excluded from other members' public profile r
   assert.equal(response.status, 200);
   assert.equal(response.body.relationshipPreferences, undefined);
 });
+
+test("GPS location updates require accurate coordinates and store private GeoJSON with explicit opt-in", async () => {
+  let stored;
+  const user = { _id: "location-user-id", uid: "location-user", birthday: new Date("1990-01-01T00:00:00.000Z"), location: { city: "Dubai", country: "United Arab Emirates" } };
+  const users = {
+    findOne: async () => user,
+    updateOne: async (_query, update) => { stored = update.$set; return { matchedCount: 1 }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => { assert.equal(name, "users"); return users; } });
+  const result = await connection.saveUserLocation("location-user", { latitude: 25.2048, longitude: 55.2708, accuracyMeters: 35 });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.enabled, true);
+  assert.deepEqual(stored.location.coordinates, [55.2708, 25.2048]);
+  assert.equal(stored.location.type, "Point");
+  assert.equal(stored.location.city, "Dubai");
+  assert.equal(stored.locationSharing.enabled, true);
+  assert.equal(stored.locationSharing.source, "browser_geolocation");
+  assert.equal("coordinates" in result.body, false);
+});
+
+test("GPS location updates reject inaccurate or out-of-range coordinates", async () => {
+  let databaseAccessed = false;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => { databaseAccessed = true; return {}; };
+  const inaccurate = await connection.saveUserLocation("location-user", { latitude: 25, longitude: 55, accuracyMeters: 5001 });
+  const invalid = await connection.saveUserLocation("location-user", { latitude: 91, longitude: 55, accuracyMeters: 10 });
+  assert.equal(inaccurate.status, 400);
+  assert.equal(invalid.status, 400);
+  assert.equal(databaseAccessed, false);
+});
+
+test("disabling GPS location removes coordinates while preserving approximate city metadata", async () => {
+  let update;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return {
+      findOne: async () => ({ _id: "location-user-id", location: { type: "Point", coordinates: [55.27, 25.2], city: "Dubai", country: "United Arab Emirates" } }),
+      updateOne: async (_query, value) => { update = value; return { matchedCount: 1 }; }
+    };
+  } });
+  const result = await connection.deleteUserLocation("location-user");
+  assert.equal(result.status, 200);
+  assert.equal(update.$set.location.city, "Dubai");
+  assert.equal(update.$set.location.country, "United Arab Emirates");
+  assert.equal("coordinates" in update.$set.location, false);
+  assert.equal(update.$set.locationSharing.enabled, false);
+});
