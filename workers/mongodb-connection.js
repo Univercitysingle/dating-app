@@ -1358,12 +1358,19 @@ export class MongoDBConnection {
       // Mongoose's legacy schema defaults missing locations to [0, 0]. That is
       // a placeholder, not a usable location; do not run $geoNear for it.
       const hasLocation = maxDistance !== null &&
+        currentUser.locationSharing?.enabled === true &&
+        currentUser.locationSharing.updatedAt instanceof Date &&
+        Date.now() - currentUser.locationSharing.updatedAt.getTime() <= 24 * 60 * 60 * 1000 &&
         Array.isArray(coordinates) && coordinates.length === 2 &&
         coordinates.every(Number.isFinite) &&
         coordinates[0] >= -180 && coordinates[0] <= 180 &&
-        coordinates[1] >= -90 && coordinates[1] <= 90 &&
-        !(coordinates[0] === 0 && coordinates[1] === 0);
+        coordinates[1] >= -90 && coordinates[1] <= 90;
+      if (maxDistance !== null && !hasLocation) {
+        return { status: 409, body: { error: "Refresh and enable your current location before applying a distance filter." } };
+      }
       if (hasLocation) {
+        baseMatchQuery["locationSharing.enabled"] = true;
+        baseMatchQuery["locationSharing.updatedAt"] = { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
         // $geoNear requires a 2dsphere index. Ensure it exists in MongoDB
         // instead of turning every distance-filtered Discover request into 503.
         phase = "ensure-location-index";
@@ -2939,6 +2946,101 @@ export class MongoDBConnection {
       } };
     } catch {
       return { status: 503, body: { error: "Report service is temporarily unavailable." } };
+    }
+  }
+
+  async getUserLocationStatus(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const user = await this.getDatabase(await this.getClient()).collection("users").findOne(
+        { uid },
+        { projection: { locationSharing: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }
+      );
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
+      const sharing = user.locationSharing || {};
+      return { status: 200, body: {
+        enabled: sharing.enabled === true,
+        updatedAt: sharing.updatedAt || null,
+        accuracyMeters: Number.isFinite(sharing.accuracyMeters) ? sharing.accuracyMeters : null
+      } };
+    } catch {
+      return { status: 503, body: { error: "Location settings are unavailable." } };
+    }
+  }
+
+  async saveUserLocation(uid, payload) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        !payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return { status: 400, body: { error: "Invalid location update" } };
+    }
+    const latitude = Number(payload.latitude);
+    const longitude = Number(payload.longitude);
+    const accuracyMeters = Number(payload.accuracyMeters);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
+        !Number.isFinite(accuracyMeters) || accuracyMeters < 0 || accuracyMeters > 5000) {
+      return { status: 400, body: { error: "A valid GPS position with accuracy of 5 km or better is required." } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const user = await users.findOne(
+        { uid },
+        { projection: { location: 1, birthday: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }
+      );
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
+      const birthday = user.birthday ? new Date(user.birthday) : null;
+      if (!birthday || Number.isNaN(birthday.getTime())) {
+        return { status: 403, body: { error: "Complete age verification before enabling location-based discovery." } };
+      }
+      const now = new Date();
+      let age = now.getFullYear() - birthday.getFullYear();
+      if (now.getMonth() < birthday.getMonth() ||
+          (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+      if (age < 18) return { status: 403, body: { error: "Location-based dating discovery is available only to adults aged 18 or older." } };
+      const previous = user.location && typeof user.location === "object" && !Array.isArray(user.location)
+        ? user.location : {};
+      const updatedAt = new Date();
+      await users.updateOne({ _id: user._id }, {
+        $set: {
+          location: { ...previous, type: "Point", coordinates: [longitude, latitude] },
+          locationSharing: {
+            enabled: true,
+            source: "browser_geolocation",
+            accuracyMeters,
+            consentAt: updatedAt,
+            updatedAt
+          }
+        }
+      });
+      return { status: 200, body: { enabled: true, updatedAt, accuracyMeters } };
+    } catch {
+      return { status: 503, body: { error: "Could not update your location." } };
+    }
+  }
+
+  async deleteUserLocation(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const user = await users.findOne({ uid }, { projection: { location: 1, _id: 1 } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const location = user.location && typeof user.location === "object" && !Array.isArray(user.location)
+        ? { ...user.location } : {};
+      delete location.coordinates;
+      delete location.type;
+      const update = { $set: { locationSharing: { enabled: false, revokedAt: new Date() } } };
+      if (Object.keys(location).length) update.$set.location = location;
+      else update.$unset = { location: "" };
+      await users.updateOne({ _id: user._id }, update);
+      return { status: 200, body: { enabled: false } };
+    } catch {
+      return { status: 503, body: { error: "Could not disable location sharing." } };
     }
   }
 
@@ -6199,6 +6301,20 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.getUserProfile(body.targetUid, body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/users/me/location") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          !["get", "save", "delete"].includes(body.action)) {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = body.action === "get"
+        ? await this.getUserLocationStatus(body.claims.sub)
+        : body.action === "save"
+          ? await this.saveUserLocation(body.claims.sub, body.payload)
+          : await this.deleteUserLocation(body.claims.sub);
       return json(result.body, result.status);
     }
 
