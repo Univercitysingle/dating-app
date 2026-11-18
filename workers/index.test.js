@@ -37,6 +37,7 @@ test("superadmin login issues a Firebase custom token with root-level role claim
   const bcryptModule = await import("bcryptjs");
   const bcrypt = bcryptModule.default || bcryptModule;
   const passwordHash = await bcrypt.hash("correct-test-password", 4);
+  let superadminShardName;
   const env = {
     FIREBASE_PROJECT_ID: "test-project",
     SUPER_ADMIN_EMAIL: "sadmin",
@@ -56,7 +57,7 @@ test("superadmin login issues a Firebase custom token with root-level role claim
       }
     },
     MONGODB_CONNECTION: {
-      idFromName: name => name,
+      idFromName: name => { superadminShardName = name; return name; },
       get: () => ({
         fetch: async () => new Response(JSON.stringify({ success: true }), {
           status: 200,
@@ -76,6 +77,8 @@ test("superadmin login issues a Firebase custom token with root-level role claim
   assert.equal(payload.uid, "superadmin_uid");
   assert.equal(payload.role, "superadmin");
   assert.equal(payload.claims, undefined);
+  assert.match(superadminShardName, /^mongo-shard-[0-3]$/,
+    "superadmin provisioning must use the same UID shard as authenticated profile requests");
 });
 
 test("restricted features reject wildcard country configuration on every route family", async () => {
