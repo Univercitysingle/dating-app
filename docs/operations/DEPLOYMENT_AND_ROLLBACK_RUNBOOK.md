@@ -3,15 +3,15 @@ Last reviewed: 2026-11-11. This applies to migration-branch staging, not product
 
 Pre-deploy: confirm `migrate-to-serverless`; review the exact diff; preserve secrets and the existing CDN Worker; run frontend, backend, and Worker tests; verify bindings without printing values; confirm MongoDB readiness and migration compatibility.
 
-**Current release path:** GitHub Actions CI/CD is intentionally skipped because the project operator reported that the Actions quota is exhausted. Deploy directly to the dedicated Cloudflare staging Worker and Pages project from an authenticated local checkout, using the procedure below. Do not push deployment-triggering changes to `main`.
+**Current release path:** The approved GitHub Actions workflows are available and have successfully deployed the latest application source to the dedicated Cloudflare staging Worker and Pages project on 2026-11-18. Use those staging workflows as the primary release path. The direct Wrangler procedure below is a documented fallback only. Do not push deployment-triggering changes to `main`.
 
 ## GitHub Actions quota exhausted
 
 The project operator reported exhausted GitHub Actions quota on 2026-11-11. When quota is exhausted, do not repeatedly dispatch workflows or describe a commit as deployed. Keep changes on `migrate-to-serverless`, document the exact source SHA, and mark deployment/acceptance as blocked or pending. Do not modify `main` or bypass the Cloudflare-only deployment boundary.
 
-For the call-quality revision `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`, the Cloudflare Pages workflow did not succeed and its step logs were unavailable during the documentation update. The revision is committed, but staging deployment is unverified.
+The latest paired successful staging deployments are Pages run [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) and Worker run [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), both for application source `f4fd891027c8b486f5f8609e9e7db1051988d56c`. Their automated checks are recorded in `docs/security/REMEDIATION_TRACKER.md`. Real authenticated user journeys, payment-provider settlement, real-device WebRTC and load acceptance remain outstanding.
 
-Do not resume GitHub Actions deployment unless the operator explicitly changes this instruction. The direct Cloudflare procedure below is the active staging path. Verify the deployed source SHA and run frontend/build, API smoke, and two-device audio/video acceptance. Validate adaptive video quality under constrained networks, audio continuity, TURN relay selection, and measured bytes sent/received.
+Use the approved GitHub Actions workflows for staging deployment. The direct Cloudflare procedure below is fallback-only and must be used only from an authenticated local checkout with the exact intended branch and SHA. Verify the deployed source SHA and run frontend/build, API smoke, and two-device audio/video acceptance. Validate adaptive video quality under constrained networks, audio continuity, TURN relay selection, and measured bytes sent/received.
 
 Post-deploy: check Worker liveness/readiness, route smoke tests, actual Pages deployment URL, login, authenticated API, media, Firebase chat and admin journeys. Confirm frontend and Worker SHAs are compatible.
 
@@ -116,3 +116,11 @@ The staging Wrangler configuration explicitly keeps Dark Fantasy disabled. Do no
 ## Direct deployment acceptance record
 
 For each manual deployment, append an entry to the release record containing: source Git SHA, operator, Cloudflare account/project names (never account tokens), Worker deployment ID and timestamp, Pages deployment ID and timestamp, health/readiness HTTP results, smoke-test outcomes, and rollback reference. Mark a step **not run** when no evidence exists. Do not infer deployment success from a Git commit or a successful build alone.
+
+
+## Latest staging release evidence (2026-11-18)
+
+- Pages workflow [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520): successful, source `f4fd891027c8b486f5f8609e9e7db1051988d56c`.
+- Worker workflow [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558): successful, same source revision.
+- Automated tests, build, deployment and post-deployment checks passed as described in the remediation tracker. Passive ZAP produced warnings but no new FAIL findings.
+- Production remains out of scope for these staging workflows. No production Pages project/domain, production Worker environment, production secret inventory or production rollback evidence is established by these runs.
