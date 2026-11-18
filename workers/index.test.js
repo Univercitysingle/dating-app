@@ -759,7 +759,7 @@ test("MongoDB Durable Object rejects malformed internal profile requests", async
 });
 
 test("profile updates whitelist fields and preserve legacy response shape", async () => {
-  const stored = { _id: "mongo-id", uid: "user-1", email: "user@example.com", isOnboardingComplete: false, name: "Old", role: "user" };
+  const stored = { _id: "mongo-id", uid: "user-1", email: "user@example.com", mobileNumber: "+971501234567", isOnboardingComplete: false, name: "Old", role: "user" };
   let updateDoc;
   const users = {
     findOne: async (_query, options) => options?.projection?.isOnboardingComplete ? { isOnboardingComplete: false } : stored,
@@ -778,8 +778,10 @@ test("profile updates whitelist fields and preserve legacy response shape", asyn
   assert.equal(stored.password, undefined);
   assert.deepEqual(updateDoc.$set.socialMediaLinks, { instagram: "@ok" });
   assert.equal(result.body.id, "mongo-id");
-  assert.equal(result.body.email, undefined);
-  assert.equal(result.body.mobileNumber, undefined);
+  // The authenticated owner needs contact details for account settings.
+  // Public discovery/profile endpoints apply stripPrivateContactFields separately.
+  assert.equal(result.body.email, "user@example.com");
+  assert.equal(result.body.mobileNumber, "+971501234567");
   assert.equal(result.body.bio, "Hello");
 });
 
