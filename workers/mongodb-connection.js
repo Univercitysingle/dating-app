@@ -5577,16 +5577,26 @@ export class MongoDBConnection {
     const guardBody = await request.clone().json().catch(() => null);
     const authenticatedUid = guardBody?.claims?.sub;
     if (typeof authenticatedUid === "string" && authenticatedUid && guardBody?.claims?.role !== "superadmin") {
-      // Enforce verified email and all account restrictions centrally so a
-      // suspended or unverified user cannot use a less restrictive API route.
-      if (guardBody?.claims?.email_verified !== true) {
-        return json({ error: "Email verification is required to use this service." }, 403);
-      }
+      // Enforce verified email and account restrictions centrally so a
+      // suspended or unverified identity cannot use a less restrictive route.
+      // Firebase phone sign-in proves control of a phone number rather than an
+      // email address. It is therefore allowed only for an already-provisioned
+      // account; phone sign-in must not create a new profile implicitly.
+      const claims = guardBody.claims;
+      const phoneSignIn = claims.firebase?.sign_in_provider === "phone" &&
+        typeof claims.phone_number === "string" &&
+        /^\\+[1-9][0-9]{7,14}$/.test(claims.phone_number);
       try {
         const account = await this.getDatabase(await this.getClient()).collection("users").findOne(
           { uid: authenticatedUid },
           { projection: { accountStatus: 1, deletionRequestedAt: 1, suspendedUntil: 1 } }
         );
+        if (phoneSignIn && !account) {
+          return json({ error: "Phone sign-in is available only for existing accounts." }, 403);
+        }
+        if (claims.email_verified !== true && !(phoneSignIn && account)) {
+          return json({ error: "Email verification is required to use this service." }, 403);
+        }
         if (account && isAccountRestricted(account)) {
           return json({ error: "This account is unavailable." }, 403);
         }
