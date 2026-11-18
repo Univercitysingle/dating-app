@@ -50,7 +50,6 @@ cd workers && npm ci --no-audit --no-fund && npm test
 cd ..
 npx wrangler@4 deploy --config wrangler.jsonc --env staging \
   --var "FIREBASE_PROJECT_ID:it-services-1841e" \
-  --var "MONGODB_DATABASE:test" \
   --var "CDN_HOSTNAME:https://dateme.enadoctemp.workers.dev" \
   --var "FRONTEND_URL:https://dating-app-staging.pages.dev"
 ```
@@ -59,7 +58,7 @@ The command deploys the Worker code/config only. It does not provision secrets. 
 
 #### Worker secrets and bindings
 
-The Worker staging workflow currently requires these values to be present in its deployment environment: `MONGODB_URI`, `VERIFICATION_ENCRYPTION_KEY` (64 hexadecimal characters), `JWT_SECRET` (at least 32 characters and matching the existing CDN Worker's JWT secret), `WEBXPAY_PUBLIC_KEY`, `WEBXPAY_SECRET_KEY`, and `TURNIX_API_TOKEN`. `WEBXPAY_CHECKOUT_URL` is a non-secret HTTPS environment variable, explicitly set in `wrangler.jsonc` for staging. Production must use the merchant-confirmed live checkout endpoint, and the Worker rejects the staging hostname outside `MIGRATION_STAGE=staging`. Preserve the existing WebXPay configuration. ExpressTURN primary credentials are optional as a pair: `EXPRESSTURN_USERNAME` and `EXPRESSTURN_PASSWORD`. The workflow also supports optional push secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; optional Firebase RTDB/service-account secrets; optional `TURN_URLS` plus `TURN_SHARED_SECRET`; and optional `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD_HASH`, and `CRON_SECRET`.
+The Worker staging workflow currently requires these values to be present in its deployment environment. The database name is taken from the path in `MONGODB_URI`; do not set a separate `MONGODB_DATABASE` override: `MONGODB_URI`, `VERIFICATION_ENCRYPTION_KEY` (64 hexadecimal characters), `JWT_SECRET` (at least 32 characters and matching the existing CDN Worker's JWT secret), `WEBXPAY_PUBLIC_KEY`, `WEBXPAY_SECRET_KEY`, and `TURNIX_API_TOKEN`. `WEBXPAY_CHECKOUT_URL` is a non-secret HTTPS environment variable, explicitly set in `wrangler.jsonc` for staging. Production must use the merchant-confirmed live checkout endpoint, and the Worker rejects the staging hostname outside `MIGRATION_STAGE=staging`. Preserve the existing WebXPay configuration. ExpressTURN primary credentials are optional as a pair: `EXPRESSTURN_USERNAME` and `EXPRESSTURN_PASSWORD`. The workflow also supports optional push secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; optional Firebase RTDB/service-account secrets; optional `TURN_URLS` plus `TURN_SHARED_SECRET`; and optional `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD_HASH`, and `CRON_SECRET`.
 
 Set any missing secret from a secure local shell, for example:
 
