@@ -4874,3 +4874,105 @@ test("Discover excludes candidates with future-dated GPS timestamps from distanc
   assert.ok(freshness.$gte.getTime() >= Date.now() - 24 * 60 * 60 * 1000 - 1000);
   assert.ok(freshness.$lte.getTime() <= Date.now());
 });
+
+
+test("partner links require an adult invitee's explicit acceptance and either member can revoke", async () => {
+  const { ObjectId } = await import("mongodb");
+  const now = new Date();
+  const adult = uid => ({
+    uid,
+    birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()),
+    accountStatus: "active",
+    relationshipPreferences: { consent: true, boundaries: [] }
+  });
+  const members = [adult("partner-a"), adult("partner-b")];
+  const records = [];
+  let indexSpec;
+  const links = {
+    createIndex: async (spec, options) => { indexSpec = { spec, options }; return "one_active_partner_link_per_member"; },
+    findOne: async query => {
+      if (query._id) return records.find(record =>
+        String(record._id) === String(query._id) && record.memberUids.includes(query.memberUids)
+      ) || null;
+      if (query.memberUids?.$in) return records.find(record =>
+        record.activeKey && record.memberUids.some(uid => query.memberUids.$in.includes(uid))
+      ) || null;
+      return null;
+    },
+    find: () => ({ sort: () => ({ limit: () => ({ toArray: async () => records.slice() }) }) }),
+    insertOne: async document => {
+      const record = { ...document, _id: new ObjectId() };
+      records.push(record);
+      return { insertedId: record._id };
+    },
+    updateOne: async (query, update) => {
+      const record = records.find(item => String(item._id) === String(query._id) &&
+        item.status === query.status &&
+        (query.inviteeUid ? item.inviteeUid === query.inviteeUid : item.memberUids.includes(query.memberUids)));
+      if (!record) return { modifiedCount: 0 };
+      Object.assign(record, update.$set || {});
+      for (const key of Object.keys(update.$unset || {})) delete record[key];
+      return { modifiedCount: 1 };
+    }
+  };
+  const db = {
+    collection: name => {
+      if (name === "partnerLinks") return links;
+      if (name === "users") return { findOne: async ({ uid }) => members.find(member => member.uid === uid) || null };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const invited = await connection.managePartnerLink("partner-a", "invite", { targetUid: "partner-b" });
+  assert.equal(invited.status, 201);
+  assert.equal(invited.body.status, "pending");
+  assert.equal(indexSpec.options.unique, true);
+  assert.deepEqual(indexSpec.spec, { memberUids: 1 });
+
+  const linkId = invited.body.id;
+  const wrongActor = await connection.managePartnerLink("partner-a", "accept", { linkId });
+  assert.equal(wrongActor.status, 403);
+
+  const accepted = await connection.managePartnerLink("partner-b", "accept", { linkId });
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.status, "accepted");
+  assert.equal(records[0].activeKey !== undefined, true);
+
+  const revoked = await connection.managePartnerLink("partner-a", "revoke", { linkId });
+  assert.equal(revoked.status, 200);
+  assert.equal(revoked.body.status, "revoked");
+  assert.equal(records[0].activeKey, undefined);
+
+  const listed = await connection.managePartnerLink("partner-b", "list");
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.links[0].status, "revoked");
+});
+
+test("partner links reject requests when either member has disabled partner linking", async () => {
+  const now = new Date();
+  const adult = uid => ({
+    uid,
+    birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()),
+    accountStatus: "active",
+    relationshipPreferences: { boundaries: uid === "partner-b" ? ["no_partner_linking"] : [] }
+  });
+  const users = [adult("partner-a"), adult("partner-b")];
+  let inserted = false;
+  const links = {
+    createIndex: async () => "index",
+    findOne: async () => null,
+    insertOne: async () => { inserted = true; return { insertedId: "unused" }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => name === "users"
+    ? { findOne: async ({ uid }) => users.find(user => user.uid === uid) || null }
+    : links
+  });
+  const result = await connection.managePartnerLink("partner-a", "invite", { targetUid: "partner-b" });
+  assert.equal(result.status, 403);
+  assert.equal(inserted, false);
+});
