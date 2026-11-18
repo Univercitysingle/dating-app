@@ -15,13 +15,17 @@ export default function PartnerLinkPanel({ targetUid = null }) {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const loadLinks = useCallback(async () => {
     setLoading(true);
     try {
       const result = await apiClient.get('/users/me/partner-link');
       setLinks(Array.isArray(result?.links) ? result.links : []);
+      setLoadError(false);
     } catch (error) {
+      setLinks([]);
+      setLoadError(true);
       toast.error(getUserFriendlyError(error, 'Partner links could not be loaded.'));
     } finally {
       setLoading(false);
@@ -72,12 +76,13 @@ export default function PartnerLinkPanel({ targetUid = null }) {
           <div>
             <h3 className="font-semibold text-neutral-900 dark:text-white">Partner link</h3>
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Invite this person to establish a partner link. No profile details are shared unless a separate feature explicitly allows it.</p>
-            {loading ? <p className="mt-2 text-xs text-neutral-500">Checking partner-link status…</p> : existingLink ? <p className="mt-2 text-sm text-neutral-500" role="status">{targetLinkLabel}</p> : null}
+            {loading ? <p className="mt-2 text-xs text-neutral-500">Checking partner-link status…</p> : loadError ? <p className="mt-2 text-sm text-red-600" role="alert">Unable to verify partner-link status. Try again before inviting.</p> : existingLink ? <p className="mt-2 text-sm text-neutral-500" role="status">{targetLinkLabel}</p> : null}
           </div>
-          <button type="button" onClick={invite} disabled={sending || loading || Boolean(existingLink)} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {sending ? 'Sending…' : existingLink ? 'Partner link request exists' : 'Invite to partner link'}
+          <button type="button" onClick={invite} disabled={sending || loading || loadError || Boolean(existingLink)} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+            {sending ? 'Sending…' : loading ? 'Checking status…' : loadError ? 'Status unavailable' : existingLink ? 'Partner link request exists' : 'Invite to partner link'}
           </button>
         </div>
+        {loadError && <button type="button" onClick={loadLinks} disabled={loading} className="mt-3 rounded-full border border-neutral-300 px-4 py-2 text-sm dark:border-neutral-600">Retry status check</button>}
       </section>
     );
   }
@@ -88,7 +93,7 @@ export default function PartnerLinkPanel({ targetUid = null }) {
         <h3 id="partner-link-title" className="font-semibold text-neutral-900 dark:text-white">Partner links</h3>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Review invitations and manage partner-link status. Either member can revoke an active link at any time. A link does not merge profiles or expose private preferences.</p>
       </div>
-      {loading ? <p className="text-sm text-neutral-500">Loading partner links…</p> : links.length === 0 ? (
+      {loading ? <p className="text-sm text-neutral-500">Loading partner links…</p> : loadError ? <div className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"><p>Partner-link status could not be loaded.</p><button type="button" onClick={loadLinks} className="mt-2 rounded-full border border-neutral-300 px-4 py-2 dark:border-neutral-600">Retry</button></div> : links.length === 0 ? (
         <p className="rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">You do not have any partner-link invitations or connections.</p>
       ) : (
         <ul className="space-y-3">
