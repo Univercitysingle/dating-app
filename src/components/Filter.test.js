@@ -174,7 +174,7 @@ describe('Filter component', () => {
     expect(getCurrentPosition).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      getCurrentPosition.mock.calls[0][0]({
+      await getCurrentPosition.mock.calls[0][0]({
         coords: { latitude: 25.21, longitude: 55.28, accuracy: 25 }
       });
     });
