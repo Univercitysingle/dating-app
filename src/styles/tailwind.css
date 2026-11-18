@@ -5503,4 +5503,37 @@ html.dark .discover-page {
 html.dark .discover-page .discover-stage .relative.w-full.h-full.rounded-2xl {
   border-color: rgba(255, 255, 255, .16);
 }
+/* Likes page refinement: stronger hierarchy, tactile cards and useful empty state. */
+.likes-page { color: var(--app-text, #302733); }
+.likes-heading h1 { letter-spacing: -.05em; }
+.likes-total { display:inline-flex; min-height:34px; align-items:center; padding:0 13px; border:1px solid #f0d7e1; border-radius:999px; background:#fff6f9; color:#a93c66; font-size:12px; font-weight:750; }
+.likes-page .like-card { overflow:hidden; border:1px solid #eee5eb; border-radius:22px; background:#fff; box-shadow:0 10px 32px rgba(43,29,43,.055); transition:transform 180ms ease, box-shadow 180ms ease; }
+.likes-page .like-card:hover { transform:translateY(-3px); box-shadow:0 17px 38px rgba(43,29,43,.1); }
+.likes-page .like-card img { transition:transform 400ms ease; }
+.likes-page .like-card:hover img { transform:scale(1.035); }
+.likes-page .like-card a { min-height:42px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #f0d5e0; border-radius:12px; background:#fff7fa; color:#ad3e69; text-decoration:none; transition:background-color 160ms ease; }
+.likes-page .like-card a:hover { background:#ffedf3; }
+.likes-empty { display:flex; min-height:390px; flex-direction:column; align-items:center; justify-content:center; padding:42px 22px; border:1px solid #eee5eb; border-radius:26px; background:radial-gradient(ellipse at 50% 15%,#fff0f5,transparent 56%),#fff; text-align:center; }
+.likes-empty-art { display:grid; width:76px; height:76px; margin-bottom:22px; place-items:center; border:1px solid #f1d7e1; border-radius:25px; background:#fff5f8; color:#d65a83; font-size:43px; }
+.likes-empty h2 { max-width:440px; margin-top:8px; color:#332936; font-size:clamp(22px,3vw,29px); font-weight:780; letter-spacing:-.045em; line-height:1.15; }
+.likes-empty > p:not(.page-eyebrow) { max-width:430px; margin-top:11px; color:#817782; font-size:13px; line-height:1.7; }
+.likes-empty-action { display:inline-flex; min-height:46px; align-items:center; justify-content:center; margin-top:22px; padding:0 22px; border-radius:13px; text-decoration:none; }
+.conversation-row.is-unread { background:linear-gradient(90deg,rgba(233,75,120,.09),rgba(233,75,120,.025)); }
+.conversation-avatar.is-unread { outline:2px solid #df6b91; outline-offset:2px; }
+.conversation-row:focus-visible { outline:3px solid rgba(196,58,103,.3); outline-offset:-3px; }
+html.dark .likes-total { border-color:#5d3c4c; background:#342531; color:#ffb1c8; }
+html.dark .likes-page .like-card { border-color:var(--app-border); background:var(--app-surface); }
+html.dark .likes-page .like-card a { border-color:#654255; background:#382936; color:#ffb1c8; }
+html.dark .likes-empty { border-color:var(--app-border); background:radial-gradient(ellipse at 50% 15%,#382936,transparent 56%),var(--app-surface); }
+html.dark .likes-empty h2 { color:var(--app-text); }
+html.dark .likes-empty > p:not(.page-eyebrow) { color:#b9acbb; }
+@media(max-width:640px) {
+  .likes-page .like-card { display:grid; grid-template-columns:112px minmax(0,1fr); border-radius:18px; }
+  .likes-page .like-card > div:first-child { height:100%; min-height:146px; }
+  .likes-page .like-card > div:first-child img { height:100%; }
+  .likes-page .like-card > div:last-child { min-width:0; padding:12px; }
+  .likes-page .like-card a { padding:8px 10px; font-size:11px; }
+  .likes-empty { min-height:340px; border-radius:21px; }
+}
+@media(prefers-reduced-motion:reduce) { .likes-page .like-card,.likes-page .like-card img,.likes-page .like-card a { transition:none; } .likes-page .like-card:hover { transform:none; } }
 
