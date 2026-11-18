@@ -4702,3 +4702,69 @@ test("Discover escapes regex metacharacters in city and country filters", async 
   assert.equal(result.status, 200);
   assert.equal(capturedMatch["location.city"].$regex, "New\\.\\*York");
 });
+
+
+test("location status marks GPS data stale after 24 hours without returning coordinates", async () => {
+  const users = {
+    findOne: async () => ({
+      uid: "stale-location-user",
+      locationSharing: { enabled: true, updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000), accuracyMeters: 40 },
+      location: { type: "Point", coordinates: [55.27, 25.2] }
+    })
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return users;
+  } });
+  const result = await connection.getUserLocationStatus("stale-location-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.enabled, true);
+  assert.equal(result.body.stale, true);
+  assert.equal(result.body.accuracyMeters, 40);
+  assert.equal("coordinates" in result.body, false);
+});
+
+test("location status does not mark revoked GPS sharing as active or stale", async () => {
+  const users = {
+    findOne: async () => ({
+      uid: "revoked-location-user",
+      locationSharing: { enabled: false, revokedAt: new Date() }
+    })
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return users;
+  } });
+  const result = await connection.getUserLocationStatus("revoked-location-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.enabled, false);
+  assert.equal(result.body.stale, false);
+  assert.equal("coordinates" in result.body, false);
+});
+
+test("GPS location updates reject underage users before storing coordinates", async () => {
+  let writes = 0;
+  const users = {
+    findOne: async () => ({
+      _id: "underage-location-id",
+      uid: "underage-location-user",
+      birthday: new Date(Date.now() - 17 * 365.25 * 24 * 60 * 60 * 1000)
+    }),
+    updateOne: async () => { writes++; return { matchedCount: 1 }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return users;
+  } });
+  const result = await connection.saveUserLocation("underage-location-user", {
+    latitude: 25.2, longitude: 55.27, accuracyMeters: 30
+  });
+  assert.equal(result.status, 403);
+  assert.equal(writes, 0);
+});
