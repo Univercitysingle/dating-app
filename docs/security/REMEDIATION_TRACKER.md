@@ -193,3 +193,11 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Workflow trigger:** Added `.github/workflows/deploy-worker-staging.yml` to its own path filters so future changes to the deployment workflow invoke the staging validation/deployment workflow.
 - **Validation status:** Repository configuration was re-fetched and checked: no `MONGODB_DATABASE` references remain in the Worker staging workflow or Wrangler config, and the runbook no longer passes a separate database override. The deployment workflow update is committed on `migrate-to-serverless`; a successful post-change Worker workflow run and runtime readiness check are still required. Do not treat this configuration correction as deployed until the workflow reports the exact commit SHA and passes.
 - **Scope:** Staging configuration only. No `main`, production, MongoDB secret, database contents, Firebase, payment credentials, or CDN Worker changes.
+
+
+## Residual Vercel GitHub integration (2026-11-18)
+
+- **Observation:** The legacy Vercel workflow file is absent from `migrate-to-serverless`, but GitHub commit status checks still publish a `Vercel` context with a Vercel project deployment URL on recent branch commits. The context is reported as failed. This does not establish a successful deployment, but it proves a Vercel integration/status publisher remains connected.
+- **Risk:** A connected Vercel GitHub integration may create preview deployments independently of GitHub Actions workflow cleanup. This conflicts with the Cloudflare-only hosting requirement until disabled and verified.
+- **Required action:** Disable Vercel automatic deployments for this repository and disconnect the GitHub repository integration in the Vercel project/account. Verify that a subsequent commit no longer receives a Vercel status or deployment. The available repository interface cannot perform this external account-level change, so this remains an operator action.
+- **Scope:** No Vercel deployment was intentionally triggered by this remediation. No `main`, production, Cloudflare, or CDN configuration was changed by this observation.
