@@ -442,3 +442,21 @@ This mindmap is the master product blueprint and delivery checklist. Existing in
 Treat this specification as a living contract. For each item, record implementation status, automated test, staging evidence, last verified commit, owner, dependency, and rollback/retention impact. Distinguish documented design from verified runtime behaviour. Reconcile against source and staging before release.
 
 Cross-cutting gaps requiring explicit closure: a complete API route/method/authz/schema/error catalogue; MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback definitions; Firebase RTDB rules and push subscription/delivery/retry lifecycle; tested backup/restore with RPO/RTO; payment replay/idempotency/reconciliation/refund and stale-pending recovery; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; supported browser/device, PWA/offline and notification permission matrix; accessibility checks for keyboard, screen readers, contrast and forms; localization, timezone and RTL readiness. Do not imply these are implemented unless backed by evidence.
+
+
+
+## 13. Intent-first dating product expansion (2026-11-18)
+
+The product direction is a unified combination of three interaction patterns, with original branding and interaction design:
+
+- **Fast swipe discovery (Tinder-inspired):** profile cards, like/pass, optional Super Like, undo and mutual matches.
+- **Intentional interaction (Bumble-inspired):** configurable first-move preferences, prompt-first openers, conversation invitations and respectful response reminders. Do not enforce gender stereotypes.
+- **Flexible relationship exploration (Feeld-inspired):** optional identity and relationship-intention taxonomy, interests/desire tags, glossary, consensual linked profiles, group discovery, Pings and privacy controls.
+
+The differentiator is intent-first, privacy-first dating. Relationship tags are not consent. Sensitive identity and desire fields are optional, private by default, excluded from advertising and protected by strict access controls.
+
+See [Relationship Discovery, Intent and Consent Specification](./features/RELATIONSHIP_DISCOVERY_INTENT_AND_CONSENT_SPEC.md) for the detailed profile model, eligibility and ranking rules, first-move settings, Pings, partner-link/group-consent lifecycle, private media, safety requirements, logical data model, API domains, phases and acceptance criteria.
+
+Delivery sequence: (0) jurisdiction, age assurance, privacy and threat-model foundation; (1) individual profile intentions, tags, glossary and discovery filters; (2) first-move controls, Pings, incognito and private media; (3) consensual two-person profile links; (4) group discovery and group chat only after per-member consent and moderation acceptance; (5) ranking and monetisation optimisation. Core safety and consent must remain free.
+
+These are planned capabilities, not implementation claims. Preserve Cloudflare Pages/Workers, MongoDB Atlas, Firebase RTDB chat and the existing CDN Worker. Reconcile proposed data entities with the active Worker database catalogue before migrations.
