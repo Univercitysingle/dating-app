@@ -212,3 +212,12 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Worker test commit:** `f77305650f1d19414f5786fd2b62c7a26168b3ab`.
 - **Frontend test commit:** `f0a19818f3739a91dca5427d69b204e91ac4f7dc`.
 - **Evidence status:** Source and regression tests are committed on `migrate-to-serverless`. Automated execution and Cloudflare staging deployment for these exact revisions are not yet verified. Keep the items open until Worker/frontend suites pass and the deployed SHA is confirmed. No CDN Worker or production configuration was changed.
+
+
+## Staging validation evidence (2026-11-18)
+
+- **Worker staging deployment:** GitHub Actions run [44361703418](https://github.com/Univercitysingle/dating-app/actions/runs/44361703418) completed successfully for `f77305650f1d19414f5786fd2b62c7a26168b3ab`. This includes the Worker test suite and configured post-deploy liveness/readiness and anonymous-route checks.
+- **Pages staging deployment:** GitHub Actions run [44361937990](https://github.com/Univercitysingle/dating-app/actions/runs/44361937990) checked out `f0a19818f3739a91dca5427d69b204e91ac4f7dc`. Backend regression tests, frontend regression tests, SEO validation, frontend build, Pages deployment, deployed SEO endpoint checks, and deployed frontend/API routing checks all completed successfully.
+- **Pages run finalization:** At the time of this update, only the non-blocking OWASP ZAP passive baseline step remained in progress. The Pages deployment and application verification steps were already successful. Confirm the final run conclusion separately.
+- **Scope:** Staging only. No changes to `main`, production, MongoDB data, Firebase chat, payment credentials, or CDN Worker.
+- **Outstanding external integration:** The Vercel status context continues to fail on branch commits. The GitHub Actions workflow cleanup does not disconnect this repository's Vercel GitHub integration. Disconnect/disable it in the Vercel project/account and verify the Vercel status context stops appearing.
