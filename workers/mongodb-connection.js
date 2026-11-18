@@ -3323,6 +3323,7 @@ export class MongoDBConnection {
           status: item.status,
           inviterUid: item.inviterUid,
           inviteeUid: item.inviteeUid,
+          isIncoming: item.inviteeUid === uid,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
           acceptedAt: item.acceptedAt || null,
