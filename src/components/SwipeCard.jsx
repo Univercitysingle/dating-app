@@ -245,6 +245,7 @@ const SwipeCard = ({ user, onVote, onSwipe, style, superLike }) => {
                         {user.occupation && <span>{user.occupation}</span>}
                         {user.occupation && user.location && <span aria-hidden="true">·</span>}
                         {user.location && <span>{typeof user.location === 'string' ? user.location : user.location?.city || user.location?.name || ''}</span>}
+                        {user.distanceBand && <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs">{user.distanceBand} away</span>}
                       </p>
                     )}
                     {user.bio && <p className="mt-2 line-clamp-2 max-w-[34ch] text-sm leading-relaxed text-white/85">{user.bio}</p>}
