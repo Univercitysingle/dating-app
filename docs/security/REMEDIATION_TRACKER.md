@@ -139,14 +139,27 @@ Findings and operational statements remain open until a named owner supplies rep
 - Source commit: `cb9f32f12b900174145d17ea4862ca535e49d54c` on `migrate-to-serverless`.
 - Cloudflare Pages staging deployment: **successful** at `https://dating-app-staging.pages.dev`.
 - Passed: dependency installation; production high-severity audit gates for frontend and legacy backend; full audit policy validation for development-only picomatch paths; backend and frontend regression tests; public SEO validation; frontend build; Cloudflare Pages deployment; deployed SEO endpoint checks; frontend asset and API-routing checks.
-- OWASP ZAP passive baseline: **in progress at time of this record**. Record its final result before marking the complete workflow green.
+- OWASP ZAP passive baseline: **in progress at time of this historical record**. A later complete run is recorded below.
 - Production cutover: not performed.
-- Residual: picomatch remains upstream-unpatched and scoped to development/build dependencies; moderate glob, AWS SDK v2 and uuid findings remain open for remediation.
+- Residual at that time: picomatch remained upstream-unpatched and scoped to development/build dependencies; AWS SDK v2 and uuid were subsequently addressed in the dependency manifest cleanup below. The moderate glob/minimatch advisories remain open.
 
 ## Dependency manifest cleanup (2026-11-18)
 
 - Removed the end-of-support AWS SDK for JavaScript v2 package from the root and legacy backend dependency manifests and lockfiles. The active root S3 service imports `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` (AWS SDK v3); repository code search found no direct AWS SDK v2 imports. The `backend/` directory contains dependency metadata and documentation, but no backend runtime source files.
 - Added `uuid` as an explicit root production dependency at `^11.1.1`, matching the existing locked version, because `controllers/usersController.js` imports `uuid` directly. It was previously available only transitively.
 - Regenerated the two npm lockfile package graphs from their existing resolved versions after updating root dependency metadata. No unrelated version upgrades were applied.
-- **Validation status:** JSON and lockfile dependency metadata were regenerated and structurally checked. A local `npm ci`, test suite, and fresh `npm audit` could not be run through the repository connector. Confirm these in the next available build environment before treating the remediation as closed. GitHub Dependabot alert closure also remains unconfirmed until its alert list refreshes.
+- **Validation status:** JSON and lockfile dependency metadata were regenerated and structurally checked. The subsequent Cloudflare Pages workflow `44266691520` successfully ran root and backend dependency installation, both production security-threshold checks, both full audit-policy checks, backend and frontend regression tests, SEO validation, frontend build, staging deployment, deployed asset/API-routing checks and OWASP ZAP passive baseline. GitHub Dependabot alert closure remains unconfirmed because the private alert list is not available through the connected repository interface.
 - **Scope:** `migrate-to-serverless` only. No `main`, production deployment, Cloudflare Worker deployment, or CDN Worker change.
+
+## Latest dependency audit and Pages deployment (2026-11-18)
+
+- **Commit:** `f4fd891027c8b486f5f8609e9e7db1051988d56c` on `migrate-to-serverless`.
+- **Cloudflare Pages workflow:** [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) completed successfully. It installed root and backend dependencies, passed the production high-severity audit gates and full audit-policy checks, passed backend/frontend tests and SEO validation, built and deployed the frontend to Cloudflare Pages staging, verified deployed assets/API routing and completed the OWASP ZAP passive baseline. No production deployment occurred.
+- **Resolved dependency cleanup:** Removed direct AWS SDK v2 from both manifests and lockfiles. The active root S3 service uses AWS SDK v3. Added `uuid@^11.1.1` as a direct root dependency because the application imports it directly. The lockfiles no longer contain AWS SDK v2.
+- **Remaining moderate findings:** The full audit in both root and legacy backend environments reports six moderate findings each, representing two distinct advisories:
+  - [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4): `glob@10.5.0`, reached through the optional Firebase Admin Google Cloud Firestore dependency chain (`@google-cloud/firestore-api` / `google-gax` / `gaxios` / `rimraf`). The advisory is fixed in `glob@14.0.2`; the current parent chain pins compatible ranges around `rimraf@5` and `glob@10`, so a major override is not approved without a tested parent-chain update.
+  - [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249): `minimatch@9.0.9` nested under `glob@10.5.0`. The advisory is fixed in `minimatch@11.0.1`, outside the current `glob@10` dependency range. Do not force a major override without compatibility tests.
+- **Additional upstream security update to schedule:** Root lockfile currently pins `firebase-admin@14.5.0`. Version `14.5.1` was published 2026-11-11 and includes a prototype-pollution fix in `deepExtend()` plus Authentication URL-path validation. Update the lockfile to 14.5.1 and retest before closing this item.
+- **Audit interpretation:** Both production high-severity gates passed. The two moderate advisories above remain reported and are not fixed by the current deployment. The existing development-only `picomatch` high-severity exception remains separately scoped and must be revisited when upstream publishes a fix.
+- **Dependabot visibility:** The exact open Dependabot alert inventory was not accessible through the connected GitHub interface. The npm audit output above is verified workflow evidence, not a claim that every GitHub Dependabot alert has been closed.
+- **Scope:** No changes to `main`, production, Worker staging, the existing CDN Worker or payment-provider configuration.
