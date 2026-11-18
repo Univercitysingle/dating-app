@@ -45,6 +45,17 @@ const PRIVATE_NESTED_PROFILE_FIELDS = new Set([
   "coordinates", "latitude", "longitude", "lat", "lng", "exactlocation", "location"
 ]);
 
+function stripPreciseLocation(profile) {
+  if (!profile || typeof profile !== "object") return profile;
+  delete profile.locationSharing;
+  if (profile.location && typeof profile.location === "object" && !Array.isArray(profile.location)) {
+    delete profile.location.coordinates;
+    delete profile.location.type;
+    if (Object.keys(profile.location).length === 0) delete profile.location;
+  }
+  return profile;
+}
+
 function copyPublicValue(value) {
   if (Array.isArray(value)) return value.map(copyPublicValue);
   if (!value || typeof value !== "object") return value;
@@ -1213,6 +1224,7 @@ export class MongoDBConnection {
             return { ...photo, url: this.getMediaUrl(path) };
           });
         }
+        stripPreciseLocation(profile);
         const responseProfile = currentUser.role === "superadmin" ? profile : sanitizePublicProfile(profile);
         return { ...item, user: responseProfile };
       });
@@ -1274,6 +1286,7 @@ export class MongoDBConnection {
               return { ...photo, url: this.getMediaUrl(path) };
             });
           }
+          stripPreciseLocation(profile);
           return [currentUser.role === "superadmin" ? profile : sanitizePublicProfile(profile)];
         })
       };
@@ -3217,7 +3230,10 @@ export class MongoDBConnection {
       }
       const profile = { ...user };
       // Relationship preferences are strictly owner-only, including for administrators.
-      if (!isOwner) delete profile.relationshipPreferences;
+      if (!isOwner) {
+        delete profile.relationshipPreferences;
+        stripPreciseLocation(profile);
+      }
       // Never expose credentials or operational IP metadata in profile responses.
       delete profile.password;
       delete profile.lastLoginIp;
@@ -3422,7 +3438,7 @@ export class MongoDBConnection {
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const [items, totalUsers] = await Promise.all([
-        users.find(query, { projection: { password: 0, lastLoginIp: 0, relationshipPreferences: 0 } })
+        users.find(query, { projection: { password: 0, lastLoginIp: 0, relationshipPreferences: 0, location: 0, locationSharing: 0 } })
           .sort({ [sortField]: sortDirection, _id: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
         users.countDocuments(query)
       ]);
@@ -3510,7 +3526,7 @@ export class MongoDBConnection {
       }
       const allowed = [
         "name", "email", "gender", "bio", "interests", "profilePrompts", "education",
-        "relationshipGoals", "isProfileVisible", "role", "location", "lastActiveAt"
+        "relationshipGoals", "isProfileVisible", "role", "lastActiveAt"
       ];
       const privilegedFields = ["email", "plan", "faceVerified", "isVerified", "mustSetPassword", "photos"];
       if (access.role !== "superadmin" && privilegedFields.some(key => Object.prototype.hasOwnProperty.call(payload, key))) {
