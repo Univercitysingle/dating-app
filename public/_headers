@@ -10,9 +10,11 @@
   Cross-Origin-Opener-Policy: same-origin-allow-popups
 
 /login
+  Cache-Control: private, no-store, max-age=0
   X-Robots-Tag: noindex, nofollow, noarchive
 
 /register
+  Cache-Control: private, no-store, max-age=0
   X-Robots-Tag: noindex, nofollow, noarchive
 
 /sw.js
@@ -50,11 +52,6 @@
 /sitemap.xml
   Cache-Control: public, max-age=3600, must-revalidate
 
-/login
-  Cache-Control: private, no-store, max-age=0
-
-/register
-  Cache-Control: private, no-store, max-age=0
 
 /onboarding*
   Cache-Control: private, no-store, max-age=0
