@@ -32,11 +32,40 @@
 /cookies
   Cache-Control: public, max-age=300, must-revalidate
 
+/faq/
+  Cache-Control: public, max-age=300, must-revalidate
+
+/safety/
+  Cache-Control: public, max-age=300, must-revalidate
+
+/terms/
+  Cache-Control: public, max-age=300, must-revalidate
+
+/cookies/
+  Cache-Control: public, max-age=300, must-revalidate
+
 /robots.txt
   Cache-Control: public, max-age=3600, must-revalidate
 
 /sitemap.xml
   Cache-Control: public, max-age=3600, must-revalidate
+
+/login
+  Cache-Control: private, no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/register
+  Cache-Control: private, no-store, max-age=0
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/onboarding*
+  Cache-Control: private, no-store, max-age=0
+
+/set-initial-password*
+  Cache-Control: private, no-store, max-age=0
+
+/api/*
+  Cache-Control: private, no-store, max-age=0
 
 /discover
   Cache-Control: private, no-store, max-age=0
@@ -50,13 +79,34 @@
 /conversations
   Cache-Control: private, no-store, max-age=0
 
-/chat/*
+/chat*
   Cache-Control: private, no-store, max-age=0
 
 /profile*
   Cache-Control: private, no-store, max-age=0
 
-/admin/*
+/admin*
+  Cache-Control: private, no-store, max-age=0
+
+/support*
+  Cache-Control: private, no-store, max-age=0
+
+/subscription*
+  Cache-Control: private, no-store, max-age=0
+
+/manage-subscription*
+  Cache-Control: private, no-store, max-age=0
+
+/store*
+  Cache-Control: private, no-store, max-age=0
+
+/dark-fantasy*
+  Cache-Control: private, no-store, max-age=0
+
+/notifications*
+  Cache-Control: private, no-store, max-age=0
+
+/settings*
   Cache-Control: private, no-store, max-age=0
 
 /static/*
