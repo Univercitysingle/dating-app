@@ -4768,3 +4768,46 @@ test("GPS location updates reject underage users before storing coordinates", as
   assert.equal(result.status, 403);
   assert.equal(writes, 0);
 });
+
+
+test("Discover rejects stale GPS coordinates before running a distance query", async () => {
+  const currentUser = {
+    uid: "stale-viewer", gender: "Male", preference: "everyone", blocked: [],
+    location: { type: "Point", coordinates: [55.27, 25.2] },
+    locationSharing: { enabled: true, updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) }
+  };
+  let aggregateCalled = false;
+  const db = { collection: name => {
+    assert.equal(name, "users");
+    return {
+      findOne: async () => currentUser,
+      aggregate: async () => { aggregateCalled = true; throw new Error("must not query stale GPS"); }
+    };
+  } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {}; connection.getClient = async () => ({}); connection.getDatabase = () => db;
+  const result = await connection.discoverUsers("stale-viewer", { maxDistance: 25 });
+  assert.equal(result.status, 409);
+  assert.equal(aggregateCalled, false);
+});
+
+test("Discover rejects future-dated GPS timestamps before running a distance query", async () => {
+  const currentUser = {
+    uid: "future-viewer", gender: "Male", preference: "everyone", blocked: [],
+    location: { type: "Point", coordinates: [55.27, 25.2] },
+    locationSharing: { enabled: true, updatedAt: new Date(Date.now() + 60 * 60 * 1000) }
+  };
+  let aggregateCalled = false;
+  const db = { collection: name => {
+    assert.equal(name, "users");
+    return {
+      findOne: async () => currentUser,
+      aggregate: async () => { aggregateCalled = true; throw new Error("must not query future-dated GPS"); }
+    };
+  } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {}; connection.getClient = async () => ({}); connection.getDatabase = () => db;
+  const result = await connection.discoverUsers("future-viewer", { maxDistance: 25 });
+  assert.equal(result.status, 409);
+  assert.equal(aggregateCalled, false);
+});
