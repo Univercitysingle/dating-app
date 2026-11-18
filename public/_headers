@@ -52,11 +52,9 @@
 
 /login
   Cache-Control: private, no-store, max-age=0
-  X-Robots-Tag: noindex, nofollow, noarchive
 
 /register
   Cache-Control: private, no-store, max-age=0
-  X-Robots-Tag: noindex, nofollow, noarchive
 
 /onboarding*
   Cache-Control: private, no-store, max-age=0
@@ -92,6 +90,9 @@
   Cache-Control: private, no-store, max-age=0
 
 /subscription*
+  Cache-Control: private, no-store, max-age=0
+
+/premium*
   Cache-Control: private, no-store, max-age=0
 
 /manage-subscription*
