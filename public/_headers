@@ -17,3 +17,48 @@
 
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
+
+/ 
+  Cache-Control: public, max-age=300, must-revalidate
+
+/faq
+  Cache-Control: public, max-age=300, must-revalidate
+
+/safety
+  Cache-Control: public, max-age=300, must-revalidate
+
+/terms
+  Cache-Control: public, max-age=300, must-revalidate
+
+/cookies
+  Cache-Control: public, max-age=300, must-revalidate
+
+/robots.txt
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/sitemap.xml
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/discover
+  Cache-Control: private, no-store, max-age=0
+
+/likes
+  Cache-Control: private, no-store, max-age=0
+
+/matches
+  Cache-Control: private, no-store, max-age=0
+
+/conversations
+  Cache-Control: private, no-store, max-age=0
+
+/chat/*
+  Cache-Control: private, no-store, max-age=0
+
+/profile*
+  Cache-Control: private, no-store, max-age=0
+
+/admin/*
+  Cache-Control: private, no-store, max-age=0
+
+/static/*
+  Cache-Control: public, max-age=31536000, immutable
