@@ -20,6 +20,7 @@ import BadgesDisplay from '../components/BadgesDisplay';
 import { API_URL } from '../utils/constants';
 import SectionCard from '../components/profile/SectionCard';
 import NotificationPreferencesPanel from '../components/NotificationPreferencesPanel';
+import PartnerLinkPanel from '../components/PartnerLinkPanel';
 import LoadingState from '../components/LoadingState';
 import { getUserFriendlyError } from '../utils/apiErrors';
 
@@ -567,6 +568,8 @@ function Profile() {
 
                       {isOwnProfile && <NotificationPreferencesPanel />}
 
+                      {isOwnProfile && <div className="my-6"><PartnerLinkPanel /></div>}
+
                       {isOwnProfile && <PhotoVerificationPanel isVerified={profile.isVerified === true} photos={profile.photos || []} />}
 
                       <div className="profile-settings-group">
@@ -736,6 +739,7 @@ function Profile() {
             )}
 
             {renderContent()}
+            {!isOwnProfile && activeTab === 'profile' && <div className="mt-6"><PartnerLinkPanel targetUid={profile.uid} /></div>}
         </div>
     </div>
   );
