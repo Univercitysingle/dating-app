@@ -4423,10 +4423,61 @@ test("relationship preferences require explicit consent and persist only on the 
   assert.equal(saved.consent, true);
   assert.deepEqual(saved.relationshipIntent, ["exploring", "casual_dating"]);
   assert.deepEqual(saved.desires, ["roleplay", "sensory_experiences"]);
+  assert.deepEqual(saved.visibility, {
+    relationshipIntent: "private", relationshipStyles: "private",
+    desires: "private", curiosities: "private", boundaries: "private"
+  });
 
   const fetched = await connection.getRelationshipPreferences("desire-owner");
   assert.equal(fetched.status, 200);
   assert.deepEqual(fetched.body.boundaries, ["no_pressure", "privacy_first"]);
+});
+
+
+test("relationship preference visibility exposes only explicitly public intent and styles", async () => {
+  const now = new Date();
+  const target = {
+    uid: "visibility-target", name: "Target", gender: "Female", isProfileVisible: true, blocked: [],
+    relationshipPreferences: {
+      consent: true,
+      relationshipIntent: ["long_term"],
+      relationshipStyles: ["monogamy"],
+      desires: ["roleplay"],
+      curiosities: ["new_experiences"],
+      boundaries: ["privacy_first"],
+      visibility: { relationshipIntent: "public", relationshipStyles: "private" }
+    }
+  };
+  const viewer = { uid: "visibility-viewer", role: "user", blocked: [] };
+  const db = { collection: () => ({ findOne: async ({ uid }) => uid === target.uid ? target : viewer }) };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getUserProfile(target.uid, viewer.uid);
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.relationshipDiscovery, { relationshipIntent: ["long_term"] });
+  assert.equal(Object.hasOwn(result.body, "relationshipPreferences"), false);
+  assert.equal(JSON.stringify(result.body).includes("roleplay"), false);
+  assert.equal(JSON.stringify(result.body).includes("privacy_first"), false);
+});
+
+test("relationship preference visibility rejects attempts to publish desires, curiosities or boundaries", async () => {
+  const now = new Date();
+  const user = { uid: "visibility-owner", birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()), accountStatus: "active" };
+  let writes = 0;
+  const db = { collection: () => ({
+    findOne: async () => user,
+    updateOne: async () => { writes++; return { matchedCount: 1 }; }
+  }) };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.saveRelationshipPreferences("visibility-owner", {
+    consent: true, relationshipIntent: [], relationshipStyles: [], desires: [], curiosities: [], boundaries: [],
+    visibility: { desires: "public" }
+  });
+  assert.equal(result.status, 400);
+  assert.equal(writes, 0);
 });
 
 test("relationship preferences reject underage accounts and unknown catalogue values", async () => {
