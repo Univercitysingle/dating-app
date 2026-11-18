@@ -40,7 +40,7 @@ The current product documentation catalogue is linked from the root README. This
 
 ## Current deployment status (2026-11-11)
 
-GitHub Actions quota is currently exhausted. Do not assume that a branch push or successful historical workflow means the latest frontend is deployed. The current call-quality source revision is `bf5c435553c6f18cc5a80e5b14df68e1c69249ca`; deployment of that revision is not confirmed. Once quota is restored, run the Pages workflow from `migrate-to-serverless`, verify the exact checked-out SHA and deployment URL in Cloudflare Pages, then test login, profile, discovery, same-origin API proxy and chat with staging accounts. Keep production DNS and `main` unchanged. Do not modify the CDN Worker as part of Pages deployment.
+Historical note: Actions quota was previously reported exhausted. Pages run [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) completed successfully on 2026-11-18 for application source `f4fd891027c8b486f5f8609e9e7db1051988d56c`. It passed dependency gates, frontend/backend tests, SEO validation, build, staging deployment, deployed asset/API-routing checks and passive OWASP ZAP. This proves staging deployment only. Keep production DNS and `main` unchanged until separate production approval and acceptance. Do not modify the CDN Worker as part of Pages deployment.
 
 
 ## Documentation completeness and evidence controls (2026-11-11)
@@ -48,3 +48,13 @@ GitHub Actions quota is currently exhausted. Do not assume that a branch push or
 This document must distinguish source implementation, automated test coverage, staging deployment, live-provider validation, and production acceptance. For every requirement, record an owner, status, evidence link or test identifier, last verified commit, dependencies, rollback impact, and next action. Never mark an item complete solely because it appears in source or a unit test. Reconcile this document against the live route registrations, Worker configuration, database schema/indexes, frontend call sites, and deployment workflow before release.
 
 Open cross-document gaps to close and track: (1) full API route/method/authentication/authorization/request/response/error contract; (2) MongoDB collection schemas, indexes, uniqueness, TTL and migration/rollback rules; (3) Firebase RTDB path/rule matrix and push notification subscription/delivery/retry lifecycle; (4) MongoDB backup/restore and Firebase recovery drills with approved RPO/RTO; (5) payment callback replay, reconciliation, refunds, stale-pending recovery and duplicate settlement evidence; (6) moderation case lifecycle, user/admin message edit/delete permissions and immutable audit events; (7) account export/deletion propagation and backup retention; (8) supported browser/device, PWA/offline and notification-permission matrix; (9) keyboard, screen-reader, contrast and form-accessibility checks; (10) localization, timezone and RTL readiness. These are tracked requirements, not claims that the features are implemented.
+
+
+## Staging deployment evidence refresh (2026-11-18)
+
+The latest paired staging runs for application source `f4fd891027c8b486f5f8609e9e7db1051988d56c` are:
+
+- Pages: [44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520), successful.
+- Worker: [44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558), successful.
+- Both workflows checked out `migrate-to-serverless`. Pages deployment selected `dating-app-staging`; Worker deployment targeted `dating-app-api-staging`.
+- The Pages workflow is deliberately staging-only and refuses a non-staging Pages project. The Worker Wrangler configuration currently defines a staging environment only. No production cutover occurred.
