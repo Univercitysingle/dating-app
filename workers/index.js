@@ -881,6 +881,44 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/users/me/partner-link") {
+      if (!["GET", "POST", "PATCH"].includes(request.method)) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: "Partner-link service unavailable" }, 503);
+      const payload = request.method === "GET" ? {} : await request.json().catch(() => null);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return json({ error: "A JSON partner-link request is required" }, 400);
+      }
+      const action = request.method === "GET" ? "list" : request.method === "POST" ? "invite" : payload.action;
+      if (!["list", "invite", "accept", "decline", "revoke"].includes(action)) {
+        return json({ error: "Unsupported partner-link action" }, 400);
+      }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (action === "invite" && env.RATE_LIMITER) {
+          const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName("partner-link:" + claims.sub));
+          const limitedResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "partner-link-invite", limit: 5, windowMs: 24 * 60 * 60 * 1000 })
+          });
+          if (!limitedResponse.ok) return json({ error: "Partner-link rate limit service unavailable" }, 503);
+          const quota = await limitedResponse.json();
+          if (!quota.allowed) return json({ error: "You have reached the daily partner-link invitation limit." }, 429);
+        }
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
+        const response = await connection.fetch("https://internal.invalid/internal/users/me/partner-link", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims, action, payload })
+        });
+        const body = await response.json().catch(() => ({ error: "Partner-link service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Partner-link service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/me/desires") {
       if (!["GET", "PUT", "DELETE"].includes(request.method)) return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
