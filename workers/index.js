@@ -537,18 +537,19 @@ export class RateLimiter {
     const now = Date.now();
     const windowMs = Number.isInteger(body.windowMs) && body.windowMs >= 1000 && body.windowMs <= 86400000 ? body.windowMs : 60000;
     const limit = Number.isInteger(body.limit) && body.limit >= 1 && body.limit <= 10000 ? body.limit : 60;
-    const increment = async (storage) => {
-      const record = (await storage.get(body.key)) || { count: 0, resetAt: now + windowMs };
+    const increment = async () => {
+      const record = (await this.state.storage.get(body.key)) || { count: 0, resetAt: now + windowMs };
       const current = record.resetAt <= now ? { count: 0, resetAt: now + windowMs } : record;
       current.count += 1;
-      await storage.put(body.key, current);
+      await this.state.storage.put(body.key, current);
       return current;
     };
-    // Durable Object storage transactions prevent concurrent requests from
-    // overwriting each other's counters at the limit boundary.
+    // RATE_LIMITER is a SQLite-backed Durable Object. Its transaction callback
+    // operates on this.state.storage directly; the legacy txn argument is not
+    // the storage interface for SQLite-backed classes.
     const current = typeof this.state.storage.transaction === "function"
       ? await this.state.storage.transaction(increment)
-      : await increment(this.state.storage);
+      : await increment();
     return json({ allowed: current.count <= limit, remaining: Math.max(0, limit - current.count), resetAt: current.resetAt });
   }
 }
