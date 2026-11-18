@@ -136,7 +136,7 @@ describe('Filter component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Apply Filters/ }));
 
     expect(onApply).not.toHaveBeenCalled();
-    expect(screen.getByText(/refresh GPS before applying/i)).toBeInTheDocument();
+    expect(screen.getByText(/Enable or refresh GPS location before using nearby discovery/i)).toBeInTheDocument();
   });
 
   it('does not apply nearby filters when browser GPS permission is denied', async () => {
