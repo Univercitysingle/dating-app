@@ -215,7 +215,7 @@ const Register = () => {
           </button>
           <p className="register-legal">
             By creating an account, you confirm that you are 18 or older and agree to our
-            {' '}<Link to="/terms">Terms</Link> and <Link to="/privacy">Privacy Policy</Link>.
+            {' '}<Link to="/terms">Terms</Link> and <Link to="/privacy-settings">Privacy settings</Link>.
           </p>
           <p className="register-signin">Already a member? <Link to="/login">Sign in</Link></p>
         </form>
