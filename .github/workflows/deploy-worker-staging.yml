@@ -151,7 +151,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          deploy_args=(deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "MONGODB_DATABASE:$MONGODB_DATABASE" --var "CDN_HOSTNAME:$CDN_HOSTNAME")
+          deploy_args=(deploy --config wrangler.jsonc --env staging --var "FIREBASE_PROJECT_ID:$FIREBASE_PROJECT_ID" --var "CDN_HOSTNAME:$CDN_HOSTNAME")
           if [[ -n "$FRONTEND_URL" ]]; then deploy_args+=(--var "FRONTEND_URL:$FRONTEND_URL"); fi
           npx --yes wrangler@4 "${deploy_args[@]}" 2>&1 | tee /tmp/wrangler-deploy.log
           WORKER_URL="$(grep -Eo 'https://dating-app-api-staging\.[a-z0-9-]+\.workers\.dev' /tmp/wrangler-deploy.log | tail -n 1 || true)"
