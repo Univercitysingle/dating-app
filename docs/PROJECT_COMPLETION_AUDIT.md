@@ -113,3 +113,21 @@ The API catalogue is based on `workers/index.js` blob `f11fd484cf79dc56cb0947425
 The audit identified three material source/configuration issues requiring engineering follow-up: (1) the generic edge IP rate limiter excludes `/api/calls/*`, so call-specific abuse controls need explicit verification; (2) admin purchase approve/reject routes remain in Worker source and must be reconciled with the intended payment-gateway-authoritative workflow; and (3) Dark Fantasy country gating is inconsistent because some handlers accept wildcard configuration while the catalogue gate rejects it. Keep the feature gated until the policy and implementation are aligned and tested.
 
 The legacy Mongoose schemas must not be treated as the authoritative schema for direct Worker writes. Confirm actual Atlas indexes, database selection, uniqueness constraints and TTL policies from the live environment before any migration or destructive DDL.
+
+
+## Deployment and release-readiness refresh (2026-11-18)
+
+The following evidence supersedes the older deployment timestamps above for the current migration branch:
+
+- **Application source revision:** `f4fd891027c8b486f5f8609e9e7db1051988d56c`.
+- **Cloudflare Worker staging:** [run 44266691558](https://github.com/Univercitysingle/dating-app/actions/runs/44266691558) succeeded. Worker tests, dependency installation, Turnix credential issuance, deployment, secret configuration, liveness/readiness with MongoDB, anonymous-access rejection checks, route inventory and passive OWASP ZAP completed successfully.
+- **Cloudflare Pages staging:** [run 44266691520](https://github.com/Univercitysingle/dating-app/actions/runs/44266691520) succeeded. Dependency gates, frontend/backend regression tests, SEO validation, build, deployment, deployed asset/API-routing checks and passive OWASP ZAP completed successfully.
+- **Security scan interpretation:** Both passive ZAP scans had zero new FAIL findings. Pages scan produced seven warning categories; Worker scan produced one warning category. These passive scans do not replace authenticated DAST, manual testing or a full VAPT retest.
+- **Dependency status:** Root and backend npm audits each still report six moderate findings involving `glob@10.5.0` and nested `minimatch@9.0.9`. The high-severity `picomatch` findings are accepted only under the existing development-only exception. No zero-vulnerability claim is made.
+- **Current branch HEAD:** Documentation commit `2caadb1a6ba383e373018b2339e6e7c6f87f5a02` follows the deployed application source commit. The application source revision deployed to staging is unchanged by this documentation-only commit.
+- **Production is not configured by these workflows:** The Pages workflow explicitly refuses any Pages project other than `dating-app-staging`; `wrangler.jsonc` contains a staging environment but no production environment; the active branch contains no production deployment workflow. Therefore, the successful runs above establish staging deployment only.
+- **Release governance:** The migration branch has branch protection disabled and no required status checks. Draft PR #31 is reported as not mergeable; the branch is 2,038 commits ahead and five commits behind `main`. Do not merge or modify `main` under the current project constraints.
+
+## Remaining production acceptance blockers
+
+Production release remains blocked until all of the following have evidence: production Cloudflare Pages project/domain and Worker environment configuration; production-scoped secrets and bindings; tested rollback and database recovery; payment-provider signed callback, replay, amount/currency/order binding and settlement/refund tests; deployed Firebase RTDB rules and negative cross-user access tests; real authenticated multi-account journeys; real-device WebRTC/TURN tests; CDN upload/read/delete acceptance without modifying the CDN Worker; authenticated DAST and manual security review; and repeatable load testing for the 1,000-concurrent-user target. Legal, privacy and payment-provider approvals must also be recorded where applicable.
