@@ -4976,3 +4976,73 @@ test("partner links reject requests when either member has disabled partner link
   assert.equal(result.status, 403);
   assert.equal(inserted, false);
 });
+
+
+test("refreshing GPS updates freshness without resetting the original consent timestamp", async () => {
+  const consentAt = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const user = {
+    _id: "location-consent-user",
+    uid: "location-consent-user",
+    birthday: new Date(Date.now() - 30 * 365.25 * 24 * 60 * 60 * 1000),
+    location: { type: "Point", coordinates: [55.27, 25.2], city: "Dubai" },
+    locationSharing: { enabled: true, source: "browser_geolocation", consentAt, updatedAt: consentAt }
+  };
+  let saved;
+  const users = {
+    findOne: async () => user,
+    updateOne: async (_query, update) => { saved = update.$set; return { matchedCount: 1 }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return users;
+  } });
+
+  const result = await connection.saveUserLocation("location-consent-user", {
+    latitude: 25.21, longitude: 55.28, accuracyMeters: 25
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(saved.locationSharing.consentAt, consentAt);
+  assert.ok(saved.locationSharing.updatedAt instanceof Date);
+  assert.ok(saved.locationSharing.updatedAt.getTime() > consentAt.getTime());
+  assert.deepEqual(saved.location.coordinates, [55.28, 25.21]);
+});
+
+test("withdrawing relationship discovery consent removes all saved sensitive preferences", async () => {
+  let update;
+  const user = {
+    uid: "consent-owner",
+    relationshipPreferences: {
+      consent: true,
+      relationshipIntent: ["long_term"],
+      relationshipStyles: ["monogamy"],
+      desires: ["roleplay"],
+      curiosities: ["new_experiences"],
+      boundaries: ["privacy_first"]
+    }
+  };
+  const users = {
+    findOne: async () => user,
+    updateOne: async (_query, value) => {
+      update = value;
+      delete user.relationshipPreferences;
+      return { matchedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return users;
+  } });
+
+  const result = await connection.deleteRelationshipPreferences("consent-owner");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.consentRevoked, true);
+  assert.deepEqual(update.$unset, { relationshipPreferences: "" });
+  assert.ok(update.$set.updatedAt instanceof Date);
+  assert.equal(Object.hasOwn(user, "relationshipPreferences"), false);
+});
