@@ -295,6 +295,9 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
   if (checkoutUrl.protocol !== "https:" || checkoutUrl.username || checkoutUrl.password || checkoutUrl.hash) {
     throw new Error("WEBXPAY_CHECKOUT_URL must be a valid HTTPS checkout endpoint");
   }
+  if (env.MIGRATION_STAGE !== "staging" && checkoutUrl.hostname.toLowerCase() === "stagingxpay.info") {
+    throw new Error("The WebXPay staging endpoint cannot be used outside the staging environment");
+  }
   const returnUrl = new URL(returnPath, frontend);
   returnUrl.searchParams.set("purchaseId", order.orderId);
   const encryptedPayment = publicEncrypt({
