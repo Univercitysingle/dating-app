@@ -810,17 +810,14 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const ip = request.headers.get("CF-Connecting-IP") || "";
-        const isPrivateIp = /^(::1|127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/.test(ip);
-        if (isPrivateIp || !ip) {
-          return json({ ip, city: "Private Network", country: "N/A" });
-        }
         const cf = request.cf || {};
         const city = typeof cf.city === "string" ? cf.city : "";
         const region = typeof cf.region === "string" ? cf.region : "";
         const country = typeof cf.country === "string" ? cf.country : "";
-        if (!city && !region && !country) return json({ error: "Geolocation data not found." }, 404);
-        return json({ ip, city, region, country, loc: cf.latitude && cf.longitude ? cf.latitude + "," + cf.longitude : undefined, timezone: typeof cf.timezone === "string" ? cf.timezone : undefined });
+        if (!city && !region && !country) return json({ error: "Coarse network location is unavailable." }, 404);
+        // Network-derived location is approximate context only. Never return the
+        // visitor IP or IP-derived coordinates from this helper.
+        return json({ city, region, country, timezone: typeof cf.timezone === "string" ? cf.timezone : undefined });
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
@@ -845,6 +842,44 @@ export default {
       }
     }
 
+
+    if (url.pathname === "/api/users/me/location") {
+      if (!["GET", "PUT", "DELETE"].includes(request.method)) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: "Location service unavailable" }, 503);
+      const payload = request.method === "PUT" ? await request.json().catch(() => null) : null;
+      if (request.method === "PUT" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+        return json({ error: "A GPS location object is required" }, 400);
+      }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (request.method === "PUT" && env.RATE_LIMITER) {
+          const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName("user-location:" + claims.sub));
+          const limitedResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "user-location", limit: 12, windowMs: 60 * 60 * 1000 })
+          });
+          if (!limitedResponse.ok) return json({ error: "Location rate limit service unavailable" }, 503);
+          const quota = await limitedResponse.json();
+          if (!quota.allowed) return json({ error: "Location can be refreshed up to 12 times per hour." }, 429);
+        }
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
+        const response = await connection.fetch("https://internal.invalid/internal/users/me/location", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            claims,
+            action: request.method === "GET" ? "get" : request.method === "PUT" ? "save" : "delete",
+            ...(payload ? { payload } : {})
+          })
+        });
+        const body = await response.json().catch(() => ({ error: "Location service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Location service unavailable" }, 503);
+      }
+    }
 
     if (url.pathname === "/api/users/me/desires") {
       if (!["GET", "PUT", "DELETE"].includes(request.method)) return json({ error: "Method not allowed" }, 405);
