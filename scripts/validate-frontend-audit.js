@@ -82,8 +82,8 @@ console.log(
 );
 if (blocking.length > 0) {
   console.warn(
-    `Scoped exception: ${allowedAdvisory} affects only picomatch packages marked dev-only ` +
-    'in the lockfile. These packages are used by the frontend build/test toolchain and are not part of the deployed Pages runtime.'
+    `Scoped exception: ${allowedAdvisory} propagates through development-only build/test dependencies to picomatch. ` +
+    'All affected package nodes are marked dev-only in the lockfile and are not part of the deployed Pages runtime.'
   );
 }
 console.log('No unexpected high or critical findings were found.');
