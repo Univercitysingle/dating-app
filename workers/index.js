@@ -771,7 +771,10 @@ export default {
           headers: { authorization: "Bearer " + payload.token }
         });
         const claims = await authenticateFirebaseRequest(authRequest, env.FIREBASE_PROJECT_ID);
-        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+        // Login receives the Firebase ID token in the JSON body, not the
+        // Authorization header. Select the same MongoDB shard that subsequent
+        // authenticated /api/users/* requests select from their bearer token.
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(authRequest, env));
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/profile", {
           method: "POST", headers: { "content-type": "application/json" },
