@@ -1386,6 +1386,7 @@ export class MongoDBConnection {
       const hasLocation = maxDistance !== null &&
         currentUser.locationSharing?.enabled === true &&
         currentUser.locationSharing.updatedAt instanceof Date &&
+        currentUser.locationSharing.updatedAt.getTime() <= Date.now() &&
         Date.now() - currentUser.locationSharing.updatedAt.getTime() <= 24 * 60 * 60 * 1000 &&
         Array.isArray(coordinates) && coordinates.length === 2 &&
         coordinates.every(Number.isFinite) &&
