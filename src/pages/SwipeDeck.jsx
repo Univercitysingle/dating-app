@@ -160,6 +160,7 @@ const SwipeDeck = () => {
     // that location sharing is still enabled and the GPS fix is fresh. This keeps
     // the preference useful across reloads without trusting stale browser storage.
     const loadInitialProfiles = async () => {
+      const initializationSequence = ++discoverRequestSequence.current;
       let locationStatus = null;
       if (filters.travelMode === 'nearby' && filters.maxDistance !== undefined) {
         try {
@@ -168,6 +169,7 @@ const SwipeDeck = () => {
           console.warn('Could not verify saved GPS consent. Loading without distance filtering.', locationError);
         }
       }
+      if (initializationSequence !== discoverRequestSequence.current) return;
       const initialRequestFilters = { ...filters };
       if (locationStatus?.enabled !== true || locationStatus?.stale === true) {
         delete initialRequestFilters.maxDistance;
