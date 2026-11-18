@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/apiClient';
 import { Link } from 'react-router-dom';
-import { resolvePhotoUrl } from '../utils/media';
+import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 import LoadingState from '../components/LoadingState';
 import { getUserFriendlyError } from '../utils/apiErrors';
 
@@ -42,7 +42,7 @@ const LikesPage = () => {
 
     return (
         <div className="page-container likes-page mx-auto w-full max-w-4xl p-4 sm:p-6">
-            <div className="mb-6"><p className="page-eyebrow">A LITTLE SPARK</p><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Who likes you</h1><p className="mt-2 text-sm text-gray-500">See who is interested and start a conversation.</p></div>
+            <header className="likes-heading mb-7 sm:mb-9"><p className="page-eyebrow">A LITTLE SPARK</p><div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">People who like you</h1><p className="mt-2 text-sm text-gray-500">A little interest can be the beginning of something lovely.</p></div><span className="likes-total">{users.length} {users.length === 1 ? "like" : "likes"}</span></div></header>
             {users.length > 0 ? (
                 <ul className="space-y-4">
                     {users.map((user, index) => (
@@ -52,9 +52,9 @@ const LikesPage = () => {
                         >
                             <div className="flex min-w-0 flex-1 items-center gap-4">
                                 <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-gray-100">
-                                    {user.photos?.[0]?.url ? (
+                                    {(typeof user.photos?.[0] === "string" ? user.photos[0] : user.photos?.[0]?.url) ? (
                                         <img
-                                            src={resolvePhotoUrl(user.photos[0].url)}
+                                            src={resolvePhotoUrl(typeof user.photos[0] === "string" ? user.photos[0] : user.photos[0].url)}
                                             alt=""
                                             loading="lazy"
                                             className={`h-full w-full object-cover ${user.isBlurred ? 'blur-md scale-110' : ''}`}
@@ -81,7 +81,7 @@ const LikesPage = () => {
                     ))}
                 </ul>
             ) : (
-                <div className="empty-state rounded-2xl p-10 text-center"><p className="text-lg font-semibold text-gray-800">No likes to show just yet</p><p className="mt-2 text-sm text-gray-500">Keep your profile fresh and check back soon.</p></div>
+                <div className="likes-empty"><div className="likes-empty-art" aria-hidden="true">♡</div><p className="page-eyebrow">GOOD THINGS TAKE TIME</p><h2>Your next connection could be around the corner.</h2><p>Keep your profile genuine, add a few great photos and explore people who share your interests.</p><Link to="/discover" className="app-primary-button likes-empty-action">Explore people</Link></div>
             )}
         </div>
     );
