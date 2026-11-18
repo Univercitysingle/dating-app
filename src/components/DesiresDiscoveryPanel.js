@@ -139,7 +139,7 @@ const DesiresDiscoveryPanel = () => {
       setConsent(true);
       setMessage('Your private preferences have been saved.');
     } catch (saveError) {
-      setError(saveError?.response?.data?.error || 'Your preferences could not be saved. Please try again.');
+      setError(saveError?.data?.error || saveError?.message || 'Your preferences could not be saved. Please try again.');
     } finally {
       setSaving(false);
     }

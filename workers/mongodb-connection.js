@@ -2950,7 +2950,7 @@ export class MongoDBConnection {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const user = await users.findOne(
         { uid },
-        { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1 } }
+        { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }
       );
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
@@ -3019,7 +3019,7 @@ export class MongoDBConnection {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const current = await users.findOne(
         { uid },
-        { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1 } }
+        { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1 } }
       );
       if (!current) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(current)) return { status: 403, body: { error: "This account is unavailable." } };
@@ -3062,7 +3062,7 @@ export class MongoDBConnection {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const current = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
       if (!current) return { status: 404, body: { error: "User not found" } };
-      if (isAccountRestricted(current)) return { status: 403, body: { error: "This account is unavailable." } };
+      // Consent withdrawal and deletion must remain available even if the account is restricted.
       await users.updateOne({ uid }, { $unset: { relationshipPreferences: "" }, $set: { updatedAt: new Date() } });
       return { status: 200, body: { deleted: true, consentRevoked: true } };
     } catch {
@@ -3092,6 +3092,8 @@ export class MongoDBConnection {
         return { status: 404, body: { error: "User not found" } };
       }
       const profile = { ...user };
+      // Relationship preferences are strictly owner-only, including for administrators.
+      if (!isOwner) delete profile.relationshipPreferences;
       // Never expose credentials or operational IP metadata in profile responses.
       delete profile.password;
       delete profile.lastLoginIp;
@@ -3296,7 +3298,7 @@ export class MongoDBConnection {
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
       const [items, totalUsers] = await Promise.all([
-        users.find(query, { projection: { password: 0, lastLoginIp: 0 } })
+        users.find(query, { projection: { password: 0, lastLoginIp: 0, relationshipPreferences: 0 } })
           .sort({ [sortField]: sortDirection, _id: 1 }).skip((page - 1) * limit).limit(limit).toArray(),
         users.countDocuments(query)
       ]);
@@ -3318,7 +3320,7 @@ export class MongoDBConnection {
     try {
       const { ObjectId } = await import("mongodb");
       const user = await this.getDatabase(await this.getClient()).collection("users").findOne(
-        { _id: new ObjectId(userId) }, { projection: { password: 0, lastLoginIp: 0 } }
+        { _id: new ObjectId(userId) }, { projection: { password: 0, lastLoginIp: 0, relationshipPreferences: 0 } }
       );
       if (!user) return { status: 404, body: { message: "User not found" } };
       if (access.role !== "superadmin") {
