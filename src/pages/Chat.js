@@ -517,7 +517,13 @@ function Chat() {
         </Link>
         <Link to={otherProfilePath} className="chat-participant-link flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left" aria-label={`View ${otherUser?.name || 'chat participant'}'s profile`}>
           <div aria-hidden="true" className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-pink-100 text-base font-bold text-pink-700 ring-1 ring-pink-100">
-            {otherUser?.photos?.[0]?.url ? <img src={resolvePhotoUrl(otherUser.photos[0].url)} alt="" className="h-full w-full object-cover" onError={(event) => { const image = event.currentTarget; const fallback = resolveWorkerPhotoUrl(otherUser.photos[0].url); if (fallback && image.src !== fallback) { image.src = fallback; return; } image.src = PLACEHOLDER_IMAGE; }} /> : (otherUser?.name || '?').trim().charAt(0).toUpperCase()}
+            {(() => {
+              const firstPhoto = otherUser?.photos?.[0];
+              const photoValue = typeof firstPhoto === 'string' ? firstPhoto : firstPhoto?.url;
+              return photoValue
+                ? <img src={resolvePhotoUrl(photoValue)} alt="" className="h-full w-full object-cover" onError={(event) => { const image = event.currentTarget; const fallback = resolveWorkerPhotoUrl(photoValue); if (fallback && image.src !== fallback) { image.src = fallback; return; } image.src = PLACEHOLDER_IMAGE; }} />
+                : (otherUser?.name || '?').trim().charAt(0).toUpperCase();
+            })()}
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-base font-bold text-gray-900">{otherUser?.name || 'Conversation'}</h2>
