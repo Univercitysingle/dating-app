@@ -1,3 +1,7 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { MongoDBConnection } from "./mongodb-connection.js";
+
 test("partner-link acceptance rechecks blocks and private opt-out boundaries", async () => {
   const { ObjectId } = await import("mongodb");
   const now = new Date();
