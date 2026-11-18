@@ -1,5 +1,5 @@
 # Matching and Discovery Specification
-Last reviewed: 2026-11-07.
+Last reviewed: 2026-11-18.
 
 Eligibility is server-authoritative and must satisfy both users' preferences, visibility, account status, age/location rules and product exclusions. Exclude self, blocked pairs in either direction, suspended/banned/deleted accounts and ineligible profiles.
 
@@ -10,7 +10,7 @@ Acceptance: preference combinations including Other/everyone where supported; re
 
 ## Current acceptance status (2026-11-11)
 
-This document defines required behaviour, not a claim that every edge case has passed. The current release priority remains authentication/profile management first, discovery/likes/matching second, then conversations/messaging. Require multi-account staging tests for reciprocal preference combinations, blocked pairs in both directions, duplicate/concurrent likes, pagination, unmatch and access revocation. GitHub Actions quota is exhausted, so no new automated acceptance run is available. Record exact source SHA and evidence before changing statuses to complete.
+This document defines required behaviour, not a claim that every edge case has passed. The current release priority remains authentication/profile management first, discovery/likes/matching second, then conversations/messaging. Require multi-account staging tests for reciprocal preference combinations, blocked pairs in both directions, duplicate/concurrent likes, pagination, unmatch and access revocation. The latest verified Cloudflare Pages workflow is run #725 at frontend commit `23fe494112f57870878221f9ba7da9ba2a29eac5` (success). The latest verified staging Worker deployment is run #1010 at Worker commit `d2ac08fcb21cc0baff4faadfbadf8f5563a14861` (success). The frontend commit is newer, but the intervening commits contain no Worker source changes. Record exact source SHA and evidence before changing feature statuses to complete.
 
 
 ## Operational completeness and acceptance gaps (2026-11-11)
