@@ -144,3 +144,42 @@ test("only the invited member can accept a pending partner link", async () => {
   assert.equal(result.status, 403);
   assert.equal(writes, 0);
 });
+
+test("either linked member can revoke an active partner link and the active reservation is released", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId();
+  const record = {
+    _id: id,
+    memberUids: ["partner-a", "partner-b"],
+    inviterUid: "partner-a",
+    inviteeUid: "partner-b",
+    status: "accepted",
+    activeKey: JSON.stringify(["partner-a", "partner-b"])
+  };
+  let updateFilter;
+  let updateDocument;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection: () => ({
+      createIndex: async () => "index",
+      findOne: async query => query.memberUids === "partner-a" ? record : null,
+      updateOne: async (filter, update) => {
+        updateFilter = filter;
+        updateDocument = update;
+        return { modifiedCount: 1 };
+      }
+    })
+  });
+
+  const result = await connection.managePartnerLink("partner-a", "revoke", { linkId: String(id) });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, "revoked");
+  assert.equal(updateFilter.memberUids, "partner-a");
+  assert.equal(updateFilter.status, "accepted");
+  assert.equal(updateDocument.$set.status, "revoked");
+  assert.equal(updateDocument.$set.revokedByUid, "partner-a");
+  assert.ok(updateDocument.$set.revokedAt instanceof Date);
+  assert.deepEqual(updateDocument.$unset, { activeKey: "" });
+});
+
