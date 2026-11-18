@@ -138,3 +138,12 @@ The frontend package classification and Pages audit gate have been corrected wit
 - The remaining `picomatch` advisory is not patched upstream as of this update. It remains tracked for reassessment when a fixed release is published. The moderate `glob` finding in the production dependency graph is still reported by the full audit and requires follow-up.
 
 This changes the security gate's scope, not the advisory status. The frontend still must pass regression tests, SEO validation, build, and Cloudflare Pages post-deployment checks before staging is considered deployed. No production deployment is authorized by this change.
+
+
+### Cloudflare Pages staging deployment result (2026-11-18)
+
+- Staging frontend deployed successfully from `migrate-to-serverless` in [workflow run 44263579159](https://github.com/Univercitysingle/dating-app/actions/runs/44263579159), source commit `cb9f32f12b900174145d17ea4862ca535e49d54c`.
+- Frontend and backend dependency installation, production high-severity audits, scoped full-audit validation, backend regression tests, frontend regression tests, public SEO validation, frontend build, Pages deployment, deployed SEO endpoints, and frontend asset/API-routing checks passed.
+- The OWASP ZAP passive baseline was still running when this status was recorded. Do not treat the workflow as fully complete until that step finishes.
+- Deployment target: `https://dating-app-staging.pages.dev`. The Worker remains the previously verified staging deployment. Production cutover was not performed.
+- Residual dependency findings: the upstream picomatch advisory remains limited to development/build dependencies under the documented scoped exception. Moderate findings, including glob and legacy AWS SDK v2/uuid findings, remain in the remediation backlog.
