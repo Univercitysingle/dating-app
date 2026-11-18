@@ -38,3 +38,19 @@ Important implementation distinction:
 
 Do not run schema/index migrations based solely on this document. Confirm duplicate data, backup/restore readiness and rollback first.
 
+
+
+
+## Proposed intent and consent data domains (2026-11-18)
+
+The new product specification proposes logical entities for profile preferences, profile intentions, profile tags, first-move preferences, profile links, discovery groups, group-match consents, Pings, private-media grants, privacy preferences and moderation events. These are logical boundaries only, not approved collection names or migrations.
+
+Before implementation:
+- Reconcile every proposed entity with the active Worker database catalog and existing collections to avoid duplicate sources of truth.
+- Classify orientation, relationship intention and desire data as sensitive. Restrict reads to the owner and explicitly authorised operations; never expose them by default in public profile responses, logs, analytics or advertising systems.
+- Model partner links as invitation/acceptance/revocation records with both user IDs, state transitions, timestamps and append-only audit events. Never share credentials or private chats.
+- Model group membership and group-match consent per individual member. Activate a group match only after every required member consents.
+- Model private-media access as explicit grants with owner, recipient, asset, expiry and revocation. Enforce authorization at the existing media delivery boundary; do not change the CDN Worker as part of this design.
+- Define indexes, uniqueness, TTL, deletion propagation, backup retention and rollback before any migration. Preserve MongoDB Atlas as primary and Firebase RTDB as the existing chat integration.
+
+See [Relationship Discovery, Intent and Consent Specification](../features/RELATIONSHIP_DISCOVERY_INTENT_AND_CONSENT_SPEC.md). No new collection, index or route is approved by this design document alone.
