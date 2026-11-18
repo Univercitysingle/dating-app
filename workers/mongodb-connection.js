@@ -1517,7 +1517,25 @@ export class MongoDBConnection {
           });
         }
         profile.superLikedByCurrentUser = superLikedBy.has(candidateUid);
-        result.push(sanitizePublicProfile(profile));
+        const safeProfile = sanitizePublicProfile(profile);
+        if (hasLocation && Array.isArray(user.location?.coordinates) && user.location.coordinates.length === 2) {
+          const [candidateLongitude, candidateLatitude] = user.location.coordinates;
+          const [viewerLongitude, viewerLatitude] = coordinates;
+          if ([candidateLongitude, candidateLatitude].every(Number.isFinite)) {
+            const radians = value => value * Math.PI / 180;
+            const latitudeDelta = radians(candidateLatitude - viewerLatitude);
+            const longitudeDelta = radians(candidateLongitude - viewerLongitude);
+            const haversine = Math.sin(latitudeDelta / 2) ** 2 +
+              Math.cos(radians(viewerLatitude)) * Math.cos(radians(candidateLatitude)) *
+              Math.sin(longitudeDelta / 2) ** 2;
+            const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+            safeProfile.distanceBand = distanceKm < 5 ? "Within 5 km"
+              : distanceKm < 15 ? "5 to 15 km"
+                : distanceKm < 30 ? "15 to 30 km"
+                  : distanceKm < 50 ? "30 to 50 km" : "50+ km";
+          }
+        }
+        result.push(safeProfile);
       }
       return { status: 200, body: result };
     } catch (error) {
