@@ -232,3 +232,26 @@ The first private-preferences slice is implemented on `migrate-to-serverless`:
 - Free-text fantasy descriptions, public visibility, match-only visibility, compatibility ranking and discovery filters are not part of this first slice. They require moderation, field-level authorization and reciprocal-eligibility work in the next phase.
 
 This is source implementation, not proof of deployment. Run Worker tests and frontend tests, then deploy to staging and verify owner access, public-profile non-disclosure, age restrictions, consent withdrawal and existing profile/discovery regressions before enabling this capability for members.
+
+## 2026-11-18 location-based discovery implementation
+
+The first location slice uses browser geolocation only after the member selects **Use my current location** in Discover filters and grants the browser permission.
+
+- GET /api/users/me/location reports whether location sharing is enabled and its last update time, without returning coordinates.
+- PUT /api/users/me/location stores a GeoJSON Point in the existing users.location field and records locationSharing consent metadata. Coordinates are accepted only when valid and browser-reported accuracy is 5 km or better.
+- DELETE /api/users/me/location revokes location sharing and removes GPS coordinates while preserving non-coordinate city/country metadata.
+- Location writes are authenticated, account-restricted, adult-account checked and rate-limited to 12 updates per hour when the rate-limiter binding is configured.
+- Distance filters require the viewer's explicit location opt-in and a location update no older than 24 hours. Candidate coordinates are used only when that candidate also opted in and updated within the previous 24 hours.
+- The existing users.location 2dsphere index is reused. No new collection or CDN change is required.
+- Public profile serialization does not return GPS coordinates. The legacy /api/geolocation helper now returns only coarse Cloudflare network location fields and no longer returns the visitor IP or IP-derived coordinates.
+
+This is a foreground, user-triggered location refresh, not continuous background tracking. Browser permission and device location availability remain under the member's control. Exact coordinates remain private; no map pin, address, or exact distance is exposed. The first release uses GPS for distance eligibility/filtering only. Approximate distance bands, travel-mode/commute preferences, city search, country/region fallback and privacy-preserving compatibility ranking remain follow-up work.
+
+### Location safety requirements
+
+- Do not use IP-derived location as a substitute for GPS consent.
+- Do not expose coordinates through profile APIs, discovery payloads, logs, analytics or admin listings.
+- Do not silently enable location sharing or continuously track in the background.
+- Revoke must immediately remove GPS coordinates from the active profile record and disable distance-based discovery.
+- Treat location as sensitive personal data and include it in account export/deletion and retention reviews.
+- Before international rollout, review location consent copy, retention and data-protection requirements for each launch jurisdiction.
