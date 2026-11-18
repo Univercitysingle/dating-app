@@ -4386,3 +4386,92 @@ test("caller cancellation before acceptance is not misreported as a completed ca
   assert.equal(result.body.call.endReason, "cancelled");
   assert.equal(result.body.call.durationSeconds, undefined);
 });
+
+
+test("relationship preferences require explicit consent and persist only on the owner's user record", async () => {
+  const now = new Date();
+  const user = { uid: "desire-owner", birthday: new Date(now.getFullYear() - 30, now.getMonth(), now.getDate()), accountStatus: "active" };
+  let saved = null;
+  const db = {
+    collection(name) {
+      assert.equal(name, "users");
+      return {
+        findOne: async () => ({ ...user, relationshipPreferences: saved }),
+        updateOne: async (_query, update) => { saved = update.$set.relationshipPreferences; return { matchedCount: 1 }; }
+      };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const rejected = await connection.saveRelationshipPreferences("desire-owner", {
+    consent: false, relationshipIntent: [], relationshipStyles: [], desires: [], curiosities: [], boundaries: []
+  });
+  assert.equal(rejected.status, 400);
+  assert.equal(saved, null);
+
+  const result = await connection.saveRelationshipPreferences("desire-owner", {
+    consent: true,
+    relationshipIntent: ["exploring", "casual_dating"],
+    relationshipStyles: ["ethical_non_monogamy"],
+    desires: ["roleplay", "sensory_experiences"],
+    curiosities: ["new_experiences"],
+    boundaries: ["no_pressure", "privacy_first"]
+  });
+  assert.equal(result.status, 200);
+  assert.equal(saved.consent, true);
+  assert.deepEqual(saved.relationshipIntent, ["exploring", "casual_dating"]);
+  assert.deepEqual(saved.desires, ["roleplay", "sensory_experiences"]);
+
+  const fetched = await connection.getRelationshipPreferences("desire-owner");
+  assert.equal(fetched.status, 200);
+  assert.deepEqual(fetched.body.boundaries, ["no_pressure", "privacy_first"]);
+});
+
+test("relationship preferences reject underage accounts and unknown catalogue values", async () => {
+  const underageUser = { uid: "young-user", birthday: new Date(Date.now() - 17 * 365.25 * 24 * 60 * 60 * 1000), accountStatus: "active" };
+  let writes = 0;
+  const db = {
+    collection() {
+      return {
+        findOne: async () => underageUser,
+        updateOne: async () => { writes++; return { matchedCount: 1 }; }
+      };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const payload = { consent: true, relationshipIntent: [], relationshipStyles: [], desires: ["unknown_tag"], curiosities: [], boundaries: [] };
+  const invalid = await connection.saveRelationshipPreferences("young-user", payload);
+  assert.equal(invalid.status, 400);
+  assert.equal(writes, 0);
+
+  const underage = await connection.getRelationshipPreferences("young-user");
+  assert.equal(underage.status, 403);
+  assert.equal(writes, 0);
+});
+
+test("relationship preferences are excluded from other members' public profile responses", async () => {
+  const target = {
+    uid: "desire-target", name: "Target", gender: "Female", isProfileVisible: true,
+    relationshipPreferences: { consent: true, desires: ["roleplay"], boundaries: ["privacy_first"] },
+    blocked: []
+  };
+  const viewer = { uid: "profile-viewer", role: "user", blocked: [] };
+  const db = {
+    collection(name) {
+      assert.equal(name, "users");
+      return { findOne: async ({ uid }) => uid === target.uid ? target : viewer };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  connection.getMediaUrl = value => value;
+
+  const response = await connection.getUserProfile(target.uid, viewer.uid);
+  assert.equal(response.status, 200);
+  assert.equal(response.body.relationshipPreferences, undefined);
+});

@@ -23,7 +23,7 @@ The following collection names were found in direct MongoDB operations in `worke
 
 | Collection | Purpose / observed fields | Notes |
 |---|---|---|
-| `users` | Firebase `uid`, email, name, profile, preferences, photos, location, role, account status, suspension/deletion markers, verification flags, subscription/entitlement state | Primary account/profile record. Public profile uses an allowlist; admin contact visibility differs by role. |
+| `users` | Firebase `uid`, email, name, profile, preferences, photos, location, role, account status, suspension/deletion markers, verification flags, subscription/entitlement state, private `relationshipPreferences` subdocument | Primary account/profile record. Public profile uses an allowlist; relationship preferences are owner-only and excluded from public profile serialization. |
 | `matches` | `user1Uid`, `user2Uid`, `status`, `likedBy`, `superLike`, timestamps | Mutual-like, match and unmatch state. |
 | `notifications` | `recipientUid`, `senderUid`, `type`, `status`, timestamps | Like/superlike/match and preference-driven events. |
 | `subscriptions` | `userId`, `plan`, `status`, start/end dates, Stripe legacy identifier and WebXPay order references | Payment and entitlement lifecycle. Source contains an index migration for Stripe IDs. |

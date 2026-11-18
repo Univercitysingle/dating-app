@@ -220,3 +220,15 @@ All endpoints require authentication, schema validation, ownership checks, rate 
 ## 14. Release constraints
 
 This roadmap is additive to the current platform. Preserve Cloudflare Pages/Workers, MongoDB Atlas as primary database, Firebase Realtime Database chat, and the existing CDN Worker. Do not introduce a new database or replace chat infrastructure to deliver these features. Keep all changes on migrate-to-serverless. Do not merge to main or deploy production without the required approval and release evidence.
+
+## Phase 1 implementation update (2026-11-18)
+
+The first private-preferences slice is implemented on `migrate-to-serverless`:
+- Added authenticated `GET/PUT/DELETE /api/users/me/desires` routes backed by the existing `users` collection. No new collection or migration is introduced.
+- The stored `relationshipPreferences` subdocument is private to its owner. Existing public profile serialization remains allowlist-based and deliberately excludes it.
+- Writes require explicit consent, a valid date of birth showing age 18 or older, an active account, bounded selections from a server-side allowlist, and an account-scoped update rate limit when the Durable Object rate limiter is configured.
+- Members can save relationship intentions, relationship styles, non-graphic desires/interests, curiosities and boundaries. Consent withdrawal deletes the complete subdocument.
+- The profile editor states clearly that these answers are private and are not yet displayed on public profiles or discovery cards.
+- Free-text fantasy descriptions, public visibility, match-only visibility, compatibility ranking and discovery filters are not part of this first slice. They require moderation, field-level authorization and reciprocal-eligibility work in the next phase.
+
+This is source implementation, not proof of deployment. Run Worker tests and frontend tests, then deploy to staging and verify owner access, public-profile non-disclosure, age restrictions, consent withdrawal and existing profile/discovery regressions before enabling this capability for members.

@@ -2942,6 +2942,134 @@ export class MongoDBConnection {
     }
   }
 
+  async getRelationshipPreferences(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const user = await users.findOne(
+        { uid },
+        { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1 } }
+      );
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
+      const birthday = user.birthday ? new Date(user.birthday) : null;
+      if (!birthday || Number.isNaN(birthday.getTime())) {
+        return { status: 403, body: { error: "Complete adult age verification before using Desires & Discovery." } };
+      }
+      const now = new Date();
+      let age = now.getFullYear() - birthday.getFullYear();
+      if (now.getMonth() < birthday.getMonth() ||
+          (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+      if (age < 18) return { status: 403, body: { error: "Desires & Discovery is available only to adults aged 18 or older." } };
+      const saved = user.relationshipPreferences;
+      return { status: 200, body: saved && saved.consent === true ? {
+        consent: true,
+        consentVersion: saved.consentVersion || 1,
+        consentAt: saved.consentAt || null,
+        relationshipIntent: Array.isArray(saved.relationshipIntent) ? saved.relationshipIntent : [],
+        relationshipStyles: Array.isArray(saved.relationshipStyles) ? saved.relationshipStyles : [],
+        desires: Array.isArray(saved.desires) ? saved.desires : [],
+        curiosities: Array.isArray(saved.curiosities) ? saved.curiosities : [],
+        boundaries: Array.isArray(saved.boundaries) ? saved.boundaries : [],
+        updatedAt: saved.updatedAt || null
+      } : {
+        consent: false,
+        relationshipIntent: [],
+        relationshipStyles: [],
+        desires: [],
+        curiosities: [],
+        boundaries: []
+      } };
+    } catch {
+      return { status: 503, body: { error: "Desires & Discovery preferences are unavailable." } };
+    }
+  }
+
+  async saveRelationshipPreferences(uid, payload = {}) {
+    if (typeof uid !== "string" || !uid || uid.length > 128 ||
+        !payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return { status: 400, body: { error: "Invalid preferences request" } };
+    }
+    if (payload.consent !== true) {
+      return { status: 400, body: { error: "Explicit consent is required to save these sensitive preferences." } };
+    }
+
+    const catalogues = {
+      relationshipIntent: new Set(["long_term", "casual_dating", "friendship", "exploring"]),
+      relationshipStyles: new Set(["monogamy", "open_relationship", "ethical_non_monogamy", "polyamory", "partner_inclusive", "group_connection"]),
+      desires: new Set(["romantic_exploration", "adventure", "roleplay", "sensory_experiences", "power_dynamics", "kink_aware", "shared_fantasies", "playful_experimentation"]),
+      curiosities: new Set(["new_experiences", "nontraditional_relationships", "group_social_experiences", "partner_inclusive_dating", "roleplay", "sensory_exploration"]),
+      boundaries: new Set(["no_unsolicited_explicit_media", "discuss_before_escalating", "no_pressure", "privacy_first", "no_group_invitations", "no_partner_linking"])
+    };
+    const limits = { relationshipIntent: 4, relationshipStyles: 6, desires: 8, curiosities: 6, boundaries: 6 };
+    const normalized = {};
+    for (const [field, allowed] of Object.entries(catalogues)) {
+      const values = payload[field] === undefined ? [] : payload[field];
+      if (!Array.isArray(values) || values.length > limits[field] ||
+          values.some(value => typeof value !== "string" || !allowed.has(value)) ||
+          new Set(values).size !== values.length) {
+        return { status: 400, body: { error: "Invalid or unsupported preference selection", field } };
+      }
+      normalized[field] = values.slice();
+    }
+
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const current = await users.findOne(
+        { uid },
+        { projection: { birthday: 1, relationshipPreferences: 1, accountStatus: 1, suspendedUntil: 1 } }
+      );
+      if (!current) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(current)) return { status: 403, body: { error: "This account is unavailable." } };
+      const birthday = current.birthday ? new Date(current.birthday) : null;
+      if (!birthday || Number.isNaN(birthday.getTime())) {
+        return { status: 403, body: { error: "Complete adult age verification before using Desires & Discovery." } };
+      }
+      const now = new Date();
+      let age = now.getFullYear() - birthday.getFullYear();
+      if (now.getMonth() < birthday.getMonth() ||
+          (now.getMonth() === birthday.getMonth() && now.getDate() < birthday.getDate())) age--;
+      if (age < 18) return { status: 403, body: { error: "Desires & Discovery is available only to adults aged 18 or older." } };
+
+      const previous = current.relationshipPreferences || {};
+      const preferences = {
+        consent: true,
+        consentVersion: 1,
+        consentAt: previous.consent === true && previous.consentAt ? previous.consentAt : now,
+        updatedAt: now,
+        ...normalized
+      };
+      await users.updateOne({ uid }, { $set: { relationshipPreferences: preferences, updatedAt: now } });
+      return { status: 200, body: {
+        consent: true,
+        consentVersion: preferences.consentVersion,
+        consentAt: preferences.consentAt,
+        updatedAt: preferences.updatedAt,
+        ...normalized
+      } };
+    } catch {
+      return { status: 503, body: { error: "Desires & Discovery preferences could not be saved." } };
+    }
+  }
+
+  async deleteRelationshipPreferences(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const users = this.getDatabase(await this.getClient()).collection("users");
+      const current = await users.findOne({ uid }, { projection: { accountStatus: 1, suspendedUntil: 1 } });
+      if (!current) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(current)) return { status: 403, body: { error: "This account is unavailable." } };
+      await users.updateOne({ uid }, { $unset: { relationshipPreferences: "" }, $set: { updatedAt: new Date() } });
+      return { status: 200, body: { deleted: true, consentRevoked: true } };
+    } catch {
+      return { status: 503, body: { error: "Desires & Discovery preferences could not be deleted." } };
+    }
+  }
+
   async getUserProfile(targetUid, viewerUid) {
     if (typeof targetUid !== "string" || !targetUid || targetUid.length > 128 ||
         typeof viewerUid !== "string" || !viewerUid || viewerUid.length > 128) {
@@ -6069,6 +6197,20 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.getUserProfile(body.targetUid, body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/users/me/desires") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string" ||
+          !["get", "save", "delete"].includes(body.action)) {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = body.action === "get"
+        ? await this.getRelationshipPreferences(body.claims.sub)
+        : body.action === "save"
+          ? await this.saveRelationshipPreferences(body.claims.sub, body.payload)
+          : await this.deleteRelationshipPreferences(body.claims.sub);
       return json(result.body, result.status);
     }
 

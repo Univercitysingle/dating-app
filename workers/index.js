@@ -846,6 +846,44 @@ export default {
     }
 
 
+    if (url.pathname === "/api/users/me/desires") {
+      if (!["GET", "PUT", "DELETE"].includes(request.method)) return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: "Desires service unavailable" }, 503);
+      const payload = request.method === "PUT" ? await request.json().catch(() => null) : null;
+      if (request.method === "PUT" && (!payload || typeof payload !== "object" || Array.isArray(payload))) {
+        return json({ error: "A JSON preferences object is required" }, 400);
+      }
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (request.method === "PUT" && env.RATE_LIMITER) {
+          const limiter = env.RATE_LIMITER.get(env.RATE_LIMITER.idFromName("relationship-preferences:" + claims.sub));
+          const limitedResponse = await limiter.fetch("https://rate-limiter.internal/check", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key: "relationship-preferences", limit: 10, windowMs: 60 * 60 * 1000 })
+          });
+          if (!limitedResponse.ok) return json({ error: "Preferences rate limit service unavailable" }, 503);
+          const quota = await limitedResponse.json();
+          if (!quota.allowed) return json({ error: "You have updated these preferences too often. Please try again later." }, 429);
+        }
+        const connection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
+        const response = await connection.fetch("https://internal.invalid/internal/users/me/desires", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            claims,
+            action: request.method === "GET" ? "get" : request.method === "PUT" ? "save" : "delete",
+            ...(payload ? { payload } : {})
+          })
+        });
+        const body = await response.json().catch(() => ({ error: "Desires service unavailable" }));
+        return json(body, response.status);
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Desires service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/me") {
       if (request.method !== "GET" && request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);

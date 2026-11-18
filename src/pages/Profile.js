@@ -9,6 +9,7 @@ import PhotoVerificationPanel from '../components/PhotoVerificationPanel';
 
 // Import all necessary components
 import InterestsDisplay from '../components/InterestsDisplay';
+import DesiresDiscoveryPanel from '../components/DesiresDiscoveryPanel';
 import InterestsEditor from '../components/InterestsEditor';
 import ProfilePromptsDisplay from '../components/ProfilePromptsDisplay';
 import ProfilePromptsEditor from '../components/ProfilePromptsEditor';
@@ -462,7 +463,13 @@ function Profile() {
                         <SectionCard title="Interests">
                             {isEditing ? <InterestsEditor initialInterests={editableFields.interests} onChange={(interests) => setEditableFields(prev => ({...prev, interests}))} /> : <InterestsDisplay interests={profile.interests || []} />}
                         </SectionCard>
-                        <SectionCard title="Personality Type">
+                        {isOwnProfile && (
+                        <SectionCard title="Desires & Discovery">
+                          <DesiresDiscoveryPanel />
+                        </SectionCard>
+                      )}
+
+                      <SectionCard title="Personality Type">
                           {isEditing ? (
                             <select
                               id="personalityType"
