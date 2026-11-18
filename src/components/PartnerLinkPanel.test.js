@@ -42,6 +42,7 @@ describe('PartnerLinkPanel', () => {
   });
 
   it('allows a member to invite the profile currently being viewed', async () => {
+    apiClient.get.mockResolvedValue({ links: [] });
     apiClient.post.mockResolvedValue({ status: 'pending' });
     render(<PartnerLinkPanel targetUid="member-target" />);
 
@@ -50,6 +51,17 @@ describe('PartnerLinkPanel', () => {
     await waitFor(() => expect(apiClient.post).toHaveBeenCalledWith('/users/me/partner-link', {
       targetUid: 'member-target'
     }));
+  });
+
+  it('prevents a duplicate invitation when a link already exists with the viewed profile', async () => {
+    apiClient.get.mockResolvedValue({ links: [{
+      id: '123456789012345678901234', status: 'pending', inviterUid: 'member-current',
+      inviteeUid: 'member-target', isIncoming: false
+    }] });
+    render(<PartnerLinkPanel targetUid="member-target" />);
+    expect(await screen.findByRole('status')).toHaveTextContent('You already invited this member.');
+    expect(screen.getByRole('button', { name: 'Partner link request exists' })).toBeDisabled();
+    expect(apiClient.post).not.toHaveBeenCalled();
   });
 
   it('does not show accept or decline controls for an outgoing invitation', async () => {
