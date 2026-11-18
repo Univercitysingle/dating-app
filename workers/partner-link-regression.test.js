@@ -252,3 +252,32 @@ test("simultaneous partner-link invitation loses the unique-index race with a co
   assert.match(result.body.error, /already has a pending or active partner link/i);
 });
 
+test("only the invited member can decline and only a linked member can revoke", async () => {
+  const { ObjectId } = await import("mongodb");
+  const id = new ObjectId();
+  const record = {
+    _id: id,
+    memberUids: ["partner-a", "partner-b"],
+    inviterUid: "partner-a",
+    inviteeUid: "partner-b",
+    status: "pending",
+    activeKey: JSON.stringify(["partner-a", "partner-b"])
+  };
+  let writes = 0;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection: () => ({
+      createIndex: async () => "index",
+      findOne: async query => query.memberUids === "partner-a" ? record : null,
+      updateOne: async () => { writes++; return { modifiedCount: 1 }; }
+    })
+  });
+
+  const inviterDecline = await connection.managePartnerLink("partner-a", "decline", { linkId: String(id) });
+  const unrelatedRevoke = await connection.managePartnerLink("partner-c", "revoke", { linkId: String(id) });
+  assert.equal(inviterDecline.status, 403);
+  assert.equal(unrelatedRevoke.status, 404);
+  assert.equal(writes, 0);
+});
+
