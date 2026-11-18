@@ -55,6 +55,20 @@ describe('PartnerLinkPanel', () => {
     }));
   });
 
+
+  it('fails closed when partner-link status cannot be verified and allows retry', async () => {
+    apiClient.get.mockRejectedValueOnce(new Error('network unavailable'));
+    render(<PartnerLinkPanel targetUid="member-target" />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to verify partner-link status');
+    expect(screen.getByRole('button', { name: 'Status unavailable' })).toBeDisabled();
+    expect(apiClient.post).not.toHaveBeenCalled();
+
+    apiClient.get.mockResolvedValueOnce({ links: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Retry status check' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Invite to partner link' })).toBeEnabled());
+  });
+
   it('prevents a duplicate invitation when a link already exists with the viewed profile', async () => {
     apiClient.get.mockResolvedValue({ links: [{
       id: '123456789012345678901234', status: 'pending', inviterUid: 'member-current',
