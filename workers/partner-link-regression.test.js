@@ -99,10 +99,11 @@ test("partner-link list marks invitations as incoming only for the invitee", asy
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({
     collection: () => ({
+      createIndex: async () => "index",
       find: query => ({
         sort: () => ({
           limit: () => ({
-            toArray: async () => query.memberUids === "partner-b" ? [record] : []
+            toArray: async () => record.memberUids.includes(query.memberUids) ? [record] : []
           })
         })
       })
