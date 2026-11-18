@@ -4550,3 +4550,32 @@ test("profile APIs hide precise GPS coordinates and location consent metadata fr
   assert.equal(result.body.locationSharing, undefined);
   assert.equal(result.body.relationshipPreferences, undefined);
 });
+
+test("Discover supports coarse city and country filters without GPS", async () => {
+  let capturedMatch;
+  const users = {
+    findOne: async ({ uid }) => ({ uid, gender: "Female", preference: "everyone", blocked: [] }),
+    aggregate: pipeline => { capturedMatch = pipeline[0].$match; return { toArray: async () => [] }; }
+  };
+  const db = { collection(name) { if (name === "users") return users; if (name === "matches") return { createIndex: async () => "ok" }; assert.fail(`Unexpected collection: ${name}`); } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {}; connection.getClient = async () => ({}); connection.getDatabase = () => db;
+  const result = await connection.discoverUsers("viewer", { city: "New York", country: "United States" });
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedMatch["location.city"], { $regex: "New York", $options: "i" });
+  assert.deepEqual(capturedMatch["location.country"], { $regex: "United States", $options: "i" });
+});
+
+test("Discover escapes regex metacharacters in city and country filters", async () => {
+  let capturedMatch;
+  const users = {
+    findOne: async ({ uid }) => ({ uid, gender: "Female", preference: "everyone", blocked: [] }),
+    aggregate: pipeline => { capturedMatch = pipeline[0].$match; return { toArray: async () => [] }; }
+  };
+  const db = { collection(name) { if (name === "users") return users; if (name === "matches") return { createIndex: async () => "ok" }; assert.fail(`Unexpected collection: ${name}`); } };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {}; connection.getClient = async () => ({}); connection.getDatabase = () => db;
+  const result = await connection.discoverUsers("viewer", { city: "New.*York" });
+  assert.equal(result.status, 200);
+  assert.equal(capturedMatch["location.city"].$regex, "New\\.\\*York");
+});
