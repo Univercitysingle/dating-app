@@ -2796,6 +2796,62 @@ test("central account guard blocks unverified non-admin Firebase identities", as
   assert.deepEqual(await response.json(), { error: "Email verification is required to use this service." });
 });
 
+test("central account guard permits verified phone sign-in for an existing account", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return {
+        async findOne(query) {
+          assert.deepEqual(query, { uid: "phone-user" });
+          return { uid: "phone-user", role: "user", accountStatus: "active" };
+        }
+      };
+    }
+  });
+  connection.ping = async () => ({ ok: true });
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      claims: {
+        sub: "phone-user",
+        email_verified: false,
+        phone_number: "+971501234567",
+        firebase: { sign_in_provider: "phone" }
+      }
+    })
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "ok" });
+});
+
+test("central account guard rejects phone sign-in without an existing account", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      assert.equal(name, "users");
+      return { async findOne() { return null; } };
+    }
+  });
+  const response = await connection.fetch(new Request("https://internal.invalid/internal/ping", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      claims: {
+        sub: "new-phone-user",
+        email_verified: false,
+        phone_number: "+971501234567",
+        firebase: { sign_in_provider: "phone" }
+      }
+    })
+  }));
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "Phone sign-in is available only for existing accounts." });
+});
+
 test("Firebase profile provisioning refuses accounts queued for deletion", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
