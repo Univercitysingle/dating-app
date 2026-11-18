@@ -82,7 +82,7 @@ function sanitizePublicProfile(profile) {
     "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education",
     "relationshipGoals", "familyStatus", "siblings", "religion", "politicalLeaning",
     "lookingFor", "pets", "lifestyle", "badges", "isVerified", "isOnboardingComplete",
-    "superLikedByCurrentUser"
+    "superLikedByCurrentUser", "relationshipDiscovery"
   ];
   const safe = {};
   for (const key of allowed) {
@@ -3124,6 +3124,13 @@ export class MongoDBConnection {
         desires: Array.isArray(saved.desires) ? saved.desires : [],
         curiosities: Array.isArray(saved.curiosities) ? saved.curiosities : [],
         boundaries: Array.isArray(saved.boundaries) ? saved.boundaries : [],
+        visibility: {
+          relationshipIntent: saved.visibility?.relationshipIntent === "public" ? "public" : "private",
+          relationshipStyles: saved.visibility?.relationshipStyles === "public" ? "public" : "private",
+          desires: "private",
+          curiosities: "private",
+          boundaries: "private"
+        },
         updatedAt: saved.updatedAt || null
       } : {
         consent: false,
@@ -3131,7 +3138,8 @@ export class MongoDBConnection {
         relationshipStyles: [],
         desires: [],
         curiosities: [],
-        boundaries: []
+        boundaries: [],
+        visibility: { relationshipIntent: "private", relationshipStyles: "private", desires: "private", curiosities: "private", boundaries: "private" }
       } };
     } catch {
       return { status: 503, body: { error: "Desires & Discovery preferences are unavailable." } };
@@ -3155,6 +3163,25 @@ export class MongoDBConnection {
       boundaries: new Set(["no_unsolicited_explicit_media", "discuss_before_escalating", "no_pressure", "privacy_first", "no_group_invitations", "no_partner_linking"])
     };
     const limits = { relationshipIntent: 4, relationshipStyles: 6, desires: 8, curiosities: 6, boundaries: 6 };
+    const visibilityInput = payload.visibility === undefined ? {} : payload.visibility;
+    if (!visibilityInput || typeof visibilityInput !== "object" || Array.isArray(visibilityInput)) {
+      return { status: 400, body: { error: "Invalid visibility settings" } };
+    }
+    const visibility = {
+      relationshipIntent: visibilityInput.relationshipIntent === "public" ? "public" : "private",
+      relationshipStyles: visibilityInput.relationshipStyles === "public" ? "public" : "private",
+      desires: "private",
+      curiosities: "private",
+      boundaries: "private"
+    };
+    if (["desires", "curiosities", "boundaries"].some(field => visibilityInput[field] !== undefined && visibilityInput[field] !== "private")) {
+      return { status: 400, body: { error: "Desires, curiosities and boundaries must remain private." } };
+    }
+    for (const field of ["relationshipIntent", "relationshipStyles"]) {
+      if (visibilityInput[field] !== undefined && !["private", "public"].includes(visibilityInput[field])) {
+        return { status: 400, body: { error: "Visibility must be private or public.", field } };
+      }
+    }
     const normalized = {};
     for (const [field, allowed] of Object.entries(catalogues)) {
       const values = payload[field] === undefined ? [] : payload[field];
@@ -3190,7 +3217,8 @@ export class MongoDBConnection {
         consentVersion: 1,
         consentAt: previous.consent === true && previous.consentAt ? previous.consentAt : now,
         updatedAt: now,
-        ...normalized
+        ...normalized,
+        visibility
       };
       await users.updateOne({ uid }, { $set: { relationshipPreferences: preferences, updatedAt: now } });
       return { status: 200, body: {
@@ -3198,7 +3226,8 @@ export class MongoDBConnection {
         consentVersion: preferences.consentVersion,
         consentAt: preferences.consentAt,
         updatedAt: preferences.updatedAt,
-        ...normalized
+        ...normalized,
+        visibility
       } };
     } catch {
       return { status: 503, body: { error: "Desires & Discovery preferences could not be saved." } };
@@ -3245,6 +3274,18 @@ export class MongoDBConnection {
       const profile = { ...user };
       // Relationship preferences are strictly owner-only, including for administrators.
       if (!isOwner) {
+        const preferences = profile.relationshipPreferences;
+        if (!isSuperAdmin && preferences?.consent === true) {
+          const visibility = preferences.visibility || {};
+          const relationshipDiscovery = {};
+          if (visibility.relationshipIntent === "public" && Array.isArray(preferences.relationshipIntent) && preferences.relationshipIntent.length) {
+            relationshipDiscovery.relationshipIntent = preferences.relationshipIntent.slice();
+          }
+          if (visibility.relationshipStyles === "public" && Array.isArray(preferences.relationshipStyles) && preferences.relationshipStyles.length) {
+            relationshipDiscovery.relationshipStyles = preferences.relationshipStyles.slice();
+          }
+          if (Object.keys(relationshipDiscovery).length) profile.relationshipDiscovery = relationshipDiscovery;
+        }
         delete profile.relationshipPreferences;
         stripPreciseLocation(profile);
       }
