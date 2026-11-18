@@ -131,3 +131,14 @@ Findings and operational statements remain open until a named owner supplies rep
 - The full audit still reports moderate findings, including `glob` in the production dependency graph. This update does not claim those moderate findings are fixed.
 - The Pages workflow has not yet completed with these changes. `npm ci`, the production audit, the full-audit policy script, frontend/backend tests, SEO validation, build, deployment, and post-deployment checks must all pass before staging is marked deployed.
 - Staging only. Production cutover remains out of scope.
+
+
+## Cloudflare Pages staging deployment result (2026-11-18)
+
+- Workflow: [44263579159](https://github.com/Univercitysingle/dating-app/actions/runs/44263579159)
+- Source commit: `cb9f32f12b900174145d17ea4862ca535e49d54c` on `migrate-to-serverless`.
+- Cloudflare Pages staging deployment: **successful** at `https://dating-app-staging.pages.dev`.
+- Passed: dependency installation; production high-severity audit gates for frontend and legacy backend; full audit policy validation for development-only picomatch paths; backend and frontend regression tests; public SEO validation; frontend build; Cloudflare Pages deployment; deployed SEO endpoint checks; frontend asset and API-routing checks.
+- OWASP ZAP passive baseline: **in progress at time of this record**. Record its final result before marking the complete workflow green.
+- Production cutover: not performed.
+- Residual: picomatch remains upstream-unpatched and scoped to development/build dependencies; moderate glob, AWS SDK v2 and uuid findings remain open for remediation.
