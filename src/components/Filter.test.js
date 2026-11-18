@@ -1,6 +1,19 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import apiClient from '../api/apiClient';
 import Filter from './Filter';
+
+jest.mock('../api/apiClient', () => ({
+  __esModule: true,
+  default: { get: jest.fn(), put: jest.fn(), delete: jest.fn() }
+}));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  apiClient.get.mockResolvedValue({ enabled: false, stale: false });
+  apiClient.put.mockResolvedValue({});
+  apiClient.delete.mockResolvedValue({});
+});
 
 describe('Filter component', () => {
   it('renders the filter drawer with international discovery defaults', () => {
@@ -77,4 +90,70 @@ describe('Filter component', () => {
     expect(screen.queryByLabelText('Destination city')).not.toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
   });
+
+  it('requests GPS only after the member explicitly chooses to use current location', async () => {
+    const getCurrentPosition = jest.fn();
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition }
+    });
+    render(<Filter onApply={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Discovery location'), { target: { value: 'nearby' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Use my current location' }));
+
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(getCurrentPosition).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), {
+      enableHighAccuracy: true, timeout: 15000, maximumAge: 60000
+    });
+
+    await act(async () => {
+      getCurrentPosition.mock.calls[0][0]({
+        coords: { latitude: 25.2, longitude: 55.27, accuracy: 35 }
+      });
+    });
+    expect(apiClient.put).toHaveBeenCalledWith('/users/me/location', {
+      latitude: 25.2, longitude: 55.27, accuracyMeters: 35
+    });
+    expect(await screen.findByText(/exact coordinates are private/i)).toBeInTheDocument();
+  });
+
+  it('revokes GPS sharing through the location API when the member turns it off', async () => {
+    apiClient.get.mockResolvedValue({ enabled: true, stale: false });
+    render(<Filter onApply={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Discovery location'), { target: { value: 'nearby' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn off' }));
+
+    expect(apiClient.delete).toHaveBeenCalledWith('/users/me/location');
+    expect(await screen.findByText('Location sharing is off. Distance filtering is disabled.')).toBeInTheDocument();
+  });
+
+  it('does not apply nearby filters when the saved GPS location is stale', async () => {
+    apiClient.get.mockResolvedValue({ enabled: true, stale: true });
+    const onApply = jest.fn();
+    render(<Filter onApply={onApply} />);
+    fireEvent.change(screen.getByLabelText('Discovery location'), { target: { value: 'nearby' } });
+    expect(await screen.findByText(/older than 24 hours/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Apply Filters/ }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(screen.getByText(/refresh GPS before applying/i)).toBeInTheDocument();
+  });
+
+  it('does not apply nearby filters when browser GPS permission is denied', async () => {
+    const getCurrentPosition = jest.fn((_success, error) => error({ code: 1 }));
+    Object.defineProperty(global.navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition }
+    });
+    const onApply = jest.fn();
+    render(<Filter onApply={onApply} />);
+    fireEvent.change(screen.getByLabelText('Discovery location'), { target: { value: 'nearby' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Use my current location' }));
+    expect(await screen.findByText(/Location permission was denied/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Apply Filters/ }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(apiClient.put).not.toHaveBeenCalled();
+  });
+
 });
