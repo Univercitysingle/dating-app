@@ -62,8 +62,8 @@ const Register = () => {
       await reload(credential.user);
       if (credential.user.emailVerified) {
         setCanResend(false);
-        setSuccess(true);
-        setError('This email is already verified. You can sign in and complete your profile.');
+        setError('This email is already verified. Sign in to complete your profile.');
+        return;
       } else {
         await sendEmailVerification(credential.user);
         setSuccess(true);
