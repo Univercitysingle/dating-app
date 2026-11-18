@@ -61,3 +61,12 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Source commit:** `9f60b8f002fd88f06e3dd86c1b8cac8b89c7a6cd`
 - **Regression-test commit:** `345bffaf4d1556637addc2ad1b69eb56d70fe4e5`
 - **Evidence status:** Tests added, not executed in this environment. Staging deployment and provider/browser validation are outstanding. This finding is not closed until the tests pass and the exact deployed revision is confirmed.
+
+
+## Call credential abuse protection update (2026-11-18)
+
+- **Finding:** Authenticated standard call ICE configuration and paid Video Rooms ICE configuration did not apply account-level rate limiting before obtaining ICE credentials.
+- **Change:** Added separate per-user Durable Object limiter scopes for standard calls and Video Rooms. Each scope permits 20 credential requests per 60-second window. Signalling, call polling, history and media streams are not covered by this limiter, avoiding broad throttling of normal call traffic. Limiter failures fail closed with HTTP 503.
+- **Source commit:** `b95de00790a11ee6ec24fa2f11223836e5ae9129`
+- **Regression-test commit:** `160f3bfefe7a179527e4f0d8fc389b94757f0fe9`
+- **Evidence status:** Test cases added for independent scopes, configured thresholds and fail-closed behaviour. Tests have not been executed in this environment. Staging deployment, real call setup/reconnect testing and provider usage verification remain outstanding. This is a source-level remediation, not a closed security finding.
