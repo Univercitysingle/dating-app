@@ -95,3 +95,31 @@ test("accepts a valid token when the optional user_id claim is absent", async ()
   });
   assert.equal(claimsResult.sub, "firebase-user-123");
 });
+
+
+test("reuses Firebase signing keys within the provider cache lifetime", async () => {
+  let fetchCount = 0;
+  const fetchImpl = async () => {
+    fetchCount += 1;
+    return new Response(JSON.stringify({ keys: [jwk] }), {
+      status: 200,
+      headers: { "content-type": "application/json", "cache-control": "public, max-age=300" }
+    });
+  };
+  const jwksCache = new Map();
+  await verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache });
+  await verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache });
+  assert.equal(fetchCount, 1);
+});
+
+test("does not cache malformed Firebase signing key responses", async () => {
+  let fetchCount = 0;
+  const fetchImpl = async () => {
+    fetchCount += 1;
+    return new Response(JSON.stringify({ unexpected: true }), { status: 200 });
+  };
+  const jwksCache = new Map();
+  await assert.rejects(verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache }), FirebaseKeyServiceError);
+  await assert.rejects(verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache }), FirebaseKeyServiceError);
+  assert.equal(fetchCount, 2);
+});
