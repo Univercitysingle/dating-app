@@ -1,4 +1,66 @@
 const JWKS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
+const DEFAULT_JWKS_TTL_MS = 5 * 60 * 1000;
+const MAX_JWKS_TTL_MS = 6 * 60 * 60 * 1000;
+const JWKS_FETCH_TIMEOUT_MS = 5000;
+const jwksCacheByFetcher = new WeakMap();
+
+function getJwksCache(fetchImpl) {
+  let cache = jwksCacheByFetcher.get(fetchImpl);
+  if (!cache) {
+    cache = new Map();
+    jwksCacheByFetcher.set(fetchImpl, cache);
+  }
+  return cache;
+}
+
+function getJwksTtl(response) {
+  const cacheControl = response.headers?.get?.("cache-control") || "";
+  const match = cacheControl.match(/(?:^|,)\\s*max-age=(\\d+)/i);
+  if (!match) return DEFAULT_JWKS_TTL_MS;
+  return Math.min(Number(match[1]) * 1000, MAX_JWKS_TTL_MS);
+}
+
+async function fetchFirebaseJwks(fetchImpl, now, cache) {
+  const cached = cache.get(JWKS_URL);
+  if (cached && cached.expiresAt > now) return cached.keys;
+
+  let pending = cached?.pending;
+  if (!pending) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), JWKS_FETCH_TIMEOUT_MS);
+    pending = (async () => {
+      try {
+        const response = await fetchImpl(JWKS_URL, {
+          headers: { accept: "application/json" },
+          signal: controller.signal
+        });
+        if (!response.ok) throw new FirebaseKeyServiceError();
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.keys)) throw new FirebaseKeyServiceError();
+        const ttl = getJwksTtl(response);
+        cache.set(JWKS_URL, { keys: payload.keys, expiresAt: Date.now() + ttl });
+        return payload.keys;
+      } catch {
+        throw new FirebaseKeyServiceError();
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+    cache.set(JWKS_URL, { ...(cached || {}), pending });
+  }
+
+  try {
+    return await pending;
+  } finally {
+    const current = cache.get(JWKS_URL);
+    if (current?.pending === pending) {
+      const keys = current.keys;
+      const expiresAt = current.expiresAt;
+      if (keys && expiresAt > Date.now()) cache.set(JWKS_URL, { keys, expiresAt });
+      else cache.delete(JWKS_URL);
+    }
+  }
+}
 
 function decodeBase64Url(value) {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -46,21 +108,9 @@ export async function verifyFirebaseIdToken(token, projectId, options = {}) {
   }
 
   const fetchImpl = options.fetchImpl || fetch;
-  let response;
-  try {
-    response = await fetchImpl(JWKS_URL, { headers: { accept: "application/json" } });
-  } catch {
-    throw new FirebaseKeyServiceError();
-  }
-  if (!response.ok) throw new FirebaseKeyServiceError();
-
-  let jwks;
-  try {
-    jwks = await response.json();
-  } catch {
-    throw new FirebaseKeyServiceError();
-  }
-  const jwk = Array.isArray(jwks.keys) ? jwks.keys.find((key) => key.kid === header.kid && key.kty === "RSA" && key.alg === "RS256") : null;
+  const cache = options.jwksCache || getJwksCache(fetchImpl);
+  const jwks = await fetchFirebaseJwks(fetchImpl, Date.now(), cache);
+  const jwk = jwks.find((key) => key.kid === header.kid && key.kty === "RSA" && key.alg === "RS256") || null;
   if (!jwk) throw new FirebaseTokenError();
 
   let validSignature = false;
