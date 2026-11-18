@@ -4864,8 +4864,13 @@ test("Discover excludes candidates with future-dated GPS timestamps from distanc
   const result = await connection.discoverUsers("location-viewer", { maxDistance: 25 });
 
   assert.equal(result.status, 200);
-  const freshness = capturedPipeline[0].$geoNear.query["locationSharing.updatedAt"];
+  const geoNear = capturedPipeline[0].$geoNear;
+  assert.deepEqual(geoNear.near, { type: "Point", coordinates: [55.27, 25.2] });
+  assert.equal(geoNear.maxDistance, 25 * 1000);
+  assert.equal(geoNear.query["locationSharing.enabled"], true);
+  const freshness = geoNear.query["locationSharing.updatedAt"];
   assert.ok(freshness.$gte instanceof Date);
   assert.ok(freshness.$lte instanceof Date);
+  assert.ok(freshness.$gte.getTime() >= Date.now() - 24 * 60 * 60 * 1000 - 1000);
   assert.ok(freshness.$lte.getTime() <= Date.now());
 });
