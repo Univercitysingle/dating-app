@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import apiClient from '../api/apiClient';
 import { getCallIceConfig } from '../utils/videoRoomIce';
+import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
@@ -9,6 +10,8 @@ const messageFor = (error, fallback) => error?.data?.error || error?.data?.messa
 export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const firstOtherPhoto = otherUser?.photos?.[0];
   const otherPhotoUrl = typeof firstOtherPhoto === 'string' ? firstOtherPhoto : firstOtherPhoto?.url;
+  const otherPhotoSrc = otherPhotoUrl ? resolvePhotoUrl(otherPhotoUrl) : PLACEHOLDER_IMAGE;
+  const otherPhotoFallback = otherPhotoUrl ? resolveWorkerPhotoUrl(otherPhotoUrl) : PLACEHOLDER_IMAGE;
   const [call, setCall] = useState(null);
   const [headerTarget, setHeaderTarget] = useState(null);
   const [status, setStatus] = useState('');
@@ -1029,7 +1032,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
       <div className="flex w-full max-w-sm flex-col items-center text-center">
         <div className="mb-5 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white/15 bg-slate-700 text-4xl font-semibold shadow-2xl">
           {otherPhotoUrl
-            ? <img src={otherPhotoUrl} alt="" className="h-full w-full object-cover" />
+            ? <img src={otherPhotoSrc} alt="" onError={(event) => { const image = event.currentTarget; if (otherPhotoFallback && image.src !== otherPhotoFallback) { image.src = otherPhotoFallback; return; } if (image.src !== PLACEHOLDER_IMAGE) image.src = PLACEHOLDER_IMAGE; }} className="h-full w-full object-cover" />
             : (otherUser?.name || '♡').trim().charAt(0).toUpperCase()}
         </div>
         <p className="mb-2 text-sm font-medium uppercase tracking-[0.22em] text-emerald-300">Incoming {videoCall ? 'video' : 'voice'} call</p>
@@ -1063,7 +1066,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         {videoCall ? <>
           <video ref={remoteVideoRef} autoPlay playsInline className="wa-call-remote-video" />
           {!remoteStream && <div className="wa-call-video-placeholder">
-            <div className="wa-call-avatar">{otherPhotoUrl ? <img src={otherPhotoUrl} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
+            <div className="wa-call-avatar">{otherPhotoUrl ? <img src={otherPhotoSrc} alt="" onError={(event) => { const image = event.currentTarget; if (otherPhotoFallback && image.src !== otherPhotoFallback) { image.src = otherPhotoFallback; return; } if (image.src !== PLACEHOLDER_IMAGE) image.src = PLACEHOLDER_IMAGE; }} /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</div>
             <strong>{otherUser?.name || "Video call"}</strong>
             <span>{reconnecting ? "Reconnecting…" : status || "Connecting video…"}</span>
           </div>}
@@ -1071,7 +1074,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
           <audio ref={remoteAudioRef} autoPlay />
           <div className="wa-call-audio-content">
             <div className="wa-call-avatar wa-call-avatar--large">
-              {otherPhotoUrl ? <img src={otherPhotoUrl} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}
+              {otherPhotoUrl ? <img src={otherPhotoSrc} alt="" onError={(event) => { const image = event.currentTarget; if (otherPhotoFallback && image.src !== otherPhotoFallback) { image.src = otherPhotoFallback; return; } if (image.src !== PLACEHOLDER_IMAGE) image.src = PLACEHOLDER_IMAGE; }} /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}
             </div>
             <h2>{otherUser?.name || "Voice call"}</h2>
             <p>{call?.status === 'accepted' ? (reconnecting ? 'Reconnecting…' : formatDuration(callDuration)) : (status || 'Calling…')}</p>
@@ -1080,7 +1083,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
         </>}
         {!videoMinimized && <header className="wa-call-header">
           <div className="wa-call-header-user">
-            <span className="wa-call-header-avatar">{otherPhotoUrl ? <img src={otherPhotoUrl} alt="" /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</span>
+            <span className="wa-call-header-avatar">{otherPhotoUrl ? <img src={otherPhotoSrc} alt="" onError={(event) => { const image = event.currentTarget; if (otherPhotoFallback && image.src !== otherPhotoFallback) { image.src = otherPhotoFallback; return; } if (image.src !== PLACEHOLDER_IMAGE) image.src = PLACEHOLDER_IMAGE; }} /> : (otherUser?.name || "♡").trim().charAt(0).toUpperCase()}</span>
             <span className="wa-call-header-copy"><strong>{otherUser?.name || (videoCall ? "Video call" : "Voice call")}</strong><small>{call?.status === 'accepted' ? formatDuration(callDuration) : status || "Calling…"}</small></span>
           </div>
           <div className="wa-call-header-actions">
