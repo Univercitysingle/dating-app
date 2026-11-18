@@ -4434,6 +4434,78 @@ test("relationship preferences require explicit consent and persist only on the 
 });
 
 
+test("Discover softly ranks only mutually public relationship intent and styles", async () => {
+  const viewer = {
+    uid: "viewer",
+    preference: "everyone",
+    blocked: [],
+    relationshipPreferences: {
+      consent: true,
+      relationshipIntent: ["long_term"],
+      relationshipStyles: ["monogamy"],
+      desires: ["private_desire"],
+      curiosities: ["private_curiosity"],
+      boundaries: ["private_boundary"],
+      visibility: { relationshipIntent: "public", relationshipStyles: "private" }
+    }
+  };
+  const candidates = [
+    {
+      uid: "private-match", name: "Private Match", isProfileVisible: true,
+      relationshipPreferences: {
+        consent: true, relationshipIntent: ["long_term"], relationshipStyles: ["monogamy"],
+        desires: ["secret"], visibility: { relationshipIntent: "private", relationshipStyles: "private" }
+      }
+    },
+    {
+      uid: "public-match", name: "Public Match", isProfileVisible: true,
+      relationshipPreferences: {
+        consent: true, relationshipIntent: ["long_term"], relationshipStyles: ["monogamy"],
+        desires: ["secret"], curiosities: ["secret"], boundaries: ["secret"],
+        visibility: { relationshipIntent: "public", relationshipStyles: "private" }
+      }
+    },
+    {
+      uid: "public-nonmatch", name: "Public Nonmatch", isProfileVisible: true,
+      relationshipPreferences: {
+        consent: true, relationshipIntent: ["casual"], relationshipStyles: ["monogamy"],
+        visibility: { relationshipIntent: "public", relationshipStyles: "public" }
+      }
+    }
+  ];
+  const users = {
+    findOne: async ({ uid }) => uid === viewer.uid ? viewer : null,
+    aggregate: () => ({ toArray: async () => candidates.map(candidate => ({ uid: candidate.uid })) }),
+    find: () => ({ toArray: async () => candidates })
+  };
+  const matches = {
+    createIndex: async () => "index-created",
+    find: () => ({ project() { return this; }, toArray: async () => [] })
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "matches") return matches;
+      assert.fail(`Unexpected collection: ${name}`);
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers(viewer.uid, {});
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.map(profile => profile.uid), [
+    "public-match", "private-match", "public-nonmatch"
+  ]);
+  assert.deepEqual(result.body[0].relationshipDiscovery, {
+    relationshipIntent: ["long_term"]
+  });
+  assert.equal(Object.hasOwn(result.body[1], "relationshipDiscovery"), false);
+  assert.doesNotMatch(JSON.stringify(result.body), /private_desire|private_curiosity|private_boundary|secret/);
+});
+
 test("relationship preference visibility exposes only explicitly public intent and styles", async () => {
   const now = new Date();
   const target = {
