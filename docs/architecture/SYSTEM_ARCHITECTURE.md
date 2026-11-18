@@ -31,3 +31,8 @@ The following cross-cutting acceptance items must be explicitly covered where re
 ## Call credential abuse controls (2026-11-18)
 
 The Worker applies independent per-account Durable Object limits to standard call ICE configuration and paid Video Rooms ICE configuration: 20 credential requests per user per 60 seconds per route family. This is intentionally scoped to credential issuance, not signalling, call polling, history or media traffic. Limiter unavailability fails closed. Source and regression tests are committed, but execution and staging/device validation remain pending; do not treat this as verified runtime protection until those gates pass.
+
+
+## Firebase token verification dependency handling (2026-11-18)
+
+Firebase ID-token verification now caches Google's public signing-key set in the Worker isolate, honours provider cache lifetime with a bounded fallback, coalesces concurrent key fetches, and applies a five-second fetch timeout. Invalid or unavailable key responses fail authentication closed; expired cached keys are not used as a stale fallback. This reduces repeated external key fetches but does not add token revocation checking or enforce verified-email policy. Runtime validation, key-rotation testing and cold-start measurements remain outstanding.
