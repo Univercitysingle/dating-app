@@ -55,8 +55,15 @@ const LikesPage = () => {
                                     {(typeof user.photos?.[0] === "string" ? user.photos[0] : user.photos?.[0]?.url) ? (
                                         <img
                                             src={resolvePhotoUrl(typeof user.photos[0] === "string" ? user.photos[0] : user.photos[0].url)}
-                                            alt=""
+                                            alt={user.isBlurred ? "Hidden profile photo" : `${user.name || "Member"} profile`}
                                             loading="lazy"
+                                            onError={(event) => {
+                                                const image = event.currentTarget;
+                                                const value = typeof user.photos?.[0] === "string" ? user.photos[0] : user.photos?.[0]?.url;
+                                                const fallback = value ? resolveWorkerPhotoUrl(value) : PLACEHOLDER_IMAGE;
+                                                if (fallback && image.src !== fallback) image.src = fallback;
+                                                else if (image.src !== PLACEHOLDER_IMAGE) image.src = PLACEHOLDER_IMAGE;
+                                            }}
                                             className={`h-full w-full object-cover ${user.isBlurred ? 'blur-md scale-110' : ''}`}
                                         />
                                     ) : (
