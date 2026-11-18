@@ -4726,6 +4726,28 @@ test("location status marks GPS data stale after 24 hours without returning coor
   assert.equal("coordinates" in result.body, false);
 });
 
+test("location status marks future-dated GPS data stale without returning coordinates", async () => {
+  const users = {
+    findOne: async () => ({
+      uid: "future-location-user",
+      locationSharing: { enabled: true, updatedAt: new Date(Date.now() + 60 * 60 * 1000), accuracyMeters: 35 },
+      location: { type: "Point", coordinates: [55.27, 25.2] }
+    })
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: name => {
+    assert.equal(name, "users");
+    return users;
+  } });
+  const result = await connection.getUserLocationStatus("future-location-user");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.enabled, true);
+  assert.equal(result.body.stale, true);
+  assert.equal(result.body.accuracyMeters, 35);
+  assert.equal("coordinates" in result.body, false);
+});
+
 test("location status does not mark revoked GPS sharing as active or stale", async () => {
   const users = {
     findOne: async () => ({
