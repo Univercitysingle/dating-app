@@ -142,3 +142,11 @@ Findings and operational statements remain open until a named owner supplies rep
 - OWASP ZAP passive baseline: **in progress at time of this record**. Record its final result before marking the complete workflow green.
 - Production cutover: not performed.
 - Residual: picomatch remains upstream-unpatched and scoped to development/build dependencies; moderate glob, AWS SDK v2 and uuid findings remain open for remediation.
+
+## Dependency manifest cleanup (2026-11-18)
+
+- Removed the end-of-support AWS SDK for JavaScript v2 package from the root and legacy backend dependency manifests and lockfiles. The active root S3 service imports `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` (AWS SDK v3); repository code search found no direct AWS SDK v2 imports. The `backend/` directory contains dependency metadata and documentation, but no backend runtime source files.
+- Added `uuid` as an explicit root production dependency at `^11.1.1`, matching the existing locked version, because `controllers/usersController.js` imports `uuid` directly. It was previously available only transitively.
+- Regenerated the two npm lockfile package graphs from their existing resolved versions after updating root dependency metadata. No unrelated version upgrades were applied.
+- **Validation status:** JSON and lockfile dependency metadata were regenerated and structurally checked. A local `npm ci`, test suite, and fresh `npm audit` could not be run through the repository connector. Confirm these in the next available build environment before treating the remediation as closed. GitHub Dependabot alert closure also remains unconfirmed until its alert list refreshes.
+- **Scope:** `migrate-to-serverless` only. No `main`, production deployment, Cloudflare Worker deployment, or CDN Worker change.

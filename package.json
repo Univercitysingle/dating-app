@@ -21,7 +21,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.574.0",
     "@aws-sdk/s3-request-presigner": "^3.574.0",
-    "aws-sdk": "^2.1611.0",
     "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.2",
@@ -56,7 +55,8 @@
     "wavesurfer.js": "^7.10.1",
     "web-vitals": "^3.3.1",
     "winston": "^3.13.0",
-    "winston-daily-rotate-file": "^5.0.0"
+    "winston-daily-rotate-file": "^5.0.0",
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.3",
