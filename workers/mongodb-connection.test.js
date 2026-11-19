@@ -5182,3 +5182,48 @@ test("only superadmins can restore a permanently banned account", async () => {
   assert.equal(result.status, 403);
   assert.equal(writes, 0);
 });
+
+
+test("admin suspension fails closed with retry status when Firebase membership revocation fails", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  const userWrites = [];
+  const users = {
+    async findOne() {
+      return { _id: targetId, uid: "suspension-target", role: "user", accountStatus: "active", isProfileVisible: true };
+    },
+    async findOneAndUpdate(_filter, update) {
+      userWrites.push(update);
+      return { _id: targetId, uid: "suspension-target", accountStatus: "temporarily_suspended" };
+    },
+    async updateOne(_filter, update) { userWrites.push(update); return { matchedCount: 1 }; }
+  };
+  const emptyCollection = {
+    async deleteMany() { return { deletedCount: 0 }; },
+    async updateMany() { return { modifiedCount: 0 }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {
+    FIREBASE_DATABASE_URL: "https://test-project-default-rtdb.firebaseio.com",
+    FIREBASE_PROJECT_ID: "test-project",
+    FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      project_id: "test-project",
+      client_email: "firebase-admin@test-project.iam.gserviceaccount.com",
+      private_key: "not-a-valid-private-key"
+    })
+  };
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "users") return users;
+    return emptyCollection;
+  } });
+  const result = await connection.updateAdminUser("admin-uid", targetId.toHexString(), {
+    accountStatus: "temporarily_suspended",
+    suspendedUntil: new Date(Date.now() + 86400000).toISOString()
+  });
+  assert.equal(result.status, 202);
+  assert.equal(result.body.accountStatus, "temporarily_suspended");
+  assert.equal(result.body.chatAccessRevocationStatus, "retry_pending");
+  assert.ok(userWrites.some(update => update.$set?.chatAccessRevocationStatus === "retry_pending"));
+});
