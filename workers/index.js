@@ -540,6 +540,31 @@ export function enforceCallStartRateLimit(env, claims) {
   );
 }
 
+
+export function enforceCallRouteRateLimit(env, claims, action) {
+  const uid = typeof claims?.sub === "string" ? claims.sub : "";
+  if (!uid) return json({ error: "Unauthorized" }, 401);
+  // Keep polling responsive while bounding multi-tab and scripted request abuse.
+  // ICE candidate bursts receive a larger budget than state-changing actions.
+  const limits = {
+    poll: { limit: 120, windowMs: 60 * 1000, message: "Call updates are arriving too quickly. Please retry shortly." },
+    incoming: { limit: 120, windowMs: 60 * 1000, message: "Incoming-call checks are arriving too quickly. Please retry shortly." },
+    history: { limit: 30, windowMs: 60 * 1000, message: "Too many call-history requests. Please retry shortly." },
+    signal: { limit: 240, windowMs: 60 * 1000, message: "Too many call-signaling updates. Please wait before retrying." },
+    action: { limit: 60, windowMs: 60 * 1000, message: "Too many call actions. Please wait before retrying." }
+  };
+  const policy = limits[action];
+  if (!policy) return json({ error: "Invalid call action" }, 400);
+  return enforceAccountRateLimit(
+    env,
+    "call-" + action,
+    uid,
+    policy.limit,
+    policy.windowMs,
+    policy.message
+  );
+}
+
 export class RateLimiter {
   constructor(state) { this.state = state; }
 
@@ -2696,6 +2721,9 @@ export default {
         if (action === "start") {
           const callStartLimit = await enforceCallStartRateLimit(env, claims);
           if (callStartLimit) return callStartLimit;
+        } else {
+          const callRouteLimit = await enforceCallRouteRateLimit(env, claims, action);
+          if (callRouteLimit) return callRouteLimit;
         }
         if (!env.MONGODB_CONNECTION) return json({ error: "Calling service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
