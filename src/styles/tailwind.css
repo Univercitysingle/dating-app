@@ -5966,3 +5966,35 @@ html.dark .register-intro { color: var(--app-muted); }
 @media (prefers-reduced-motion: reduce) {
   .member-app-shell *, .member-app-shell *::before, .member-app-shell *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* Final route coverage for secondary member journeys and small-screen chat sizing. */
+.member-app-main > .container { width: min(100%,1120px); max-width: 1120px; margin-right: auto; margin-left: auto; padding: 8px 0 24px; }
+.member-app-main > .container > .bg-white,
+.member-app-main > .container .bg-white.rounded-lg,
+.member-app-main > .container .bg-white.rounded-xl { border: 1px solid #eae5ec; border-radius: 19px; box-shadow: 0 8px 28px rgba(38,26,40,.05); }
+.member-app-main > .container > div:first-child h1,
+.member-app-main > .container > div:first-child h2 { letter-spacing: -.045em; }
+.member-app-main > .container button[class*="bg-primary"],
+.member-app-main > .container button[class*="bg-pink"],
+.member-app-main > .container a[class*="bg-primary"] { border-radius: 999px; font-weight: 750; }
+.member-app-main .store-page { padding-top: 8px; }
+.member-app-main .store-card { border-color: #ebe5eb; border-radius: 21px; background: #fff; box-shadow: 0 10px 32px rgba(38,26,40,.055); }
+.member-app-main .store-card h2,.member-app-main .store-card h3 { letter-spacing: -.04em; }
+.member-app-main .store-card .app-primary-button { min-height: 46px; }
+.member-app-main .dark-fantasy-page { border-radius: 24px; }
+.member-app-main .dark-fantasy-page .sticky { top: calc(var(--member-header-height) + 10px); }
+.member-app-main .dark-fantasy-page input,.member-app-main .dark-fantasy-page select,.member-app-main .dark-fantasy-page textarea { border-radius: 12px; }
+.member-app-main .auth-card { max-width: 720px; }
+.member-app-main .auth-card input,.member-app-main .auth-card select { min-height: 48px; }
+.member-app-main .auth-card button { border-radius: 999px; }
+html.dark .member-app-main > .container > .bg-white,
+html.dark .member-app-main > .container .bg-white.rounded-lg,
+html.dark .member-app-main > .container .bg-white.rounded-xl,
+html.dark .member-app-main .store-card { border-color: var(--app-border); background: var(--app-surface); }
+@media (max-width: 767px) {
+  .member-app-main-chat { padding-bottom: 8px; }
+  .member-app-main > .container { padding: 2px 0 18px; }
+  .member-app-main .store-page { padding: 2px 0 18px; }
+  .member-app-main .dark-fantasy-page .sticky { top: calc(var(--member-header-height) + 6px); }
+}
