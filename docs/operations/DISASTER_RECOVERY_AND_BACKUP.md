@@ -49,3 +49,71 @@ Never store secrets in backups or this document in plaintext. Secret recovery mu
 - [ ] CDN/B2 recovery owner and evidence confirmed without modifying the CDN Worker.
 - [ ] RPO/RTO approved by accountable owners.
 - [ ] Restore drill evidence stored in an access-controlled location.
+
+
+## Operator procedure: isolated recovery drill
+
+The following commands are templates for an operator with approved provider access. Use a dedicated encrypted backup location and a separate restore project/database. Do not run restore commands against production.
+
+### MongoDB Atlas
+
+Create a compressed logical backup of the application database:
+
+```bash
+: "${MONGODB_URI:?Set the source Atlas connection string}"
+: "${BACKUP_FILE:?Set an encrypted backup destination}"
+mongodump --uri="$MONGODB_URI" --db=test --archive="$BACKUP_FILE" --gzip
+```
+
+Restore into an isolated database namespace, not the production `test` namespace:
+
+```bash
+: "${RESTORE_MONGODB_URI:?Set an isolated Atlas restore connection string}"
+: "${BACKUP_FILE:?Set the backup archive path}"
+mongorestore --uri="$RESTORE_MONGODB_URI" --archive="$BACKUP_FILE" --gzip \
+  --nsFrom='test.*' --nsTo='test_restore.*'
+```
+
+After restore, compare collection counts and index definitions against the source inventory. Run application read-only smoke tests against the isolated database. Do not switch the Worker secret to the restored database until the owner approves the drill.
+
+### Firebase Realtime Database and Authentication
+
+Export RTDB data and rules separately:
+
+```bash
+firebase database:get / --project "$FIREBASE_PROJECT_ID" > rtdb-backup.json
+cp database.rules.json database.rules.backup.json
+```
+
+Restore only into a dedicated Firebase recovery project:
+
+```bash
+firebase database:set / rtdb-backup.json --project "$FIREBASE_RESTORE_PROJECT_ID"
+firebase deploy --only database --project "$FIREBASE_RESTORE_PROJECT_ID"
+```
+
+Export Firebase Authentication users using an approved secure location:
+
+```bash
+firebase auth:export auth-users.json --project "$FIREBASE_PROJECT_ID" --format=json
+```
+
+Authentication exports contain sensitive identity data. Encrypt them, restrict access, record export time, and validate password-hash import requirements before attempting any import. Never use a production identity export as test data.
+
+### Cloudflare and secrets
+
+Reconstruct Pages and Worker code from the exact approved Git commit on `migrate-to-serverless`. Recreate bindings, Durable Object migrations, service bindings, routes, cron triggers and non-secret variables from the checked-in configuration and deployment workflow. Re-provision secrets from the approved secret manager. Cloudflare secrets cannot be recovered from Git and must never be written into this repository.
+
+### Evidence required to close a restore drill
+
+- [ ] Backup timestamp, source project/database and archive checksum recorded.
+- [ ] Backup retention and encryption verified in the provider console.
+- [ ] Restore completed into an isolated environment.
+- [ ] MongoDB collection counts, indexes and representative records validated.
+- [ ] Firebase chat membership and rules tested with two separate test identities.
+- [ ] Authentication recovery/import tested without touching production accounts.
+- [ ] Payment records reconciled against the merchant portal before entitlement validation.
+- [ ] Measured restore duration and recoverable data point recorded.
+- [ ] Technical owner and product owner sign-off recorded.
+
+A successful backup job is not a successful restore drill. Do not mark this gap closed until the isolated restore and negative-access tests have evidence.
