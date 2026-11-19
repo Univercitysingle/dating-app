@@ -4292,6 +4292,47 @@ export class MongoDBConnection {
             financialAndAuditRecordsRetained: true
           } };
         }
+        // RTDB membership must be revoked before deleting the Firebase identity.
+        // Repeated admin DELETE requests retry this idempotent cleanup if Firebase
+        // is temporarily unavailable, while the MongoDB account remains restricted.
+        const realtimeConfigured = Boolean(
+          this.env.FIREBASE_SERVICE_ACCOUNT_JSON && this.env.FIREBASE_DATABASE_URL
+        );
+        if (targetUid && (realtimeConfigured || this.env.ENABLE_FIREBASE_REALTIME_SYNC === "true")) {
+          let chatRevocation;
+          try {
+            const { revokeAllChatMembershipsForUser } = await import("./firebase-rtdb.js");
+            chatRevocation = await revokeAllChatMembershipsForUser(this.env, targetUid);
+          } catch {
+            await db.collection("users").updateOne(
+              { _id: targetId, accountStatus: "deletion_pending" },
+              { $set: {
+                chatAccessRevocationStatus: "retry_pending",
+                chatAccessRevocationLastAttemptAt: new Date(),
+                updatedAt: new Date()
+              } }
+            );
+            return {
+              status: 202,
+              body: {
+                message: "Account access is disabled. Realtime chat access revocation is pending and will be retried.",
+                deletionStatus: "deletion_pending",
+                chatAccessRevocationStatus: "retry_pending",
+                financialAndAuditRecordsRetained: true
+              }
+            };
+          }
+          await db.collection("users").updateOne(
+            { _id: targetId, accountStatus: "deletion_pending" },
+            { $set: {
+              chatAccessRevocationStatus: "completed",
+              chatAccessRevokedRoomCount: chatRevocation.revoked,
+              chatAccessRevokedAt: new Date(),
+              updatedAt: new Date()
+            } }
+          );
+        }
+
         if (!targetUid) {
           await db.collection("users").updateOne(
             { _id: targetId },
