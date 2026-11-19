@@ -142,6 +142,45 @@ test("chat message edits reject attempts to modify another participant's message
   assert.equal(result.status, 403);
 });
 
+test("support ticket message edit and delete conflicts remove orphan audit records", async () => {
+  const { ObjectId } = await import("mongodb");
+  for (const operation of ["edit", "delete"]) {
+    const actorId = new ObjectId();
+    const ticketId = new ObjectId();
+    const messageId = new ObjectId();
+    const auditId = new ObjectId();
+    let auditRemoved = false;
+    let ticketTouched = false;
+    const db = {
+      collection(name) {
+        if (name === "users") return { findOne: async () => ({ _id: actorId }) };
+        if (name === "supporttickets") return {
+          findOne: async () => ({ _id: ticketId, userId: actorId }),
+          updateOne: async () => { ticketTouched = true; return { matchedCount: 1 }; }
+        };
+        if (name === "ticketmessages") return {
+          findOne: async () => ({ _id: messageId, ticketId, senderId: actorId, message: "Original", createdAt: new Date(), isFromAdmin: false }),
+          updateOne: async () => ({ matchedCount: 0 })
+        };
+        if (name === "auditlogs") return {
+          insertOne: async () => ({ insertedId: auditId }),
+          deleteOne: async query => { auditRemoved = String(query._id) === String(auditId); return { deletedCount: 1 }; }
+        };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = Object.create(MongoDBConnection.prototype);
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    const result = operation === "edit"
+      ? await connection.updateSupportTicketMessage("customer-uid", ticketId.toHexString(), messageId.toHexString(), { message: "Changed" })
+      : await connection.deleteSupportTicketMessage("customer-uid", ticketId.toHexString(), messageId.toHexString());
+    assert.equal(result.status, 409);
+    assert.equal(auditRemoved, true);
+    assert.equal(ticketTouched, false);
+  }
+});
+
 test("support ticket message edits and deletes are audited soft operations", async () => {
   const { ObjectId } = await import("mongodb");
   const actorId = new ObjectId();
