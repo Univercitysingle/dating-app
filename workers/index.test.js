@@ -3617,3 +3617,57 @@ test("payment reconciliation endpoint rejects anonymous access before contacting
   assert.equal(response.status, 401);
   assert.equal(mongoAccessed, false);
 });
+
+
+test("WebXPay callback parser rejects oversized, unsupported and ambiguous request bodies before settlement", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const payload = "0123456789abcdef01234567|T123456|2026-10-21 12:00:00|00|Approved|1";
+  const encrypt = value => privateEncrypt({
+    key: privateKey,
+    padding: constants.RSA_PKCS1_PADDING
+  }, Buffer.from(value, "utf8")).toString("base64");
+  const payment = encrypt(payload);
+  const signature = encrypt(payload);
+  let settlementCalls = 0;
+  const env = {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    MONGODB_CONNECTION: {
+      idFromName() { return "mongo-id"; },
+      get() {
+        return { async fetch() {
+          settlementCalls += 1;
+          return new Response(JSON.stringify({ success: true }), { status: 200 });
+        } };
+      }
+    }
+  };
+  const url = "https://dating-app.test/api/webxpay/response";
+  const cases = [
+    new Request(url, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ payment, signature, custom_fields: "x".repeat(70000) })
+    }),
+    new Request(url, {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: new URLSearchParams({ payment, signature }).toString()
+    }),
+    new Request(url, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "payment=" + encodeURIComponent(payment) + "&payment=" + encodeURIComponent(payment) +
+        "&signature=" + encodeURIComponent(signature)
+    })
+  ];
+
+  for (const req of cases) {
+    const response = await worker.fetch(req, env);
+    assert.equal(response.status, 400);
+  }
+  assert.equal(settlementCalls, 0);
+});
