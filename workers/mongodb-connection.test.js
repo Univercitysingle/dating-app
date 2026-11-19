@@ -1451,7 +1451,11 @@ test("unmatch rejects self-targeting and missing active matches", async () => {
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({ collection(name) {
     if (name === "chatmessages") return { async findOne() { return null; } };
-    return { async updateOne() { return { matchedCount: 0 }; } };
+    if (name === "matches") return {
+      async updateOne() { return { matchedCount: 0 }; },
+      async findOne() { return null; }
+    };
+    assert.fail("Unexpected collection: " + name);
   } });
   assert.equal((await connection.unmatchUsers("same", "same")).status, 400);
   assert.equal((await connection.unmatchUsers("viewer", "other")).status, 404);
