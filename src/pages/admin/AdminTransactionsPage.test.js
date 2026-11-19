@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import apiClient from '../../api/apiClient';
 import AdminTransactionsPage from './AdminTransactionsPage';
 
@@ -62,7 +62,7 @@ describe('AdminTransactionsPage', () => {
       }));
     render(<AdminTransactionsPage />);
     const button = await screen.findByRole('button', { name: 'Run reconciliation' });
-    button.click();
+    fireEvent.click(button);
     expect(await screen.findByText(/Provider status was not queried/)).toBeInTheDocument();
     expect(screen.getByText('stale pending')).toBeInTheDocument();
     expect(apiClient.get).toHaveBeenCalledWith('/admin/payment-reconciliation');
