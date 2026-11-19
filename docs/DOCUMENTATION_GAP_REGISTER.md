@@ -61,9 +61,10 @@ Two source-backed catalogues have now been added:
 This closes the first static source-inventory pass, not the live verification gaps. The API catalogue still needs request/response schemas and contract tests. The database catalogue still needs a live Atlas collection/index export and deployed database-name confirmation.
 
 Additional source findings to track:
+- Turnix staging credential verification returned HTTP 401 on 2026-11-19 while ExpressTURN credentials were present. Worker deployment and OWASP ZAP passed, but Turnix fallback is unavailable. The request uses the documented Bearer-token endpoint; inspect the provider's sanitized `error`/`code` response and rotate `TURNIX_API_TOKEN` with a valid token from the active staging project. Do not disable ExpressTURN while resolving this.
 - Admin purchase approve/reject endpoints and the manual entitlement-grant path have been removed. WebXPay callbacks remain authoritative for payment settlement; admins can only record a refund after verifying it in the merchant portal. Sandbox callback replay, reconciliation and refund evidence remain open.
 - `/api/calls/*` remains excluded from the generic Worker IP limiter to avoid throttling call polling/signalling. Call initiation now has a per-account quota of 30 starts/hour; ICE credential issuance remains separately limited to 20 requests/minute. Active-call concurrency is enforced server-side. Validate the quota with real-user call workflows and monitor false positives.
-- Wrangler staging sets Dark Fantasy enabled with wildcard country configuration. Some route handlers accept wildcard globally, while the catalogue handler rejects it. Treat this as a configuration/security inconsistency and keep the feature gated until corrected.
+- Wrangler staging explicitly sets `DARK_FANTASY_ENABLED=false`. Independently, the shared `darkFantasyRegionGate` rejects wildcard country configuration and requires explicit two-letter ISO country codes. Regression coverage verifies wildcard rejection across video-room ICE, Dark Fantasy community, profile and catalogue route families. Keep the feature disabled in staging until an approved country allowlist and legal/product sign-off are supplied.
 - Mongoose model schemas are legacy definitions and are not automatically enforced by direct MongoDB Worker writes.
 
 
