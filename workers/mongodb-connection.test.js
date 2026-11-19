@@ -2105,6 +2105,51 @@ test("pending WebXPay subscription checkout blocks a second checkout and expires
   assert.equal(expiredUpdate.$set.cancellationReason, "payment_timeout");
 });
 
+test("completed profiles can add a missing adult birthday once, but cannot change a recorded birthday", async () => {
+  let storedUser = { uid: "legacy-user", isOnboardingComplete: true };
+  const writes = [];
+  const users = {
+    async findOne(query) {
+      assert.equal(query.uid, "legacy-user");
+      return { ...storedUser };
+    },
+    async updateOne(query, update) {
+      assert.deepEqual(query, { uid: "legacy-user" });
+      writes.push(update.$set);
+      if (update.$set.birthday) storedUser.birthday = update.$set.birthday;
+      return { matchedCount: 1, modifiedCount: 1 };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { assert.equal(name, "users"); return users; } });
+  connection.getCurrentUserProfile = async () => ({ status: 200, body: { birthday: storedUser.birthday || null } });
+
+  const validAdult = await connection.updateCurrentUserProfile("legacy-user", { birthday: "1995-06-01" });
+  assert.equal(validAdult.status, 200);
+  assert.ok(storedUser.birthday instanceof Date);
+  assert.equal(storedUser.birthday.toISOString().slice(0, 10), "1995-06-01");
+
+  const attemptsToChange = await connection.updateCurrentUserProfile("legacy-user", { birthday: "1990-01-01" });
+  assert.equal(attemptsToChange.status, 200);
+  assert.equal(writes.length, 1, "a previously recorded birthday must remain immutable");
+  assert.equal(writes[0].birthday.toISOString().slice(0, 10), "1995-06-01");
+});
+
+test("completed profiles cannot add an underage birthday", async () => {
+  let updateCalled = false;
+  const users = {
+    async findOne() { return { uid: "legacy-minor", isOnboardingComplete: true }; },
+    async updateOne() { updateCalled = true; return { matchedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection() { return users; } });
+  const result = await connection.updateCurrentUserProfile("legacy-minor", { birthday: "2015-01-01" });
+  assert.equal(result.status, 400);
+  assert.equal(updateCalled, false);
+});
+
 test("profile updates accept education text from onboarding and structured legacy education", async () => {
   const storedUser = { uid: "user-education", isOnboardingComplete: false };
   let saved;
