@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload, enforceCallIceRateLimit, enforceCallStartRateLimit } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload, enforceCallIceRateLimit, enforceCallStartRateLimit, enforceCallRouteRateLimit } from "./index.js";
 import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
@@ -2288,6 +2288,45 @@ test("WebXPay callback rejects a status code in the wrong field", async () => {
   assert.equal(settled, false);
 });
 
+
+
+test("call polling, signaling and state actions use independent per-account quotas", async () => {
+  const cases = [
+    ["poll", 120], ["incoming", 120], ["history", 30], ["signal", 240], ["action", 60]
+  ];
+  for (const [action, limit] of cases) {
+    let observedName = "";
+    let observedPayload = null;
+    const env = { RATE_LIMITER: {
+      idFromName(name) { observedName = name; return name; },
+      get() { return { async fetch(_url, options) {
+        observedPayload = JSON.parse(options.body);
+        return new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 60000 }), { status: 200 });
+      } }; }
+    } };
+    assert.equal(await enforceCallRouteRateLimit(env, { sub: "caller-123" }, action), null);
+    assert.equal(observedName, "call-" + action + ":caller-123");
+    assert.deepEqual(observedPayload, { key: "call-" + action, limit, windowMs: 60000 });
+  }
+});
+
+test("call route quotas fail closed when the limiter is unavailable", async () => {
+  const response = await enforceCallRouteRateLimit({}, { sub: "caller-123" }, "signal");
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /abuse protection/i);
+});
+
+test("call route quotas reject exhausted signaling with Retry-After", async () => {
+  const env = { RATE_LIMITER: {
+    idFromName(name) { assert.equal(name, "call-signal:caller-123"); return name; },
+    get() { return { async fetch() {
+      return new Response(JSON.stringify({ allowed: false, resetAt: Date.now() + 45000 }), { status: 200 });
+    } }; }
+  } };
+  const response = await enforceCallRouteRateLimit(env, { sub: "caller-123" }, "signal");
+  assert.equal(response.status, 429);
+  assert.ok(Number(response.headers.get("retry-after")) >= 1);
+});
 
 test("call signaling endpoints bypass the generic per-IP API limiter", async () => {
   let limiterCalls = 0;
