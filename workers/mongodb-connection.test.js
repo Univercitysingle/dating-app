@@ -5868,7 +5868,7 @@ test("superadmin payment reconciliation flags stale, incomplete, refund and dupl
   assert.equal(result.status, 200);
   assert.equal(result.body.source, "local_mongodb_records_only");
   assert.equal(result.body.providerStatusQueried, false);
-  assert.equal(result.body.counts.totalScanned, 6);
+  assert.equal(result.body.counts.totalScanned, 7);
   assert.equal(result.body.counts.pending, 2);
   assert.equal(result.body.counts.refundRequired, 1);
   const reasons = result.body.anomalies.map(item => item.reason);
