@@ -1,6 +1,13 @@
 name: Scan dating-app Worker staging
 
 on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - "workers/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-worker-staging.yml"
   workflow_dispatch:
 
 permissions:
@@ -16,6 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Allow staging deployment to finish
+        run: sleep 120
+
       - name: Verify staging Worker is reachable
         shell: bash
         run: |
