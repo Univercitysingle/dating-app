@@ -477,8 +477,16 @@ function Chat() {
     if (!message?._id || !/^[a-fA-F0-9]{24}$/.test(String(message._id)) || message.deletedAt) return;
     if (!window.confirm('Delete this message? The conversation will show a deleted-message placeholder.')) return;
     try {
-      await apiClient.delete('/chat/messages/' + encodeURIComponent(message._id));
-      addMessage({ ...message, messageContent: 'This message was deleted.', deletedAt: new Date().toISOString() });
+      const result = await apiClient.delete('/chat/messages/' + encodeURIComponent(message._id));
+      const deletedMessage = result?.message;
+      addMessage({
+        ...message,
+        ...(deletedMessage && typeof deletedMessage === 'object' ? deletedMessage : {}),
+        _id: String(deletedMessage?._id || message._id),
+        roomId: chatId,
+        messageContent: 'This message was deleted.',
+        deletedAt: deletedMessage?.deletedAt || new Date().toISOString(),
+      });
       setError(null);
     } catch (requestError) {
       setError(requestError?.data?.error || requestError?.message || 'Could not delete this message.');
