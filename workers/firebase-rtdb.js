@@ -90,10 +90,10 @@ function getDatabaseBaseUrl(env) {
 async function authenticatedDatabaseRequest(env, path, method, body, fetchImpl = fetch) {
   const baseUrl = getDatabaseBaseUrl(env);
   const accessToken = await getFirebaseAdminAccessToken(env, fetchImpl);
-  const url = baseUrl + path + ".json?access_token=" + encodeURIComponent(accessToken);
+  const url = baseUrl + path + ".json";
   const response = await fetchImpl(url, {
     method,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", authorization: "Bearer " + accessToken },
     ...(body === undefined ? {} : { body: JSON.stringify(body) })
   });
   if (!response.ok) throw new Error("Firebase Realtime Database update failed");
