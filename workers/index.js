@@ -1,5 +1,5 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
-import { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
+import { syncChatMessageStatusToRtdb, syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
 import { Buffer } from "node:buffer";
 import { sendWebPush } from "./push-notifications.js";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
@@ -2854,7 +2854,24 @@ export default {
             body: JSON.stringify({ claims, payload })
           });
           const result = await response.json().catch(() => ({ error: "Chat status update unavailable" }));
-          return json(result, response.status);
+          let realtimeSync = null;
+          if (response.ok && env.ENABLE_FIREBASE_REALTIME_SYNC === "true") {
+            realtimeSync = false;
+            if (payload && typeof payload.roomId === "string" && Array.isArray(payload.messageIds)) {
+              try {
+                const sync = await syncChatMessageStatusToRtdb(
+                  env, payload.roomId, payload.messageIds,
+                  chatRoute[1] === "read" ? "read" : "delivered"
+                );
+                realtimeSync = sync.synced === payload.messageIds.length;
+              } catch {
+                console.warn("Firebase chat receipt sync was not completed", {
+                  phase: chatRoute[1] === "read" ? "read-realtime-chat-receipt" : "delivery-realtime-chat-receipt"
+                });
+              }
+            }
+          }
+          return json({ ...result, realtimeSync }, response.status);
         }
         const response = await connection.fetch("https://internal.invalid/internal/chat/send", {
           method: "POST", headers: { "content-type": "application/json" },
