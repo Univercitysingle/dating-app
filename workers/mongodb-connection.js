@@ -2936,14 +2936,19 @@ export class MongoDBConnection {
         return { status: 403, body: { message: "Messages can only be edited within 15 minutes of sending." } };
       }
       const now = new Date();
-      await db.collection("auditlogs").insertOne({
+      const auditLogs = db.collection("auditlogs");
+      const auditResult = await auditLogs.insertOne({
         eventType: "support_ticket_message_edited", actorUid: uid, actorType: adminAction ? "admin" : "customer",
         ticketId: ticketObjectId, messageId: messageObjectId, previousMessage: message.message,
         updatedMessage: payload.message.trim(), createdAt: now
       });
-      await db.collection("ticketmessages").updateOne(messageQuery, {
+      const updateResult = await db.collection("ticketmessages").updateOne(messageQuery, {
         $set: { message: payload.message.trim(), editedAt: now, editedByUid: uid, updatedAt: now }
       });
+      if (!updateResult.matchedCount) {
+        if (auditResult?.insertedId) await auditLogs.deleteOne({ _id: auditResult.insertedId });
+        return { status: 409, body: { message: "Message changed before the edit could be saved." } };
+      }
       await db.collection("supporttickets").updateOne({ _id: ticketObjectId }, { $set: { updatedAt: now } });
       return { status: 200, body: { ...message, message: payload.message.trim(), editedAt: now, updatedAt: now, editedByUid: uid } };
     } catch { return { status: 503, body: { message: "Unable to edit support message." } }; }
@@ -2975,15 +2980,20 @@ export class MongoDBConnection {
         return { status: 403, body: { message: "Messages can only be deleted within one hour of sending." } };
       }
       const now = new Date();
-      await db.collection("auditlogs").insertOne({
+      const auditLogs = db.collection("auditlogs");
+      const auditResult = await auditLogs.insertOne({
         eventType: "support_ticket_message_deleted", actorUid: uid, actorType: adminAction ? "admin" : "customer",
         ticketId: ticketObjectId, messageId: messageObjectId, previousMessage: message.message,
         attachments: Array.isArray(message.attachments) ? message.attachments : [], createdAt: now
       });
-      await db.collection("ticketmessages").updateOne(messageQuery, {
+      const updateResult = await db.collection("ticketmessages").updateOne(messageQuery, {
         $set: { message: "This message was deleted.", deletedAt: now, deletedByUid: uid, updatedAt: now },
         $unset: { attachments: "" }
       });
+      if (!updateResult.matchedCount) {
+        if (auditResult?.insertedId) await auditLogs.deleteOne({ _id: auditResult.insertedId });
+        return { status: 409, body: { message: "Message changed before deletion could be saved." } };
+      }
       await db.collection("supporttickets").updateOne({ _id: ticketObjectId }, { $set: { updatedAt: now } });
       return { status: 200, body: { success: true, messageId } };
     } catch { return { status: 503, body: { message: "Unable to delete support message." } }; }
