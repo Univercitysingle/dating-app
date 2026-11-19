@@ -5849,7 +5849,8 @@ test("superadmin payment reconciliation flags stale, incomplete, refund and dupl
       if (name === "subscriptions") return {
         find: () => cursor([
           { _id: "s1", status: "active", createdAt: recent, plan: "monthly", paymentReference: "subscription-ref" },
-          { _id: "s2", status: "pending", createdAt: recent }
+          { _id: "s2", status: "pending", createdAt: recent },
+          { _id: "s3", status: "active", createdAt: recent, plan: "yearly" }
         ])
       };
       assert.fail("Unexpected collection: " + name);
