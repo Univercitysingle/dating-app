@@ -2765,6 +2765,11 @@ test("delivery receipts update only messages addressed to the authenticated reci
         async updateMany(filter) {
           capturedFilter = filter;
           return { modifiedCount: 1 };
+        },
+        find(filter) {
+          assert.equal(filter.roomId, "alice-bob");
+          assert.equal(filter.receiverUid, "bob");
+          return { toArray: async () => [{ _id: new ObjectId(messageId) }] };
         }
       };
       if (name === "users") return { async findOne() { return { blocked: [] }; } };
@@ -2779,6 +2784,7 @@ test("delivery receipts update only messages addressed to the authenticated reci
     messageIds: [messageId]
   });
   assert.equal(result.status, 200);
+  assert.deepEqual(result.body.updatedMessageIds, [messageId]);
   assert.deepEqual(capturedFilter, {
     _id: { $in: [new ObjectId(messageId)] },
     roomId: "alice-bob",
@@ -2805,6 +2811,11 @@ test("read receipts update only unread messages addressed to the authenticated r
           capturedFilter = filter;
           capturedUpdate = update;
           return { modifiedCount: 1 };
+        },
+        find(filter) {
+          assert.equal(filter.roomId, "alice-bob");
+          assert.equal(filter.receiverUid, "bob");
+          return { toArray: async () => [{ _id: new ObjectId(messageId) }] };
         }
       };
       if (name === "users") return { async findOne() { return { blocked: [] }; } };
@@ -2820,6 +2831,7 @@ test("read receipts update only unread messages addressed to the authenticated r
   });
   assert.equal(result.status, 200);
   assert.equal(result.body.readCount, 1);
+  assert.deepEqual(result.body.updatedMessageIds, [messageId]);
   assert.deepEqual(capturedFilter, {
     _id: { $in: [new ObjectId(messageId)] },
     roomId: "alice-bob",
