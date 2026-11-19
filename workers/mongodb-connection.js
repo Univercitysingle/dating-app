@@ -943,7 +943,6 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
-      const matches = db.collection("matches");
       const [currentUser, targetUser] = await Promise.all([
         users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1, accountStatus: 1, suspendedUntil: 1 } }),
         users.findOne({ uid: targetUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1 } })
@@ -959,6 +958,7 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "This user has blocked you." } };
       }
 
+      const matches = db.collection("matches");
       let superLikeSpent = null;
       if (action === "superlike") {
         if (Number(currentUser.purchasedSuperLikes) > 0) {
@@ -976,20 +976,22 @@ export class MongoDBConnection {
       // first likes from creating duplicate match documents under concurrency.
       const orderedUids = [uid, targetUid].sort();
       const pairKey = orderedUids.map(value => value.length + ":" + value).join("|");
-      if (!this.matchPairIndexPromise) {
-        this.matchPairIndexPromise = matches.createIndex(
-          { pairKey: 1 },
-          {
-            unique: true,
-            partialFilterExpression: { pairKey: { $type: "string" } },
-            name: "unique_match_pair_key"
-          }
-        ).catch(error => {
-          this.matchPairIndexPromise = null;
-          throw error;
-        });
+      if (typeof matches.createIndex === "function") {
+        if (!this.matchPairIndexPromise) {
+          this.matchPairIndexPromise = matches.createIndex(
+            { pairKey: 1 },
+            {
+              unique: true,
+              partialFilterExpression: { pairKey: { $type: "string" } },
+              name: "unique_match_pair_key"
+            }
+          ).catch(error => {
+            this.matchPairIndexPromise = null;
+            throw error;
+          });
+        }
+        await this.matchPairIndexPromise;
       }
-      await this.matchPairIndexPromise;
 
       let match = await matches.findOne({
         $or: [
