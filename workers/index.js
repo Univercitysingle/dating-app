@@ -985,6 +985,14 @@ export default {
           body: JSON.stringify(request.method === "PUT" ? { claims, update: payload } : { claims })
         });
         const body = await response.json().catch(() => ({ error: "Profile service unavailable" }));
+        if (response.ok && blockMatch[1] === "block" && body.roomId && env.ENABLE_FIREBASE_REALTIME_SYNC === "true") {
+          try {
+            await syncChatRoomMembership(env, body.roomId, [claims.sub, targetUid], false);
+          } catch {
+            console.error("Firebase chat membership revocation failed", { phase: "block-revoke" });
+            return json({ error: "The user was blocked, but realtime chat access revocation is pending. Please contact support." }, 503);
+          }
+        }
         return json(body, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
@@ -1148,6 +1156,14 @@ export default {
           body: JSON.stringify({ claims, filters: Object.fromEntries(url.searchParams.entries()) })
         });
         const body = await response.json().catch(() => ({ error: "Match service unavailable" }));
+        if (response.ok && body.roomId && env.ENABLE_FIREBASE_REALTIME_SYNC === "true") {
+          try {
+            await syncChatRoomMembership(env, body.roomId, [claims.sub, targetUid], false);
+          } catch {
+            console.error("Firebase chat membership revocation failed", { phase: "unmatch-revoke" });
+            return json({ error: "The match ended, but realtime chat access revocation is pending. Please contact support." }, 503);
+          }
+        }
         return json(body, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
