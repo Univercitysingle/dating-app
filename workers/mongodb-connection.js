@@ -3745,7 +3745,12 @@ export class MongoDBConnection {
       if (sanitizedUpdate.lifestyle && sanitizedUpdate.lifestyle.lookingFor === "Casual (FWB)" && !sanitizedUpdate.sexualOrientation) {
         return { status: 400, body: { error: 'Sexual orientation is required when looking for "Casual (FWB)".' } };
       }
-      await users.updateOne({ uid }, { $set: { ...sanitizedUpdate, updatedAt: new Date() } });
+      // Do not write an empty profile update. In particular, completed
+      // profiles must ignore attempts to replace an already-recorded birthday
+      // without touching updatedAt or creating a misleading database write.
+      if (Object.keys(sanitizedUpdate).length > 0) {
+        await users.updateOne({ uid }, { $set: { ...sanitizedUpdate, updatedAt: new Date() } });
+      }
       return await this.getCurrentUserProfile(uid);
     } catch {
       return { status: 503, body: { error: "Profile service unavailable" } };
