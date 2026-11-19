@@ -1,66 +1,61 @@
 # Firebase Realtime Database Security Review
 
-Date: 2026-11-10
+Date: 2026-11-19
 Branch: `migrate-to-serverless`
 
-## Scope
+## Scope and release decision
 
-This review covers the Firebase Realtime Database integration only. IPG and the CDN Worker are explicitly out of scope. No Firebase console settings or live database data were changed.
+This review covers Firebase Realtime Database client access and the Cloudflare Worker synchronization path. It does not change Firebase Console settings, deployed rules, Firebase IAM, IPG, or the CDN Worker.
 
-## Repository findings
+**Client realtime synchronization remains disabled until the deployed Firebase rules and IAM configuration are independently verified.** The repository now contains a reviewable rules source at `database.rules.json`; committing that file does not deploy it to Firebase.
 
-- No `database.rules.json`, `firebase.json`, or `.firebaserc` is present in this branch.
-- The Cloudflare Worker/backend writes chat messages under `chats/{roomId}/{messageId}` using the Firebase Admin SDK.
-- It writes notifications under `notifications/{recipientUid}/{notificationId}`.
-- The web chat page can attach an RTDB `onChildAdded` listener at `chats/{chatId}` when `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC=true`.
-- The VAPT assessment already records that Firebase Admin SDK writes bypass client RTDB rules and that the deployed project's external rules and IAM settings have not been inspected.
+## Source-controlled client rules
 
-## Security conclusion
+The rules in `database.rules.json` enforce:
 
-**Firebase RTDB client access remains unverified and is a production release blocker.** Repository inspection cannot establish the rules currently deployed in the Firebase console. Do not assume that Worker authorization protects direct browser RTDB reads.
+- Root-level reads and writes denied by default.
+- Chat reads require a signed-in user whose UID is explicitly present in `chatParticipants/{roomId}`.
+- Client writes to chats, membership records, inverse indexes, and notifications denied.
+- `chatParticipants` and `chatUserRooms` are not client-readable.
+- Notifications are readable only by the matching recipient UID.
 
-The current message path contains room IDs and message data, but the repository does not establish a Firebase-side, rules-readable authoritative membership/eligibility record for each room. Therefore, a permissive rule based only on an authenticated user's UID, a supplied room ID, or message sender/receiver fields would be unsafe. Do not deploy such a rule.
+The Worker uses Firebase Admin credentials for trusted writes. Admin SDK access bypasses client RTDB rules, so Worker authorization and service-account IAM remain security boundaries.
 
-## Required Firebase Console actions
+## Worker membership lifecycle implemented
 
-1. Open Firebase Console for the configured project and inspect Realtime Database > Rules. Export/copy the currently deployed rules before making changes.
-2. Confirm unauthenticated reads and writes are denied.
-3. Confirm an authenticated third party cannot read another room's messages by guessing or learning its room ID.
-4. Confirm only the intended participants can read a room, and that block, unmatch, suspension, and account deletion revoke access.
-5. Confirm users cannot write arbitrary messages, impersonate another sender, alter timestamps, or write notifications for another UID.
-6. Confirm the `notifications/{uid}` path is readable only by that UID and is not client-writable unless a separately validated write use case requires it.
-7. Verify Firebase service-account IAM is least-privilege and credentials are not exposed in frontend build variables.
-8. Record the deployed rules version and run the negative tests below before enabling realtime sync in production.
+- `syncChatRoomMembership` writes the per-user inverse index at `chatUserRooms/{uid}/{roomId}` before granting the room membership at `chatParticipants/{roomId}`.
+- Authorized chat-history requests backfill membership and messages for legacy conversations.
+- Unmatch and block revoke the room grant and both inverse-index entries.
+- Account suspension and permanent ban revoke all indexed rooms and discover legacy rooms from MongoDB chat history.
+- Account deletion revokes memberships before Firebase identity deletion.
+- Revocation failures are surfaced as retry-pending rather than reported as completed.
+- Restoring an account does not grant access to rooms that have been revoked. Authorized chat-history backfill can re-establish membership only when the conversation remains eligible.
 
-## Required negative tests
+## Required Firebase Console verification
 
-- Unauthenticated read and write to `/chats/{roomId}`: denied.
-- Authenticated non-member read and write to `/chats/{roomId}`: denied.
-- Participant read of an authorized room: allowed only while membership is active.
+1. Export the currently deployed Realtime Database rules and compare them with `database.rules.json`.
+2. Confirm the Firebase project ID and database URL match the Cloudflare staging environment.
+3. Review the service account's IAM roles and reduce them to the minimum required for token issuance and RTDB access.
+4. Confirm service-account credentials are Worker secrets and never exposed as frontend build variables.
+5. Run the negative tests below against the deployed Firebase project using two test accounts.
+
+## Required live negative tests
+
+- Anonymous read/write to `/chats/{roomId}`: denied.
+- Authenticated non-member read/write to another room: denied.
+- Authorized participant read while membership is active: allowed.
 - Former participant read after unmatch or block: denied.
-- Suspended/deleted account read: denied.
+- Suspended, banned, and deleted account read: denied after revocation.
 - User A read/write under `/notifications/UserB`: denied.
-- Client write attempting to set another `senderUid` or `recipientUid`: denied.
+- Client write to `chatParticipants`, `chatUserRooms`, or any chat message: denied.
+- Worker membership grant and revocation: verify both room membership and inverse indexes.
 
-## Safe implementation decision
+## Remaining release blockers
 
-No RTDB rules file was invented or deployed because the authoritative membership model and live Firebase rules are not available in this repository. Keep the realtime client listener disabled until the external rules are verified. Server-side Admin SDK writes remain subject to the Worker application's own authorization checks.
+- Deployed Firebase Console rules have not been independently exported and verified in this repository.
+- Firebase service-account IAM least-privilege review remains outstanding.
+- Two-account live tests for unmatch, block, suspension, deletion, and reactivation remain outstanding.
+- Push subscription delivery and revocation tests remain outstanding.
+- Backup/restore exercises, payment reconciliation tests, accessibility and browser/device coverage remain separate release gates.
 
-## Follow-up evidence required
-
-- Screenshot or exported JSON of the deployed RTDB rules (secrets redacted).
-- Firebase project IAM/service-account review.
-- Results of the negative tests above.
-- Confirmation whether `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC` is enabled in the staging and production Pages environments.
-
-
-## Follow-up status (2026-11-11)
-
-No external Firebase Console evidence has been added since this review. Deployed RTDB rules, project IAM and negative-test results remain unverified. Keep `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC` disabled in production until the evidence listed above is collected and reviewed. Do not create permissive rules based only on a client-supplied room ID or message fields. GitHub Actions quota exhaustion does not change this security conclusion.
-
-
-## Traceability and outstanding verification (2026-11-11)
-
-Every requirement, metric, journey and finding must map to an implementation reference, test, staging evidence, owner, status, last verified commit, and release decision. Do not infer feature adoption, reliability, security, or capacity from source code or analytics instrumentation alone. Define metric event names, properties, privacy classification, sampling, retention, denominator, exclusion rules, and dashboard ownership before using metrics for decisions.
-
-Keep the following open until supported by evidence: complete API contract and authorization matrix; MongoDB schema/index/TTL and migration inventory; Firebase RTDB rules and push subscription/delivery/revocation tests; backup/restore exercises with RPO/RTO; payment replay/reconciliation/refund/stale-pending tests; moderation message edit/delete permissions and immutable audit events; account export/deletion propagation and backup retention; browser/device/PWA/offline/notification coverage; keyboard/screen-reader/contrast/form accessibility; localization, timezone and RTL readiness.
+Do not enable `REACT_APP_ENABLE_FIREBASE_REALTIME_SYNC` or `ENABLE_FIREBASE_REALTIME_SYNC` for production until the external evidence and negative tests above are complete.
