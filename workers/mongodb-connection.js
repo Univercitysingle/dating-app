@@ -3857,7 +3857,7 @@ export class MongoDBConnection {
 
       // Export only account-owned records and remove credentials, authentication
       // material, biometric evidence, operational IPs, and provider secrets.
-      const sensitiveKey = /password|token|secret|credential|private.?key|lastloginip|ipaddress|biometric|selfie|face.?template|encryption.?key|api.?key|rawcallback|signature/i;
+      const sensitiveKey = /password|token|secret|credential|private.?key|lastloginip|ipaddress|biometric|selfie|face.?template|verification|internal.?note|admin.?note|encryption.?key|api.?key|rawcallback|signature/i;
       const serialize = value => {
         if (value === null || value === undefined) return value;
         if (value instanceof Date) return value.toISOString();
