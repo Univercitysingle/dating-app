@@ -3662,6 +3662,16 @@ test("WebXPay callback parser rejects oversized, unsupported and ambiguous reque
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: "payment=" + encodeURIComponent(payment) + "&payment=" + encodeURIComponent(payment) +
         "&signature=" + encodeURIComponent(signature)
+    }),
+    new Request(url, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new Uint8Array([0xc3, 0x28])
+    }),
+    new Request(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "[]"
     })
   ];
 
