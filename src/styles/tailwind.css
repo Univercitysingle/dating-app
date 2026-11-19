@@ -6021,3 +6021,122 @@ html.dark .member-app-main .store-card { border-color: var(--app-border); backgr
     height: clamp(132px, 22vh, 176px) !important;
   }
 }
+
+
+/* Mobile fit-and-finish: keep every primary member workflow inside the usable viewport. */
+.member-app-shell { min-height: 100svh; min-height: 100dvh; }
+.member-app-main { min-width: 0; overflow-x: clip; }
+.member-topbar { position: sticky; top: 0; z-index: 45; }
+.member-mobile-nav { padding-bottom: env(safe-area-inset-bottom); }
+.member-mobile-nav-inner { padding-left: max(4px, env(safe-area-inset-left)); padding-right: max(4px, env(safe-area-inset-right)); }
+.member-mobile-nav-item { min-height: 54px; touch-action: manipulation; }
+.member-mobile-nav-item:focus-visible { outline-offset: -4px; border-radius: 12px; }
+
+/* Tinder-like discovery card takes the available space rather than forcing page scroll. */
+.discover-page { min-width: 0; }
+.discover-page .discover-stage { min-height: 0; }
+.discover-page .discover-card-stack { min-width: 0; }
+.discover-page .discover-filter-icon-button { position: relative; }
+.discover-page .filter-count { position: absolute; top: -5px; right: -5px; display: grid; min-width: 18px; height: 18px; place-items: center; padding: 0 4px; border: 2px solid #fff; border-radius: 999px; background: #fe3c72; color: #fff; font-size: 10px; font-weight: 800; }
+.discover-filter-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 12px; background: rgba(24,18,27,.52); backdrop-filter: blur(5px); }
+.discover-page .discover-filter-overlay > * { max-height: min(88dvh, 760px); overflow-y: auto; }
+.discover-page .discover-empty-state,.discover-page .discover-load-error { max-height: 100%; overflow-y: auto; }
+.discover-page .discover-actions { flex: 0 0 auto; }
+.discover-page .discover-action-button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.discover-page .discover-action-button:focus-visible { outline: 3px solid rgba(254,60,114,.32); outline-offset: 4px; }
+
+/* Match celebration must cover the viewport, including the fixed mobile navigation. */
+.discover-page > [role="dialog"], .discover-page .match-modal,
+.discover-page .absolute.inset-0.bg-neutral-900 { position: fixed; inset: 0; z-index: 120; overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom)); }
+
+/* Inbox rows remain thumb-friendly and the search stays visible while scrolling. */
+.inbox-page { min-width: 0; }
+.inbox-sidebar { min-width: 0; }
+.inbox-sidebar-header { position: sticky; top: 0; z-index: 2; background: #fff; }
+.inbox-conversation-list { min-width: 0; }
+.conversation-row { min-width: 0; min-height: 76px; }
+.conversation-row:focus-visible { outline-offset: -3px; }
+.conversation-row .conversation-avatar { object-position: center; }
+.inbox-search input { min-width: 0; }
+
+/* Chat uses a bounded flex column so the composer stays above the phone safe area. */
+.chat-shell.chat-whatsapp-shell { display: flex; min-height: 0; min-width: 0; }
+.chat-whatsapp-shell .chat-messages { min-height: 0; flex: 1 1 auto; overscroll-behavior: contain; }
+.chat-whatsapp-composer { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+.chat-composer-form { min-width: 0; }
+.chat-message-input { min-width: 0; }
+.chat-send-button { flex: 0 0 44px; touch-action: manipulation; }
+
+/* Profile, store and support forms avoid narrow-screen overflow and undersized controls. */
+.member-app-main .profile-page,.member-app-main .store-page,.member-app-main .support-page { min-width: 0; }
+.member-app-main input:not([type="checkbox"]):not([type="radio"]),
+.member-app-main select,.member-app-main textarea { max-width: 100%; }
+.member-app-main button,.member-app-main a { touch-action: manipulation; }
+
+@media (max-width: 767px) {
+  .member-app-shell { min-height: 100svh; min-height: 100dvh; }
+  .member-topbar { flex: 0 0 var(--member-header-height); }
+  .member-app-main { min-height: 0; }
+  .member-app-main-chat { display: flex; min-height: 0; overflow: hidden; }
+  .discover-page {
+    height: calc(100dvh - var(--member-header-height) - var(--bottom-nav-height) - 8px);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .discover-page .discover-header { flex: 0 0 42px; }
+  .discover-page .discover-stage { flex: 1 1 auto; justify-content: center; padding: 2px 4px; }
+  .discover-page .discover-card-stack {
+    width: min(100%, 440px);
+    height: clamp(260px, calc(100dvh - 310px), 560px);
+    min-height: 0;
+    max-height: 100%;
+  }
+  .discover-page .discover-actions { flex: 0 0 auto; padding: 0 4px max(4px, env(safe-area-inset-bottom)); }
+  .discover-page .discover-action-row { gap: clamp(9px, 3.2vw, 18px); margin: 5px 0 2px; }
+  .discover-page .discover-action-button { width: clamp(44px, 13vw, 54px); height: clamp(44px, 13vw, 54px); }
+  .discover-page .discover-action-like { width: clamp(54px, 16vw, 64px); height: clamp(54px, 16vw, 64px); }
+  .discover-page .discover-action-button svg { width: 22px; height: 22px; }
+  .discover-page .discover-action-like svg { width: 27px; height: 27px; }
+  .discover-page .discover-filter-overlay { align-items: flex-end; padding: 8px 8px max(8px, env(safe-area-inset-bottom)); }
+  .discover-page .discover-filter-overlay > * { width: 100%; max-height: 90dvh; border-radius: 22px 22px 12px 12px; }
+  .discover-page > [role="dialog"], .discover-page .match-modal,
+  .discover-page .absolute.inset-0.bg-neutral-900 { align-items: center; justify-content: center; }
+  .likes-page > div > ul { align-items: stretch; }
+  .likes-page .like-card { min-width: 0; overflow: hidden; }
+  .likes-page .like-card > div:first-child > div:first-child { height: auto; aspect-ratio: 4 / 5; min-height: 0; }
+  .likes-page .like-card > div:first-child > div:last-child { min-width: 0; }
+  .likes-page .like-card > a { display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+  .inbox-page { width: 100%; }
+  .inbox-workspace { min-height: 0; height: calc(100dvh - var(--member-header-height) - var(--bottom-nav-height) - 118px); overflow: hidden; }
+  .inbox-sidebar { display: flex; height: 100%; min-height: 0; flex-direction: column; }
+  .inbox-sidebar-header { flex: 0 0 auto; }
+  .inbox-conversation-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+  .chat-shell.chat-whatsapp-shell {
+    height: calc(100dvh - var(--member-header-height) - var(--bottom-nav-height) - 16px);
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .chat-whatsapp-header { flex: 0 0 66px; }
+  .chat-whatsapp-shell .chat-messages { flex: 1 1 auto; min-height: 0; padding-top: 12px; padding-bottom: 12px; }
+  .chat-whatsapp-composer { flex: 0 0 auto; padding: 9px 10px max(9px, env(safe-area-inset-bottom)); }
+  .chat-composer-form { gap: 7px; }
+  .chat-message-input { min-height: 44px; font-size: 16px; }
+  .chat-send-button { width: 42px; height: 42px; flex-basis: 42px; }
+}
+@media (max-width: 380px) {
+  .member-mobile-nav-item { gap: 2px; font-size: 8px; }
+  .member-mobile-nav-item svg { width: 19px; height: 19px; }
+  .discover-page .discover-card-stack { width: 100%; }
+  .discover-page .discover-action-row { gap: 8px; }
+  .inbox-heading p:not(.page-eyebrow) { max-width: 240px; }
+  .likes-page > div > ul { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-height: 700px) and (max-width: 767px) {
+  .discover-page .discover-card-stack { height: clamp(245px, calc(100dvh - 285px), 390px); }
+  .discover-page .discover-actions { padding-top: 0; }
+  .discover-page .discover-action-row { margin-top: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .discover-page .discover-action-button { transition: none; }
+}
