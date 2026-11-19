@@ -82,3 +82,8 @@ GitHub Actions staging deployments are running on `migrate-to-serverless`. The P
 ## Call abuse-protection follow-up (2026-11-19)
 
 Call signalling, polling, incoming-call checks, history reads and state-changing call actions now have independent per-account Durable Object quotas. The limits are deliberately generous for WebRTC candidate bursts and active polling, while preventing unbounded authenticated request floods. The generic IP limiter remains bypassed for `/api/calls/*` so users behind shared NAT are not throttled together. Unit tests cover each scope and fail-closed/exhaustion responses. Staging workflow [44510511778](https://github.com/Univercitysingle/dating-app/actions/runs/44510511778) is the deployment evidence for the implementation; do not mark it deployed until that run completes successfully. Real-device TURN relay, reconnect and multi-tab acceptance remain open.
+
+
+## WebRTC signaling payload hardening (2026-11-19)
+
+The call signaling persistence path now validates optional ICE candidate metadata (`sdpMid`, `sdpMLineIndex`, and `usernameFragment`) and stores only the standard bounded `RTCIceCandidateInit` fields. Arbitrary client-supplied candidate object properties are discarded before MongoDB persistence. Regression tests cover metadata normalization and invalid candidate rejection. Automated deployment does not prove TURN relay connectivity; real-device network tests remain required.
