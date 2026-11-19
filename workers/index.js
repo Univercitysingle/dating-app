@@ -2854,9 +2854,9 @@ export default {
             body: JSON.stringify({ claims, payload })
           });
           const result = await response.json().catch(() => ({ error: "Chat status update unavailable" }));
-          let realtimeSync = null;
+          let responseBody = result;
           if (response.ok && env.ENABLE_FIREBASE_REALTIME_SYNC === "true") {
-            realtimeSync = false;
+            let realtimeSync = false;
             const verifiedMessageIds = Array.isArray(result.updatedMessageIds) ? result.updatedMessageIds : [];
             if (payload && typeof payload.roomId === "string" && verifiedMessageIds.length) {
               try {
@@ -2871,8 +2871,9 @@ export default {
                 });
               }
             }
+            responseBody = { ...result, realtimeSync };
           }
-          return json({ ...result, realtimeSync }, response.status);
+          return json(responseBody, response.status);
         }
         const response = await connection.fetch("https://internal.invalid/internal/chat/send", {
           method: "POST", headers: { "content-type": "application/json" },
