@@ -123,15 +123,23 @@ test("account-wide chat revocation removes room access and both participant inde
       calls.push({ url: String(url), init });
       return new Response(JSON.stringify({ "uid-a": true, "uid-c": true }), { status: 200 });
     }
+    if (String(url).endsWith("/chatParticipants/legacy-room-uid-a-uid-d.json")) {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ "uid-a": true, "uid-d": true }), { status: 200 });
+    }
     return originalFetch(url, init);
   };
-  const result = await revokeAllChatMembershipsForUser(env, "uid-a", fetchImpl);
-  assert.deepEqual(result, { revoked: 2 });
+  const result = await revokeAllChatMembershipsForUser(
+    env, "uid-a", fetchImpl, ["legacy-room-uid-a-uid-d"]
+  );
+  assert.deepEqual(result, { revoked: 3 });
   const deletes = calls.filter(call => call.init.method === "DELETE");
-  assert.equal(deletes.length, 6);
+  assert.equal(deletes.length, 9);
   assert.ok(deletes.some(call => call.url.endsWith("/chatParticipants/uid-a-uid-b.json")));
   assert.ok(deletes.some(call => call.url.endsWith("/chatUserRooms/uid-b/uid-a-uid-b.json")));
   assert.ok(deletes.some(call => call.url.endsWith("/chatUserRooms/uid-a/uid-a-uid-c.json")));
+  assert.ok(deletes.some(call => call.url.endsWith("/chatParticipants/legacy-room-uid-a-uid-d.json")));
+  assert.ok(deletes.some(call => call.url.endsWith("/chatUserRooms/uid-d/legacy-room-uid-a-uid-d.json")));
 });
 
 test("account-wide chat revocation rejects invalid identities before database access", async () => {
