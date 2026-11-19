@@ -2222,6 +2222,48 @@ test("call signaling keeps a rolling candidate buffer without a lifetime 429 cap
   assert.equal(capturedUpdate.$push.signals.$each[0].toUid, "receiver-uid");
 });
 
+test("call signaling stores only bounded standard ICE candidate fields", async () => {
+  const callId = "0123456789abcdef01234567";
+  let capturedUpdate;
+  const calls = {
+    async findOne() {
+      return { _id: { toString: () => callId }, callerUid: "caller-uid", receiverUid: "receiver-uid", status: "accepted" };
+    },
+    async updateOne(_filter, update) { capturedUpdate = update; return { matchedCount: 1 }; }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection: () => calls }) });
+  const result = await connection.sendCallSignal("caller-uid", {
+    callId,
+    candidate: {
+      candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 5000 typ host",
+      sdpMid: "0",
+      sdpMLineIndex: 0,
+      usernameFragment: "ufrag",
+      arbitraryLargeField: "x".repeat(50000)
+    }
+  });
+  assert.equal(result.status, 200);
+  assert.deepEqual(capturedUpdate.$push.signals.$each[0].candidate, {
+    candidate: "candidate:1 1 UDP 2122260223 192.0.2.1 5000 typ host",
+    sdpMid: "0",
+    sdpMLineIndex: 0,
+    usernameFragment: "ufrag"
+  });
+});
+
+test("call signaling rejects malformed ICE candidate metadata", async () => {
+  let databaseAccessed = false;
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => { databaseAccessed = true; throw new Error("unexpected"); };
+  const result = await connection.sendCallSignal("caller-uid", {
+    callId: "0123456789abcdef01234567",
+    candidate: { candidate: "candidate:1", sdpMLineIndex: -1 }
+  });
+  assert.equal(result.status, 400);
+  assert.equal(databaseAccessed, false);
+});
+
 test("call signaling rejects non-participants before writing candidates", async () => {
   const callId = "0123456789abcdef01234567";
   let writeAttempted = false;
