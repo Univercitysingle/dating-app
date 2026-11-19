@@ -6,6 +6,34 @@ import logger from '../utils/logger';
 
 const AuthContext = createContext();
 
+async function removeBrowserPushSubscription() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) ||
+      typeof window === 'undefined' || !('PushManager' in window)) return;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('/');
+    const subscription = await registration?.pushManager.getSubscription();
+    if (!subscription) return;
+    try {
+      await apiClient.delete('/push/subscriptions', { endpoint: subscription.endpoint });
+    } catch (error) {
+      logger.warn('Server-side push subscription cleanup failed during logout.', {
+        message: error?.message || 'Push cleanup request failed'
+      });
+    }
+    try {
+      await subscription.unsubscribe();
+    } catch (error) {
+      logger.warn('Browser push subscription cleanup failed during logout.', {
+        message: error?.message || 'Browser unsubscribe failed'
+      });
+    }
+  } catch (error) {
+    logger.warn('Browser push subscription lookup failed during logout.', {
+      message: error?.message || 'Push subscription lookup failed'
+    });
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,6 +150,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    await removeBrowserPushSubscription();
     try {
       await apiClient.post('/auth/logout');
     } catch (error) {
