@@ -5848,7 +5848,7 @@ test("superadmin payment reconciliation flags stale, incomplete, refund and dupl
       };
       if (name === "subscriptions") return {
         find: () => cursor([
-          { _id: "s1", status: "active", createdAt: recent, plan: "monthly" },
+          { _id: "s1", status: "active", createdAt: recent, plan: "monthly", paymentReference: "subscription-ref" },
           { _id: "s2", status: "pending", createdAt: recent }
         ])
       };
@@ -5872,7 +5872,7 @@ test("superadmin payment reconciliation flags stale, incomplete, refund and dupl
   assert.equal(result.body.counts.refundRequired, 1);
   const reasons = result.body.anomalies.map(item => item.reason);
   assert.ok(reasons.includes("stale_pending"));
-  assert.ok(reasons.includes("settled_missing_gateway_metadata"));
+  assert.ok(reasons.includes("partial_gateway_metadata"));
   assert.ok(reasons.includes("refund_review_required"));
   assert.ok(reasons.includes("duplicate_payment_reference"));
   assert.ok(reasons.includes("duplicate_gateway_transaction_id"));
