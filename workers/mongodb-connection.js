@@ -2714,21 +2714,21 @@ export class MongoDBConnection {
       }
       let chatAccessRevocationStatus = "not_required";
       if (payload.action === "suspend_user" || payload.action === "ban_user") {
+        await Promise.all([
+          db.collection("chatTyping").deleteMany({ uid: report.reportedUserUid }),
+          db.collection("callSessions").updateMany(
+            { $or: [{ callerUid: report.reportedUserUid }, { receiverUid: report.reportedUserUid }], status: { $in: ["ringing", "accepted"] } },
+            { $set: { status: "cancelled", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+          ),
+          db.collection("videoRooms").updateMany(
+            { hostUid: report.reportedUserUid, status: "active" },
+            { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+          )
+        ]);
         try {
           const revocation = await revokeFirebaseChatMemberships(this.env, report.reportedUserUid);
           if (revocation.configured) {
             chatAccessRevocationStatus = "completed";
-            await Promise.all([
-              db.collection("chatTyping").deleteMany({ uid: report.reportedUserUid }),
-              db.collection("callSessions").updateMany(
-                { $or: [{ callerUid: report.reportedUserUid }, { receiverUid: report.reportedUserUid }], status: { $in: ["ringing", "accepted"] } },
-                { $set: { status: "cancelled", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
-              ),
-              db.collection("videoRooms").updateMany(
-                { hostUid: report.reportedUserUid, status: "active" },
-                { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
-              )
-            ]);
             await db.collection("users").updateOne({ uid: report.reportedUserUid }, { $set: {
               chatAccessRevocationStatus,
               chatAccessRevokedRoomCount: revocation.revoked,
@@ -3997,20 +3997,20 @@ export class MongoDBConnection {
       );
       if (!result) return { status: 404, body: { message: "User not found" } };
       if (revokeChatAccess && typeof target.uid === "string" && target.uid) {
+        await Promise.all([
+          db.collection("chatTyping").deleteMany({ uid: target.uid }),
+          db.collection("callSessions").updateMany(
+            { $or: [{ callerUid: target.uid }, { receiverUid: target.uid }], status: { $in: ["ringing", "accepted"] } },
+            { $set: { status: "cancelled", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+          ),
+          db.collection("videoRooms").updateMany(
+            { hostUid: target.uid, status: "active" },
+            { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+          )
+        ]);
         try {
           const revocation = await revokeFirebaseChatMemberships(this.env, target.uid);
           if (revocation.configured) {
-            await Promise.all([
-              db.collection("chatTyping").deleteMany({ uid: target.uid }),
-              db.collection("callSessions").updateMany(
-                { $or: [{ callerUid: target.uid }, { receiverUid: target.uid }], status: { $in: ["ringing", "accepted"] } },
-                { $set: { status: "cancelled", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
-              ),
-              db.collection("videoRooms").updateMany(
-                { hostUid: target.uid, status: "active" },
-                { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
-              )
-            ]);
             await users.updateOne({ _id: targetId }, { $set: {
               chatAccessRevocationStatus: "completed",
               chatAccessRevokedRoomCount: revocation.revoked,
