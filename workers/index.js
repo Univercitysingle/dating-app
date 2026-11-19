@@ -2733,6 +2733,23 @@ export default {
           body: JSON.stringify({ claims, messageId: chatMessageAction[1], payload })
         });
         const result = await response.json().catch(() => ({ error: "Chat message operation unavailable" }));
+        if (response.ok && env.ENABLE_FIREBASE_REALTIME_SYNC === "true") {
+          const messageForSync = isEdit ? result : result.message;
+          if (messageForSync && messageForSync.roomId && messageForSync.senderUid && messageForSync.receiverUid) {
+            try {
+              await syncChatMessageToRtdb(env, {
+                ...messageForSync,
+                _id: String(messageForSync._id),
+                timestamp: messageForSync.timestamp instanceof Date
+                  ? messageForSync.timestamp.toISOString() : messageForSync.timestamp
+              });
+            } catch {
+              console.warn("Firebase chat message mutation sync was not completed", {
+                phase: isEdit ? "edit-realtime-chat-message" : "delete-realtime-chat-message"
+              });
+            }
+          }
+        }
         return json(result, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
