@@ -347,3 +347,84 @@ test("call history supports opaque chat room IDs and remains participant-scoped"
   assert.equal("answer" in result.body.calls[0], false);
   assert.equal("signals" in result.body.calls[0], false);
 });
+
+test("chat message edit and delete reject attempts by a non-sender without writing audit records", async () => {
+  const messageId = "abcdef0123456789abcdef01";
+  const auditEvents = [];
+  const message = {
+    _id: messageId,
+    roomId: "alice-bob",
+    senderUid: "alice",
+    receiverUid: "bob",
+    messageContent: "private message",
+    timestamp: new Date()
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          return { uid, role: "user", accountStatus: "active" };
+        }
+      };
+      if (name === "chatmessages") return {
+        async findOne() { return message; },
+        async updateOne() { assert.fail("Unauthorized message mutation must not run"); }
+      };
+      if (name === "auditlogs") return {
+        async insertOne(event) { auditEvents.push(event); }
+      };
+      if (name === "matches") return { async findOne() { return { status: "matched" }; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const edited = await connection.updateChatMessage("bob", messageId, {
+    messageContent: "tampered message"
+  });
+  const deleted = await connection.deleteChatMessage("bob", messageId);
+
+  assert.equal(edited.status, 403);
+  assert.equal(deleted.status, 403);
+  assert.equal(auditEvents.length, 0);
+});
+
+test("chat message edit and delete enforce their time windows for the original sender", async () => {
+  const messageId = "abcdef0123456789abcdef01";
+  const message = {
+    _id: messageId,
+    roomId: "alice-bob",
+    senderUid: "alice",
+    receiverUid: "bob",
+    messageContent: "old message",
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne() { return { uid: "alice", role: "user", accountStatus: "active" }; }
+      };
+      if (name === "chatmessages") return {
+        async findOne() { return message; },
+        async updateOne() { assert.fail("Expired message mutation must not run"); }
+      };
+      if (name === "auditlogs") return {
+        async insertOne() { assert.fail("Expired message mutation must not be audited as successful"); }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const edited = await connection.updateChatMessage("alice", messageId, {
+    messageContent: "edited too late"
+  });
+  const deleted = await connection.deleteChatMessage("alice", messageId);
+
+  assert.equal(edited.status, 403);
+  assert.match(edited.body.error, /15 minutes/);
+  assert.equal(deleted.status, 403);
+  assert.match(deleted.body.error, /one hour/);
+});
