@@ -1485,6 +1485,10 @@ test("moderation uses explicit temporary and permanent account states and suppor
       if (name === "users") return users;
       if (name === "reports") return reports;
       if (name === "auditlogs") return auditlogs;
+      if (["chatTyping", "callSessions", "videoRooms"].includes(name)) return {
+        async deleteMany() { return { deletedCount: 0 }; },
+        async updateMany() { return { modifiedCount: 0 }; }
+      };
       assert.fail("Unexpected collection: " + name);
     } });
     const result = await connection.moderateReport("admin", String(report._id), { action, ...extraPayload });
@@ -1924,6 +1928,10 @@ test("moderation writes a durable audit entry before changing account state", as
       if (name === "users") return users;
       if (name === "reports") return reports;
       if (name === "auditlogs") return auditlogs;
+      if (["chatTyping", "callSessions", "videoRooms"].includes(name)) return {
+        async deleteMany() { return { deletedCount: 0 }; },
+        async updateMany() { return { modifiedCount: 0 }; }
+      };
       assert.fail("Unexpected collection: " + name);
     }
   };
