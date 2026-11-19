@@ -31,6 +31,7 @@ test("blocking a user records the block and terminates the pair's active match",
   const db = { collection(name) {
     if (name === "users") return users;
     if (name === "matches") return matches;
+    if (name === "chatmessages") return { async findOne() { return { roomId: "current-user-target-user" }; } };
     assert.fail("Unexpected collection: " + name);
   } };
   const result = await makeConnection(db).updateBlockedUser("current-user", "target-user", "block");
@@ -62,8 +63,9 @@ test("unmatch only changes an active match and records who initiated it", async 
     }
   };
   const db = { collection(name) {
-    assert.equal(name, "matches");
-    return matches;
+    if (name === "matches") return matches;
+    if (name === "chatmessages") return { async findOne() { return { roomId: "a-user-z-user" }; } };
+    assert.fail("Unexpected collection: " + name);
   } };
   const result = await makeConnection(db).unmatchUsers("z-user", "a-user");
   assert.equal(result.status, 200);
