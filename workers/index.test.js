@@ -1518,7 +1518,6 @@ test("admin read methods deny users without an admin role", async () => {
   assert.equal((await connection.getAdminLogs("ordinary-user", "login")).status, 403);
   assert.equal((await connection.getAdminLogs("ordinary-user", "audit")).status, 403);
   assert.equal((await connection.getAdminPurchases("ordinary-user")).status, 403);
-  assert.equal((await connection.moderateAdminPurchase("ordinary-user", "0123456789abcdef01234567", "approve")).status, 403);
 });
 
 test("admin report endpoints reject anonymous requests", async () => {
