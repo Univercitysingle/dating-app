@@ -1785,6 +1785,8 @@ export default {
     if (adminPurchasesMatch) {
       const parts = url.pathname.slice(adminPurchasesBase.length).split("/").filter(Boolean);
       const isList = parts.length === 0 && request.method === "GET";
+      // Payment state is gateway-authoritative. Admins may record verified refunds,
+      // but cannot approve or reject IPG transactions or grant paid entitlements.
       const isAction = parts.length === 2 && /^[a-fA-F0-9]{24}$/.test(parts[0]) &&
         parts[1] === "record-refund" && request.method === "POST";
       if (!isList && !isAction) return json({ message: "Not found" }, 404);
