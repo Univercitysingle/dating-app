@@ -2329,7 +2329,9 @@ test("a user cannot start or receive overlapping calls in different chat rooms",
   assert.equal(activeCallFilter.roomId, undefined);
   assert.deepEqual(activeCallFilter.$or, [
     { callerUid: "caller-uid" },
-    { receiverUid: "caller-uid" }
+    { receiverUid: "caller-uid" },
+    { callerUid: "new-receiver" },
+    { receiverUid: "new-receiver" }
   ]);
   assert.equal(insertAttempted, false);
 });
