@@ -110,7 +110,6 @@ jobs:
       - name: Resolve and install Worker dependencies
         working-directory: workers
         run: |
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci --no-audit --no-fund
           npm audit --audit-level=high
 
