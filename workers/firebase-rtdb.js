@@ -124,11 +124,82 @@ export async function syncChatRoomMembership(env, roomId, participantUids, activ
       participantUids[0] === participantUids[1] || typeof active !== "boolean") {
     throw new Error("Invalid chat membership update");
   }
-  return authenticatedDatabaseRequest(
-    env,
-    "/chatParticipants/" + encodeURIComponent(roomId),
-    active ? "PUT" : "DELETE",
-    active ? Object.fromEntries(participantUids.map(uid => [uid, true])) : undefined,
-    fetchImpl
+  const encodedRoomId = encodeURIComponent(roomId);
+  const operations = active
+    ? [
+        authenticatedDatabaseRequest(
+          env, "/chatParticipants/" + encodedRoomId, "PUT",
+          Object.fromEntries(participantUids.map(uid => [uid, true])), fetchImpl
+        ),
+        ...participantUids.map(uid => authenticatedDatabaseRequest(
+          env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
+          "PUT", true, fetchImpl
+        ))
+      ]
+    : [
+        authenticatedDatabaseRequest(env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl),
+        ...participantUids.map(uid => authenticatedDatabaseRequest(
+          env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
+          "DELETE", undefined, fetchImpl
+        ))
+      ];
+  await Promise.all(operations);
+  return true;
+}
+
+async function readAuthenticatedDatabaseValue(env, path, fetchImpl = fetch) {
+  const baseUrl = getDatabaseBaseUrl(env);
+  const accessToken = await getFirebaseAdminAccessToken(env, fetchImpl);
+  const response = await fetchImpl(baseUrl + path + ".json", {
+    method: "GET",
+    headers: { authorization: "Bearer " + accessToken }
+  });
+  if (!response.ok) throw new Error("Firebase Realtime Database read failed");
+  return response.json();
+}
+
+/**
+ * Revoke every indexed chat room for a user. The inverse index is written
+ * alongside chatParticipants by syncChatRoomMembership, making this bounded
+ * by the user's own conversation count rather than a database-wide scan.
+ * The operation is idempotent and removes stale per-user index entries too.
+ */
+export async function revokeAllChatMembershipsForUser(env, uid, fetchImpl = fetch) {
+  if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
+    throw new Error("Invalid chat membership user");
+  }
+  const encodedUid = encodeURIComponent(uid);
+  const roomIndex = await readAuthenticatedDatabaseValue(
+    env, "/chatUserRooms/" + encodedUid, fetchImpl
   );
+  const roomIds = roomIndex && typeof roomIndex === "object" && !Array.isArray(roomIndex)
+    ? Object.keys(roomIndex).filter(roomId => roomIndex[roomId] === true)
+    : [];
+  if (!roomIds.length) return { revoked: 0 };
+
+  let revoked = 0;
+  for (const roomId of roomIds) {
+    if (!roomId || roomId.length > 260) continue;
+    const encodedRoomId = encodeURIComponent(roomId);
+    const participants = await readAuthenticatedDatabaseValue(
+      env, "/chatParticipants/" + encodedRoomId, fetchImpl
+    );
+    const participantUids = participants && typeof participants === "object" && !Array.isArray(participants)
+      ? Object.keys(participants).filter(participantUid =>
+          participants[participantUid] === true && /^[A-Za-z0-9_-]{1,128}$/.test(participantUid)
+        )
+      : [uid];
+    await Promise.all([
+      authenticatedDatabaseRequest(env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl),
+      ...new Set([...participantUids, uid]).values().map(participantUid =>
+        authenticatedDatabaseRequest(
+          env,
+          "/chatUserRooms/" + encodeURIComponent(participantUid) + "/" + encodedRoomId,
+          "DELETE", undefined, fetchImpl
+        )
+      )
+    ]);
+    revoked += 1;
+  }
+  return { revoked };
 }
