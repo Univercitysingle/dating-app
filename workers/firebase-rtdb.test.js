@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
+import { syncChatMessageToRtdb, syncChatRoomMembership, revokeAllChatMembershipsForUser } from "./firebase-rtdb.js";
 
 let testAccountSequence = 0;
 
@@ -40,20 +40,31 @@ test("chat membership is written by the service account, not a client ID token",
   const env = makeEnv();
   const { calls, fetchImpl } = createFetchRecorder();
   await syncChatRoomMembership(env, "uid-a-uid-b", ["uid-a", "uid-b"], true, fetchImpl);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 4);
   assert.equal(calls[0].url, "https://oauth2.googleapis.com/token");
-  assert.match(calls[1].url, /\/chatParticipants\/uid-a-uid-b\.json$/);
-  assert.equal(calls[1].init.headers.authorization, "Bearer test-admin-token");
-  assert.equal(calls[1].init.method, "PUT");
-  assert.deepEqual(JSON.parse(calls[1].init.body), { "uid-a": true, "uid-b": true });
+  const membershipWrite = calls.find(call => /\/chatParticipants\/uid-a-uid-b\.json$/.test(call.url));
+  assert.equal(membershipWrite.init.headers.authorization, "Bearer test-admin-token");
+  assert.equal(membershipWrite.init.method, "PUT");
+  assert.deepEqual(JSON.parse(membershipWrite.init.body), { "uid-a": true, "uid-b": true });
+  for (const uid of ["uid-a", "uid-b"]) {
+    const indexWrite = calls.find(call => call.url.endsWith("/chatUserRooms/" + uid + "/uid-a-uid-b.json"));
+    assert.equal(indexWrite.init.method, "PUT");
+    assert.equal(JSON.parse(indexWrite.init.body), true);
+  }
 });
 
 test("chat membership is revoked with an authenticated service-account DELETE", async () => {
   const env = makeEnv();
   const { calls, fetchImpl } = createFetchRecorder();
   await syncChatRoomMembership(env, "uid-a-uid-b", ["uid-a", "uid-b"], false, fetchImpl);
-  assert.equal(calls[1].init.method, "DELETE");
-  assert.equal(calls[1].init.body, undefined);
+  assert.equal(calls.length, 4);
+  const membershipDelete = calls.find(call => /\/chatParticipants\/uid-a-uid-b\.json$/.test(call.url));
+  assert.equal(membershipDelete.init.method, "DELETE");
+  assert.equal(membershipDelete.init.body, undefined);
+  for (const uid of ["uid-a", "uid-b"]) {
+    const indexDelete = calls.find(call => call.url.endsWith("/chatUserRooms/" + uid + "/uid-a-uid-b.json"));
+    assert.equal(indexDelete.init.method, "DELETE");
+  }
 });
 
 test("chat message sync writes only the expected public message fields", async () => {
@@ -93,4 +104,38 @@ test("missing or mismatched service-account configuration fails closed", async (
       "uid-a-uid-b", ["uid-a", "uid-b"], true, fetchImpl),
     /configuration is invalid/
   );
+});
+
+
+test("account-wide chat revocation removes room access and both participant indexes", async () => {
+  const env = makeEnv();
+  const { calls, fetchImpl: originalFetch } = createFetchRecorder();
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).endsWith("/chatUserRooms/uid-a.json")) {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ "uid-a-uid-b": true, "uid-a-uid-c": true }), { status: 200 });
+    }
+    if (String(url).endsWith("/chatParticipants/uid-a-uid-b.json")) {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ "uid-a": true, "uid-b": true }), { status: 200 });
+    }
+    if (String(url).endsWith("/chatParticipants/uid-a-uid-c.json")) {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ "uid-a": true, "uid-c": true }), { status: 200 });
+    }
+    return originalFetch(url, init);
+  };
+  const result = await revokeAllChatMembershipsForUser(env, "uid-a", fetchImpl);
+  assert.deepEqual(result, { revoked: 2 });
+  const deletes = calls.filter(call => call.init.method === "DELETE");
+  assert.equal(deletes.length, 6);
+  assert.ok(deletes.some(call => call.url.endsWith("/chatParticipants/uid-a-uid-b.json")));
+  assert.ok(deletes.some(call => call.url.endsWith("/chatUserRooms/uid-b/uid-a-uid-b.json")));
+  assert.ok(deletes.some(call => call.url.endsWith("/chatUserRooms/uid-a/uid-a-uid-c.json")));
+});
+
+test("account-wide chat revocation rejects invalid identities before database access", async () => {
+  const env = makeEnv();
+  const { fetchImpl } = createFetchRecorder();
+  await assert.rejects(revokeAllChatMembershipsForUser(env, "../uid", fetchImpl), /Invalid chat membership user/);
 });
