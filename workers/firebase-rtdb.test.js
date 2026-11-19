@@ -131,7 +131,7 @@ test("chat delivery and read receipts patch only existing message nodes", async 
   assert.deepEqual(result, { synced: 1, skipped: 0, status: "read" });
   const patch = calls.find(call => call.init.method === "PATCH");
   assert.ok(patch);
-  assert.match(patch.url, /\\/chats\\/uid-a-uid-b\\/[a-f0-9]{24}\\.json$/);
+  assert.match(patch.url, /\/chats\/uid-a-uid-b\/[a-f0-9]{24}\.json$/);
   const body = JSON.parse(patch.init.body);
   assert.equal(body.status, "read");
   assert.equal(typeof body.readAt, "string");
