@@ -32,6 +32,9 @@ test("chat message edits and deletes enforce sender ownership and preserve audit
   assert.equal(edited.status, 200);
   assert.equal(stored.messageContent, "Updated");
   assert.ok(stored.editedAt instanceof Date);
+  assert.equal(edited.body.messageContent, "Updated");
+  assert.ok(edited.body.editedAt instanceof Date);
+  assert.equal(edited.body.editedByUid, "chat-owner");
   assert.equal(audit[0].eventType, "chat_message_edited");
   assert.equal(audit[0].previousMessage, "Original");
 
@@ -39,6 +42,10 @@ test("chat message edits and deletes enforce sender ownership and preserve audit
   assert.equal(deleted.status, 200);
   assert.equal(stored.messageContent, "This message was deleted.");
   assert.ok(stored.deletedAt instanceof Date);
+  assert.equal(deleted.body.message.roomId, "chat-room");
+  assert.equal(deleted.body.message.messageContent, "This message was deleted.");
+  assert.ok(deleted.body.message.deletedAt instanceof Date);
+  assert.equal(deleted.body.message.deletedByUid, "chat-owner");
   assert.equal(audit[1].eventType, "chat_message_deleted");
   assert.equal(audit[1].previousMessage, "Updated");
 });
