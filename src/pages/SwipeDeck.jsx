@@ -171,7 +171,12 @@ const SwipeDeck = () => {
       }
       if (initializationSequence !== discoverRequestSequence.current) return;
       const initialRequestFilters = { ...filters };
-      if (locationStatus?.enabled !== true || locationStatus?.stale === true) {
+      // Older saved filter records may contain the former default maxDistance
+      // even when the user selected Anywhere. Only send a radius for an
+      // explicitly selected Nearby search with fresh, server-confirmed consent.
+      if (filters.travelMode !== 'nearby' ||
+          locationStatus?.enabled !== true ||
+          locationStatus?.stale === true) {
         delete initialRequestFilters.maxDistance;
       }
       fetchUsersToSwipe(initialRequestFilters);
