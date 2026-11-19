@@ -1,4 +1,4 @@
-import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
+import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";\nimport { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
 import { Buffer } from "node:buffer";
 import { sendWebPush } from "./push-notifications.js";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
@@ -2775,6 +2775,20 @@ export default {
             body: JSON.stringify({ claims, roomId, limit, skip, after, before })
           });
           const result = await response.json().catch(() => ({ error: "Chat history unavailable" }));
+          if (response.ok && env.ENABLE_FIREBASE_REALTIME_SYNC === "true" && Array.isArray(result.messages) && result.messages.length) {
+            const first = result.messages.find(message =>
+              typeof message.senderUid === "string" && typeof message.receiverUid === "string"
+            );
+            if (first) {
+              const participants = [first.senderUid, first.receiverUid];
+              try {
+                await syncChatRoomMembership(env, roomId, participants, true);
+                await Promise.all(result.messages.map(message => syncChatMessageToRtdb(env, message)));
+              } catch {
+                console.warn("Firebase chat history backfill was not completed", { phase: "chat-history-backfill" });
+              }
+            }
+          }
           return json(result, response.status);
         }
         if (chatRoute[1] === "typing" && request.method === "GET") {
@@ -2812,75 +2826,24 @@ export default {
           if (ctx?.waitUntil) ctx.waitUntil(task);
           else await task;
         }
-        const authorization = request.headers.get("authorization") || "";
-        const idToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-        // MongoDB is the source of truth. Realtime Database is a best-effort
-        // notification/sync layer and must never invalidate a saved message.
-        // The current staging Firebase RTDB is deactivated. MongoDB is the
-        // source of truth, and the frontend polls message history, so RTDB sync
-        // stays off unless an operator explicitly enables a live database.
-        const realtimeSyncEnabled = env.ENABLE_FIREBASE_REALTIME_SYNC === "true";
-        const databaseUrl = realtimeSyncEnabled
-          ? (env.FIREBASE_DATABASE_URL ||
-            (env.FIREBASE_PROJECT_ID ? `https://${env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com` : ""))
-          : "";
+        // MongoDB remains authoritative. With RTDB sync enabled, only the
+        // Worker service account writes messages and membership. Client writes
+        // remain denied by the deployed database rules.
         let realtimeSync = false;
-        let databaseBase = "";
-        if (realtimeSyncEnabled && (!idToken || !databaseUrl)) {
-          console.warn("Firebase Realtime Database chat sync is not configured", {
-            phase: "write-realtime-chat-message",
-            hasIdToken: Boolean(idToken),
-            hasDatabaseUrl: Boolean(databaseUrl)
-          });
-        } else if (realtimeSyncEnabled) {
+        if (env.ENABLE_FIREBASE_REALTIME_SYNC === "true" && result.receiverUid && result.roomId) {
           try {
-            if (!isFirebaseDatabaseUrl(databaseUrl)) {
-              throw new Error("Invalid Firebase Realtime Database URL");
-            }
-            const configured = new URL(databaseUrl);
-            databaseBase = configured.toString().replace(/\/+$/, "");
+            await syncChatRoomMembership(env, result.roomId, [result.senderUid, result.receiverUid], true);
+            await syncChatMessageToRtdb(env, {
+              ...result,
+              _id: String(result._id),
+              timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
+            });
+            realtimeSync = true;
           } catch {
-            console.error("Firebase Realtime Database chat sync URL is invalid", {
-              phase: "write-realtime-chat-message"
-            });
+            console.warn("Firebase chat realtime sync was not completed", { phase: "write-realtime-chat-message" });
           }
         }
-        if (realtimeSyncEnabled && idToken && databaseBase) {
-          const room = encodeURIComponent(result.roomId);
-          const messageKey = encodeURIComponent(String(result._id));
-          let realtimeResponse = null;
-          let realtimeNetworkError = null;
-          try {
-            realtimeResponse = await fetch(
-              databaseBase + "/chats/" + room + "/" + messageKey + ".json?auth=" + encodeURIComponent(idToken),
-              {
-                method: "PUT",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                  _id: String(result._id), roomId: result.roomId,
-                  senderUid: result.senderUid, receiverUid: result.receiverUid,
-                  messageContent: result.messageContent,
-                  timestamp: result.timestamp instanceof Date ? result.timestamp.toISOString() : result.timestamp
-                })
-              }
-            );
-          } catch (error) {
-            realtimeNetworkError = error && typeof error.message === "string" ? error.message.slice(0, 160) : "Network request failed";
-          }
-          realtimeSync = Boolean(realtimeResponse && realtimeResponse.ok);
-          if (!realtimeSync) {
-            const firebaseErrorBody = realtimeResponse
-              ? (await realtimeResponse.clone().text().catch(() => "")).slice(0, 240)
-              : "";
-            console.error("Firebase Realtime Database chat write failed", {
-              phase: "write-realtime-chat-message",
-              status: realtimeResponse ? realtimeResponse.status : null,
-              databaseHost: new URL(databaseBase).hostname,
-              error: firebaseErrorBody || realtimeNetworkError || "No response from Firebase"
-            });
-          }
-        }
-        return json({ ...result, realtimeSync }, 201);
+        return json({ ...result, realtimeSync }, response.status === 200 ? 200 : 201);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
         if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
