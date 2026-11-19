@@ -6368,10 +6368,13 @@ export class MongoDBConnection {
 
   async savePushSubscription(uid, subscription) {
     if (typeof uid !== "string" || !uid || uid.length > 128 ||
-        !subscription || typeof subscription !== "object" ||
+        !subscription || typeof subscription !== "object" || Array.isArray(subscription) ||
         typeof subscription.endpoint !== "string" || subscription.endpoint.length > 2048 ||
-        !subscription.keys || typeof subscription.keys.p256dh !== "string" ||
-        typeof subscription.keys.auth !== "string") {
+        !subscription.keys || typeof subscription.keys !== "object" || Array.isArray(subscription.keys) ||
+        typeof subscription.keys.p256dh !== "string" || typeof subscription.keys.auth !== "string" ||
+        (subscription.expirationTime !== undefined && subscription.expirationTime !== null &&
+          (typeof subscription.expirationTime !== "number" || !Number.isFinite(subscription.expirationTime) ||
+            subscription.expirationTime <= Date.now()))) {
       return { status: 400, body: { error: "Invalid push subscription" } };
     }
     let endpoint;
