@@ -13,7 +13,8 @@ jest.mock('../api/apiClient', () => ({
   __esModule: true,
   default: {
     get: jest.fn(),
-    post: jest.fn()
+    post: jest.fn(),
+    delete: jest.fn()
   }
 }));
 
@@ -58,6 +59,7 @@ describe('AuthProvider session lifecycle', () => {
     window.localStorage.clear();
     auth.signOut.mockResolvedValue(undefined);
     apiClient.post.mockResolvedValue({});
+    apiClient.delete.mockResolvedValue({});
     apiClient.get.mockResolvedValue({ uid: 'user-1', name: 'Test User' });
     onIdTokenChanged.mockImplementation((_auth, callback) => {
       tokenListener = callback;
@@ -122,6 +124,35 @@ describe('AuthProvider session lifecycle', () => {
     expect(window.localStorage.getItem('authToken')).toBeNull();
     expect(screen.getByTestId('user-id')).toHaveTextContent('signed-out');
     expect(screen.getByTestId('loading')).toHaveTextContent('false');
+  });
+
+
+
+  test('removes the account push subscription and unsubscribes the browser on logout', async () => {
+    const order = [];
+    const subscription = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/test-token',
+      unsubscribe: jest.fn(async () => { order.push('browser-unsubscribe'); return true; })
+    };
+    const registration = {
+      pushManager: { getSubscription: jest.fn().mockResolvedValue(subscription) }
+    };
+    Object.defineProperty(window, 'PushManager', { configurable: true, value: function PushManager() {} });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: jest.fn().mockResolvedValue(registration) }
+    });
+    apiClient.delete.mockImplementation(async (...args) => { order.push('server-delete'); return {}; });
+    renderProvider();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledTimes(1));
+    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions', { endpoint: subscription.endpoint });
+    expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['server-delete', 'browser-unsubscribe']);
+    delete window.PushManager;
+    delete navigator.serviceWorker;
   });
 
   test('always clears the local session when logging out, even if the API logout fails', async () => {
