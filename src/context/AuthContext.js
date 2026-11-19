@@ -14,17 +14,19 @@ async function removeBrowserPushSubscription() {
     const subscription = await registration?.pushManager.getSubscription();
     if (!subscription) return;
     try {
-      await apiClient.delete('/push/subscriptions', { endpoint: subscription.endpoint });
-    } catch (error) {
-      logger.warn('Server-side push subscription cleanup failed during logout.', {
-        message: error?.message || 'Push cleanup request failed'
-      });
-    }
-    try {
       await subscription.unsubscribe();
     } catch (error) {
       logger.warn('Browser push subscription cleanup failed during logout.', {
         message: error?.message || 'Browser unsubscribe failed'
+      });
+    }
+    try {
+      // Browser permission revocation must not wait behind a slow API request.
+      // Keep server cleanup bounded so logout cannot hang on a network timeout.
+      await apiClient.delete('/push/subscriptions', { endpoint: subscription.endpoint }, { timeout: 3000 });
+    } catch (error) {
+      logger.warn('Server-side push subscription cleanup failed during logout.', {
+        message: error?.message || 'Push cleanup request failed'
       });
     }
   } catch (error) {
