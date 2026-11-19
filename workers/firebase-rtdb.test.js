@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
 
-function makeEnv() {
+let testAccountSequence = 0;\n\nfunction makeEnv() {
   const { privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -14,7 +14,7 @@ function makeEnv() {
     FIREBASE_DATABASE_URL: "https://test-project-default-rtdb.firebaseio.com",
     FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
       project_id: "test-project",
-      client_email: "firebase-admin@test-project.iam.gserviceaccount.com",
+      client_email: "firebase-admin-" + (++testAccountSequence) + "@test-project.iam.gserviceaccount.com",
       private_key: privateKey
     })
   };
