@@ -5331,9 +5331,12 @@ export class MongoDBConnection {
       // another conversation attempts to call them concurrently.
       const active = await calls.findOne({
         status: { $in: ["ringing", "accepted"] },
-        $or: [{ callerUid: uid }, { receiverUid: uid }]
+        $or: [
+          { callerUid: uid }, { receiverUid: uid },
+          { callerUid: receiverUid }, { receiverUid: receiverUid }
+        ]
       }, { projection: { _id: 1 } });
-      if (active) return { status: 409, body: { error: "There is already an active call in this conversation" } };
+      if (active) return { status: 409, body: { error: "One of the participants is already in an active call" } };
 
       // Chat room IDs are opaque and must not be reconstructed from UIDs.
       // Resolve the peer from a persisted message in this exact room, then
