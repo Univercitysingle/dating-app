@@ -2712,8 +2712,48 @@ export class MongoDBConnection {
         });
         status = "resolved_user_restored";
       }
+      let chatAccessRevocationStatus = "not_required";
+      if (payload.action === "suspend_user" || payload.action === "ban_user") {
+        try {
+          const revocation = await revokeFirebaseChatMemberships(this.env, report.reportedUserUid);
+          if (revocation.configured) {
+            chatAccessRevocationStatus = "completed";
+            await Promise.all([
+              db.collection("chatTyping").deleteMany({ uid: report.reportedUserUid }),
+              db.collection("callSessions").updateMany(
+                { $or: [{ callerUid: report.reportedUserUid }, { receiverUid: report.reportedUserUid }], status: { $in: ["ringing", "accepted"] } },
+                { $set: { status: "cancelled", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+              ),
+              db.collection("videoRooms").updateMany(
+                { hostUid: report.reportedUserUid, status: "active" },
+                { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+              )
+            ]);
+            await db.collection("users").updateOne({ uid: report.reportedUserUid }, { $set: {
+              chatAccessRevocationStatus,
+              chatAccessRevokedRoomCount: revocation.revoked,
+              chatAccessRevokedAt: new Date()
+            } });
+          }
+        } catch {
+          chatAccessRevocationStatus = "retry_pending";
+          await db.collection("users").updateOne({ uid: report.reportedUserUid }, { $set: {
+            chatAccessRevocationStatus,
+            chatAccessRevocationLastAttemptAt: new Date()
+          } });
+          await auditCollection.updateOne({ _id: auditId }, { $set: {
+            outcome: "revocation_pending", chatAccessRevocationStatus, updatedAt: new Date()
+          } });
+          return { status: 202, body: {
+            message: "Account restriction is active, but realtime chat access revocation is pending.",
+            accountStatus: payload.action === "ban_user" ? "permanently_banned" : "temporarily_suspended",
+            chatAccessRevocationStatus
+          } };
+        }
+      }
       const update = { status, updatedAt: now };
       if (typeof payload.adminNotes === "string") update.adminNotes = payload.adminNotes.trim();
+      if (chatAccessRevocationStatus !== "not_required") update.chatAccessRevocationStatus = chatAccessRevocationStatus;
       await db.collection("reports").updateOne({ _id: report._id }, { $set: update });
       await auditCollection.updateOne(
         { _id: auditId, outcome: "started" },
