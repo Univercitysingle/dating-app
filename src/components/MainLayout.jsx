@@ -2,9 +2,14 @@ import React from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomNavBar from './BottomNavBar';
 import Footer from './Footer';
+import { useAuth } from '../context/AuthContext';
+import ChatCallPanel from './ChatCallPanel';
+import { CallSessionProvider, useCallSession } from '../context/CallSessionContext';
 
-const MainLayout = () => {
+const MainLayoutContent = () => {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const { session, setCallActive } = useCallSession();
   const isChatRoute = pathname.startsWith('/chat/');
   const navClass = ({ isActive }) => `member-top-link${isActive ? ' is-active' : ''}`;
 
@@ -32,11 +37,14 @@ const MainLayout = () => {
       </header>
       <main className={`app-main member-app-main flex-grow${isChatRoute ? ' app-main-chat member-app-main-chat' : ''}`}>
         <Outlet />
+        {session && user && <ChatCallPanel roomId={session.roomId} currentUser={user} otherUser={session.otherUser} onCallStateChange={setCallActive} />}
       </main>
       {!isChatRoute && <Footer />}
       <BottomNavBar />
     </div>
   );
 };
+
+const MainLayout = () => <CallSessionProvider><MainLayoutContent /></CallSessionProvider>;
 
 export default MainLayout;
