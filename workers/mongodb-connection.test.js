@@ -5526,7 +5526,7 @@ test("push subscription storage scopes records to the authenticated UID and pers
 test("push delivery lookup prunes expired endpoints and returns only unexpired subscriptions", async () => {
   let deleteFilter;
   let findFilter;
-  const valid = { endpoint: "https://fcm.googleapis.com/fcm/send/valid", keys: { p256dh: "A".repeat(88), auth: "B".repeat(24) } };
+  const valid = { endpoint: "https://fcm.googleapis.com/fcm/send/valid", expirationTime: null, keys: { p256dh: "A".repeat(88), auth: "B".repeat(24) } };
   const collection = {
     async deleteMany(filter) { deleteFilter = filter; return { deletedCount: 1 }; },
     find(filter) {
