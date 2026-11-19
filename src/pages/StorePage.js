@@ -49,44 +49,74 @@ const StorePage = () => {
     if (!purchaseId) return undefined;
 
     let attempts = 0;
+    let timer = null;
+    let stopped = false;
+    const clearReturnParameter = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('purchaseId');
+      window.history.replaceState({}, '', url);
+    };
     const verify = async () => {
       try {
         const result = await apiClient.get(`/purchase/status/${encodeURIComponent(purchaseId)}`);
         if (result?.status === 'completed') {
           setNotification({ show: true, message: 'Your purchase was successful!', type: 'success' });
-          const url = new URL(window.location.href);
-          url.searchParams.delete('purchaseId');
-          window.history.replaceState({}, '', url);
+          clearReturnParameter();
           return true;
         }
-        if (result?.status === 'failed') {
-          setNotification({ show: true, message: 'Your purchase failed. Please try again.', type: 'error' });
+        if (['rejected', 'failed', 'cancelled', 'expired'].includes(result?.status)) {
+          setNotification({ show: true, message: 'Your payment was declined or cancelled. No purchase was completed. You can try again.', type: 'error' });
+          clearReturnParameter();
+          return true;
+        }
+        if (result?.status === 'refund_required') {
+          setNotification({ show: true, message: 'Payment was received, but the purchase needs manual refund review. Please contact support and do not pay again.', type: 'error' });
+          clearReturnParameter();
           return true;
         }
       } catch (error) {
-        // The return URL can belong to a subscription checkout instead; try that route too.
+        // A subscription return is not a purchase. Check its status separately.
         try {
           const result = await apiClient.get(`/subscription/status/${encodeURIComponent(purchaseId)}`);
           if (result?.status === 'active') {
             setCurrentSubscription(result);
             setNotification({ show: true, message: 'Your subscription is now active!', type: 'success' });
-            const url = new URL(window.location.href);
-            url.searchParams.delete('purchaseId');
-            window.history.replaceState({}, '', url);
+            clearReturnParameter();
+            return true;
+          }
+          if (['cancelled', 'inactive', 'expired'].includes(result?.status)) {
+            setNotification({ show: true, message: 'Your subscription payment was declined or cancelled. Your checkout is released, so you can safely try again.', type: 'error' });
+            clearReturnParameter();
+            return true;
+          }
+          if (result?.status === 'refund_required') {
+            setNotification({ show: true, message: 'Payment was received after checkout cancellation and has been flagged for refund review. Please contact support and do not pay again.', type: 'error' });
+            clearReturnParameter();
             return true;
           }
         } catch (subscriptionError) {
-          // Payment provider callbacks can take time to update the status.
+          // Provider callbacks and database settlement can take time to complete.
         }
       }
       return false;
     };
 
-    const timer = setInterval(async () => {
+    const poll = async () => {
+      if (stopped) return;
       attempts += 1;
-      if (await verify() || attempts >= 20) clearInterval(timer);
-    }, 3000);
-    return () => { clearInterval(timer); };
+      const finished = await verify();
+      if (stopped || finished) return;
+      if (attempts >= 20) {
+        setNotification({ show: true, message: 'Your payment is still being confirmed. Refresh this page later to check the final status. Do not submit another payment while it is pending.', type: 'info' });
+        return;
+      }
+      timer = setTimeout(poll, 3000);
+    };
+    poll();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [location.search]);
 
 
