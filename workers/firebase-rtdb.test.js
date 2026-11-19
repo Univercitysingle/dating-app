@@ -42,7 +42,7 @@ test("chat membership is written by the service account, not a client ID token",
   await syncChatRoomMembership(env, "uid-a-uid-b", ["uid-a", "uid-b"], true, fetchImpl);
   assert.equal(calls.length, 2);
   assert.equal(calls[0].url, "https://oauth2.googleapis.com/token");
-  assert.match(calls[1].url, /\/chatParticipants\/uid-a-uid-b\.json\?access_token=test-admin-token$/);
+  assert.match(calls[1].url, /\/chatParticipants\/uid-a-uid-b\.json$/);\n  assert.equal(calls[1].init.headers.authorization, "Bearer test-admin-token");
   assert.equal(calls[1].init.method, "PUT");
   assert.deepEqual(JSON.parse(calls[1].init.body), { "uid-a": true, "uid-b": true });
 });
