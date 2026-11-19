@@ -5148,8 +5148,14 @@ test("admin can suspend a user with a bounded expiry and hide the profile", asyn
     async deleteMany() { return { deletedCount: 0 }; },
     async updateMany() { return { modifiedCount: 0 }; }
   };
+  const auditCollection = {
+    async insertOne() { return { insertedId: "lifecycle-audit-id" }; },
+    async updateOne() { return { matchedCount: 1 }; }
+  };
   connection.getDatabase = () => ({ collection(name) {
-    return name === "users" ? users : cleanupCollection;
+    if (name === "users") return users;
+    if (name === "auditlogs") return auditCollection;
+    return cleanupCollection;
   } });
   const until = new Date(Date.now() + 2 * 86400000).toISOString();
   const result = await connection.updateAdminUser("admin-uid", targetId.toHexString(), {
@@ -5220,6 +5226,8 @@ test("admin suspension fails closed with retry status when Firebase membership r
   };
   const emptyCollection = {
     async distinct() { return []; },
+    async insertOne() { return { insertedId: "lifecycle-audit-id" }; },
+    async updateOne() { return { matchedCount: 1 }; },
     async deleteMany() { return { deletedCount: 0 }; },
     async updateMany() { return { modifiedCount: 0 }; }
   };
@@ -5273,7 +5281,13 @@ test("superadmin can restore a temporary suspension and restore prior profile vi
   connection.env = {};
   connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
   connection.getClient = async () => ({});
-  connection.getDatabase = () => ({ collection: () => users });
+  const auditCollection = {
+    async insertOne() { return { insertedId: "restore-audit-id" }; },
+    async updateOne() { return { matchedCount: 1 }; }
+  };
+  connection.getDatabase = () => ({ collection(name) {
+    return name === "users" ? users : auditCollection;
+  } });
   const result = await connection.updateAdminUser("superadmin-uid", targetId.toHexString(), {
     accountStatus: "active"
   });
