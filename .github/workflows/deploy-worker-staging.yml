@@ -392,8 +392,6 @@ jobs:
           POST /api/admin/users
           GET /api/admin/users/stats
           GET /api/admin/users/purchases
-          POST /api/admin/users/purchases/0123456789abcdef01234567/approve
-          POST /api/admin/users/purchases/0123456789abcdef01234567/reject
           GET /api/admin/users/0123456789abcdef01234567
           PUT /api/admin/users/0123456789abcdef01234567
           DELETE /api/admin/users/0123456789abcdef01234567
@@ -440,6 +438,12 @@ jobs:
           test "$STATUS" = "401" || { echo "Expected anonymous admin purchase list request to return 401; received $STATUS"; cat /tmp/admin-purchases-response.json; exit 1; }
           STATUS="$(curl --silent --show-error --output /tmp/admin-refund-response.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{"transactionType":"store_purchase","refundReference":"STAGING-REF-001","note":"Anonymous route authorization check"}' "$WORKER_URL/api/admin/users/purchases/507f1f77bcf86cd799439011/record-refund")"
           test "$STATUS" = "401" || { echo "Expected anonymous refund recording request to return 401; received $STATUS"; cat /tmp/admin-refund-response.json; exit 1; }
+          # Manual payment approval/rejection is intentionally disabled because
+          # WebXPay callbacks are the only authority for payment settlement.
+          for ACTION in approve reject; do
+            STATUS="$(curl --silent --show-error --output /tmp/admin-payment-action-response.json --write-out '%{http_code}' --request POST --header 'content-type: application/json' --data '{}' "$WORKER_URL/api/admin/users/purchases/507f1f77bcf86cd799439011/$ACTION")"
+            test "$STATUS" = "404" || { echo "Expected disabled manual payment action $ACTION to return 404; received $STATUS"; cat /tmp/admin-payment-action-response.json; exit 1; }
+          done
 
       - name: Run OWASP ZAP passive baseline against deployed API Worker
         timeout-minutes: 5
