@@ -3487,3 +3487,59 @@ test("superadmin profile retains contact fields while regular profiles hide them
   assert.equal(result.body.email, "admin@example.com");
   assert.equal(result.body.mobileNumber, "+971501234567");
 });
+
+
+test("current-user profile route returns the internal profile response without unrelated block-route logic", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "profile-route-test", typ: "JWT" })).toString("base64url");
+  const claims = Buffer.from(JSON.stringify({
+    iss: "https://securetoken.google.com/test-project",
+    aud: "test-project",
+    sub: "profile-user",
+    iat: now,
+    exp: now + 3600,
+    auth_time: now,
+    email: "profile@example.com",
+    email_verified: true
+  })).toString("base64url");
+  const unsigned = header + "." + claims;
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const token = unsigned + "." + signer.sign(privateKey, "base64url");
+  const publicJwk = createPublicKey(publicKey).export({ format: "jwk" });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async input => {
+    assert.equal(String(input), "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com");
+    return new Response(JSON.stringify({
+      keys: [{ ...publicJwk, kid: "profile-route-test", alg: "RS256", use: "sig" }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://dating-app.test/api/users/me", {
+      headers: { authorization: "Bearer " + token }
+    }), {
+      FIREBASE_PROJECT_ID: "test-project",
+      MONGODB_CONNECTION: {
+        idFromName: name => name,
+        get: () => ({
+          async fetch(input) {
+            assert.equal(new URL(input).pathname, "/internal/profile");
+            return new Response(JSON.stringify({ uid: "profile-user", name: "Profile User" }), {
+              status: 200, headers: { "content-type": "application/json" }
+            });
+          }
+        })
+      }
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { uid: "profile-user", name: "Profile User" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
