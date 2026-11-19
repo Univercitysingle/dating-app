@@ -1383,11 +1383,11 @@ test("migrated admin read endpoints reject anonymous requests before database ch
   const approve = await worker.fetch(new Request("https://dating-app.test/api/admin/users/purchases/0123456789abcdef01234567/approve", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({})
   }), env);
-  assert.equal(approve.status, 401);
+  assert.equal(approve.status, 404);
   const reject = await worker.fetch(new Request("https://dating-app.test/api/admin/users/purchases/0123456789abcdef01234567/reject", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason: "Test" })
   }), env);
-  assert.equal(reject.status, 401);
+  assert.equal(reject.status, 404);
   const message = await worker.fetch(new Request("https://dating-app.test/api/admin/support-tickets/0123456789abcdef01234567/messages", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: "Help" })
   }), env);
@@ -3460,14 +3460,12 @@ test("analytics CSV export safely quotes dates and normalizes signup counts", ()
 });
 
 
-test("admin purchase approval accepts an omitted body while reject and refund require JSON objects", () => {
-  assert.deepEqual(normalizeAdminPurchaseActionPayload("approve", null), {});
-  assert.deepEqual(normalizeAdminPurchaseActionPayload("approve", undefined), {});
-  assert.deepEqual(normalizeAdminPurchaseActionPayload("approve", {}), {});
-  assert.equal(normalizeAdminPurchaseActionPayload("reject", null), null);
-  assert.equal(normalizeAdminPurchaseActionPayload("reject", []), null);
-  assert.deepEqual(normalizeAdminPurchaseActionPayload("reject", { reason: "Duplicate request" }), { reason: "Duplicate request" });
+test("admin payment actions accept only structured refund records", () => {
+  assert.equal(normalizeAdminPurchaseActionPayload("approve", {}), null);
+  assert.equal(normalizeAdminPurchaseActionPayload("approve", null), null);
+  assert.equal(normalizeAdminPurchaseActionPayload("reject", { reason: "Duplicate request" }), null);
   assert.equal(normalizeAdminPurchaseActionPayload("record-refund", null), null);
+  assert.equal(normalizeAdminPurchaseActionPayload("record-refund", []), null);
   assert.deepEqual(normalizeAdminPurchaseActionPayload("record-refund", { refundReference: "WX-123" }), { refundReference: "WX-123" });
 });
 
