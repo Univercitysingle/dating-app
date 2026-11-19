@@ -5230,11 +5230,12 @@ test("account deletion retries safely when Firebase chat access revocation fails
     findOne: async () => user,
     updateOne: async (query, update) => { updates.push(update); return { matchedCount: 1 }; }
   };
+  const cleanupCalls = [];
   const collection = name => ({
     distinct: async () => [],
     updateMany: async () => ({ matchedCount: 0, modifiedCount: 0 }),
     deleteOne: async () => ({ deletedCount: 0 }),
-    deleteMany: async () => ({ deletedCount: 0 }),
+    deleteMany: async (...args) => { cleanupCalls.push({ name, args }); return { deletedCount: 1 }; },
     updateOne: async () => ({ matchedCount: 1 })
   });
   const db = { collection(name) { return name === "users" ? users : collection(name); } };
@@ -5266,6 +5267,8 @@ test("account deletion retries safely when Firebase chat access revocation fails
   assert.equal(result.body.deletionStatus, "deletion_pending");
   assert.equal(result.body.chatAccessRevocationStatus, "retry_pending");
   assert.ok(updates.some(update => update.$set?.chatAccessRevocationStatus === "retry_pending"));
+  assert.ok(cleanupCalls.some(call => call.name === "pushSubscriptions" &&
+    call.args[0]?.uid === "deleting-user"), "push endpoints must be removed before external identity cleanup");
   assert.equal(user.accountStatus, "active",
     "the transaction mock does not mutate the original user; the operation is still expected to record the pending status");
 });
@@ -5552,4 +5555,40 @@ test("push delivery lookup prunes expired endpoints and returns only unexpired s
   });
   assert.ok(Number.isFinite(findFilter.$or[1].expirationTime.$gt));
   assert.equal(deleteFilter.expirationTime.$lte, findFilter.$or[1].expirationTime.$gt);
+});
+
+
+test("account anonymization purges browser push subscriptions with biometric evidence", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId();
+  const cleanupCalls = [];
+  const user = {
+    _id: targetId, uid: "anonymizing-user", role: "user",
+    accountStatus: "deletion_pending",
+    firebaseAuthDeletionStatus: "completed",
+    cdnAssetCleanupStatus: "completed",
+    anonymizationStatus: "pending"
+  };
+  const users = {
+    async findOne() { return user; },
+    async updateOne() { return { matchedCount: 1 }; }
+  };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      return {
+        async deleteMany(filter) { cleanupCalls.push({ name, filter }); return { deletedCount: 1 }; }
+      };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.finalizeAdminUserAnonymization("admin-uid", targetId.toHexString());
+
+  assert.equal(result.status, 200);
+  assert.ok(cleanupCalls.some(call => call.name === "photoVerifications" && call.filter.uid === "anonymizing-user"));
+  assert.ok(cleanupCalls.some(call => call.name === "pushSubscriptions" && call.filter.uid === "anonymizing-user"));
 });
