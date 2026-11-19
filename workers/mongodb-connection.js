@@ -3664,12 +3664,13 @@ export class MongoDBConnection {
     if (!update || typeof update !== "object" || Array.isArray(update)) return { status: 400, body: { error: "A JSON profile object is required" } };
     try {
       const users = this.getDatabase(await this.getClient()).collection("users");
-      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1, accountStatus: 1, suspendedUntil: 1, photos: 1 } });
+      const current = await users.findOne({ uid }, { projection: { isOnboardingComplete: 1, accountStatus: 1, suspendedUntil: 1, photos: 1, birthday: 1 } });
       if (!current) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(current)) return { status: 403, body: { error: "Account is suspended or banned." } };
       const onboardingComplete = current.isOnboardingComplete === undefined ? true : current.isOnboardingComplete;
+      const hasRecordedBirthday = current.birthday !== undefined && current.birthday !== null && current.birthday !== "";
       const allowedFields = onboardingComplete
-        ? ["preference", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "familyStatus", "siblings", "lifestyle", "mobileNumber", "badges", "lastActiveAt"]
+        ? ["preference", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "familyStatus", "siblings", "lifestyle", "mobileNumber", "badges", "lastActiveAt", ...(!hasRecordedBirthday ? ["birthday"] : [])]
         : ["name", "birthday", "gender", "preference", "sexualOrientation", "bio", "interests", "profilePrompts", "personalityType", "socialMediaLinks", "education", "relationshipGoals", "lifestyle", "mobileNumber", "photos", "badges", "lastActiveAt", "isOnboardingComplete"];
       const nestedAllowed = {
         lifestyle: ["drinking", "smoking", "exercise", "diet", "lookingFor"],
