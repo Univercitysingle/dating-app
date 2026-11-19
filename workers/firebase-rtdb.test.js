@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
 
-let testAccountSequence = 0;\n\nfunction makeEnv() {
+let testAccountSequence = 0;
+
+function makeEnv() {
   const { privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
