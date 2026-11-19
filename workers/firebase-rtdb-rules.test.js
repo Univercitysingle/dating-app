@@ -23,3 +23,9 @@ test("chat reads require authenticated room membership and notifications are rec
   assert.match(rules.notifications["$recipientUid"][".read"], /auth != null/);
   assert.match(rules.notifications["$recipientUid"][".read"], /auth\.uid === \$recipientUid/);
 });
+
+
+test("Firebase CLI configuration deploys the reviewed Realtime Database rules file", async () => {
+  const config = JSON.parse(await readFile(new URL("../firebase.json", import.meta.url), "utf8"));
+  assert.equal(config.database?.rules, "database.rules.json");
+});
