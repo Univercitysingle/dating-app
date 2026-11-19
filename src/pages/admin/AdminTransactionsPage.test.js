@@ -8,6 +8,12 @@ jest.mock('../../api/apiClient', () => ({
   default: { get: jest.fn() }
 }));
 
+jest.mock('../../context/AuthContext', () => ({
+  useAuth: jest.fn(() => ({ user: { role: 'admin' } }))
+}));
+import { useAuth } from '../../context/AuthContext';
+
+
 describe('AdminTransactionsPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -43,5 +49,29 @@ describe('AdminTransactionsPage', () => {
 
     render(<AdminTransactionsPage />);
     expect(await screen.findByText('Legacy Transaction Owner')).toBeInTheDocument();
+  });
+  test('shows local reconciliation flags to superadmins and labels the report as local-only', async () => {
+    useAuth.mockReturnValue({ user: { role: 'superadmin' } });
+    apiClient.get.mockImplementation((path) => path === '/admin/transactions'
+      ? Promise.resolve([])
+      : Promise.resolve({
+        source: 'local_mongodb_records_only',
+        providerStatusQueried: false,
+        counts: { totalScanned: 2, pending: 1, completed: 1, refundRequired: 0, anomalies: 1 },
+        anomalies: [{ reason: 'stale_pending', transactionId: 'transaction-1', status: 'pending', recommendedAction: 'Check provider transaction.' }]
+      }));
+    render(<AdminTransactionsPage />);
+    const button = await screen.findByRole('button', { name: 'Run reconciliation' });
+    button.click();
+    expect(await screen.findByText(/Provider status was not queried/)).toBeInTheDocument();
+    expect(screen.getByText('stale pending')).toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith('/admin/payment-reconciliation');
+  });
+
+  test('does not show reconciliation controls to ordinary admins', async () => {
+    useAuth.mockReturnValue({ user: { role: 'admin' } });
+    render(<AdminTransactionsPage />);
+    expect(await screen.findByText('Transaction Owner')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run reconciliation' })).not.toBeInTheDocument();
   });
 });
