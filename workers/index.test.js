@@ -3603,3 +3603,17 @@ test("current-user profile route returns the internal profile response without u
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("payment reconciliation endpoint rejects anonymous access before contacting MongoDB", async () => {
+  let mongoAccessed = false;
+  const response = await worker.fetch(new Request("https://dating-app.test/api/admin/payment-reconciliation"), {
+    FIREBASE_PROJECT_ID: "test-project",
+    MONGODB_CONNECTION: {
+      idFromName() { mongoAccessed = true; throw new Error("must not be reached"); },
+      get() { mongoAccessed = true; throw new Error("must not be reached"); }
+    }
+  });
+  assert.equal(response.status, 401);
+  assert.equal(mongoAccessed, false);
+});
