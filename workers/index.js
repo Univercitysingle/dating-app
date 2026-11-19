@@ -1551,6 +1551,19 @@ export default {
           body: JSON.stringify({ claims, targetUid, action: blockMatch[1] })
         });
         const body = await response.json().catch(() => ({ error: "Profile service unavailable" }));
+        if (response.ok && blockMatch[1] === "block" && body.roomId &&
+            (env.ENABLE_FIREBASE_REALTIME_SYNC === "true" ||
+             (env.FIREBASE_SERVICE_ACCOUNT_JSON && env.FIREBASE_DATABASE_URL))) {
+          try {
+            await syncChatRoomMembership(env, body.roomId, [claims.sub, targetUid], false);
+          } catch {
+            console.error("Firebase chat membership revocation failed", { phase: "block-revoke" });
+            return json({
+              error: "The user was blocked, but realtime chat access revocation is pending. Please retry or contact support.",
+              chatAccessRevocationStatus: "retry_pending"
+            }, 503);
+          }
+        }
         return json(body, response.status);
       } catch (error) {
         if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
