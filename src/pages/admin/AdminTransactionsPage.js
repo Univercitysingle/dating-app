@@ -86,7 +86,7 @@ const AdminTransactionsPage = () => {
               {reconciliation.anomalies?.length > 0 ? (
                 <ul className="divide-y divide-slate-100">
                   {reconciliation.anomalies.map((item, index) => (
-                    <li key={item.transactionId || item.duplicateValue || index} className="py-3 text-sm">
+                    <li key={item.transactionId || `${item.reason}-${item.duplicateValue || index}`} className="py-3 text-sm">
                       <p className="font-semibold text-slate-800">{String(item.reason || 'Review required').replace(/_/g, ' ')}</p>
                       {item.transactionId && <p className="mt-1 text-xs text-slate-500">Transaction: {item.transactionId} · Status: {item.status}</p>}
                       {item.transactions && <p className="mt-1 text-xs text-slate-500">{item.transactions.length} records share the same gateway identifier or reference.</p>}
