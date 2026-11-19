@@ -1,6 +1,6 @@
 # Documentation completeness register
 
-**Review date:** 2026-11-11  
+**Review date:** 2026-11-19  
 **Branch:** `migrate-to-serverless`  
 **Scope:** Markdown documentation and the tracked Word document.  
 **Status key:** Updated = scope and controls documented; Evidence pending = runtime proof or source inventory still required; Not updated = binary artifact not safely editable through the available UTF-8 GitHub file operation.
@@ -32,7 +32,7 @@ The existing CDN Worker and WebXPay/payment implementation were not modified. Al
 | Localization/RTL | New specification | Confirm supported locales, UTC storage, locale rendering and RTL layout. |
 | Performance | Updated; evidence pending | Run repeatable load tests. 1,000 concurrent users remains a target, not a proven capacity figure. |
 | WebRTC/TURN | Existing docs updated; evidence pending | Verify ExpressTURN primary and Turnix fallback secrets/configuration, relay allocation and two-device restrictive-network calls. |
-| Release/deployment | Direct Cloudflare path documented; deployment not executed | GitHub Actions is intentionally skipped. Deploy from an authenticated local Wrangler session, then capture exact Pages/Worker deployment SHAs and smoke-test evidence. Confirm one canonical Firebase project ID is used by both Worker and Pages. |
+| Release/deployment | Cloudflare staging workflows verified on 2026-11-19 | Pages deployment run [44506117077](https://github.com/Univercitysingle/dating-app/actions/runs/44506117077) passed on `7a16fe63fb019a82556efb3349cdd32011d1070b`, including dependency audits, backend/frontend regression tests, build, deployment, SEO/API routing checks and OWASP ZAP passive baseline. Worker deployment run [44503457955](https://github.com/Univercitysingle/dating-app/actions/runs/44503457955) passed on `e4cac4f715496c09cf4096f8ccfba33c06401301`, including Worker tests, deployment, MongoDB readiness, anonymous-route checks and OWASP ZAP. Direct HTTP verification of the public staging URLs was not available in this review channel. Confirm one canonical Firebase project ID is used by both Worker and Pages, and perform authenticated end-to-end acceptance tests. |
 | Word document | Not updated | `dating-app.docx` is binary. It was not rewritten as UTF-8 or replaced with a generated file because the available GitHub file operation accepts UTF-8 text only. A safe binary-preserving workflow is required. |
 
 ## Status and safety rules
@@ -49,7 +49,7 @@ The existing CDN Worker and WebXPay/payment implementation were not modified. Al
 
 ## Next review
 
-After API/schema/source inventory and staging access are available, replace the evidence-pending items with source-backed route and collection inventories, then run the relevant acceptance tests. Revisit the Word document with a binary-safe DOCX editing and upload method.
+After API/schema/source inventory and authenticated staging access are available, replace the evidence-pending items with live route and collection inventories, then run the relevant acceptance tests. Revisit the Word document with a binary-safe DOCX editing and upload method.
 
 
 ## Source inventory progress (2026-11-11)
@@ -73,6 +73,6 @@ Additional source findings to track:
 The active Worker API and database catalogues are now documented in `docs/architecture/WORKER_API_CATALOG.md` and `docs/architecture/WORKER_DATABASE_CATALOG.md`. They were generated from source files at blobs `f11fd484cf79dc56cb09474254640e9d635cfa54` and `641b7851e107be99d3d55fbfabcf34595b40e888`, respectively. Their source-backed static inventory is complete for this review pass. Live deployment parity, OpenAPI request/response schemas, Atlas index export, and staging integration evidence remain open.
 
 
-## Direct Cloudflare deployment follow-up (2026-11-11)
+## Cloudflare deployment evidence follow-up (2026-11-19)
 
-GitHub Actions deployment is intentionally bypassed while the quota is exhausted. The Worker staging workflow no longer hardcodes a Firebase project ID; it reads `FIREBASE_PROJECT_ID` from the matching GitHub secret, with `REACT_APP_FIREBASE_PROJECT_ID` as a fallback. The manual deployment runbook requires the operator to verify the canonical Firebase project in Firebase Console and use the same ID for Worker and Pages. No Cloudflare deployment has been performed or verified from this pass. Attempts to inspect the staging health/readiness and Pages manifest URLs through the available public verification channel were unsuccessful, so those endpoints remain unverified, not necessarily offline.
+GitHub Actions staging deployments are running on `migrate-to-serverless`. The Pages and Worker workflow evidence is recorded in the release/deployment row above. The Worker staging workflow reads `FIREBASE_PROJECT_ID` from the matching GitHub secret, with `REACT_APP_FIREBASE_PROJECT_ID` as a fallback. The deployment workflows validate configured Firebase Authentication settings and Cloudflare Pages/Worker deployment configuration. The public staging URLs could not be independently fetched through the current verification channel, so workflow-level smoke checks are recorded as passed while direct external HTTP checks remain unverified. Firebase Console RTDB rules deployment and two-account authorization tests remain open.
