@@ -4854,6 +4854,103 @@ export class MongoDBConnection {
       return { status: 503, body: { message: "Refund record unavailable; no completion was confirmed" } };
     } finally { if (session) await session.endSession().catch(() => {}); }
   }
+  async getAdminPaymentReconciliation(uid) {
+    const access = await this.requireAdmin(uid, true);
+    if (access.status !== 200) return access;
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const [purchases, subscriptions] = await Promise.all([
+        db.collection("purchases").find(
+          {}, { projection: { userId: 0 } }
+        ).sort({ createdAt: -1 }).limit(1000).maxTimeMS(10000).toArray(),
+        db.collection("subscriptions").find(
+          {}, { projection: { userId: 0 } }
+        ).sort({ createdAt: -1 }).limit(1000).maxTimeMS(10000).toArray()
+      ]);
+      const now = new Date();
+      const records = [
+        ...purchases.map(record => ({ ...record, transactionType: "store_purchase" })),
+        ...subscriptions.map(record => ({ ...record, transactionType: "subscription" }))
+      ];
+      const anomalies = [];
+      const references = new Map();
+      const gatewayIds = new Map();
+      const addDuplicate = (map, value, record, kind) => {
+        if (typeof value !== "string" || !value.trim()) return;
+        const key = value.trim();
+        const prior = map.get(key) || [];
+        prior.push({
+          transactionId: String(record._id),
+          transactionType: record.transactionType,
+          status: record.status,
+          createdAt: record.createdAt || null
+        });
+        map.set(key, prior);
+      };
+      for (const record of records) {
+        const base = {
+          transactionId: String(record._id),
+          transactionType: record.transactionType,
+          status: record.status || "unknown",
+          createdAt: record.createdAt || null,
+          updatedAt: record.updatedAt || null,
+          paymentReference: record.paymentReference || null,
+          gatewayId: record.paymentGatewayId || null,
+          amount: record.itemPrice ?? record.amount ?? null,
+          currency: record.currency || "LKR"
+        };
+        if (record.status === "pending" && record.createdAt &&
+            new Date(record.createdAt).getTime() < now.getTime() - 30 * 60 * 1000) {
+          anomalies.push({ ...base, reason: "stale_pending", recommendedAction: "Check provider transaction before cancelling or retrying." });
+        }
+        if (["completed", "active"].includes(record.status) &&
+            (!record.paymentReference || !record.paymentGatewayId)) {
+          anomalies.push({ ...base, reason: "settled_missing_gateway_metadata", recommendedAction: "Compare with the provider merchant statement." });
+        }
+        if (record.status === "refund_required") {
+          anomalies.push({ ...base, reason: "refund_review_required", recommendedAction: "Verify the captured payment and process the refund through the merchant portal." });
+        }
+        addDuplicate(references, record.paymentReference, record, "reference");
+        addDuplicate(gatewayIds, record.paymentGatewayId, record, "gateway");
+      }
+      for (const [value, matches] of references) {
+        if (matches.length > 1) anomalies.push({
+          reason: "duplicate_payment_reference",
+          duplicateValue: value,
+          transactions: matches,
+          recommendedAction: "Verify whether the provider reference was reused or incorrectly attached."
+        });
+      }
+      for (const [value, matches] of gatewayIds) {
+        if (matches.length > 1) anomalies.push({
+          reason: "duplicate_gateway_transaction_id",
+          duplicateValue: value,
+          transactions: matches,
+          recommendedAction: "Verify gateway transaction identity before changing any entitlement."
+        });
+      }
+      return {
+        status: 200,
+        body: {
+          generatedAt: now.toISOString(),
+          source: "local_mongodb_records_only",
+          providerStatusQueried: false,
+          scanned: { purchases: purchases.length, subscriptions: subscriptions.length, maximumPerCollection: 1000 },
+          counts: {
+            totalScanned: records.length,
+            pending: records.filter(record => record.status === "pending").length,
+            completed: records.filter(record => record.status === "completed" || record.status === "active").length,
+            refundRequired: records.filter(record => record.status === "refund_required").length,
+            anomalies: anomalies.length
+          },
+          anomalies
+        }
+      };
+    } catch {
+      return { status: 503, body: { message: "Payment reconciliation report unavailable." } };
+    }
+  }
+
   async getAdminTransactions(uid) {
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
