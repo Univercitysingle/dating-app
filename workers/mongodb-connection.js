@@ -4317,6 +4317,9 @@ export class MongoDBConnection {
         return { status: 403, body: { message: "Superadmin accounts cannot be anonymized" } };
       }
       if (user.accountStatus === "deleted" && user.anonymizationStatus === "completed") {
+        if (typeof user.uid === "string" && user.uid) {
+          await db.collection("pushSubscriptions").deleteMany({ uid: user.uid });
+        }
         return { status: 200, body: { deletionStatus: "completed", anonymizationStatus: "completed" } };
       }
       if (user.accountStatus !== "deletion_pending" ||
@@ -4333,9 +4336,13 @@ export class MongoDBConnection {
         };
       }
 
-      // Biometric evidence must be purged before completing account anonymization.
+      // Biometric evidence and browser push credentials are personal data.
+      // Purge both before completing account anonymization.
       if (typeof user.uid === "string" && user.uid) {
-        await db.collection("photoVerifications").deleteMany({ uid: user.uid });
+        await Promise.all([
+          db.collection("photoVerifications").deleteMany({ uid: user.uid }),
+          db.collection("pushSubscriptions").deleteMany({ uid: user.uid })
+        ]);
       }
       const now = new Date();
       const result = await users.updateOne(
@@ -4480,6 +4487,7 @@ export class MongoDBConnection {
             await db.collection("darkfantasyprofiles").deleteOne({ uid: target.uid }, { session });
             await db.collection("secretcommunitymemberships").deleteMany({ uid: target.uid }, { session });
             await db.collection("chatTyping").deleteMany({ uid: target.uid }, { session });
+            await db.collection("pushSubscriptions").deleteMany({ uid: target.uid }, { session });
             await db.collection("videoRooms").updateMany(
               { hostUid: target.uid, status: "active" },
               { $set: { status: "ended", endedAt: now, updatedAt: now, endReason: "account_deletion" } },
@@ -4494,6 +4502,7 @@ export class MongoDBConnection {
         });
         if (!targetFound) return { status: 404, body: { message: "User not found" } };
         if (alreadyAnonymized) {
+          if (targetUid) await db.collection("pushSubscriptions").deleteMany({ uid: targetUid });
           return { status: 200, body: {
             message: "Account deletion and anonymization are already complete.",
             deletionStatus: "completed", firebaseAuthDeletionStatus: "completed",
