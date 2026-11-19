@@ -87,3 +87,8 @@ Call signalling, polling, incoming-call checks, history reads and state-changing
 ## WebRTC signaling payload hardening (2026-11-19)
 
 The call signaling persistence path now validates optional ICE candidate metadata (`sdpMid`, `sdpMLineIndex`, and `usernameFragment`) and stores only the standard bounded `RTCIceCandidateInit` fields. Arbitrary client-supplied candidate object properties are discarded before MongoDB persistence. Regression tests cover metadata normalization and invalid candidate rejection. Automated deployment does not prove TURN relay connectivity; real-device network tests remain required.
+
+
+## Support-ticket message concurrency hardening (2026-11-19)
+
+Customer/admin support-ticket message edit and delete operations now check the conditional MongoDB update result. If the message was concurrently changed or deleted, the API returns HTTP 409, removes the just-created audit entry, and does not update the parent ticket timestamp. Regression tests cover both edit and delete conflict paths. This improves race handling but does not replace live cross-account permission tests or a full immutable audit-trail review.
