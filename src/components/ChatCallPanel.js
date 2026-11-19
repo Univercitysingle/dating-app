@@ -758,11 +758,13 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
     const runPoll = async () => {
       await poll();
       if (!mounted) return;
-      // Poll more frequently while ringing or connected, but reduce idle chat
-      // traffic. The old fixed 1.2s interval generated 50 requests per minute
-      // for every open chat, even when neither user was calling.
+      // Keep signaling responsive during calls, but avoid frequent idle
+      // polling for every open chat. Hidden idle tabs back off further.
       const activeCall = callRef.current && ["ringing", "accepted"].includes(callRef.current.status);
-      pollTimer = window.setTimeout(runPoll, activeCall ? 1200 : 3000);
+      const nextPollDelay = activeCall
+        ? 1200
+        : document.visibilityState === 'visible' ? 5000 : 15000;
+      pollTimer = window.setTimeout(runPoll, nextPollDelay);
     };
     runPoll();
     return () => {
