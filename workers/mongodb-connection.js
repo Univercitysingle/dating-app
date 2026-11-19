@@ -4903,9 +4903,12 @@ export class MongoDBConnection {
             new Date(record.createdAt).getTime() < now.getTime() - 30 * 60 * 1000) {
           anomalies.push({ ...base, reason: "stale_pending", recommendedAction: "Check provider transaction before cancelling or retrying." });
         }
-        if (["completed", "active"].includes(record.status) &&
-            (!record.paymentReference || !record.paymentGatewayId)) {
-          anomalies.push({ ...base, reason: "settled_missing_gateway_metadata", recommendedAction: "Compare with the provider merchant statement." });
+        const hasPaymentReference = typeof record.paymentReference === "string" && Boolean(record.paymentReference.trim());
+        const hasGatewayId = typeof record.paymentGatewayId === "string" && Boolean(record.paymentGatewayId.trim());
+        // Older Stripe/PayHere records may legitimately predate WebXPay metadata.
+        // Flag only partially populated gateway metadata, not legacy records with neither field.
+        if (["completed", "active"].includes(record.status) && hasPaymentReference !== hasGatewayId) {
+          anomalies.push({ ...base, reason: "partial_gateway_metadata", recommendedAction: "Compare the payment reference and gateway transaction ID with the provider merchant statement." });
         }
         if (record.status === "refund_required") {
           anomalies.push({ ...base, reason: "refund_review_required", recommendedAction: "Verify the captured payment and process the refund through the merchant portal." });
