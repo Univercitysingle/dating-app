@@ -147,13 +147,24 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
-async function revokeFirebaseChatMemberships(env, uid) {
+async function revokeFirebaseChatMemberships(env, uid, db) {
   const configured = Boolean(env?.FIREBASE_SERVICE_ACCOUNT_JSON && env?.FIREBASE_DATABASE_URL);
   if (!configured && env?.ENABLE_FIREBASE_REALTIME_SYNC !== "true") {
     return { configured: false, revoked: 0 };
   }
+  // Merge the RTDB inverse index with MongoDB's authoritative conversation
+  // inventory. This also catches rooms created before chatUserRooms existed.
+  let legacyRoomIds = [];
+  if (db && typeof db.collection === "function") {
+    legacyRoomIds = await db.collection("chatmessages").distinct("roomId", {
+      $or: [{ senderUid: uid }, { receiverUid: uid }]
+    });
+    legacyRoomIds = legacyRoomIds.filter(roomId =>
+      typeof roomId === "string" && roomId.length >= 3 && roomId.length <= 260
+    );
+  }
   const { revokeAllChatMembershipsForUser } = await import("./firebase-rtdb.js");
-  const result = await revokeAllChatMembershipsForUser(env, uid);
+  const result = await revokeAllChatMembershipsForUser(env, uid, fetch, legacyRoomIds);
   return { configured: true, revoked: result.revoked };
 }
 
@@ -2726,7 +2737,7 @@ export class MongoDBConnection {
           )
         ]);
         try {
-          const revocation = await revokeFirebaseChatMemberships(this.env, report.reportedUserUid);
+          const revocation = await revokeFirebaseChatMemberships(this.env, report.reportedUserUid, db);
           if (revocation.configured) {
             chatAccessRevocationStatus = "completed";
             await db.collection("users").updateOne({ uid: report.reportedUserUid }, { $set: {
@@ -4009,7 +4020,7 @@ export class MongoDBConnection {
           )
         ]);
         try {
-          const revocation = await revokeFirebaseChatMemberships(this.env, target.uid);
+          const revocation = await revokeFirebaseChatMemberships(this.env, target.uid, db);
           if (revocation.configured) {
             await users.updateOne({ _id: targetId }, { $set: {
               chatAccessRevocationStatus: "completed",
