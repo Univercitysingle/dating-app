@@ -106,8 +106,7 @@ export function isFirebaseDatabaseUrl(value) {
 }
 
 export function normalizeAdminPurchaseActionPayload(action, payload) {
-  if (action === "approve" && (payload === null || payload === undefined)) return {};
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  if (action !== "record-refund" || !payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   return payload;
 }
 
@@ -1787,7 +1786,8 @@ export default {
       const parts = url.pathname.slice(adminPurchasesBase.length).split("/").filter(Boolean);
       const isList = parts.length === 0 && request.method === "GET";
       const isAction = parts.length === 2 && /^[a-fA-F0-9]{24}$/.test(parts[0]) &&
-        ["approve", "reject", "record-refund"].includes(parts[1]) && request.method === "POST";
+        parts[1] === "record-refund" && request.method === "POST";
+      if (!isList && !isAction) return json({ message: "Not found" }, 404);
       if (isList || isAction) {
         if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
         try {
@@ -1796,9 +1796,7 @@ export default {
           const parsedPayload = isAction ? await request.json().catch(() => null) : null;
           const payload = isAction ? normalizeAdminPurchaseActionPayload(parts[1], parsedPayload) : null;
           if (isAction && payload === null) {
-            return json({ message: parts[1] === "reject"
-              ? "A valid request body with a rejection reason is required"
-              : "A valid request body is required" }, 400);
+            return json({ message: "A valid refund record is required" }, 400);
           }
           const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
           const connection = env.MONGODB_CONNECTION.get(id);
