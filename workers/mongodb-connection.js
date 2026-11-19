@@ -6143,7 +6143,11 @@ export class MongoDBConnection {
       if (!isAdmin && Date.now() - new Date(message.timestamp).getTime() > 15 * 60 * 1000) return { status: 403, body: { error: "Messages can only be edited within 15 minutes of sending" } };
       const now = new Date();
       await db.collection("auditlogs").insertOne({ eventType: "chat_message_edited", actorUid: uid, actorType: isAdmin ? "admin" : "customer", messageId: id, roomId: message.roomId, previousMessage: message.messageContent, updatedMessage: payload.messageContent.trim(), createdAt: now });
-      await messages.updateOne({ _id: id, deletedAt: { $exists: false } }, { $set: { messageContent: payload.messageContent.trim(), editedAt: now, editedByUid: uid, updatedAt: now } });
+      const updateResult = await messages.updateOne(
+        { _id: id, deletedAt: { $exists: false } },
+        { $set: { messageContent: payload.messageContent.trim(), editedAt: now, editedByUid: uid, updatedAt: now } }
+      );
+      if (!updateResult.matchedCount) return { status: 409, body: { error: "Message changed before the edit could be saved" } };
       return { status: 200, body: { ...message, messageContent: payload.messageContent.trim(), editedAt: now, editedByUid: uid } };
     } catch { return { status: 503, body: { error: "Unable to edit chat message" } }; }
   }
@@ -6170,8 +6174,19 @@ export class MongoDBConnection {
       if (!isAdmin && Date.now() - new Date(message.timestamp).getTime() > 60 * 60 * 1000) return { status: 403, body: { error: "Messages can only be deleted within one hour of sending" } };
       const now = new Date();
       await db.collection("auditlogs").insertOne({ eventType: "chat_message_deleted", actorUid: uid, actorType: isAdmin ? "admin" : "customer", messageId: id, roomId: message.roomId, previousMessage: message.messageContent, createdAt: now });
-      await messages.updateOne({ _id: id, deletedAt: { $exists: false } }, { $set: { messageContent: "This message was deleted.", deletedAt: now, deletedByUid: uid, updatedAt: now } });
-      return { status: 200, body: { success: true, messageId } };
+      const updateResult = await messages.updateOne(
+        { _id: id, deletedAt: { $exists: false } },
+        { $set: { messageContent: "This message was deleted.", deletedAt: now, deletedByUid: uid, updatedAt: now } }
+      );
+      if (!updateResult.matchedCount) return { status: 409, body: { error: "Message changed before deletion could be saved" } };
+      return {
+        status: 200,
+        body: {
+          success: true,
+          messageId,
+          message: { ...message, messageContent: "This message was deleted.", deletedAt: now, deletedByUid: uid }
+        }
+      };
     } catch { return { status: 503, body: { error: "Unable to delete chat message" } }; }
   }
 
