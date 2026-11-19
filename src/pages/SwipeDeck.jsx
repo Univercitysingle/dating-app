@@ -155,6 +155,8 @@ const SwipeDeck = () => {
       ...restored,
       preference: user.preference || restored.preference || 'everyone',
     };
+    // Discard legacy radius defaults unless Nearby mode was explicitly chosen.
+    if (filters.travelMode !== 'nearby') delete filters.maxDistance;
     setActiveFilters(filters);
     // Restore a previously selected nearby radius only when the server confirms
     // that location sharing is still enabled and the GPS fix is fresh. This keeps
