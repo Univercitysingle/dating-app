@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "chats": {
+      "$roomId": {
+        ".read": "auth != null && root.child('chatParticipants').child($roomId).child(auth.uid).val() === true",
+        ".write": false
+      }
+    },
+    "chatParticipants": {
+      ".read": false,
+      ".write": false
+    },
+    "chatUserRooms": {
+      ".read": false,
+      ".write": false
+    },
+    "notifications": {
+      "$recipientUid": {
+        ".read": "auth != null && auth.uid === $recipientUid",
+        ".write": false
+      }
+    }
+  }
+}
