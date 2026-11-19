@@ -79,9 +79,26 @@ const AdminUserListPage = () => {
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) return;
     try {
-      await apiClient.delete(`/admin/users/${userId}`);
-      fetchUsers(currentPage, searchTerm, filterRole);
-      alert('User deleted successfully.');
+      let result = null;
+      const maxCleanupBatches = 10;
+      for (let attempt = 0; attempt < maxCleanupBatches; attempt += 1) {
+        result = await apiClient.delete(`/admin/users/${userId}`);
+        if (result?.deletionStatus === 'completed' || result?.anonymizationStatus === 'completed') break;
+        // The Worker processes at most 40 storage objects per request. Continue only
+        // when it explicitly confirms that another cleanup batch is available.
+        if (result?.cdnAssetCleanupStatus !== 'in_progress') break;
+      }
+
+      await fetchUsers(currentPage, searchTerm, filterRole);
+      if (result?.deletionStatus === 'completed' || result?.anonymizationStatus === 'completed') {
+        alert('User deletion and account anonymization completed successfully.');
+      } else if (result?.cdnAssetCleanupStatus === 'manual_review_required') {
+        alert('Account deletion is paused because some storage assets require manual review. The account remains restricted.');
+      } else if (result?.cdnAssetCleanupStatus === 'in_progress' || result?.cdnAssetCleanupStatus === 'retry_pending') {
+        alert('Account deletion is still processing. Some storage cleanup remains. Retry the deletion action to continue; the account remains restricted.');
+      } else {
+        alert('Account deletion has not completed yet. Check the returned deletion status before taking further action.');
+      }
     } catch (err) {
       alert(`Error deleting user: ${err.message}`);
     }
