@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { syncChatMessageToRtdb, syncChatRoomMembership, revokeAllChatMembershipsForUser } from "./firebase-rtdb.js";
+import { syncChatMessageStatusToRtdb, syncChatMessageToRtdb, syncChatRoomMembership, revokeAllChatMembershipsForUser } from "./firebase-rtdb.js";
 
 let testAccountSequence = 0;
 
@@ -98,6 +98,38 @@ test("chat message edits and soft deletions preserve mutation metadata in RTDB s
   assert.equal(payload.deletedAt, "2026-11-19T08:02:00.000Z");
   assert.equal(payload.deletedByUid, "uid-a");
   assert.equal(payload.messageContent, "This message was deleted.");
+});
+
+test("chat delivery and read receipts patch only the selected RTDB message nodes", async () => {
+  const env = makeEnv();
+  const { calls, fetchImpl } = createFetchRecorder();
+  const result = await syncChatMessageStatusToRtdb(
+    env, "uid-a-uid-b", ["0123456789abcdef01234567", "abcdef0123456789abcdef01"],
+    "read", fetchImpl
+  );
+  assert.deepEqual(result, { synced: 2, status: "read" });
+  const patches = calls.filter(call => call.init.method === "PATCH");
+  assert.equal(patches.length, 2);
+  for (const call of patches) {
+    assert.match(call.url, /\/chats\/uid-a-uid-b\/[a-f0-9]{24}\.json$/);
+    const body = JSON.parse(call.init.body);
+    assert.equal(body.status, "read");
+    assert.equal(typeof body.readAt, "string");
+    assert.equal(typeof body.deliveredAt, "string");
+  }
+});
+
+test("chat receipt sync rejects invalid status and message identifiers", async () => {
+  const env = makeEnv();
+  const { fetchImpl } = createFetchRecorder();
+  await assert.rejects(
+    syncChatMessageStatusToRtdb(env, "uid-a-uid-b", ["bad-id"], "read", fetchImpl),
+    /Invalid chat message status sync/
+  );
+  await assert.rejects(
+    syncChatMessageStatusToRtdb(env, "uid-a-uid-b", ["0123456789abcdef01234567"], "sent", fetchImpl),
+    /Invalid chat message status sync/
+  );
 });
 
 test("invalid membership inputs and non-Firebase database URLs fail closed", async () => {
