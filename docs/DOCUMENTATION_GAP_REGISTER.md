@@ -61,7 +61,7 @@ Two source-backed catalogues have now been added:
 This closes the first static source-inventory pass, not the live verification gaps. The API catalogue still needs request/response schemas and contract tests. The database catalogue still needs a live Atlas collection/index export and deployed database-name confirmation.
 
 Additional source findings to track:
-- Worker source still exposes admin purchase approve/reject/record-refund routes. Reconcile with the intended gateway-authoritative payment workflow before exposing manual approval.
+- Admin purchase approve/reject endpoints and the manual entitlement-grant path have been removed. WebXPay callbacks remain authoritative for payment settlement; admins can only record a refund after verifying it in the merchant portal. Sandbox callback replay, reconciliation and refund evidence remain open.
 - `/api/calls/*` remains excluded from the generic Worker IP limiter to avoid throttling call polling/signalling. Call initiation now has a per-account quota of 30 starts/hour; ICE credential issuance remains separately limited to 20 requests/minute. Active-call concurrency is enforced server-side. Validate the quota with real-user call workflows and monitor false positives.
 - Wrangler staging sets Dark Fantasy enabled with wildcard country configuration. Some route handlers accept wildcard globally, while the catalogue handler rejects it. Treat this as a configuration/security inconsistency and keep the feature gated until corrected.
 - Mongoose model schemas are legacy definitions and are not automatically enforced by direct MongoDB Worker writes.
