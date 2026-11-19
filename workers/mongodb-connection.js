@@ -5472,8 +5472,13 @@ export class MongoDBConnection {
 
   async sendCallSignal(uid, payload) {
     const { callId, candidate, description } = payload || {};
-    const validCandidate = candidate && typeof candidate === "object" &&
-      typeof candidate.candidate === "string" && candidate.candidate.length <= 10000;
+    const validCandidate = candidate && typeof candidate === "object" && !Array.isArray(candidate) &&
+      typeof candidate.candidate === "string" && candidate.candidate.length <= 10000 &&
+      (candidate.sdpMid == null || (typeof candidate.sdpMid === "string" && candidate.sdpMid.length <= 256)) &&
+      (candidate.sdpMLineIndex == null || (Number.isInteger(candidate.sdpMLineIndex) &&
+        candidate.sdpMLineIndex >= 0 && candidate.sdpMLineIndex <= 65535)) &&
+      (candidate.usernameFragment == null || (typeof candidate.usernameFragment === "string" &&
+        candidate.usernameFragment.length <= 256));
     const validDescription = description && typeof description === "object" &&
       ["offer", "answer"].includes(description.type) &&
       typeof description.sdp === "string" && description.sdp.length <= 200000;
@@ -5481,7 +5486,17 @@ export class MongoDBConnection {
         Number(Boolean(validCandidate)) + Number(Boolean(validDescription)) !== 1) {
       return { status: 400, body: { error: "Invalid call signal" } };
     }
-    const signalData = validCandidate ? { candidate } : { description: { type: description.type, sdp: description.sdp } };
+    // Persist only the ICECandidateInit fields used by WebRTC. Never copy
+    // arbitrary client properties into the shared call document.
+    const normalizedCandidate = validCandidate ? {
+      candidate: candidate.candidate,
+      ...(candidate.sdpMid == null ? {} : { sdpMid: candidate.sdpMid }),
+      ...(candidate.sdpMLineIndex == null ? {} : { sdpMLineIndex: candidate.sdpMLineIndex }),
+      ...(candidate.usernameFragment == null ? {} : { usernameFragment: candidate.usernameFragment })
+    } : null;
+    const signalData = validCandidate
+      ? { candidate: normalizedCandidate }
+      : { description: { type: description.type, sdp: description.sdp } };
     try {
       const db = this.getDatabase(await this.getClient());
       const { ObjectId } = await import("mongodb");
