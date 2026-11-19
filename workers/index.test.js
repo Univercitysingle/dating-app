@@ -473,7 +473,10 @@ test("undo swipe restores a prior like and consumes an undo credit", async () =>
     updateOne: async (_query, update) => { matchUpdate = update; return { matchedCount: 1 }; }
   };
   const connection = new MongoDBConnection({}, {});
-  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) =>
+    name === "users" ? users : name === "matches" ? matches :
+      name === "chatmessages" ? { findOne: async () => ({ roomId: "a-user-z-user" }) } : null
+  }) });
   const result = await connection.undoSwipe("current");
   assert.equal(result.status, 200);
   assert.equal(result.body.undoneUser.uid, "target");
