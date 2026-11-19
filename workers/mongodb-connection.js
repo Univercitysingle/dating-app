@@ -817,7 +817,18 @@ export class MongoDBConnection {
         { user1Uid, user2Uid, status: "matched" },
         { $set: { status: "unmatched", unmatchedBy: currentUid, unmatchedAt: new Date(), updatedAt: new Date() }, $unset: { likedBy: "" } }
       );
-      if (!result.matchedCount) return { status: 404, body: { error: "An active match with this person was not found." } };
+      if (!result.matchedCount) {
+        // A previous request may have ended the match but failed while revoking
+        // the Firebase RTDB membership. Treat an already-unmatched pair as an
+        // idempotent retry and return the room ID so the caller can finish revocation.
+        const existingMatch = await db.collection("matches").findOne(
+          { user1Uid, user2Uid },
+          { projection: { status: 1 } }
+        );
+        if (existingMatch?.status !== "unmatched") {
+          return { status: 404, body: { error: "An active match with this person was not found." } };
+        }
+      }
       return { status: 200, body: {
         success: true, message: "Match ended successfully.",
         ...(typeof conversation?.roomId === "string" ? { roomId: conversation.roomId } : {})
