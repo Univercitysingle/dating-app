@@ -5823,3 +5823,68 @@ test("account data export rejects invalid identity and reports database failures
   assert.equal(failed.body.error, "User data export is temporarily unavailable.");
   assert.equal(JSON.stringify(failed.body).includes("private database diagnostic"), false);
 });
+
+
+test("superadmin payment reconciliation flags stale, incomplete, refund and duplicate gateway records without mutating payments", async () => {
+  const old = new Date(Date.now() - 60 * 60 * 1000);
+  const recent = new Date();
+  const observed = [];
+  const cursor = records => ({
+    sort() { return this; },
+    limit() { return this; },
+    maxTimeMS() { return this; },
+    async toArray() { return records; }
+  });
+  const db = {
+    collection(name) {
+      observed.push(name);
+      if (name === "purchases") return {
+        find: () => cursor([
+          { _id: "p1", status: "pending", createdAt: old, itemPrice: 100 },
+          { _id: "p2", status: "completed", createdAt: recent, itemPrice: 200, paymentReference: "ref-duplicate", paymentGatewayId: "gateway-duplicate" },
+          { _id: "p3", status: "completed", createdAt: recent, itemPrice: 200, paymentReference: "ref-duplicate", paymentGatewayId: "gateway-duplicate" },
+          { _id: "p4", status: "refund_required", createdAt: recent, paymentReference: "late-ref", paymentGatewayId: "late-gateway" }
+        ])
+      };
+      if (name === "subscriptions") return {
+        find: () => cursor([
+          { _id: "s1", status: "active", createdAt: recent, plan: "monthly" },
+          { _id: "s2", status: "pending", createdAt: recent }
+        ])
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async (_uid, superadminOnly) => {
+    assert.equal(superadminOnly, true);
+    return { status: 200, role: "superadmin" };
+  };
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getAdminPaymentReconciliation("superadmin-uid");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.source, "local_mongodb_records_only");
+  assert.equal(result.body.providerStatusQueried, false);
+  assert.equal(result.body.counts.totalScanned, 6);
+  assert.equal(result.body.counts.pending, 2);
+  assert.equal(result.body.counts.refundRequired, 1);
+  const reasons = result.body.anomalies.map(item => item.reason);
+  assert.ok(reasons.includes("stale_pending"));
+  assert.ok(reasons.includes("settled_missing_gateway_metadata"));
+  assert.ok(reasons.includes("refund_review_required"));
+  assert.ok(reasons.includes("duplicate_payment_reference"));
+  assert.ok(reasons.includes("duplicate_gateway_transaction_id"));
+  assert.deepEqual(observed.sort(), ["purchases", "subscriptions"]);
+});
+
+test("payment reconciliation is restricted to superadmins", async () => {
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async (_uid, superadminOnly) => {
+    assert.equal(superadminOnly, true);
+    return { status: 403, body: { message: "Forbidden" } };
+  };
+  const result = await connection.getAdminPaymentReconciliation("admin-uid");
+  assert.equal(result.status, 403);
+});
