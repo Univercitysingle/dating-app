@@ -1,4 +1,5 @@
-import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";\nimport { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
+import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
+import { syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
 import { Buffer } from "node:buffer";
 import { sendWebPush } from "./push-notifications.js";
 import { constants, createPublicKey, createSign, publicDecrypt, publicEncrypt, timingSafeEqual } from "node:crypto";
