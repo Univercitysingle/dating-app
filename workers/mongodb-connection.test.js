@@ -5518,3 +5518,38 @@ test("push subscription storage scopes records to the authenticated UID and pers
   assert.deepEqual(captured.update.$set.keys, { p256dh: "A".repeat(88), auth: "B".repeat(24) });
   assert.equal(captured.options.upsert, true);
 });
+
+
+test("push delivery lookup prunes expired endpoints and returns only unexpired subscriptions", async () => {
+  let deleteFilter;
+  let findFilter;
+  const valid = { endpoint: "https://fcm.googleapis.com/fcm/send/valid", keys: { p256dh: "A".repeat(88), auth: "B".repeat(24) } };
+  const collection = {
+    async deleteMany(filter) { deleteFilter = filter; return { deletedCount: 1 }; },
+    find(filter) {
+      findFilter = filter;
+      return { sort() { return this; }, limit() { return this; }, async toArray() { return [valid]; } };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "pushSubscriptions") return collection;
+      if (name === "users") return { async findOne() { return { notificationPreferences: {} }; } };
+      throw new Error("Unexpected collection " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getPushSubscriptions("push-user");
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.subscriptions, [valid]);
+  assert.deepEqual(deleteFilter, { uid: "push-user", expirationTime: { $ne: null, $lte: deleteFilter.expirationTime.$lte } });
+  assert.ok(Number.isFinite(deleteFilter.expirationTime.$lte));
+  assert.deepEqual(findFilter, {
+    uid: "push-user",
+    $or: [{ expirationTime: null }, { expirationTime: { $gt: findFilter.$or[1].expirationTime.$gt } }]
+  });
+  assert.ok(Number.isFinite(findFilter.$or[1].expirationTime.$gt));
+  assert.equal(deleteFilter.expirationTime.$lte, findFilter.$or[1].expirationTime.$gt);
+});
