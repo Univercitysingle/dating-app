@@ -724,7 +724,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
             try {
               if (signal.description.type === 'offer' && peer.signalingState !== 'stable') {
                 const active = callRef.current || next;
-                const polite = String(currentUser.uid) > String(active.callerUid || '');
+                const remoteUid = String(active.callerUid || '') === String(currentUser.uid)
+                  ? active.receiverUid
+                  : active.callerUid;
+                const polite = Boolean(remoteUid) && String(currentUser.uid) > String(remoteUid);
                 if (!polite) continue;
                 await peer.setLocalDescription({ type: 'rollback' });
               }
