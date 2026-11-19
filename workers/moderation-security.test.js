@@ -166,3 +166,63 @@ test("regular users cannot read admin moderation audit history", async () => {
   const result = await connection.getAdminLogs("ordinary-user", "audit");
   assert.equal(result.status, 403);
 });
+
+
+test("report moderation cannot demote admins, alter superadmins, or revive deleted accounts", async () => {
+  async function attempt({ actorRole, targetRole, targetStatus, action = "ban_user" }) {
+    let auditWrites = 0;
+    let accountWrites = 0;
+    const db = {
+      collection(name) {
+        if (name === "users") return {
+          async findOne(query) {
+            if (query.uid === "moderator") return { uid: "moderator", role: actorRole };
+            if (query.uid === "reported") return {
+              uid: "reported", role: targetRole, accountStatus: targetStatus,
+              _id: "target-id", isProfileVisible: true
+            };
+            return null;
+          },
+          async updateOne() { accountWrites += 1; return { matchedCount: 1 }; }
+        };
+        if (name === "reports") return {
+          async findOne() { return { _id: "0123456789abcdef01234567", reportedUserUid: "reported" }; },
+          async updateOne() { return { matchedCount: 1 }; }
+        };
+        if (name === "auditlogs") return {
+          async insertOne() { auditWrites += 1; return { insertedId: "audit-id" }; },
+          async updateOne() { return { matchedCount: 1 }; }
+        };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = makeConnection(db);
+    const result = await connection.moderateReport(
+      "moderator", "0123456789abcdef01234567",
+      { action, ...(action === "suspend_user" ? { durationDays: 7 } : {}) }
+    );
+    return { result, auditWrites, accountWrites };
+  }
+
+  const adminTarget = await attempt({ actorRole: "admin", targetRole: "admin", targetStatus: "active" });
+  assert.equal(adminTarget.result.status, 403);
+  assert.equal(adminTarget.auditWrites, 0);
+  assert.equal(adminTarget.accountWrites, 0);
+
+  const superadminTarget = await attempt({ actorRole: "superadmin", targetRole: "superadmin", targetStatus: "active" });
+  assert.equal(superadminTarget.result.status, 403);
+  assert.equal(superadminTarget.auditWrites, 0);
+  assert.equal(superadminTarget.accountWrites, 0);
+
+  const deletedTarget = await attempt({ actorRole: "superadmin", targetRole: "user", targetStatus: "deleted" });
+  assert.equal(deletedTarget.result.status, 409);
+  assert.equal(deletedTarget.auditWrites, 0);
+  assert.equal(deletedTarget.accountWrites, 0);
+
+  const adminRestoresBan = await attempt({
+    actorRole: "admin", targetRole: "user", targetStatus: "permanently_banned", action: "restore_user"
+  });
+  assert.equal(adminRestoresBan.result.status, 403);
+  assert.equal(adminRestoresBan.auditWrites, 0);
+  assert.equal(adminRestoresBan.accountWrites, 0);
+});
