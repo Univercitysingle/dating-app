@@ -414,6 +414,7 @@ test("chat message edit and delete enforce their time windows for the original s
       if (name === "auditlogs") return {
         async insertOne() { assert.fail("Expired message mutation must not be audited as successful"); }
       };
+      if (name === "matches") return { async findOne() { return null; } };
       assert.fail("Unexpected collection: " + name);
     }
   });
