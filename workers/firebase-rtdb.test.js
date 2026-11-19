@@ -82,6 +82,24 @@ test("chat message sync writes only the expected public message fields", async (
   });
 });
 
+test("chat message edits and soft deletions preserve mutation metadata in RTDB sync", async () => {
+  const env = makeEnv();
+  const { calls, fetchImpl } = createFetchRecorder();
+  await syncChatMessageToRtdb(env, {
+    _id: "message-mutated", roomId: "uid-a-uid-b", senderUid: "uid-a",
+    receiverUid: "uid-b", messageContent: "This message was deleted.",
+    timestamp: new Date("2026-11-19T08:00:00.000Z"),
+    editedAt: new Date("2026-11-19T08:01:00.000Z"), editedByUid: "uid-a",
+    deletedAt: new Date("2026-11-19T08:02:00.000Z"), deletedByUid: "uid-a"
+  }, fetchImpl);
+  const payload = JSON.parse(calls[1].init.body);
+  assert.equal(payload.editedAt, "2026-11-19T08:01:00.000Z");
+  assert.equal(payload.editedByUid, "uid-a");
+  assert.equal(payload.deletedAt, "2026-11-19T08:02:00.000Z");
+  assert.equal(payload.deletedByUid, "uid-a");
+  assert.equal(payload.messageContent, "This message was deleted.");
+});
+
 test("invalid membership inputs and non-Firebase database URLs fail closed", async () => {
   const env = makeEnv();
   const { fetchImpl } = createFetchRecorder();
