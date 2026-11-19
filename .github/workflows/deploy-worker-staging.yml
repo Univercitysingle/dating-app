@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: dating-app-worker-staging
+  group: dating-app-worker-staging-v2
   cancel-in-progress: false
 
 jobs:
@@ -446,12 +446,3 @@ jobs:
             test "$STATUS" = "404" || { echo "Expected disabled manual payment action $ACTION to return 404; received $STATUS"; cat /tmp/admin-payment-action-response.json; exit 1; }
           done
 
-      - name: Run OWASP ZAP passive baseline against deployed API Worker
-        timeout-minutes: 5
-        continue-on-error: true
-        uses: zaproxy/action-baseline@v0.14.0
-        with:
-          target: https://dating-app-api-staging.enadoctemp.workers.dev
-          fail_action: false
-          allow_issue_writing: false
-          artifact_name: zap-worker-after-deploy
