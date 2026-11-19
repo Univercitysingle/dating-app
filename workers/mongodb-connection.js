@@ -7052,7 +7052,7 @@ export class MongoDBConnection {
 
     if (url.pathname.startsWith("/internal/admin/") && [
       "/internal/admin/users", "/internal/admin/user", "/internal/admin/stats",
-      "/internal/admin/transactions", "/internal/admin/analytics", "/internal/admin/user-create",
+      "/internal/admin/transactions", "/internal/admin/payment-reconciliation", "/internal/admin/analytics", "/internal/admin/user-create",
       "/internal/admin/user-update", "/internal/admin/user-delete", "/internal/admin/user-plan",
       "/internal/admin/user-deletion-assets", "/internal/admin/user-deletion-assets-finalize",
       "/internal/admin/payment-logs", "/internal/admin/login-history", "/internal/admin/audit-logs",
@@ -7072,6 +7072,7 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/user-plan") result = await this.updateAdminUserPlan(body.claims.sub, body.userId, body.payload || {});
       else if (url.pathname === "/internal/admin/stats") result = await this.getAdminDashboardStats(body.claims.sub);
       else if (url.pathname === "/internal/admin/transactions") result = await this.getAdminTransactions(body.claims.sub);
+      else if (url.pathname === "/internal/admin/payment-reconciliation") result = await this.getAdminPaymentReconciliation(body.claims.sub);
       else if (url.pathname === "/internal/admin/payment-logs") result = await this.getAdminLogs(body.claims.sub, "payment", body.search || "");
       else if (url.pathname === "/internal/admin/login-history") result = await this.getAdminLogs(body.claims.sub, "login", body.search || "");
       else if (url.pathname === "/internal/admin/audit-logs") result = await this.getAdminLogs(body.claims.sub, "audit", body.search || "");
