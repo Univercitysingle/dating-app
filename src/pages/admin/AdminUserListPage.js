@@ -11,7 +11,7 @@ const AdminUserListPage = () => {
   const [error, setError] = useState(null);
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
-  const emptyStateColumnCount = adminUser?.role === 'superadmin' ? 8 : 6;
+  const emptyStateColumnCount = adminUser?.role === 'superadmin' ? 9 : 7;
 
   // State for filters and pagination
   const [searchTerm, setSearchTerm] = useState('');
@@ -109,6 +109,62 @@ const AdminUserListPage = () => {
     }
   };
 
+  const handleAccountRestriction = async (user) => {
+    if (!user?._id || user.role !== 'user') return;
+    const isRestricted = ['temporarily_suspended', 'permanently_banned', 'deletion_pending', 'deleted'].includes(user.accountStatus);
+    if (isRestricted) {
+      if (user.accountStatus === 'permanently_banned' && adminUser?.role !== 'superadmin') {
+        alert('Only a superadmin can restore a permanently banned account.');
+        return;
+      }
+      if (!window.confirm('Restore this account? Previous profile visibility will be restored.')) return;
+      try {
+        const result = await apiClient.put(`/admin/users/${user._id}`, { accountStatus: 'active' });
+        await fetchUsers(currentPage, searchTerm, filterRole);
+        alert(result?.chatAccessRevocationStatus === 'retry_pending'
+          ? 'Account status updated. Chat access cleanup is pending.'
+          : 'Account restored successfully.');
+      } catch (err) {
+        alert(`Unable to restore account: ${err.message}`);
+      }
+      return;
+    }
+    const rawDays = window.prompt('Suspend this account for how many days? Enter 1 to 3650.', '7');
+    if (rawDays === null) return;
+    const days = Number(rawDays);
+    if (!Number.isInteger(days) || days < 1 || days > 3650) {
+      alert('Enter a whole number between 1 and 3650.');
+      return;
+    }
+    if (!window.confirm(`Suspend this account for ${days} days? This hides the profile and disables messaging and calls.`)) return;
+    try {
+      const suspendedUntil = new Date(Date.now() + days * 86400000).toISOString();
+      const result = await apiClient.put(`/admin/users/${user._id}`, {
+        accountStatus: 'temporarily_suspended', suspendedUntil
+      });
+      await fetchUsers(currentPage, searchTerm, filterRole);
+      alert(result?.chatAccessRevocationStatus === 'retry_pending'
+        ? 'Account restricted. Realtime chat access revocation needs a retry.'
+        : 'Account suspended successfully.');
+    } catch (err) {
+      alert(`Unable to suspend account: ${err.message}`);
+    }
+  };
+
+  const handlePermanentBan = async (user) => {
+    if (!user?._id || user.role !== 'user') return;
+    if (!window.confirm('Permanently ban this account? The profile, messaging, and calls will be disabled. Only a superadmin can restore it.')) return;
+    try {
+      const result = await apiClient.put(`/admin/users/${user._id}`, { accountStatus: 'permanently_banned' });
+      await fetchUsers(currentPage, searchTerm, filterRole);
+      alert(result?.chatAccessRevocationStatus === 'retry_pending'
+        ? 'Account banned. Realtime chat access revocation needs a retry.'
+        : 'Account permanently banned.');
+    } catch (err) {
+      alert(`Unable to ban account: ${err.message}`);
+    }
+  };
+
   const handleChat = (targetUid) => {
     if (!adminUser || !adminUser.uid) {
       alert("Your user ID is not available, cannot start chat.");
@@ -173,7 +229,7 @@ const AdminUserListPage = () => {
               <th>Name</th>
               {(adminUser?.role === 'superadmin' || adminUser?.role === 'admin') && <th>Email</th>}
               {adminUser?.role === 'superadmin' && <th>Mobile</th>}
-              <th>Role</th><th>Visibility</th><th>Last active</th>
+              <th>Role</th><th>Account status</th><th>Visibility</th><th>Last active</th>
               {adminUser?.role === 'superadmin' && <th>Last login IP</th>}
               <th>Actions</th>
             </tr></thead>
@@ -188,6 +244,7 @@ const AdminUserListPage = () => {
                   {(adminUser?.role === 'superadmin' || adminUser?.role === 'admin') && <td><span className="text-sm text-slate-500">{user.email || 'Not available'}</span></td>}
                   {adminUser?.role === 'superadmin' && <td><span className="text-sm text-slate-500">{user.mobileNumber || 'Not available'}</span></td>}
                   <td><span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{user.role}</span></td>
+                  <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${user.accountStatus === 'permanently_banned' ? 'bg-rose-50 text-rose-700' : user.accountStatus === 'temporarily_suspended' || user.accountStatus === 'deletion_pending' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{(user.accountStatus || 'active').replaceAll('_', ' ')}</span></td>
                   <td><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${user.isProfileVisible ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{user.isProfileVisible ? 'Visible' : 'Hidden'}</span></td>
                   <td><span className="whitespace-nowrap text-xs text-slate-500">{user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString() : 'Not available'}</span></td>
                   {adminUser?.role === 'superadmin' && <td><span className="font-mono text-xs text-slate-500">{user.lastLoginIp || 'Not available'}</span></td>}
@@ -196,6 +253,8 @@ const AdminUserListPage = () => {
                     <button type="button" onClick={() => navigate(`/admin/users/${user._id}/edit`)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">Edit</button>
                     <button type="button" onClick={() => handleChat(user.uid)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Chat</button>
                     <button type="button" onClick={() => handleToggleVisibility(user._id, user.isProfileVisible)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">{user.isProfileVisible ? 'Hide' : 'Show'}</button>
+                    {user.role === 'user' && <button type="button" onClick={() => handleAccountRestriction(user)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${['temporarily_suspended', 'permanently_banned', 'deletion_pending', 'deleted'].includes(user.accountStatus) ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-amber-200 text-amber-700 hover:bg-amber-50'}`}>{['temporarily_suspended', 'permanently_banned', 'deletion_pending', 'deleted'].includes(user.accountStatus) ? 'Restore' : 'Suspend'}</button>}
+                    {user.role === 'user' && <button type="button" onClick={() => handlePermanentBan(user)} className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">Ban</button>}
                     {adminUser?.role === 'superadmin' && user.role === 'user' && <button type="button" onClick={() => handleRoleChange(user._id, 'admin')} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Promote</button>}
                     {adminUser?.role === 'superadmin' && user.role === 'admin' && <button type="button" onClick={() => handleRoleChange(user._id, 'user')} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Demote</button>}
                     <button type="button" onClick={() => navigate(`/admin/reports?reportedUserUid=${user.uid}`)} className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50">Reports</button>
