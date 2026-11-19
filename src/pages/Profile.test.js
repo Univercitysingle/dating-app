@@ -85,6 +85,22 @@ describe('Profile page', () => {
     expect(screen.getByText('Save All Changes')).toBeInTheDocument();
   });
 
+  it('allows an existing member to add a missing adult date of birth', async () => {
+    renderWithProviders(<Profile />);
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/users/me'));
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    fireEvent.click(screen.getByText('Edit Profile'));
+
+    const birthdayInput = screen.getByLabelText(/date of birth/i);
+    fireEvent.change(birthdayInput, { target: { value: '1990-01-01' } });
+    fireEvent.click(screen.getByText('Save All Changes'));
+
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith(
+      '/users/me',
+      expect.objectContaining({ birthday: '1990-01-01' })
+    ));
+  });
+
   it('switches to the settings tab when "Settings" is clicked', async () => {
     renderWithProviders(<Profile />);
     await waitFor(() => expect(screen.queryByText(/Loading profile.../i)).not.toBeInTheDocument());
