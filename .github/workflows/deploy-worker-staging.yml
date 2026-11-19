@@ -136,12 +136,13 @@ jobs:
             -H 'Content-Type: application/json' \
             --data '{"ttl":3600,"room":"dating-app-staging-validation","initiator_client":"github-actions-validation"}')"
           count="$(jq -r 'if (.iceServers | type) == "array" then (.iceServers | length) else 0 end' /tmp/turnix-ice-response.json)"
-          echo "Turnix credential API status: $status; ICE server entries: $count"
+          provider_error="$(jq -r '[.error // empty, .code // empty] | map(tostring | gsub("[^A-Za-z0-9 _.-]"; "")) | join(" / ")' /tmp/turnix-ice-response.json 2>/dev/null || echo "unavailable")"
+          echo "Turnix credential API status: $status; ICE server entries: $count; provider diagnostic: $provider_error"
           if [[ "$status" != "200" || "$count" -lt 1 ]]; then
             if [[ -n "$EXPRESSTURN_USERNAME" && -n "$EXPRESSTURN_PASSWORD" ]]; then
-              echo "::warning::Turnix credential verification failed (HTTP $status). Proceeding with ExpressTURN primary; Turnix fallback is unavailable until TURNIX_API_TOKEN is corrected."
+              echo "::warning::Turnix credential verification failed (HTTP $status; $provider_error). Proceeding with ExpressTURN primary; Turnix fallback remains unavailable."
             else
-              echo "::error::Turnix credential verification failed and no ExpressTURN credentials are configured. Check TURNIX_API_TOKEN and provider quota."
+              echo "::error::Turnix credential verification failed (HTTP $status; $provider_error) and no ExpressTURN credentials are configured. Check TURNIX_API_TOKEN and provider subscription."
               exit 1
             fi
           fi
