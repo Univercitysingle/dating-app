@@ -943,6 +943,7 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
+      const matches = db.collection("matches");
       const [currentUser, targetUser] = await Promise.all([
         users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1, accountStatus: 1, suspendedUntil: 1 } }),
         users.findOne({ uid: targetUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1 } })
@@ -971,17 +972,48 @@ export class MongoDBConnection {
         if (!superLikeSpent) return { status: 400, body: { error: "No super likes remaining." } };
       }
 
-      let match = await db.collection("matches").findOne({
+      // A deterministic pair key plus a partial unique index prevents opposite
+      // first likes from creating duplicate match documents under concurrency.
+      const orderedUids = [uid, targetUid].sort();
+      const pairKey = orderedUids.map(value => value.length + ":" + value).join("|");
+      if (!this.matchPairIndexPromise) {
+        this.matchPairIndexPromise = matches.createIndex(
+          { pairKey: 1 },
+          {
+            unique: true,
+            partialFilterExpression: { pairKey: { $type: "string" } },
+            name: "unique_match_pair_key"
+          }
+        ).catch(error => {
+          this.matchPairIndexPromise = null;
+          throw error;
+        });
+      }
+      await this.matchPairIndexPromise;
+
+      let match = await matches.findOne({
         $or: [
           { user1Uid: uid, user2Uid: targetUid },
           { user1Uid: targetUid, user2Uid: uid }
         ]
       });
       const now = new Date();
+
+      if (match && match.pairKey !== pairKey) {
+        try {
+          await matches.updateOne({ _id: match._id }, { $set: { pairKey, updatedAt: now } });
+          match = await matches.findOne({ pairKey }) || { ...match, pairKey };
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          match = await matches.findOne({ pairKey }) || match;
+        }
+      }
+
       if (!match) {
-        const user1Uid = canonical && uid > targetUid ? targetUid : uid;
-        const user2Uid = canonical && uid > targetUid ? uid : targetUid;
-        const inserted = await db.collection("matches").insertOne({
+        const user1Uid = canonical ? orderedUids[0] : uid;
+        const user2Uid = canonical ? orderedUids[1] : targetUid;
+        const initialMatch = {
+          pairKey,
           user1Uid,
           user2Uid,
           status: action === "pass" ? "unmatched" : "pending",
@@ -989,22 +1021,39 @@ export class MongoDBConnection {
           superLike: action === "superlike",
           createdAt: now,
           updatedAt: now
-        });
-        match = { _id: inserted.insertedId, user1Uid, user2Uid, status: action === "pass" ? "unmatched" : "pending", likedBy: action === "pass" ? [] : [uid], superLike: action === "superlike" };
-      } else if (action === "like" || action === "superlike") {
+        };
+        try {
+          const inserted = await matches.insertOne(initialMatch);
+          match = { _id: inserted.insertedId, ...initialMatch };
+        } catch (error) {
+          // The other participant may have inserted this pair after our read.
+          // Recover from that unique-key race and apply this participant's vote.
+          if (error?.code !== 11000) throw error;
+          match = await matches.findOne({ pairKey });
+          if (!match) throw error;
+        }
+      }
+
+      if (action === "like" || action === "superlike") {
         const update = { $addToSet: { likedBy: uid }, $set: { updatedAt: now } };
         if (action === "superlike") update.$set.superLike = true;
-        await db.collection("matches").updateOne({ _id: match._id }, update);
-        match = await db.collection("matches").findOne({ _id: match._id });
+        await matches.updateOne({ _id: match._id }, update);
+        match = await matches.findOne({ _id: match._id }) || {
+          ...match,
+          likedBy: Array.from(new Set([...(Array.isArray(match.likedBy) ? match.likedBy : []), uid])),
+          ...(action === "superlike" ? { superLike: true } : {}),
+          updatedAt: now
+        };
       } else {
-        await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: "unmatched", updatedAt: now } });
+        await matches.updateOne({ _id: match._id }, { $set: { status: "unmatched", updatedAt: now } });
         match.status = "unmatched";
+        match.updatedAt = now;
       }
 
       if (action === "like" || action === "superlike") {
         const likedBy = Array.isArray(match.likedBy) ? match.likedBy : [];
         const finalStatus = likedBy.includes(match.user1Uid) && likedBy.includes(match.user2Uid) ? "matched" : "pending";
-        await db.collection("matches").updateOne({ _id: match._id }, { $set: { status: finalStatus, updatedAt: now } });
+        await matches.updateOne({ _id: match._id }, { $set: { status: finalStatus, updatedAt: now } });
         match.status = finalStatus;
         const notificationType = finalStatus === "matched" ? "match" : action === "superlike" ? "superlike" : "like";
         await db.collection("notifications").updateOne(
@@ -1053,7 +1102,12 @@ export class MongoDBConnection {
           _id: match._id === undefined ? undefined : String(match._id)
         }
       };
-    } catch {
+    } catch (error) {
+      console.error("Swipe recording failed", {
+        name: error && typeof error.name === "string" ? error.name : "Error",
+        code: error && (typeof error.code === "string" || typeof error.code === "number") ? error.code : undefined,
+        message: error && typeof error.message === "string" ? error.message.slice(0, 180) : undefined
+      });
       return { status: 503, body: { error: "Swipe service unavailable" } };
     }
   }
