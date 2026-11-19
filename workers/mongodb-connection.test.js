@@ -5630,3 +5630,58 @@ test("account deletion recognizes both UUID and timestamp generated profile phot
   ]);
   assert.equal(result.body.unresolvedAssetCount, 0);
 });
+
+
+test("unmatch retry returns the prior room ID when membership revocation previously failed", async () => {
+  const roomId = "alice-bob";
+  let matchLookups = 0;
+  const db = {
+    collection(name) {
+      if (name === "chatmessages") return {
+        findOne: async () => ({ roomId })
+      };
+      if (name === "matches") return {
+        updateOne: async () => ({ matchedCount: 0 }),
+        findOne: async (query, options) => {
+          matchLookups += 1;
+          assert.deepEqual(query, { user1Uid: "alice", user2Uid: "bob" });
+          assert.deepEqual(options, { projection: { status: 1 } });
+          return { status: "unmatched" };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.unmatchUsers("alice", "bob");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.success, true);
+  assert.equal(result.body.roomId, roomId);
+  assert.equal(matchLookups, 1);
+});
+
+test("unmatch retry does not treat a missing or pending match as already completed", async () => {
+  for (const existingMatch of [null, { status: "pending" }]) {
+    const db = {
+      collection(name) {
+        if (name === "chatmessages") return { findOne: async () => ({ roomId: "alice-bob" }) };
+        if (name === "matches") return {
+          updateOne: async () => ({ matchedCount: 0 }),
+          findOne: async () => existingMatch
+        };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = Object.create(MongoDBConnection.prototype);
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+
+    const result = await connection.unmatchUsers("alice", "bob");
+    assert.equal(result.status, 404);
+    assert.equal(result.body.roomId, undefined);
+  }
+});
