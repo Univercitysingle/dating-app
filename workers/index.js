@@ -2857,13 +2857,14 @@ export default {
           let realtimeSync = null;
           if (response.ok && env.ENABLE_FIREBASE_REALTIME_SYNC === "true") {
             realtimeSync = false;
-            if (payload && typeof payload.roomId === "string" && Array.isArray(payload.messageIds)) {
+            const verifiedMessageIds = Array.isArray(result.updatedMessageIds) ? result.updatedMessageIds : [];
+            if (payload && typeof payload.roomId === "string" && verifiedMessageIds.length) {
               try {
                 const sync = await syncChatMessageStatusToRtdb(
-                  env, payload.roomId, payload.messageIds,
+                  env, payload.roomId, verifiedMessageIds,
                   chatRoute[1] === "read" ? "read" : "delivered"
                 );
-                realtimeSync = sync.synced === payload.messageIds.length;
+                realtimeSync = sync.synced === verifiedMessageIds.length;
               } catch {
                 console.warn("Firebase chat receipt sync was not completed", {
                   phase: chatRoute[1] === "read" ? "read-realtime-chat-receipt" : "delivery-realtime-chat-receipt"
