@@ -1045,7 +1045,7 @@ export default {
         const connection = env.MONGODB_CONNECTION.get(id);
         const response = await connection.fetch("https://internal.invalid/internal/swipe", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims, targetUid: payload.userId, action: swipeAction[1] })
+          body: JSON.stringify({ claims, targetUid: payload.userId, action: swipeAction[1], canonical: true })
         });
         const body = await response.json().catch(() => ({ error: "Swipe service unavailable" }));
         return json(body, response.status);
