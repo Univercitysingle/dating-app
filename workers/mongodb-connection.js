@@ -3917,7 +3917,7 @@ export class MongoDBConnection {
       const users = db.collection("users");
       const targetId = new ObjectId(userId);
       const target = await users.findOne({ _id: targetId }, { projection: {
-        uid: 1, role: 1, accountStatus: 1, suspendedUntil: 1,
+        uid: 1, role: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1,
         isProfileVisible: 1, profileVisibilityBeforeSuspension: 1
       } });
       if (!target) return { status: 404, body: { message: "User not found" } };
@@ -3966,6 +3966,9 @@ export class MongoDBConnection {
           update.isProfileVisible = false;
           revokeChatAccess = true;
         } else {
+          if (target.accountStatus === "deletion_pending" || target.accountStatus === "deleted" || target.deletionRequestedAt) {
+            return { status: 409, body: { message: "An account in the deletion process cannot be restored through user management." } };
+          }
           if (target.accountStatus === "permanently_banned" && access.role !== "superadmin") {
             return { status: 403, body: { message: "Only a superadmin can restore a permanently banned account" } };
           }
