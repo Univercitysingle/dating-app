@@ -4168,7 +4168,7 @@ export class MongoDBConnection {
         }
         const validUid = /^[A-Za-z0-9_-]{1,128}$/.test(uidValue);
         const ownedPattern = validUid
-          ? new RegExp("^photos-" + uidValue + "-[0-9]{10,16}\\.(?:jpg|jpeg|png|gif|webp)$", "i")
+          ? new RegExp("^photos-" + uidValue + "-(?:[0-9a-f-]{36}|[0-9]{10,16})\\.(?:jpg|jpeg|png|gif|webp)$", "i")
           : null;
         if (!ownedPattern || !ownedPattern.test(key)) unresolvedAssetCount++;
         else photoKeys.push(key);
