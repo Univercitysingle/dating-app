@@ -113,12 +113,19 @@ const SwipeDeck = () => {
   const discoverRequestSequence = useRef(0);
 
   const fetchUsersToSwipe = useCallback(async (filters = {}) => {
+    // The API only accepts maxDistance for an explicitly selected Nearby
+    // search. Older saved preferences and manual refreshes may otherwise
+    // re-send the legacy 100 km default and trigger a 409 response.
+    const requestFilters = { ...filters };
+    if (requestFilters.travelMode !== 'nearby') {
+      delete requestFilters.maxDistance;
+    }
     const requestSequence = ++discoverRequestSequence.current;
     setIsLoading(true);
     setError(null);
     setNewMatchInfo(null);
     try {
-      const data = await apiClient.get('/users/discover', { params: filters });
+      const data = await apiClient.get('/users/discover', { params: requestFilters });
       if (requestSequence !== discoverRequestSequence.current) return;
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
