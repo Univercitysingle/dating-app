@@ -6,7 +6,7 @@ import { useSocket } from '../context/SocketContext';
 import logger from '../utils/logger';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 import ChatMessage from '../components/ChatMessage';
-import ChatCallPanel from '../components/ChatCallPanel';
+import { useCallSession } from '../context/CallSessionContext';
 import { database } from '../firebase';
 import { ref, onChildAdded, off } from 'firebase/database';
 import { collectPendingDeliveryMessages, getVisibleChatMessageIds } from '../utils/chat';
@@ -25,6 +25,7 @@ function Chat() {
   const { user } = useAuth();
   const { socket, allMessages, addMessage, removeMessage } = useSocket();
   const { chatId } = useParams();
+  const { registerSession, leaveSession } = useCallSession();
   const typingTimeoutRef = useRef(null);
   const typingLastSentAtRef = useRef(0);
   const messagesEndRef = useRef(null);
@@ -40,6 +41,12 @@ function Chat() {
   const pendingMessageRef = useRef(null);
   const addMessageRef = useRef(addMessage);
   useEffect(() => { addMessageRef.current = addMessage; }, [addMessage]);
+
+  useEffect(() => {
+    if (!user?.uid || !chatId || !otherUser?.uid) return undefined;
+    registerSession({ roomId: chatId, otherUser });
+    return () => leaveSession(chatId);
+  }, [chatId, user?.uid, otherUser?.uid, registerSession, leaveSession]);
 
   const messages = allMessages[chatId] || [];
   // Resolve the peer from persisted message identities. Splitting room IDs is
@@ -536,7 +543,7 @@ function Chat() {
         </div>
       </header>
       {error && <div className="mx-4 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800" role="alert">{error}</div>}
-      {otherUser && user && <ChatCallPanel roomId={chatId} currentUser={user} otherUser={otherUser} />}
+
       <main ref={messagesContainerRef} className="chat-messages chat-wallpaper flex-grow overflow-y-auto px-3 py-5 sm:px-6">
         <div className="chat-message-stack mx-auto flex max-w-3xl flex-col gap-3">
           {hasOlderMessages && (
