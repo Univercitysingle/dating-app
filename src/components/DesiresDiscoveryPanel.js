@@ -99,8 +99,14 @@ const DesiresDiscoveryPanel = () => {
         setPreferences(next);
         setConsent(next.consent === true);
       })
-      .catch(() => {
-        if (active) setError('Desires & Discovery could not be loaded. Please try again.');
+      .catch(loadError => {
+        if (!active) return;
+        const serverMessage = loadError?.data?.error || loadError?.data?.message;
+        if (loadError?.status === 403) {
+          setError(serverMessage || 'This feature is unavailable for this account. Check that your profile has a valid adult date of birth and that your account is in good standing.');
+        } else {
+          setError(serverMessage || 'Desires & Discovery could not be loaded. Please try again.');
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -160,8 +166,8 @@ const DesiresDiscoveryPanel = () => {
       setPreferences(EMPTY_PREFERENCES);
       setConsent(false);
       setMessage('Your preferences were deleted and consent was withdrawn.');
-    } catch {
-      setError('Your preferences could not be deleted. Please try again.');
+    } catch (deleteError) {
+      setError(deleteError?.data?.error || deleteError?.data?.message || 'Your preferences could not be deleted. Please try again.');
     } finally {
       setSaving(false);
     }
