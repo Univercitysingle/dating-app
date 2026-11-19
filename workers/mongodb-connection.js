@@ -2662,6 +2662,22 @@ export class MongoDBConnection {
       if (!report) return { status: 404, body: { message: "Report not found." } };
       const target = await db.collection("users").findOne({ uid: report.reportedUserUid });
       if (!target) return { status: 404, body: { message: "Reported user not found." } };
+      // Moderation must never let an ordinary admin demote or disable another
+      // administrator. Superadmin identities are immutable through report actions.
+      if (target.role === "superadmin") {
+        return { status: 403, body: { message: "Superadmin accounts cannot be moderated through reports." } };
+      }
+      if (["admin", "contributor"].includes(target.role) && admin.role !== "superadmin") {
+        return { status: 403, body: { message: "Only a superadmin can moderate administrative accounts." } };
+      }
+      if (payload.action !== "dismiss" &&
+          ["deletion_pending", "deleted"].includes(target.accountStatus)) {
+        return { status: 409, body: { message: "An account in the deletion process cannot be changed by report moderation." } };
+      }
+      if (payload.action === "restore_user" && target.accountStatus === "permanently_banned" &&
+          admin.role !== "superadmin") {
+        return { status: 403, body: { message: "Only a superadmin can restore a permanently banned account." } };
+      }
       const now = new Date();
       auditCollection = db.collection("auditlogs");
       const auditEntry = {
