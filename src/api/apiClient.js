@@ -98,7 +98,9 @@ const apiClient = {
 
     try {
       const response = await fetch(url, config);
-      const responseData = await readResponseBody(response, !response.ok);
+      const responseData = response.ok && options.responseType === 'blob'
+        ? await response.blob()
+        : await readResponseBody(response, !response.ok);
       logger.debug(`API Response - ${config.method} ${url}`, { status: response.status });
 
       if (!response.ok) {
