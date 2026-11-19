@@ -5068,6 +5068,7 @@ test("account deletion retries safely when Firebase chat access revocation fails
     updateOne: async (query, update) => { updates.push(update); return { matchedCount: 1 }; }
   };
   const collection = name => ({
+    distinct: async () => [],
     updateMany: async () => ({ matchedCount: 0, modifiedCount: 0 }),
     deleteOne: async () => ({ deletedCount: 0 }),
     deleteMany: async () => ({ deletedCount: 0 }),
@@ -5199,6 +5200,7 @@ test("admin suspension fails closed with retry status when Firebase membership r
     async updateOne(_filter, update) { userWrites.push(update); return { matchedCount: 1 }; }
   };
   const emptyCollection = {
+    async distinct() { return []; },
     async deleteMany() { return { deletedCount: 0 }; },
     async updateMany() { return { modifiedCount: 0 }; }
   };
@@ -5226,4 +5228,39 @@ test("admin suspension fails closed with retry status when Firebase membership r
   assert.equal(result.body.accountStatus, "temporarily_suspended");
   assert.equal(result.body.chatAccessRevocationStatus, "retry_pending");
   assert.ok(userWrites.some(update => update.$set?.chatAccessRevocationStatus === "retry_pending"));
+});
+
+
+test("superadmin can restore a temporary suspension and restore prior profile visibility", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let capturedUpdate;
+  const users = {
+    async findOne() {
+      return {
+        _id: targetId, uid: "target", role: "user",
+        accountStatus: "temporarily_suspended",
+        suspendedUntil: new Date(Date.now() + 86400000),
+        profileVisibilityBeforeSuspension: true,
+        isProfileVisible: false
+      };
+    },
+    async findOneAndUpdate(_filter, update) {
+      capturedUpdate = update;
+      return { _id: targetId, uid: "target", accountStatus: "active", isProfileVisible: true };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  const result = await connection.updateAdminUser("superadmin-uid", targetId.toHexString(), {
+    accountStatus: "active"
+  });
+  assert.equal(result.status, 200);
+  assert.equal(capturedUpdate.$set.accountStatus, "active");
+  assert.equal(capturedUpdate.$set.isProfileVisible, true);
+  assert.ok(capturedUpdate.$unset.suspendedUntil);
+  assert.ok(capturedUpdate.$unset.profileVisibilityBeforeSuspension);
 });
