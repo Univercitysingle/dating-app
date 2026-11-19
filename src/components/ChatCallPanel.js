@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import apiClient from '../api/apiClient';
 import { getCallIceConfig } from '../utils/videoRoomIce';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
+import { shouldBePolitePeer } from '../utils/webrtcNegotiation';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
@@ -724,10 +725,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
             try {
               if (signal.description.type === 'offer' && peer.signalingState !== 'stable') {
                 const active = callRef.current || next;
-                const remoteUid = String(active.callerUid || '') === String(currentUser.uid)
-                  ? active.receiverUid
-                  : active.callerUid;
-                const polite = Boolean(remoteUid) && String(currentUser.uid) > String(remoteUid);
+                const polite = shouldBePolitePeer(currentUser.uid, active.callerUid, active.receiverUid);
                 if (!polite) continue;
                 await peer.setLocalDescription({ type: 'rollback' });
               }
