@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
 
       try {
         if (!firebaseUser) {
+          await removeBrowserPushSubscription();
           setUser(null);
           localStorage.removeItem('authToken');
           lastUid.current = null;
