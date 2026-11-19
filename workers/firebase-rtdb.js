@@ -125,25 +125,27 @@ export async function syncChatRoomMembership(env, roomId, participantUids, activ
     throw new Error("Invalid chat membership update");
   }
   const encodedRoomId = encodeURIComponent(roomId);
-  const operations = active
-    ? [
-        authenticatedDatabaseRequest(
-          env, "/chatParticipants/" + encodedRoomId, "PUT",
-          Object.fromEntries(participantUids.map(uid => [uid, true])), fetchImpl
-        ),
-        ...participantUids.map(uid => authenticatedDatabaseRequest(
-          env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
-          "PUT", true, fetchImpl
-        ))
-      ]
-    : [
-        authenticatedDatabaseRequest(env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl),
-        ...participantUids.map(uid => authenticatedDatabaseRequest(
-          env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
-          "DELETE", undefined, fetchImpl
-        ))
-      ];
-  await Promise.all(operations);
+  if (active) {
+    // Publish the inverse index first. The membership grant is last so a
+    // partially failed index update cannot leave an unrevokable room grant.
+    await Promise.all(participantUids.map(uid => authenticatedDatabaseRequest(
+      env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
+      "PUT", true, fetchImpl
+    )));
+    await authenticatedDatabaseRequest(
+      env, "/chatParticipants/" + encodedRoomId, "PUT",
+      Object.fromEntries(participantUids.map(uid => [uid, true])), fetchImpl
+    );
+  } else {
+    // Remove the actual read grant first, then clean up both inverse indexes.
+    await authenticatedDatabaseRequest(
+      env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl
+    );
+    await Promise.all(participantUids.map(uid => authenticatedDatabaseRequest(
+      env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
+      "DELETE", undefined, fetchImpl
+    )));
+  }
   return true;
 }
 
