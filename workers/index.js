@@ -343,17 +343,66 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
 export { buildWebXPayCheckoutForm };
 
 async function readWebXPayCallback(request) {
-  const raw = await request.text();
-  if (!raw || raw.length > 65536) return null;
-  const contentType = request.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    try { return JSON.parse(raw); } catch { return null; }
+  const maxBytes = 65536;
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) return null;
+
+  const contentType = String(request.headers.get("content-type") || "")
+    .split(";", 1)[0].trim().toLowerCase();
+  if (!["application/json", "application/x-www-form-urlencoded"].includes(contentType)) return null;
+  if (!request.body) return null;
+
+  const reader = request.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) return null;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel("WebXPay callback body exceeds the size limit").catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
+  if (!totalBytes) return null;
+
+  const raw = new TextDecoder("utf-8", { fatal: true }).decode(
+    (() => {
+      const bytes = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return bytes;
+    })()
+  );
+
+  if (contentType === "application/json") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
   const params = new URLSearchParams(raw);
+  const payment = params.getAll("payment");
+  const signature = params.getAll("signature");
+  const customFields = params.getAll("custom_fields");
+  if (payment.length !== 1 || signature.length !== 1 || customFields.length > 1) return null;
   return {
-    payment: params.get("payment"),
-    signature: params.get("signature"),
-    custom_fields: params.get("custom_fields")
+    payment: payment[0],
+    signature: signature[0],
+    custom_fields: customFields[0] ?? null
   };
 }
 
