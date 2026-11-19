@@ -6603,7 +6603,9 @@ export class MongoDBConnection {
         if (phoneSignIn && !account) {
           return json({ error: "Phone sign-in is available only for existing accounts." }, 403);
         }
-        if (account && isAccountRestricted(account)) {
+        // Restricted users may still retrieve their own portable account data.
+        // All other account operations continue to fail closed.
+        if (account && isAccountRestricted(account) && url.pathname !== "/internal/user-data-export") {
           return json({ error: "This account is unavailable." }, 403);
         }
       } catch {
@@ -7113,6 +7115,15 @@ export class MongoDBConnection {
         : body.action === "save"
           ? await this.saveRelationshipPreferences(body.claims.sub, body.payload)
           : await this.deleteRelationshipPreferences(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/user-data-export") {
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body.claims?.sub !== "string" || !body.claims.sub) {
+        return json({ error: "Unauthorized" }, 401);
+      }
+      const result = await this.exportUserData(body.claims.sub);
       return json(result.body, result.status);
     }
 
