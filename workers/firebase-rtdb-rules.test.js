@@ -2,30 +2,50 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("Realtime Database rules deny root access and client writes", async () => {
-  const rules = JSON.parse(await readFile(new URL("../database.rules.json", import.meta.url), "utf8")).rules;
+async function loadRules() {
+  return JSON.parse(
+    await readFile(new URL("../database.rules.json", import.meta.url), "utf8")
+  ).rules;
+}
+
+test("Realtime Database rules default to deny and expose only reviewed paths", async () => {
+  const rules = await loadRules();
   assert.equal(rules[".read"], false);
   assert.equal(rules[".write"], false);
-  assert.equal(rules.chats["$roomId"][".write"], false);
-  assert.equal(rules.chatParticipants[".read"], false);
-  assert.equal(rules.chatParticipants[".write"], false);
-  assert.equal(rules.chatUserRooms[".read"], false);
-  assert.equal(rules.chatUserRooms[".write"], false);
-  assert.equal(rules.notifications["$recipientUid"][".write"], false);
+  assert.deepEqual(
+    Object.keys(rules).sort(),
+    [".read", ".write", "chats", "chatParticipants", "chatUserRooms", "notifications"].sort()
+  );
 });
 
-test("chat reads require authenticated room membership and notifications are recipient-only", async () => {
-  const rules = JSON.parse(await readFile(new URL("../database.rules.json", import.meta.url), "utf8")).rules;
-  assert.match(rules.chats["$roomId"][".read"], /auth != null/);
-  assert.match(rules.chats["$roomId"][".read"], /chatParticipants/);
-  assert.match(rules.chats["$roomId"][".read"], /auth\.uid/);
-  assert.match(rules.chats["$roomId"][".read"], /=== true/);
-  assert.match(rules.notifications["$recipientUid"][".read"], /auth != null/);
-  assert.match(rules.notifications["$recipientUid"][".read"], /auth\.uid === \$recipientUid/);
+test("chat history reads require authenticated room membership", async () => {
+  const rules = await loadRules();
+  const chatRules = rules.chats?.["$roomId"];
+  assert.ok(chatRules);
+  assert.equal(chatRules[".read"],
+    "auth != null && root.child('chatParticipants').child($roomId).child(auth.uid).val() === true");
+  assert.equal(chatRules[".write"], false);
 });
 
+test("chat membership indexes are inaccessible to clients", async () => {
+  const rules = await loadRules();
+  for (const path of ["chatParticipants", "chatUserRooms"]) {
+    assert.equal(rules[path]?.[".read"], false, path + " must not be client-readable");
+    assert.equal(rules[path]?.[".write"], false, path + " must not be client-writable");
+  }
+});
 
-test("Firebase CLI configuration deploys the reviewed Realtime Database rules file", async () => {
-  const config = JSON.parse(await readFile(new URL("../firebase.json", import.meta.url), "utf8"));
+test("notifications are recipient-readable only and cannot be client-written", async () => {
+  const rules = await loadRules();
+  const notificationRules = rules.notifications?.["$recipientUid"];
+  assert.ok(notificationRules);
+  assert.equal(notificationRules[".read"], "auth != null && auth.uid === $recipientUid");
+  assert.equal(notificationRules[".write"], false);
+});
+
+test("Firebase CLI configuration points to the reviewed Realtime Database rules file", async () => {
+  const config = JSON.parse(
+    await readFile(new URL("../firebase.json", import.meta.url), "utf8")
+  );
   assert.equal(config.database?.rules, "database.rules.json");
 });
