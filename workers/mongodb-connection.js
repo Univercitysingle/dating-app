@@ -3990,7 +3990,7 @@ export class MongoDBConnection {
       if (update.name !== undefined && (typeof update.name !== "string" || update.name.length > 160)) return { status: 400, body: { message: "Invalid name" } };
       if (update.bio !== undefined && (typeof update.bio !== "string" || update.bio.length > 5000)) return { status: 400, body: { message: "Invalid bio" } };
       if (update.isProfileVisible !== undefined && typeof update.isProfileVisible !== "boolean") return { status: 400, body: { message: "Invalid profile visibility" } };
-      if (update.isProfileVisible === true && (
+      if (update.isProfileVisible === true && !(lifecycleRequested && payload.accountStatus === "active") && (
         target.accountStatus === "temporarily_suspended" ||
         target.accountStatus === "permanently_banned" ||
         (target.suspendedUntil && new Date(target.suspendedUntil) > new Date())
@@ -4442,8 +4442,7 @@ export class MongoDBConnection {
         if (targetUid && (realtimeConfigured || this.env.ENABLE_FIREBASE_REALTIME_SYNC === "true")) {
           let chatRevocation;
           try {
-            const { revokeAllChatMembershipsForUser } = await import("./firebase-rtdb.js");
-            chatRevocation = await revokeAllChatMembershipsForUser(this.env, targetUid);
+            chatRevocation = await revokeFirebaseChatMemberships(this.env, targetUid, db);
           } catch {
             await db.collection("users").updateOne(
               { _id: targetId, accountStatus: "deletion_pending" },
