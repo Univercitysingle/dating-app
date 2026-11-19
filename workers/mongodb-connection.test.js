@@ -1386,11 +1386,13 @@ test("unmatching ends the active match without blocking either participant", asy
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({ collection(name) {
-    assert.equal(name, "matches");
-    return matches;
+    if (name === "matches") return matches;
+    if (name === "chatmessages") return { async findOne() { return { roomId: "a-user-z-user" }; } };
+    assert.fail("Unexpected collection: " + name);
   } });
   const result = await connection.unmatchUsers("z-user", "a-user");
   assert.equal(result.status, 200);
+  assert.equal(result.body.roomId, "a-user-z-user");
   assert.deepEqual(capturedFilter, { user1Uid: "a-user", user2Uid: "z-user", status: "matched" });
   assert.equal(capturedUpdate.$set.status, "unmatched");
   assert.equal(capturedUpdate.$set.unmatchedBy, "z-user");
@@ -1401,7 +1403,10 @@ test("unmatching ends the active match without blocking either participant", asy
 test("unmatch rejects self-targeting and missing active matches", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
-  connection.getDatabase = () => ({ collection() { return { async updateOne() { return { matchedCount: 0 }; } }; } });
+  connection.getDatabase = () => ({ collection(name) {
+    if (name === "chatmessages") return { async findOne() { return null; } };
+    return { async updateOne() { return { matchedCount: 0 }; } };
+  } });
   assert.equal((await connection.unmatchUsers("same", "same")).status, 400);
   assert.equal((await connection.unmatchUsers("viewer", "other")).status, 404);
 });
@@ -1421,6 +1426,7 @@ test("blocking unmatches the pair and unblocking removes only the block entry", 
   connection.getDatabase = () => ({ collection(name) {
     if (name === "users") return users;
     if (name === "matches") return matches;
+    if (name === "chatmessages") return { async findOne() { return { roomId: "user-a-user-b" }; } };
     assert.fail("Unexpected collection: " + name);
   } });
 
