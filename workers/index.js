@@ -2013,6 +2013,7 @@ export default {
       url.pathname === "/api/admin/users/stats" ||
       (url.pathname.startsWith("/api/admin/users/") && /^[a-fA-F0-9]{24}$/.test(url.pathname.split("/").pop())) ||
       url.pathname === "/api/admin/transactions" ||
+      url.pathname === "/api/admin/payment-reconciliation" ||
       url.pathname === "/api/admin/analytics/summary" ||
       url.pathname === "/api/admin/analytics/export" ||
       url.pathname === "/api/admin/payment-logs" ||
@@ -2035,6 +2036,8 @@ export default {
           internalPath = "/internal/admin/stats";
         } else if (url.pathname === "/api/admin/transactions") {
           internalPath = "/internal/admin/transactions";
+        } else if (url.pathname === "/api/admin/payment-reconciliation") {
+          internalPath = "/internal/admin/payment-reconciliation";
         } else if (url.pathname === "/api/admin/analytics/summary" || url.pathname === "/api/admin/analytics/export") {
           internalPath = "/internal/admin/analytics";
           body.params = Object.fromEntries(url.searchParams.entries());
