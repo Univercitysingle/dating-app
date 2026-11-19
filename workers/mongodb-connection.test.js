@@ -5734,3 +5734,92 @@ test("replayed successful WebXPay callback cannot grant a purchase entitlement t
   assert.equal(userUpdates, 0);
   assert.equal(purchase.status, "completed");
 });
+
+
+test("account data export is scoped to the authenticated user and excludes secrets and internal support notes", async () => {
+  const { ObjectId } = await import("mongodb");
+  const userId = new ObjectId("abcdef0123456789abcdef01");
+  const ticketId = new ObjectId("abcdef0123456789abcdef02");
+  const observed = [];
+  const cursor = records => ({
+    sort() { return this; },
+    limit() { return this; },
+    maxTimeMS() { return this; },
+    async toArray() { return records; }
+  });
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        findOne: async query => {
+          assert.deepEqual(query, { uid: "export-owner" });
+          return {
+            _id: userId, uid: "export-owner", name: "Account Owner",
+            email: "owner@example.test", password: "must-not-export",
+            lastLoginIp: "192.0.2.1", refreshToken: "must-not-export",
+            photoVerificationEvidence: { selfie: "must-not-export" },
+            birthday: new Date("1990-01-01T00:00:00.000Z")
+          };
+        }
+      };
+      if (name === "matches") return {
+        find: query => { observed.push({ name, query }); return cursor([{ user1Uid: "export-owner", user2Uid: "peer", status: "matched" }]); }
+      };
+      if (name === "chatmessages") return {
+        find: query => { observed.push({ name, query }); return cursor([
+          { roomId: "export-owner-peer", senderUid: "export-owner", receiverUid: "peer", messageContent: "Hello", timestamp: new Date("2026-01-01T00:00:00.000Z") }
+        ]); }
+      };
+      if (name === "purchases" || name === "subscriptions" || name === "supporttickets") return {
+        find: (query, options) => {
+          observed.push({ name, query, options });
+          return cursor(name === "supporttickets" ? [{ _id: ticketId, userId, subject: "Help", status: "open" }] : [{ userId, status: "completed", paymentReference: "reference", providerSecret: "must-not-export" }]);
+        }
+      };
+      if (name === "ticketmessages") return {
+        find: query => {
+          observed.push({ name, query });
+          return cursor([{ ticketId, message: "Customer-visible reply", isInternalNote: false }]);
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.exportUserData("export-owner");
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.account.name, "Account Owner");
+  assert.equal(result.body.account.email, "owner@example.test");
+  assert.equal(result.body.account.password, undefined);
+  assert.equal(result.body.account.lastLoginIp, undefined);
+  assert.equal(result.body.account.refreshToken, undefined);
+  assert.equal(result.body.account.photoVerificationEvidence, undefined);
+  assert.equal(result.body.data.matches.length, 1);
+  assert.equal(result.body.data.conversations[0].messageContent, "Hello");
+  assert.equal(result.body.data.purchases[0].providerSecret, undefined);
+  assert.equal(result.body.data.supportTicketMessages[0].message, "Customer-visible reply");
+  assert.equal(result.body.limits.perCollectionMaximum, 1000);
+  assert.ok(observed.some(item => item.name === "matches" && JSON.stringify(item.query).includes("export-owner")));
+  assert.ok(observed.some(item => item.name === "chatmessages" && JSON.stringify(item.query).includes("export-owner")));
+  const ticketMessageQuery = observed.find(item => item.name === "ticketmessages").query;
+  assert.equal(ticketMessageQuery.isInternalNote.$ne, true);
+  assert.ok(result.body.exclusions.includes("Internal support-ticket notes"));
+});
+
+test("account data export rejects invalid identity and reports database failures without leaking details", async () => {
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection() {
+      return { findOne: async () => { throw new Error("private database diagnostic"); } };
+    }
+  });
+  assert.equal((await connection.exportUserData("")).status, 400);
+  const failed = await connection.exportUserData("export-owner");
+  assert.equal(failed.status, 503);
+  assert.equal(failed.body.error, "User data export is temporarily unavailable.");
+  assert.equal(JSON.stringify(failed.body).includes("private database diagnostic"), false);
+});
