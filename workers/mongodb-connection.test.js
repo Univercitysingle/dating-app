@@ -5689,3 +5689,48 @@ test("unmatch retry does not treat a missing or pending match as already complet
     assert.equal(result.body.roomId, undefined);
   }
 });
+
+
+test("replayed successful WebXPay callback cannot grant a purchase entitlement twice", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "2123456789abcdef01234567";
+  const purchase = {
+    _id: new ObjectId(orderId),
+    userId: new ObjectId("abcdef0123456789abcdef01"),
+    itemId: "profile-boost-1",
+    status: "completed",
+    paymentReference: "provider-reference"
+  };
+  let purchaseUpdates = 0;
+  let userUpdates = 0;
+  const purchases = {
+    findOne: async () => purchase,
+    updateOne: async () => { purchaseUpdates += 1; return { modifiedCount: 1 }; }
+  };
+  const subscriptions = {
+    findOne: async () => { assert.fail("Completed purchase must not be looked up as a subscription"); }
+  };
+  const users = {
+    updateOne: async () => { userUpdates += 1; return { matchedCount: 1 }; }
+  };
+  const db = {
+    collection(name) {
+      if (name === "purchases") return purchases;
+      if (name === "subscriptions") return subscriptions;
+      if (name === "users") return users;
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const session = { async withTransaction(callback) { return callback(); }, async endSession() {} };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+
+  const result = await connection.settleWebXPay(orderId, "00", "provider-reference", { gatewayId: "gateway-transaction-1" });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.message, "Payment already processed.");
+  assert.equal(purchaseUpdates, 0);
+  assert.equal(userUpdates, 0);
+  assert.equal(purchase.status, "completed");
+});
