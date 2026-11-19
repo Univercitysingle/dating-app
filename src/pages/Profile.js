@@ -250,14 +250,14 @@ function Profile() {
 
   const handleSaveAll = async () => {
       const logger = console;
-      if (mobileNationalNumber.replace(/\D/g, '').length < 6 || mobileNationalNumber.replace(/\D/g, '').length > 14) {
-          toast.error('Mobile number is required.');
+      const mobileDigits = mobileNationalNumber.replace(/\D/g, '');
+      if (mobileDigits.length > 0 && (mobileDigits.length < 6 || mobileDigits.length > 14)) {
+          toast.error('Enter a valid mobile number or leave it unchanged.');
           return;
       }
       setSaveStatus('Saving...');
       try {
-          const mobileNumber = `${mobileCountryCode}${mobileNationalNumber.replace(/\D/g, '')}`;
-          const { birthday: draftBirthday, ...profileUpdates } = editableFields;
+          const { birthday: draftBirthday, mobileNumber: _storedMobileNumber, ...profileUpdates } = editableFields;
           const birthdayUpdate = !profile.birthday && draftBirthday ? { birthday: draftBirthday } : {};
           if (birthdayUpdate.birthday) {
               const birthDate = new Date(`${birthdayUpdate.birthday}T00:00:00`);
@@ -271,7 +271,13 @@ function Profile() {
                   return;
               }
           }
-          const updatedProfile = await apiClient.put('/users/me', { ...profileUpdates, ...birthdayUpdate, mobileNumber });
+          const updatePayload = { ...profileUpdates, ...birthdayUpdate };
+          // A missing legacy phone number must not block the one-time DOB recovery
+          // required for age-gated features. Omit it unless the user entered a value.
+          if (mobileDigits.length > 0) {
+              updatePayload.mobileNumber = `${mobileCountryCode}${mobileDigits}`;
+          }
+          const updatedProfile = await apiClient.put('/users/me', updatePayload);
           setProfile(updatedProfile);
           setUser(updatedProfile); // Update global user state
           toast.success('Profile saved successfully!');
