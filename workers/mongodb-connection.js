@@ -4671,65 +4671,6 @@ export class MongoDBConnection {
     }
   }
 
-  async moderateAdminPurchase(uid, purchaseId, action, reason = "") {
-    const access = await this.requireAdmin(uid);
-    if (access.status !== 200) return access;
-    if (typeof purchaseId !== "string" || !/^[a-fA-F0-9]{24}$/.test(purchaseId)) return { status: 400, body: { message: "Invalid purchase ID" } };
-    if (!["approve", "reject"].includes(action)) return { status: 400, body: { message: "Invalid purchase action" } };
-    if (action === "reject" && (typeof reason !== "string" || !reason.trim() || reason.length > 1000)) {
-      return { status: 400, body: { message: "A rejection reason is required (maximum 1000 characters)" } };
-    }
-    let outcome = { status: 500, body: { message: "Purchase moderation failed" } };
-    let session;
-    try {
-      const client = await this.getClient();
-      const { ObjectId } = await import("mongodb");
-      session = client.startSession();
-      await session.withTransaction(async () => {
-        const db = this.getDatabase(client);
-        const purchases = db.collection("purchases");
-        const purchase = await purchases.findOne({ _id: new ObjectId(purchaseId) }, { session });
-        if (!purchase || purchase.status !== "pending") {
-          outcome = { status: 404, body: { message: "Pending purchase not found" } };
-          return;
-        }
-        const user = await db.collection("users").findOne({ _id: purchase.userId }, { session, projection: { _id: 1 } });
-        if (!user) {
-          outcome = { status: 409, body: { message: "Purchase owner no longer exists" } };
-          throw new Error("ABORT_PURCHASE_TRANSACTION");
-        }
-        const now = new Date();
-        const purchaseUpdate = action === "approve"
-          ? { $set: { status: "completed", updatedAt: now } }
-          : { $set: { status: "rejected", rejectionReason: reason.trim(), updatedAt: now } };
-        const changed = await purchases.updateOne({ _id: purchase._id, status: "pending" }, purchaseUpdate, { session });
-        if (!changed.modifiedCount) {
-          outcome = { status: 409, body: { message: "Purchase was already processed" } };
-          throw new Error("ABORT_PURCHASE_TRANSACTION");
-        }
-        if (action === "approve") {
-          const userUpdate = {};
-          if (purchase.itemId === "super-like-5") userUpdate.$inc = { purchasedSuperLikes: 5 };
-          else if (purchase.itemId === "undo-swipes-5") userUpdate.$inc = { purchasedUndoSwipes: 5 };
-          else if (purchase.itemId === "profile-boost-1") userUpdate.$set = { boostExpiresAt: new Date(now.getTime() + 60 * 60 * 1000) };
-          if (Object.keys(userUpdate).length) {
-            userUpdate.$set = { ...(userUpdate.$set || {}), updatedAt: now };
-            await db.collection("users").updateOne({ _id: purchase.userId }, userUpdate, { session });
-          }
-          outcome = { status: 200, body: { message: "Purchase approved successfully" } };
-        } else {
-          outcome = { status: 200, body: { message: "Purchase rejected successfully" } };
-        }
-      });
-      return outcome;
-    } catch (error) {
-      if (outcome.status === 409) return outcome;
-      return { status: 503, body: { message: "Purchase moderation unavailable; transaction was not confirmed" } };
-    } finally {
-      if (session) await session.endSession().catch(() => {});
-    }
-  }
-
   async recordAdminRefund(uid, transactionId, transactionType, refundReference, note = "") {
     const access = await this.requireAdmin(uid, true);
     if (access.status !== 200) return access;
@@ -6870,7 +6811,7 @@ export class MongoDBConnection {
       else if (url.pathname === "/internal/admin/purchase-action") {
         result = body.action === "record-refund"
           ? await this.recordAdminRefund(body.claims.sub, body.purchaseId, body.transactionType, body.refundReference, body.note || "")
-          : await this.moderateAdminPurchase(body.claims.sub, body.purchaseId, body.action, body.reason || "");
+          : { status: 404, body: { message: "Unsupported payment action" } };
       }
       else result = await this.getAdminAnalyticsSummary(body.claims.sub, body.params || {});
       return json(result.body, result.status);
