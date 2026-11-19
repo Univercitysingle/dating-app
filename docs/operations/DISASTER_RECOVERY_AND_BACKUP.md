@@ -53,52 +53,87 @@ Never store secrets in backups or this document in plaintext. Secret recovery mu
 
 ## Operator procedure: isolated recovery drill
 
-The following commands are templates for an operator with approved provider access. Use a dedicated encrypted backup location and a separate restore project/database. Do not run restore commands against production.
+The following commands are templates for an operator with approved provider access. They require the age encryption tool (https://age-encryption.org/) and an approved recipient/identity. Use a dedicated encrypted backup location and a separate restore project/database. Do not run restore commands against production.
+
+Set an age recipient public key for backup creation and retain the corresponding private identity in the approved secret manager. Do not put the private identity in the repository, shell history, or backup directory. Use Bash with `set -o pipefail` so a failed export cannot be mistaken for a successful encrypted backup.
 
 ### MongoDB Atlas
 
-Create a compressed logical backup of the application database:
+Create a compressed, encrypted logical backup. The pipeline encrypts the dump before it reaches the destination:
 
 ```bash
+set -euo pipefail
 : "${MONGODB_URI:?Set the source Atlas connection string}"
 : "${BACKUP_FILE:?Set an encrypted backup destination}"
-mongodump --uri="$MONGODB_URI" --db=test --archive="$BACKUP_FILE" --gzip
+: "${AGE_RECIPIENT:?Set the approved age recipient public key}"
+mongodump --uri="$MONGODB_URI" --db=test --archive --gzip \
+  | age -r "$AGE_RECIPIENT" -o "$BACKUP_FILE"
+sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
 ```
 
 Restore into an isolated database namespace, not the production `test` namespace:
 
 ```bash
+set -euo pipefail
 : "${RESTORE_MONGODB_URI:?Set an isolated Atlas restore connection string}"
-: "${BACKUP_FILE:?Set the backup archive path}"
-mongorestore --uri="$RESTORE_MONGODB_URI" --archive="$BACKUP_FILE" --gzip \
-  --nsFrom='test.*' --nsTo='test_restore.*'
+: "${BACKUP_FILE:?Set the encrypted backup archive path}"
+: "${AGE_IDENTITY_FILE:?Set the protected age private identity file}"
+sha256sum -c "$BACKUP_FILE.sha256"
+age -d -i "$AGE_IDENTITY_FILE" "$BACKUP_FILE" \
+  | mongorestore --uri="$RESTORE_MONGODB_URI" --archive --gzip \
+      --nsFrom='test.*' --nsTo='test_restore.*'
 ```
 
 After restore, compare collection counts and index definitions against the source inventory. Run application read-only smoke tests against the isolated database. Do not switch the Worker secret to the restored database until the owner approves the drill.
 
 ### Firebase Realtime Database and Authentication
 
-Export RTDB data and rules separately:
+Export RTDB data as an encrypted stream. Do not redirect the raw JSON export to a persistent plaintext file:
 
 ```bash
-firebase database:get / --project "$FIREBASE_PROJECT_ID" > rtdb-backup.json
-cp database.rules.json database.rules.backup.json
+set -euo pipefail
+: "${FIREBASE_PROJECT_ID:?Set the source Firebase project ID}"
+: "${BACKUP_FILE:?Set an encrypted backup destination}"
+: "${AGE_RECIPIENT:?Set the approved age recipient public key}"
+firebase database:get / --project "$FIREBASE_PROJECT_ID" \
+  | age -r "$AGE_RECIPIENT" -o "$BACKUP_FILE"
+sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
 ```
 
-Restore only into a dedicated Firebase recovery project:
+Restore only into a dedicated Firebase recovery project. The temporary plaintext file is created with owner-only permissions and removed on exit:
 
 ```bash
-firebase database:set / rtdb-backup.json --project "$FIREBASE_RESTORE_PROJECT_ID"
+set -euo pipefail
+: "${FIREBASE_RESTORE_PROJECT_ID:?Set the dedicated recovery project ID}"
+: "${BACKUP_FILE:?Set the encrypted RTDB backup path}"
+: "${AGE_IDENTITY_FILE:?Set the protected age private identity file}"
+sha256sum -c "$BACKUP_FILE.sha256"
+umask 077
+RESTORE_FILE="$(mktemp)"
+trap 'rm -f "$RESTORE_FILE"' EXIT
+age -d -i "$AGE_IDENTITY_FILE" "$BACKUP_FILE" > "$RESTORE_FILE"
+firebase database:set / "$RESTORE_FILE" --project "$FIREBASE_RESTORE_PROJECT_ID"
 firebase deploy --only database --project "$FIREBASE_RESTORE_PROJECT_ID"
 ```
 
-Export Firebase Authentication users using an approved secure location:
+Export Firebase Authentication users to a protected temporary file, encrypt it, and remove the plaintext temporary file:
 
 ```bash
-firebase auth:export auth-users.json --project "$FIREBASE_PROJECT_ID" --format=json
+set -euo pipefail
+: "${FIREBASE_PROJECT_ID:?Set the source Firebase project ID}"
+: "${BACKUP_FILE:?Set an encrypted backup destination}"
+: "${AGE_RECIPIENT:?Set the approved age recipient public key}"
+umask 077
+AUTH_EXPORT="$(mktemp)"
+trap 'rm -f "$AUTH_EXPORT"' EXIT
+firebase auth:export "$AUTH_EXPORT" --project "$FIREBASE_PROJECT_ID" --format=json
+age -r "$AGE_RECIPIENT" -o "$BACKUP_FILE" "$AUTH_EXPORT"
+sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
 ```
 
 Authentication exports contain sensitive identity data. Encrypt them, restrict access, record export time, and validate password-hash import requirements before attempting any import. Never use a production identity export as test data.
+
+The rules source file is not a substitute for a rules export from the live Firebase project. Preserve the reviewed source file and separately capture the deployed rules/configuration revision as evidence. Do not deploy rules to production as part of a backup test.
 
 ### Cloudflare and secrets
 
