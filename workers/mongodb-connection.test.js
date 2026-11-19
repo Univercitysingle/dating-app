@@ -3404,7 +3404,7 @@ test("completed profiles cannot replace photos through the generic profile updat
   });
 
   assert.equal(result.status, 200);
-  assert.equal(Object.hasOwn(capturedUpdate.$set, "photos"), false);
+  assert.equal(capturedUpdate, undefined, "ignored photo replacements must not trigger an empty database write");
 });
 
 
