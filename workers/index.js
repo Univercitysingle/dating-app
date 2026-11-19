@@ -1009,6 +1009,41 @@ export default {
       }
     }
 
+    if (url.pathname === "/api/users/me/export") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
+      if (!env.MONGODB_CONNECTION) return json({ error: "Data export service unavailable" }, 503);
+      try {
+        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        const limited = await enforceAccountRateLimit(
+          env, "user-data-export", claims.sub, 1, 24 * 60 * 60 * 1000,
+          "You can request one account data export every 24 hours."
+        );
+        if (limited) return limited;
+        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
+        const connection = env.MONGODB_CONNECTION.get(id);
+        const response = await connection.fetch("https://internal.invalid/internal/user-data-export", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ claims })
+        });
+        const body = await response.json().catch(() => ({ error: "Data export service unavailable" }));
+        if (!response.ok) return json(body, response.status);
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: {
+            ...JSON_HEADERS,
+            "content-disposition": 'attachment; filename="dating-app-account-data.json"',
+            "content-type": "application/json; charset=utf-8"
+          }
+        });
+      } catch (error) {
+        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
+        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
+        return json({ error: "Data export service unavailable" }, 503);
+      }
+    }
+
     if (url.pathname === "/api/users/me") {
       if (request.method !== "GET" && request.method !== "PUT") return json({ error: "Method not allowed" }, 405);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
