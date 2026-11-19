@@ -128,10 +128,12 @@ export async function syncChatRoomMembership(env, roomId, participantUids, activ
   if (active) {
     // Publish the inverse index first. The membership grant is last so a
     // partially failed index update cannot leave an unrevokable room grant.
-    await Promise.all(participantUids.map(uid => authenticatedDatabaseRequest(
-      env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
-      "PUT", true, fetchImpl
-    )));
+    for (const uid of participantUids) {
+      await authenticatedDatabaseRequest(
+        env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
+        "PUT", true, fetchImpl
+      );
+    }
     await authenticatedDatabaseRequest(
       env, "/chatParticipants/" + encodedRoomId, "PUT",
       Object.fromEntries(participantUids.map(uid => [uid, true])), fetchImpl
@@ -141,10 +143,12 @@ export async function syncChatRoomMembership(env, roomId, participantUids, activ
     await authenticatedDatabaseRequest(
       env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl
     );
-    await Promise.all(participantUids.map(uid => authenticatedDatabaseRequest(
-      env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
-      "DELETE", undefined, fetchImpl
-    )));
+    for (const uid of participantUids) {
+      await authenticatedDatabaseRequest(
+        env, "/chatUserRooms/" + encodeURIComponent(uid) + "/" + encodedRoomId,
+        "DELETE", undefined, fetchImpl
+      );
+    }
   }
   return true;
 }
@@ -191,16 +195,16 @@ export async function revokeAllChatMembershipsForUser(env, uid, fetchImpl = fetc
           participants[participantUid] === true && /^[A-Za-z0-9_-]{1,128}$/.test(participantUid)
         )
       : [uid];
-    await Promise.all([
-      authenticatedDatabaseRequest(env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl),
-      ...Array.from(new Set([...participantUids, uid]), participantUid =>
-        authenticatedDatabaseRequest(
-          env,
-          "/chatUserRooms/" + encodeURIComponent(participantUid) + "/" + encodedRoomId,
-          "DELETE", undefined, fetchImpl
-        )
-      )
-    ]);
+    await authenticatedDatabaseRequest(
+      env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl
+    );
+    for (const participantUid of new Set([...participantUids, uid])) {
+      await authenticatedDatabaseRequest(
+        env,
+        "/chatUserRooms/" + encodeURIComponent(participantUid) + "/" + encodedRoomId,
+        "DELETE", undefined, fetchImpl
+      );
+    }
     revoked += 1;
   }
   return { revoked };
