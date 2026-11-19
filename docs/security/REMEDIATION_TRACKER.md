@@ -1,6 +1,6 @@
 # Security Remediation Tracker
 
-**Last reviewed:** 2026-11-18  
+**Last reviewed:** 2026-11-19  
 **Branch:** `migrate-to-serverless`  
 **Status:** Working remediation register. This is not a fresh penetration test or security certification.
 
@@ -15,6 +15,7 @@ Track each finding from reproducible evidence through a code/configuration fix, 
 | Critical gate | Firebase Realtime Database | Verify deployed RTDB rules and project IAM. Test unauthenticated access, non-member reads/writes, blocked/unmatched users, stale membership and cross-user notification access. Keep direct browser realtime sync disabled until negative tests pass. | Open, external console evidence required |
 | High | Email verification and phone authentication | Keep the central verified-email gate for email-based accounts; permit Firebase phone-provider tokens only when the UID already has a provisioned profile. Reject phone-only identities without an existing profile. Validate provider claims and account restrictions. | Worker test suite passed and source deployed to staging in run 44255109535; real phone-account journey still pending |\n| High | Authentication and authorization | Run two-user and admin/ordinary-user IDOR, role escalation, token expiry/revocation and resource ownership tests against staging. | Regression coverage exists; staging evidence pending |
 | High | Payment callbacks | Verify provider signature, order/amount/currency binding, replay/idempotency, duplicate callbacks, failed checkout recovery and entitlement revocation with provider sandbox evidence. | Partial, provider acceptance pending |
+| High | Payment reconciliation | Use the superadmin-only read-only reconciliation report to identify stale pending records, partial gateway metadata, refund review items and duplicate references. Match findings against WebXPay merchant/provider records before taking action. | Local MongoDB report deployed to staging; provider status is not queried and no automatic entitlement or refund action is performed |
 | High | Media access | Validate upload/read/delete ownership and support attachment access through the existing CDN proxy. Do not modify the CDN Worker under this tracker. | Staging acceptance pending |
 | High | Moderation | Verify report, block, unmatch, ticket-message edit/delete permissions, admin audit history and abuse/rate-limit enforcement. | Implementation and role-specific acceptance require confirmation |
 | High | Verification evidence | Verify encryption-key availability without revealing its value, reviewer-only access, audit trail, expiry, deletion, backup retention and consent withdrawal. | Operational/privacy review pending |
@@ -221,3 +222,11 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Pages run finalization:** At the time of this update, only the non-blocking OWASP ZAP passive baseline step remained in progress. The Pages deployment and application verification steps were already successful. Confirm the final run conclusion separately.
 - **Scope:** Staging only. No changes to `main`, production, MongoDB data, Firebase chat, payment credentials, or CDN Worker.
 - **Outstanding external integration:** The Vercel status context continues to fail on branch commits. The GitHub Actions workflow cleanup does not disconnect this repository's Vercel GitHub integration. Disconnect/disable it in the Vercel project/account and verify the Vercel status context stops appearing.
+
+
+## Staging deployment evidence update (2026-11-19)
+
+- **Worker deployment:** Run [44593922179](https://github.com/Univercitysingle/dating-app/actions/runs/44593922179) completed successfully on branch `migrate-to-serverless`, source SHA `8e1b975117ca37ffbfc4672240c231990fbad222`. The run included Worker regression tests, staging liveness/readiness checks, protected-route anonymous rejection checks, route inventory and OWASP ZAP passive baseline.
+- **Pages deployment:** Run [44596670894](https://github.com/Univercitysingle/dating-app/actions/runs/44596670894) completed successfully on branch `migrate-to-serverless`, source SHA `e5a05beffba4c818197bf80472788178c9da36fc`. The run included dependency security checks, backend/frontend regression tests, build, Pages deployment, deployed endpoint checks and OWASP ZAP passive baseline.
+- **Payment reconciliation:** The superadmin-only report is read-only and evaluates local MongoDB records. It does not query WebXPay, verify provider settlement, issue refunds or change entitlements. Merchant/provider reconciliation remains an external release gate.
+- **Environment boundary:** These are staging deployments only. They do not establish production acceptance, Firebase RTDB rule deployment, real-device call acceptance, isolated restore evidence or 1,000-user capacity.
