@@ -111,7 +111,11 @@ const AdminUserListPage = () => {
 
   const handleAccountRestriction = async (user) => {
     if (!user?._id || user.role !== 'user') return;
-    const isRestricted = ['temporarily_suspended', 'permanently_banned', 'deletion_pending', 'deleted'].includes(user.accountStatus);
+    if (['deletion_pending', 'deleted'].includes(user.accountStatus)) {
+      alert('Accounts in deletion processing or already deleted cannot be restored from this screen.');
+      return;
+    }
+    const isRestricted = ['temporarily_suspended', 'permanently_banned'].includes(user.accountStatus);
     if (isRestricted) {
       if (user.accountStatus === 'permanently_banned' && adminUser?.role !== 'superadmin') {
         alert('Only a superadmin can restore a permanently banned account.');
@@ -253,8 +257,11 @@ const AdminUserListPage = () => {
                     <button type="button" onClick={() => navigate(`/admin/users/${user._id}/edit`)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700">Edit</button>
                     <button type="button" onClick={() => handleChat(user.uid)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Chat</button>
                     <button type="button" onClick={() => handleToggleVisibility(user._id, user.isProfileVisible)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">{user.isProfileVisible ? 'Hide' : 'Show'}</button>
-                    {user.role === 'user' && <button type="button" onClick={() => handleAccountRestriction(user)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${['temporarily_suspended', 'permanently_banned', 'deletion_pending', 'deleted'].includes(user.accountStatus) ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-amber-200 text-amber-700 hover:bg-amber-50'}`}>{['temporarily_suspended', 'permanently_banned', 'deletion_pending', 'deleted'].includes(user.accountStatus) ? 'Restore' : 'Suspend'}</button>}
-                    {user.role === 'user' && <button type="button" onClick={() => handlePermanentBan(user)} className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">Ban</button>}
+                    {user.role === 'user' && !['deletion_pending', 'deleted'].includes(user.accountStatus) &&
+                      !(user.accountStatus === 'permanently_banned' && adminUser?.role !== 'superadmin') &&
+                      <button type="button" onClick={() => handleAccountRestriction(user)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${['temporarily_suspended', 'permanently_banned'].includes(user.accountStatus) ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-amber-200 text-amber-700 hover:bg-amber-50'}`}>{['temporarily_suspended', 'permanently_banned'].includes(user.accountStatus) ? 'Restore' : 'Suspend'}</button>}
+                    {user.role === 'user' && user.accountStatus !== 'permanently_banned' && !['deletion_pending', 'deleted'].includes(user.accountStatus) &&
+                      <button type="button" onClick={() => handlePermanentBan(user)} className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">Ban</button>}
                     {adminUser?.role === 'superadmin' && user.role === 'user' && <button type="button" onClick={() => handleRoleChange(user._id, 'admin')} className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Promote</button>}
                     {adminUser?.role === 'superadmin' && user.role === 'admin' && <button type="button" onClick={() => handleRoleChange(user._id, 'user')} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Demote</button>}
                     <button type="button" onClick={() => navigate(`/admin/reports?reportedUserUid=${user.uid}`)} className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50">Reports</button>
