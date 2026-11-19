@@ -114,11 +114,35 @@ export async function syncChatMessageToRtdb(env, message, fetchImpl = fetch) {
     receiverUid: message.receiverUid,
     messageContent: message.messageContent,
     timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : message.timestamp,
+    ...(typeof message.status === "string" ? { status: message.status } : {}),
+    ...(message.deliveredAt ? { deliveredAt: message.deliveredAt instanceof Date ? message.deliveredAt.toISOString() : message.deliveredAt } : {}),
+    ...(message.readAt ? { readAt: message.readAt instanceof Date ? message.readAt.toISOString() : message.readAt } : {}),
     ...(message.editedAt ? { editedAt: message.editedAt instanceof Date ? message.editedAt.toISOString() : message.editedAt } : {}),
     ...(message.editedByUid ? { editedByUid: message.editedByUid } : {}),
     ...(message.deletedAt ? { deletedAt: message.deletedAt instanceof Date ? message.deletedAt.toISOString() : message.deletedAt } : {}),
     ...(message.deletedByUid ? { deletedByUid: message.deletedByUid } : {})
   }, fetchImpl);
+}
+
+export async function syncChatMessageStatusToRtdb(env, roomId, messageIds, status, fetchImpl = fetch) {
+  if (typeof roomId !== "string" || roomId.length < 3 || roomId.length > 260 ||
+      !Array.isArray(messageIds) || messageIds.length > 100 ||
+      messageIds.some(id => typeof id !== "string" || !/^[a-fA-F0-9]{24}$/.test(id)) ||
+      !["delivered", "read"].includes(status)) {
+    throw new Error("Invalid chat message status sync");
+  }
+  const timestamp = new Date().toISOString();
+  const patch = status === "read"
+    ? { status, deliveredAt: timestamp, readAt: timestamp }
+    : { status, deliveredAt: timestamp };
+  await Promise.all(messageIds.map(id => authenticatedDatabaseRequest(
+    env,
+    "/chats/" + encodeURIComponent(roomId) + "/" + encodeURIComponent(id),
+    "PATCH",
+    patch,
+    fetchImpl
+  )));
+  return { synced: messageIds.length, status };
 }
 
 export async function syncChatRoomMembership(env, roomId, participantUids, active, fetchImpl = fetch) {
