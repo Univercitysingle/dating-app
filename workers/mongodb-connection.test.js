@@ -5592,3 +5592,41 @@ test("account anonymization purges browser push subscriptions with biometric evi
   assert.ok(cleanupCalls.some(call => call.name === "photoVerifications" && call.filter.uid === "anonymizing-user"));
   assert.ok(cleanupCalls.some(call => call.name === "pushSubscriptions" && call.filter.uid === "anonymizing-user"));
 });
+
+test("account deletion recognizes both UUID and timestamp generated profile photo keys", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId();
+  const user = {
+    _id: targetId,
+    uid: "photo-owner",
+    photos: [
+      { url: "https://cdn.example.test/photos-photo-owner-550e8400-e29b-41d4-a716-446655440000.webp" },
+      { url: "https://cdn.example.test/photos-photo-owner-1700000000000.jpg" }
+    ]
+  };
+  const users = {
+    async findOne() { return user; },
+    async updateOne() { return { matchedCount: 1 }; }
+  };
+  const tickets = { find() { return { async toArray() { return []; } }; } };
+  const db = {
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "supporttickets") return tickets;
+      throw new Error("Unexpected collection " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getAdminUserDeletionAssets("admin-uid", targetId.toHexString());
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.photoKeys, [
+    "photos-photo-owner-550e8400-e29b-41d4-a716-446655440000.webp",
+    "photos-photo-owner-1700000000000.jpg"
+  ]);
+  assert.equal(result.body.unresolvedAssetCount, 0);
+});
