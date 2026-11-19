@@ -5105,3 +5105,80 @@ test("account deletion retries safely when Firebase chat access revocation fails
   assert.equal(user.accountStatus, "active",
     "the transaction mock does not mutate the original user; the operation is still expected to record the pending status");
 });
+
+
+test("admin can suspend a user with a bounded expiry and hide the profile", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let capturedUpdate;
+  const users = {
+    async findOne() {
+      return {
+        _id: targetId, uid: "suspension-target", role: "user",
+        accountStatus: "active", isProfileVisible: true
+      };
+    },
+    async findOneAndUpdate(_filter, update) {
+      capturedUpdate = update;
+      return { _id: targetId, uid: "suspension-target", accountStatus: "temporarily_suspended" };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) {
+    assert.equal(name, "users");
+    return users;
+  } });
+  const until = new Date(Date.now() + 2 * 86400000).toISOString();
+  const result = await connection.updateAdminUser("admin-uid", targetId.toHexString(), {
+    accountStatus: "temporarily_suspended", suspendedUntil: until
+  });
+  assert.equal(result.status, 200);
+  assert.equal(capturedUpdate.$set.accountStatus, "temporarily_suspended");
+  assert.ok(capturedUpdate.$set.suspendedUntil instanceof Date);
+  assert.equal(capturedUpdate.$set.isProfileVisible, false);
+  assert.equal(capturedUpdate.$set.profileVisibilityBeforeSuspension, true);
+});
+
+test("admin cannot set invalid or expired account suspension dates", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let writes = 0;
+  const users = {
+    async findOne() { return { _id: targetId, uid: "target", role: "user", accountStatus: "active" }; },
+    async findOneAndUpdate() { writes++; return { _id: targetId }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  for (const suspendedUntil of ["not-a-date", new Date(Date.now() - 1000).toISOString(),
+    new Date(Date.now() + 4000 * 86400000).toISOString()]) {
+    const result = await connection.updateAdminUser("admin-uid", targetId.toHexString(), {
+      accountStatus: "temporarily_suspended", suspendedUntil
+    });
+    assert.equal(result.status, 400);
+  }
+  assert.equal(writes, 0);
+});
+
+test("only superadmins can restore a permanently banned account", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let writes = 0;
+  const users = {
+    async findOne() { return { _id: targetId, uid: "target", role: "user", accountStatus: "permanently_banned" }; },
+    async findOneAndUpdate() { writes++; return { _id: targetId }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  const result = await connection.updateAdminUser("admin-uid", targetId.toHexString(), { accountStatus: "active" });
+  assert.equal(result.status, 403);
+  assert.equal(writes, 0);
+});
