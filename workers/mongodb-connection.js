@@ -6421,8 +6421,14 @@ export class MongoDBConnection {
     }
     try {
       const db = this.getDatabase(await this.getClient());
+      const pushSubscriptions = db.collection("pushSubscriptions");
+      const now = Date.now();
+      // Browser subscriptions can expire without sending a final 404/410.
+      // Prune them before selecting delivery targets to avoid repeated failures.
+      await pushSubscriptions.deleteMany({ uid, expirationTime: { $ne: null, $lte: now } });
       const [subscriptions, user] = await Promise.all([
-        db.collection("pushSubscriptions").find({ uid }).sort({ updatedAt: -1 }).limit(10).toArray(),
+        pushSubscriptions.find({ uid, $or: [{ expirationTime: null }, { expirationTime: { $gt: now } }] })
+          .sort({ updatedAt: -1 }).limit(10).toArray(),
         db.collection("users").findOne({ uid }, { projection: { notificationPreferences: 1, _id: 0 } })
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
