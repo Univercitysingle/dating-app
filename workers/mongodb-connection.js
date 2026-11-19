@@ -786,12 +786,21 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const user1Uid = currentUid < targetUid ? currentUid : targetUid;
       const user2Uid = currentUid < targetUid ? targetUid : currentUid;
+      const conversation = await db.collection("chatmessages").findOne({
+        $or: [
+          { senderUid: currentUid, receiverUid: targetUid },
+          { senderUid: targetUid, receiverUid: currentUid }
+        ]
+      }, { projection: { roomId: 1 } });
       const result = await db.collection("matches").updateOne(
         { user1Uid, user2Uid, status: "matched" },
         { $set: { status: "unmatched", unmatchedBy: currentUid, unmatchedAt: new Date(), updatedAt: new Date() }, $unset: { likedBy: "" } }
       );
       if (!result.matchedCount) return { status: 404, body: { error: "An active match with this person was not found." } };
-      return { status: 200, body: { success: true, message: "Match ended successfully." } };
+      return { status: 200, body: {
+        success: true, message: "Match ended successfully.",
+        ...(typeof conversation?.roomId === "string" ? { roomId: conversation.roomId } : {})
+      } };
     } catch {
       return { status: 503, body: { error: "Unable to unmatch this conversation right now." } };
     }
@@ -812,6 +821,12 @@ export class MongoDBConnection {
       if (action === "block") {
         const target = await users.findOne({ uid: targetUid }, { projection: { _id: 1 } });
         if (!target) return { status: 404, body: { error: "User to block not found." } };
+        const conversation = await db.collection("chatmessages").findOne({
+          $or: [
+            { senderUid: currentUid, receiverUid: targetUid },
+            { senderUid: targetUid, receiverUid: currentUid }
+          ]
+        }, { projection: { roomId: 1 } });
         const current = await users.updateOne({ uid: currentUid }, { $addToSet: { blocked: targetUid } });
         if (!current.matchedCount) return { status: 404, body: { error: "Current user not found during update." } };
         const user1Uid = currentUid < targetUid ? currentUid : targetUid;
@@ -820,7 +835,10 @@ export class MongoDBConnection {
           { user1Uid, user2Uid },
           { $set: { status: "unmatched" }, $unset: { likedBy: "" } }
         );
-        return { status: 200, body: { message: "User " + targetUid + " successfully blocked." } };
+        return { status: 200, body: {
+          message: "User " + targetUid + " successfully blocked.",
+          ...(typeof conversation?.roomId === "string" ? { roomId: conversation.roomId } : {})
+        } };
       }
       const current = await users.updateOne({ uid: currentUid }, { $pull: { blocked: targetUid } });
       if (!current.matchedCount) return { status: 404, body: { error: "Current user not found." } };
