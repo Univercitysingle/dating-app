@@ -5469,3 +5469,52 @@ test("admin account management cannot reactivate an account in the deletion life
   assert.equal(result.status, 409);
   assert.equal(writes, 0);
 });
+
+
+test("push subscription storage rejects malformed and expired browser metadata before database access", async () => {
+  let accessed = false;
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection() { accessed = true; return {}; } });
+  const valid = {
+    endpoint: "https://fcm.googleapis.com/fcm/send/token",
+    expirationTime: Date.now() + 60000,
+    keys: { p256dh: "A".repeat(88), auth: "B".repeat(24) }
+  };
+  for (const subscription of [
+    { ...valid, expirationTime: "tomorrow" },
+    { ...valid, expirationTime: Date.now() - 1000 },
+    { ...valid, keys: [] },
+    []
+  ]) {
+    const result = await connection.savePushSubscription("push-user", subscription);
+    assert.equal(result.status, 400);
+  }
+  assert.equal(accessed, false);
+});
+
+test("push subscription storage scopes records to the authenticated UID and persists only normalized fields", async () => {
+  let captured;
+  const collection = {
+    async updateOne(filter, update, options) {
+      captured = { filter, update, options };
+      return { upsertedCount: 1 };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection(name) { assert.equal(name, "pushSubscriptions"); return collection; } });
+  const expirationTime = Date.now() + 60000;
+  const result = await connection.savePushSubscription("push-user", {
+    endpoint: "https://fcm.googleapis.com/fcm/send/token",
+    expirationTime,
+    keys: { p256dh: "A".repeat(88), auth: "B".repeat(24), unexpected: "discard-me" },
+    unexpected: "discard-me"
+  });
+  assert.equal(result.status, 201);
+  assert.deepEqual(captured.filter, { uid: "push-user", endpoint: "https://fcm.googleapis.com/fcm/send/token" });
+  assert.equal(captured.update.$set.uid, "push-user");
+  assert.equal(captured.update.$set.expirationTime, expirationTime);
+  assert.deepEqual(captured.update.$set.keys, { p256dh: "A".repeat(88), auth: "B".repeat(24) });
+  assert.equal(captured.options.upsert, true);
+});
