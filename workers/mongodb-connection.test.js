@@ -5052,3 +5052,56 @@ test("withdrawing relationship discovery consent removes all saved sensitive pre
   assert.ok(update.$set.updatedAt instanceof Date);
   assert.equal(Object.hasOwn(user, "relationshipPreferences"), false);
 });
+
+
+test("account deletion retries safely when Firebase chat access revocation fails", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId();
+  const updates = [];
+  const user = {
+    _id: targetId, uid: "deleting-user", role: "user",
+    accountStatus: "active", deletionRequestedAt: null,
+    firebaseAuthDeletionStatus: null
+  };
+  const users = {
+    findOne: async () => user,
+    updateOne: async (query, update) => { updates.push(update); return { matchedCount: 1 }; }
+  };
+  const collection = name => ({
+    updateMany: async () => ({ matchedCount: 0, modifiedCount: 0 }),
+    deleteOne: async () => ({ deletedCount: 0 }),
+    deleteMany: async () => ({ deletedCount: 0 }),
+    updateOne: async () => ({ matchedCount: 1 })
+  });
+  const db = { collection(name) { return name === "users" ? users : collection(name); } };
+  const client = {
+    startSession() {
+      return {
+        withTransaction: async callback => callback(),
+        endSession: async () => {}
+      };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {
+    FIREBASE_PROJECT_ID: "test-project",
+    FIREBASE_DATABASE_URL: "https://test-project-default-rtdb.firebaseio.com",
+    FIREBASE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      project_id: "test-project",
+      client_email: "firebase-admin@test-project.iam.gserviceaccount.com",
+      private_key: "INVALID PRIVATE KEY"
+    })
+  };
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => client;
+  connection.getDatabase = () => db;
+
+  const result = await connection.deleteAdminUser("admin-uid", targetId.toHexString());
+
+  assert.equal(result.status, 202);
+  assert.equal(result.body.deletionStatus, "deletion_pending");
+  assert.equal(result.body.chatAccessRevocationStatus, "retry_pending");
+  assert.ok(updates.some(update => update.$set?.chatAccessRevocationStatus === "retry_pending"));
+  assert.equal(user.accountStatus, "active",
+    "the transaction mock does not mutate the original user; the operation is still expected to record the pending status");
+});
