@@ -5741,6 +5741,16 @@ export class MongoDBConnection {
           chatMessages.createIndex(
             { receiverUid: 1, roomId: 1, status: 1 },
             { name: "chat_receiver_unread_room_status" }
+          ),
+          // Account suspension/deletion revocation also enumerates legacy rooms
+          // by participant UID. These indexes keep that cleanup bounded.
+          chatMessages.createIndex(
+            { senderUid: 1, roomId: 1 },
+            { name: "chat_sender_room_membership" }
+          ),
+          chatMessages.createIndex(
+            { receiverUid: 1, roomId: 1 },
+            { name: "chat_receiver_room_membership" }
           )
         ]).catch((error) => {
           this.chatConversationIndexesPromise = null;
