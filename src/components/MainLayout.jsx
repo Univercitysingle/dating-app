@@ -20,6 +20,7 @@ const MainLayout = () => {
             <NavLink to="/discover" className={navClass}>Discover</NavLink>
             <NavLink to="/likes" className={navClass}>Likes</NavLink>
             <NavLink to="/conversations" className={navClass}>Messages</NavLink>
+            <NavLink to="/dark-fantasy" className={navClass}>Dark Fantasy</NavLink>
             <NavLink to="/profile" className={navClass}>Profile</NavLink>
             <NavLink to="/store" className={navClass}>Store</NavLink>
           </nav>
