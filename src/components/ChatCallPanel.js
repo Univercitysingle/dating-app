@@ -7,7 +7,7 @@ import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../ut
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
 
-export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
+export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallStateChange }) {
   const firstOtherPhoto = otherUser?.photos?.[0];
   const otherPhotoUrl = typeof firstOtherPhoto === 'string' ? firstOtherPhoto : firstOtherPhoto?.url;
   const otherPhotoSrc = otherPhotoUrl ? resolvePhotoUrl(otherPhotoUrl) : PLACEHOLDER_IMAGE;
@@ -953,6 +953,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser }) {
   const incoming = call && call.receiverUid === currentUser?.uid && call.status === 'ringing';
   const active = call && ['ringing', 'accepted'].includes(call.status);
   const videoCall = call?.type === 'video';
+  useEffect(() => { onCallStateChange?.(Boolean(active)); }, [active, onCallStateChange]);
 
   // A full-screen call must also take ownership of document scrolling.
   // Restore the exact previous inline styles when the call is minimized or ends.
