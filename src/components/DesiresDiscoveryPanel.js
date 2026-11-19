@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 
 const GROUPS = [
@@ -86,6 +87,7 @@ const DesiresDiscoveryPanel = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [requiresAgeVerification, setRequiresAgeVerification] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -103,6 +105,7 @@ const DesiresDiscoveryPanel = () => {
         if (!active) return;
         const serverMessage = loadError?.data?.error || loadError?.data?.message;
         if (loadError?.status === 403) {
+          setRequiresAgeVerification(String(serverMessage || '').includes('Complete adult age verification'));
           setError(serverMessage || 'This feature is unavailable for this account. Check that your profile has a valid adult date of birth and that your account is in good standing.');
         } else {
           setError(serverMessage || 'Desires & Discovery could not be loaded. Please try again.');
@@ -239,7 +242,15 @@ const DesiresDiscoveryPanel = () => {
           for future relationship discovery features. I can withdraw this consent and delete the data at any time.
         </span>
       </label>
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      {error && <div className="space-y-2" role="alert">
+        <p className="text-sm text-red-600">{error}</p>
+        {requiresAgeVerification && (
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">
+            Add your date of birth in your profile to complete adult age verification. Your full date of birth is not shown on public profiles.
+            {' '}<Link to="/profile" className="font-semibold text-primary underline underline-offset-2">Open your profile</Link>, choose Edit Profile, then enter your date of birth under Details and save.
+          </p>
+        )}
+      </div>}
       {message && <p className="text-sm text-green-700 dark:text-green-400" role="status">{message}</p>}
       <div className="flex flex-wrap gap-3">
         <button type="button" onClick={save} disabled={saving} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
