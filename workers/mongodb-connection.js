@@ -3845,6 +3845,105 @@ export class MongoDBConnection {
     }
   }
 
+  async exportUserData(uid) {
+    if (typeof uid !== "string" || uid.length < 1 || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne({ uid });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+
+      // Export only account-owned records and remove credentials, authentication
+      // material, biometric evidence, operational IPs, and provider secrets.
+      const sensitiveKey = /password|token|secret|credential|private.?key|lastloginip|ipaddress|biometric|selfie|face.?template|encryption.?key|api.?key|rawcallback|signature/i;
+      const serialize = value => {
+        if (value === null || value === undefined) return value;
+        if (value instanceof Date) return value.toISOString();
+        if (typeof value?.toHexString === "function") return value.toHexString();
+        if (Array.isArray(value)) return value.map(serialize);
+        if (typeof value === "object") {
+          const output = {};
+          for (const [key, item] of Object.entries(value)) {
+            if (key === "__v" || sensitiveKey.test(key)) continue;
+            if (item !== undefined && typeof item !== "function") output[key] = serialize(item);
+          }
+          return output;
+        }
+        if (typeof value === "bigint") return value.toString();
+        return value;
+      };
+      const readBounded = async (collectionName, query, sort = { createdAt: -1 }) => {
+        const records = await db.collection(collectionName).find(query)
+          .sort(sort).limit(1001).maxTimeMS(10000).toArray();
+        return {
+          records: records.slice(0, 1000).map(serialize),
+          truncated: records.length > 1000
+        };
+      };
+
+      const userId = user._id;
+      const [matches, conversations, purchases, subscriptions, tickets] = await Promise.all([
+        readBounded("matches", { $or: [{ user1Uid: uid }, { user2Uid: uid }] }),
+        readBounded("chatmessages", { $or: [{ senderUid: uid }, { receiverUid: uid }] }, { timestamp: 1, _id: 1 }),
+        readBounded("purchases", { userId }),
+        readBounded("subscriptions", { userId }),
+        readBounded("supporttickets", { userId })
+      ]);
+
+      const ticketIds = (await db.collection("supporttickets").find(
+        { userId }, { projection: { _id: 1 } }
+      ).limit(1000).maxTimeMS(10000).toArray()).map(ticket => ticket._id);
+      const ticketMessages = ticketIds.length
+        ? await readBounded("ticketmessages", { ticketId: { $in: ticketIds }, isInternalNote: { $ne: true } }, { createdAt: 1, _id: 1 })
+        : { records: [], truncated: false };
+
+      const profile = { ...user };
+      delete profile.password;
+      delete profile.lastLoginIp;
+      const generatedAt = new Date().toISOString();
+      return {
+        status: 200,
+        body: {
+          exportVersion: 1,
+          generatedAt,
+          account: serialize(profile),
+          data: {
+            matches: matches.records,
+            conversations: conversations.records,
+            purchases: purchases.records,
+            subscriptions: subscriptions.records,
+            supportTickets: tickets.records,
+            supportTicketMessages: ticketMessages.records
+          },
+          limits: {
+            perCollectionMaximum: 1000,
+            truncated: {
+              matches: matches.truncated,
+              conversations: conversations.truncated,
+              purchases: purchases.truncated,
+              subscriptions: subscriptions.truncated,
+              supportTickets: tickets.truncated,
+              supportTicketMessages: ticketMessages.truncated
+            }
+          },
+          exclusions: [
+            "Passwords, authentication tokens, provider credentials, and signing secrets",
+            "Biometric and photo-verification evidence",
+            "Operational IP addresses and internal security audit logs",
+            "Internal support-ticket notes"
+          ]
+        }
+      };
+    } catch (error) {
+      console.error("User data export failed", {
+        message: error && typeof error.message === "string" ? error.message.slice(0, 160) : "Unknown error"
+      });
+      return { status: 503, body: { error: "User data export is temporarily unavailable." } };
+    }
+  }
+
   async requireAdmin(uid, allowSuperadminOnly = false) {
     if (typeof uid !== "string" || !uid || uid.length > 128) return { status: 400, body: { message: "Invalid user identity" } };
     try {
