@@ -372,17 +372,18 @@ async function readWebXPayCallback(request) {
   }
   if (!totalBytes) return null;
 
-  const raw = new TextDecoder("utf-8", { fatal: true }).decode(
-    (() => {
-      const bytes = new Uint8Array(totalBytes);
-      let offset = 0;
-      for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
-      return bytes;
-    })()
-  );
+  let raw;
+  try {
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
 
   if (contentType === "application/json") {
     try {
