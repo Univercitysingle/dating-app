@@ -113,7 +113,11 @@ export async function syncChatMessageToRtdb(env, message, fetchImpl = fetch) {
     senderUid: message.senderUid,
     receiverUid: message.receiverUid,
     messageContent: message.messageContent,
-    timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : message.timestamp
+    timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : message.timestamp,
+    ...(message.editedAt ? { editedAt: message.editedAt instanceof Date ? message.editedAt.toISOString() : message.editedAt } : {}),
+    ...(message.editedByUid ? { editedByUid: message.editedByUid } : {}),
+    ...(message.deletedAt ? { deletedAt: message.deletedAt instanceof Date ? message.deletedAt.toISOString() : message.deletedAt } : {}),
+    ...(message.deletedByUid ? { deletedByUid: message.deletedByUid } : {})
   }, fetchImpl);
 }
 
