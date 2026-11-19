@@ -191,7 +191,7 @@ export async function revokeAllChatMembershipsForUser(env, uid, fetchImpl = fetc
       : [uid];
     await Promise.all([
       authenticatedDatabaseRequest(env, "/chatParticipants/" + encodedRoomId, "DELETE", undefined, fetchImpl),
-      ...new Set([...participantUids, uid]).values().map(participantUid =>
+      ...Array.from(new Set([...participantUids, uid]), participantUid =>
         authenticatedDatabaseRequest(
           env,
           "/chatUserRooms/" + encodeURIComponent(participantUid) + "/" + encodedRoomId,
