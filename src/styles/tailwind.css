@@ -5998,3 +5998,26 @@ html.dark .member-app-main .store-card { border-color: var(--app-border); backgr
   .member-app-main .store-page { padding: 2px 0 18px; }
   .member-app-main .dark-fantasy-page .sticky { top: calc(var(--member-header-height) + 6px); }
 }
+
+
+/* Keep the remote video visible behind the draggable compact call controls. */
+.wa-call-screen--mini.wa-call-screen--video .wa-call-mini-bar {
+  background: linear-gradient(180deg, rgba(4, 12, 9, .78), rgba(4, 12, 9, .12) 58%, rgba(4, 12, 9, .72));
+  align-items: flex-end;
+}
+.wa-call-screen--mini.wa-call-screen--video .wa-call-mini-bar > span {
+  align-self: flex-end;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: rgba(4, 12, 9, .66);
+}
+.wa-call-screen--mini.wa-call-screen--video .wa-call-mini-bar button {
+  background: rgba(18, 32, 26, .88);
+  backdrop-filter: blur(10px);
+}
+@media (max-width: 520px) {
+  .wa-call-screen--mini.wa-call-screen--video {
+    width: min(76vw, 300px) !important;
+    height: clamp(132px, 22vh, 176px) !important;
+  }
+}
