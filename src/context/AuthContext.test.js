@@ -148,9 +148,9 @@ describe('AuthProvider session lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
 
     await waitFor(() => expect(auth.signOut).toHaveBeenCalledTimes(1));
-    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions', { endpoint: subscription.endpoint });
+    expect(apiClient.delete).toHaveBeenCalledWith('/push/subscriptions', { endpoint: subscription.endpoint }, { timeout: 3000 });
     expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
-    expect(order).toEqual(['server-delete', 'browser-unsubscribe']);
+    expect(order).toEqual(['browser-unsubscribe', 'server-delete']);
     delete window.PushManager;
     delete navigator.serviceWorker;
   });
