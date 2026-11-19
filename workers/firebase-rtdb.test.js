@@ -100,24 +100,44 @@ test("chat message edits and soft deletions preserve mutation metadata in RTDB s
   assert.equal(payload.messageContent, "This message was deleted.");
 });
 
-test("chat delivery and read receipts patch only the selected RTDB message nodes", async () => {
+test("chat receipts do not create partial RTDB records when a mirrored message is missing", async () => {
   const env = makeEnv();
   const { calls, fetchImpl } = createFetchRecorder();
   const result = await syncChatMessageStatusToRtdb(
     env, "uid-a-uid-b", ["0123456789abcdef01234567", "abcdef0123456789abcdef01"],
     "read", fetchImpl
   );
-  assert.deepEqual(result, { synced: 2, status: "read" });
-  const patches = calls.filter(call => call.init.method === "PATCH");
-  assert.equal(patches.length, 2);
-  for (const call of patches) {
-    assert.match(call.url, /\/chats\/uid-a-uid-b\/[a-f0-9]{24}\.json$/);
-    const body = JSON.parse(call.init.body);
-    assert.equal(body.status, "read");
-    assert.equal(typeof body.readAt, "string");
-    assert.equal(typeof body.deliveredAt, "string");
-  }
+  assert.deepEqual(result, { synced: 0, skipped: 2, status: "read" });
+  assert.equal(calls.filter(call => call.init.method === "GET").length, 2);
+  assert.equal(calls.some(call => call.init.method === "PATCH"), false);
 });
+
+test("chat delivery and read receipts patch only existing message nodes", async () => {
+  const env = makeEnv();
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    if (String(url) === "https://oauth2.googleapis.com/token") {
+      return new Response(JSON.stringify({ access_token: "test-admin-token", expires_in: 3600 }), { status: 200 });
+    }
+    if (init.method === "GET") {
+      return new Response(JSON.stringify({ _id: "0123456789abcdef01234567", messageContent: "Hello" }), { status: 200 });
+    }
+    return new Response("null", { status: 200 });
+  };
+  const result = await syncChatMessageStatusToRtdb(
+    env, "uid-a-uid-b", ["0123456789abcdef01234567"], "read", fetchImpl
+  );
+  assert.deepEqual(result, { synced: 1, skipped: 0, status: "read" });
+  const patch = calls.find(call => call.init.method === "PATCH");
+  assert.ok(patch);
+  assert.match(patch.url, /\\/chats\\/uid-a-uid-b\\/[a-f0-9]{24}\\.json$/);
+  const body = JSON.parse(patch.init.body);
+  assert.equal(body.status, "read");
+  assert.equal(typeof body.readAt, "string");
+  assert.equal(typeof body.deliveredAt, "string");
+});
+
 
 test("chat receipt sync rejects invalid status and message identifiers", async () => {
   const env = makeEnv();
