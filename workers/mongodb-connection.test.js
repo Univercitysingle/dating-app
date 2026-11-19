@@ -2597,6 +2597,14 @@ test("chat conversations exclude users blocked in either direction", async () =>
     {
       keys: { receiverUid: 1, roomId: 1, status: 1 },
       options: { name: "chat_receiver_unread_room_status" }
+    },
+    {
+      keys: { senderUid: 1, roomId: 1 },
+      options: { name: "chat_sender_room_membership" }
+    },
+    {
+      keys: { receiverUid: 1, roomId: 1 },
+      options: { name: "chat_receiver_room_membership" }
     }
   ]);
   assert.equal(profileBatchQueries, 1, "counterpart profiles should be fetched in one batch");
