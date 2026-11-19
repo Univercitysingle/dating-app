@@ -473,10 +473,7 @@ test("undo swipe restores a prior like and consumes an undo credit", async () =>
     updateOne: async (_query, update) => { matchUpdate = update; return { matchedCount: 1 }; }
   };
   const connection = new MongoDBConnection({}, {});
-  connection.getClient = async () => ({ db: () => ({ collection: (name) =>
-    name === "users" ? users : name === "matches" ? matches :
-      name === "chatmessages" ? { findOne: async () => ({ roomId: "a-user-z-user" }) } : null
-  }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
   const result = await connection.undoSwipe("current");
   assert.equal(result.status, 200);
   assert.equal(result.body.undoneUser.uid, "target");
@@ -1055,7 +1052,10 @@ test("blocking updates block list and unmatches the pair using sorted UIDs", asy
   };
   const matches = { updateOne: async (query, update) => { matchUpdate = { query, update }; return { matchedCount: 1 }; } };
   const connection = new MongoDBConnection({}, {});
-  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) =>
+    name === "users" ? users : name === "matches" ? matches :
+      name === "chatmessages" ? { findOne: async () => ({ roomId: "a-user-z-user" }) } : null
+  }) });
   const result = await connection.updateBlockedUser("z-user", "a-user", "block");
   assert.equal(result.status, 200);
   assert.deepEqual(userUpdate.$addToSet, { blocked: "a-user" });
