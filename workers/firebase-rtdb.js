@@ -135,14 +135,16 @@ export async function syncChatMessageStatusToRtdb(env, roomId, messageIds, statu
   const patch = status === "read"
     ? { status, deliveredAt: timestamp, readAt: timestamp }
     : { status, deliveredAt: timestamp };
-  await Promise.all(messageIds.map(id => authenticatedDatabaseRequest(
-    env,
-    "/chats/" + encodeURIComponent(roomId) + "/" + encodeURIComponent(id),
-    "PATCH",
-    patch,
-    fetchImpl
-  )));
-  return { synced: messageIds.length, status };
+  const results = await Promise.all(messageIds.map(async id => {
+    const path = "/chats/" + encodeURIComponent(roomId) + "/" + encodeURIComponent(id);
+    // PATCH creates a missing RTDB node. Do not create partial message records
+    // from receipt metadata when the canonical message has not been mirrored.
+    const existing = await readAuthenticatedDatabaseValue(env, path, fetchImpl);
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) return false;
+    await authenticatedDatabaseRequest(env, path, "PATCH", patch, fetchImpl);
+    return true;
+  }));
+  return { synced: results.filter(Boolean).length, skipped: results.length - results.filter(Boolean).length, status };
 }
 
 export async function syncChatRoomMembership(env, roomId, participantUids, active, fetchImpl = fetch) {
