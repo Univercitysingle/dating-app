@@ -83,6 +83,16 @@ const countryCallingCodes = [
   { country: 'Peru', flag: '🇵🇪', code: '+51' },
 ];
 
+// Keep date-only profile values stable across browser time zones.
+const toDateInputValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+};
+
+const formatLocalDateInput = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 // Reusable components
 const PremiumBadge = () => (
   <span className="ml-2 px-2 py-1 text-xs font-semibold text-accent-dark bg-accent rounded-full">Premium</span>
@@ -117,6 +127,7 @@ function Profile() {
   // State for editable fields
   const [editableFields, setEditableFields] = useState({
       education: '',
+      birthday: '',
       relationshipGoals: '',
       bio: '',
       personalityType: '',
@@ -160,6 +171,7 @@ function Profile() {
         setMobileNationalNumber(matchingCallingCode ? savedMobile.slice(matchingCallingCode.length).replace(/\D/g, '') : savedMobile.replace(/\D/g, ''));
         setEditableFields({
           education: data.education || '',
+          birthday: toDateInputValue(data.birthday),
           relationshipGoals: data.relationshipGoals || 'Figuring it out',
           bio: data.bio || '',
           personalityType: data.personalityType || '',
@@ -245,7 +257,21 @@ function Profile() {
       setSaveStatus('Saving...');
       try {
           const mobileNumber = `${mobileCountryCode}${mobileNationalNumber.replace(/\D/g, '')}`;
-          const updatedProfile = await apiClient.put('/users/me', { ...editableFields, mobileNumber });
+          const { birthday: draftBirthday, ...profileUpdates } = editableFields;
+          const birthdayUpdate = !profile.birthday && draftBirthday ? { birthday: draftBirthday } : {};
+          if (birthdayUpdate.birthday) {
+              const birthDate = new Date(`${birthdayUpdate.birthday}T00:00:00`);
+              const today = new Date();
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const month = today.getMonth() - birthDate.getMonth();
+              if (month < 0 || (month === 0 && today.getDate() < birthDate.getDate())) age--;
+              if (Number.isNaN(birthDate.getTime()) || age < 18 || birthDate > today) {
+                  toast.error('Enter a valid date of birth. You must be at least 18 years old.');
+                  setSaveStatus('');
+                  return;
+              }
+          }
+          const updatedProfile = await apiClient.put('/users/me', { ...profileUpdates, ...birthdayUpdate, mobileNumber });
           setProfile(updatedProfile);
           setUser(updatedProfile); // Update global user state
           toast.success('Profile saved successfully!');
@@ -366,6 +392,25 @@ function Profile() {
                                     <div>
                                         <label htmlFor="age" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Age</label>
                                         <input type="text" id="age" value={profile.age} disabled className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"/>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="birthday" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Date of birth</label>
+                                        {profile.birthday ? (
+                                            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">Your date of birth is already saved and cannot be changed from this form.</p>
+                                        ) : (
+                                            <>
+                                                <input
+                                                    type="date"
+                                                    id="birthday"
+                                                    value={editableFields.birthday || ''}
+                                                    max={formatLocalDateInput(new Date(new Date().getFullYear() - 18, new Date().getMonth(), new Date().getDate()))}
+                                                    min={formatLocalDateInput(new Date(new Date().getFullYear() - 100, new Date().getMonth(), new Date().getDate()))}
+                                                    onChange={handleFieldChange}
+                                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-50"
+                                                />
+                                                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">A valid adult date of birth is required for age-restricted features such as Desires & Discovery.</p>
+                                            </>
+                                        )}
                                     </div>
                                     <div>
                                         <label htmlFor="gender" className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Gender</label>
