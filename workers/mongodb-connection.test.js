@@ -5136,9 +5136,12 @@ test("admin can suspend a user with a bounded expiry and hide the profile", asyn
   connection.env = {};
   connection.requireAdmin = async () => ({ status: 200, role: "admin" });
   connection.getClient = async () => ({});
+  const cleanupCollection = {
+    async deleteMany() { return { deletedCount: 0 }; },
+    async updateMany() { return { modifiedCount: 0 }; }
+  };
   connection.getDatabase = () => ({ collection(name) {
-    assert.equal(name, "users");
-    return users;
+    return name === "users" ? users : cleanupCollection;
   } });
   const until = new Date(Date.now() + 2 * 86400000).toISOString();
   const result = await connection.updateAdminUser("admin-uid", targetId.toHexString(), {
@@ -5269,6 +5272,6 @@ test("superadmin can restore a temporary suspension and restore prior profile vi
   assert.equal(result.status, 200);
   assert.equal(capturedUpdate.$set.accountStatus, "active");
   assert.equal(capturedUpdate.$set.isProfileVisible, true);
-  assert.ok(capturedUpdate.$unset.suspendedUntil);
-  assert.ok(capturedUpdate.$unset.profileVisibilityBeforeSuspension);
+  assert.equal(capturedUpdate.$unset.suspendedUntil, "");
+  assert.equal(capturedUpdate.$unset.profileVisibilityBeforeSuspension, "");
 });
