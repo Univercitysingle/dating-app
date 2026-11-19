@@ -5975,11 +5975,22 @@ export class MongoDBConnection {
       if (await this.isChatPairUnavailable(db, uid, roomId)) {
         return { status: 403, body: { error: "Chat receipts are unavailable for this conversation" } };
       }
-      const result = await db.collection("chatmessages").updateMany(
+      const messages = db.collection("chatmessages");
+      const result = await messages.updateMany(
         { _id: { $in: ids }, roomId, receiverUid: uid, status: "sent" },
         { $set: { status: "delivered", deliveredAt: new Date() } }
       );
-      return { status: 200, body: { deliveredCount: result.modifiedCount } };
+      const syncedMessages = await messages.find(
+        { _id: { $in: ids }, roomId, receiverUid: uid, status: "delivered" },
+        { projection: { _id: 1 } }
+      ).toArray();
+      return {
+        status: 200,
+        body: {
+          deliveredCount: result.modifiedCount,
+          updatedMessageIds: syncedMessages.map(message => String(message._id))
+        }
+      };
     } catch {
       return { status: 503, body: { error: "Could not mark messages as delivered" } };
     }
@@ -6002,11 +6013,22 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "Chat receipts are unavailable for this conversation" } };
       }
       const now = new Date();
-      const result = await db.collection("chatmessages").updateMany(
+      const messages = db.collection("chatmessages");
+      const result = await messages.updateMany(
         { _id: { $in: ids }, roomId, receiverUid: uid, status: { $in: ["sent", "delivered"] } },
         { $set: { status: "read", deliveredAt: now, readAt: now } }
       );
-      return { status: 200, body: { readCount: result.modifiedCount } };
+      const syncedMessages = await messages.find(
+        { _id: { $in: ids }, roomId, receiverUid: uid, status: "read" },
+        { projection: { _id: 1 } }
+      ).toArray();
+      return {
+        status: 200,
+        body: {
+          readCount: result.modifiedCount,
+          updatedMessageIds: syncedMessages.map(message => String(message._id))
+        }
+      };
     } catch {
       return { status: 503, body: { error: "Could not mark messages as read" } };
     }
