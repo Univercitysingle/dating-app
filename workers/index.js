@@ -525,6 +525,21 @@ export function enforceCallIceRateLimit(env, claims, scope = "call-ice-config") 
   );
 }
 
+export function enforceCallStartRateLimit(env, claims) {
+  const uid = typeof claims?.sub === "string" ? claims.sub : "";
+  if (!uid) return json({ error: "Unauthorized" }, 401);
+  // Limit invitation spam only. Polling, incoming-call checks and WebRTC
+  // signalling remain outside this quota so active calls are not interrupted.
+  return enforceAccountRateLimit(
+    env,
+    "call-start",
+    uid,
+    30,
+    60 * 60 * 1000,
+    "You've started too many calls. Please wait before starting another."
+  );
+}
+
 export class RateLimiter {
   constructor(state) { this.state = state; }
 
@@ -2677,6 +2692,10 @@ export default {
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
+        if (action === "start") {
+          const callStartLimit = await enforceCallStartRateLimit(env, claims);
+          if (callStartLimit) return callStartLimit;
+        }
         if (!env.MONGODB_CONNECTION) return json({ error: "Calling service unavailable" }, 503);
         const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
         const connection = env.MONGODB_CONNECTION.get(id);
