@@ -1,58 +1,31 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-// A simple component for SVG icons. In a real app, you might use a library like react-icons.
 const Icon = ({ path }) => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={path} />
+  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d={path} />
   </svg>
 );
 
-const BottomNavBar = () => {
-  return (
-    <nav
-      className="app-bottom-nav fixed bottom-0 left-0 right-0 z-50"
-      aria-label="Primary navigation"
-    >
-      <div className="mx-auto flex w-full max-w-xl justify-around">
-        <NavLink
-          to="/discover"
-          className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
-        >
-          <Icon path="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 016-6h6a6 6 0 016 6v1h-3" />
-          <span className="text-xs">Discover</span>
+const items = [
+  { to: '/discover', label: 'Discover', icon: 'M12 3v3m0 12v3M3 12h3m12 0h3M5.64 5.64l2.12 2.12m8.48 8.48 2.12 2.12m0-12.72-2.12 2.12m-8.48 8.48-2.12 2.12M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z' },
+  { to: '/likes', label: 'Likes', icon: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z' },
+  { to: '/conversations', label: 'Messages', icon: 'M21 11.5a8.4 8.4 0 0 1-8.9 8.4 9.2 9.2 0 0 1-4-.9L3 21l1.4-4.7A8.2 8.2 0 1 1 21 11.5Z' },
+  { to: '/profile', label: 'Profile', icon: 'M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z' },
+  { to: '/store', label: 'Store', icon: 'M3 9h18l-1.5 11h-15L3 9Zm3 0V6a6 6 0 0 1 12 0v3' },
+];
+
+const BottomNavBar = () => (
+  <nav className="app-bottom-nav member-mobile-nav fixed bottom-0 left-0 right-0 z-50" aria-label="Primary navigation">
+    <div className="member-mobile-nav-inner">
+      {items.map((item) => (
+        <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item member-mobile-nav-item${isActive ? ' is-active' : ''}`}>
+          <Icon path={item.icon} />
+          <span>{item.label}</span>
         </NavLink>
-        <NavLink
-          to="/likes"
-          className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
-        >
-          <Icon path="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          <span className="text-xs">Likes</span>
-        </NavLink>
-        <NavLink
-          to="/conversations"
-          className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
-        >
-          <Icon path="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          <span className="text-xs">Conversations</span>
-        </NavLink>
-        <NavLink
-          to="/dark-fantasy"
-          className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
-        >
-          <Icon path="M12 3v2m0 14v2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42M3 12h2m14 0h2M5.64 18.36l1.42-1.42m9.88-9.88 1.42-1.42M12 8a4 4 0 100 8 4 4 0 000-8z" />
-          <span className="text-xs">Dark Fantasy</span>
-        </NavLink>
-        <NavLink
-          to="/profile"
-          className={({ isActive }) => `nav-item flex flex-col items-center justify-center ${isActive ? "is-active" : ""}`}
-        >
-          <Icon path="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          <span className="text-xs">Profile</span>
-        </NavLink>
-      </div>
-    </nav>
-  );
-};
+      ))}
+    </div>
+  </nav>
+);
 
 export default BottomNavBar;
