@@ -170,7 +170,7 @@ async function readAuthenticatedDatabaseValue(env, path, fetchImpl = fetch) {
  * by the user's own conversation count rather than a database-wide scan.
  * The operation is idempotent and removes stale per-user index entries too.
  */
-export async function revokeAllChatMembershipsForUser(env, uid, fetchImpl = fetch) {
+export async function revokeAllChatMembershipsForUser(env, uid, fetchImpl = fetch, additionalRoomIds = []) {
   if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
     throw new Error("Invalid chat membership user");
   }
@@ -178,9 +178,15 @@ export async function revokeAllChatMembershipsForUser(env, uid, fetchImpl = fetc
   const roomIndex = await readAuthenticatedDatabaseValue(
     env, "/chatUserRooms/" + encodedUid, fetchImpl
   );
-  const roomIds = roomIndex && typeof roomIndex === "object" && !Array.isArray(roomIndex)
+  if (!Array.isArray(additionalRoomIds) || additionalRoomIds.some(roomId =>
+    typeof roomId !== "string" || !roomId || roomId.length > 260
+  )) {
+    throw new Error("Invalid additional chat room index");
+  }
+  const indexedRoomIds = roomIndex && typeof roomIndex === "object" && !Array.isArray(roomIndex)
     ? Object.keys(roomIndex).filter(roomId => roomIndex[roomId] === true)
     : [];
+  const roomIds = [...new Set([...indexedRoomIds, ...additionalRoomIds])];
   if (!roomIds.length) return { revoked: 0 };
 
   let revoked = 0;
