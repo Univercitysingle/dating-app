@@ -147,6 +147,16 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
+async function revokeFirebaseChatMemberships(env, uid) {
+  const configured = Boolean(env?.FIREBASE_SERVICE_ACCOUNT_JSON && env?.FIREBASE_DATABASE_URL);
+  if (!configured && env?.ENABLE_FIREBASE_REALTIME_SYNC !== "true") {
+    return { configured: false, revoked: 0 };
+  }
+  const { revokeAllChatMembershipsForUser } = await import("./firebase-rtdb.js");
+  const result = await revokeAllChatMembershipsForUser(env, uid);
+  return { configured: true, revoked: result.revoked };
+}
+
 function isAccountRestricted(user, now = new Date()) {
   if (!user) return true;
   if (user.deletionRequestedAt || user.accountStatus === "deletion_pending" || user.accountStatus === "deleted") return true;
@@ -3855,11 +3865,19 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const targetId = new ObjectId(userId);
-      const target = await users.findOne({ _id: targetId }, { projection: { role: 1, accountStatus: 1, suspendedUntil: 1 } });
+      const target = await users.findOne({ _id: targetId }, { projection: {
+        uid: 1, role: 1, accountStatus: 1, suspendedUntil: 1,
+        isProfileVisible: 1, profileVisibilityBeforeSuspension: 1
+      } });
       if (!target) return { status: 404, body: { message: "User not found" } };
       if (target.role === "superadmin") return { status: 403, body: { message: "Superadmin accounts cannot be modified" } };
       if (access.role !== "superadmin" && target.role !== "user") {
         return { status: 403, body: { message: "Admins cannot modify other administrative accounts" } };
+      }
+      const lifecycleRequested = Object.prototype.hasOwnProperty.call(payload, "accountStatus") ||
+        Object.prototype.hasOwnProperty.call(payload, "suspendedUntil");
+      if (lifecycleRequested && access.role !== "superadmin" && target.role !== "user") {
+        return { status: 403, body: { message: "Only superadmins can change account status for administrative accounts." } };
       }
       const allowed = [
         "name", "email", "gender", "bio", "interests", "profilePrompts", "education",
@@ -3871,6 +3889,39 @@ export class MongoDBConnection {
       }
       const update = {};
       for (const key of allowed) if (Object.prototype.hasOwnProperty.call(payload, key)) update[key] = payload[key];
+      let revokeChatAccess = false;
+      if (lifecycleRequested) {
+        const nextStatus = payload.accountStatus;
+        if (!["active", "temporarily_suspended", "permanently_banned"].includes(nextStatus)) {
+          return { status: 400, body: { message: "Invalid account status" } };
+        }
+        if (nextStatus === "temporarily_suspended") {
+          const until = new Date(payload.suspendedUntil);
+          const maxUntil = Date.now() + 3650 * 86400000;
+          if (!Number.isFinite(until.getTime()) || until.getTime() <= Date.now() || until.getTime() > maxUntil) {
+            return { status: 400, body: { message: "A future suspension expiry within 3650 days is required" } };
+          }
+          update.accountStatus = "temporarily_suspended";
+          update.suspendedUntil = until;
+          update.profileVisibilityBeforeSuspension = target.profileVisibilityBeforeSuspension !== undefined
+            ? target.profileVisibilityBeforeSuspension : target.isProfileVisible !== false;
+          update.isProfileVisible = false;
+          revokeChatAccess = true;
+        } else if (nextStatus === "permanently_banned") {
+          update.accountStatus = "permanently_banned";
+          update.suspendedUntil = new Date("9999-12-31T00:00:00.000Z");
+          update.bannedAt = new Date();
+          update.bannedBy = uid;
+          update.isProfileVisible = false;
+          revokeChatAccess = true;
+        } else {
+          if (target.accountStatus === "permanently_banned" && access.role !== "superadmin") {
+            return { status: 403, body: { message: "Only a superadmin can restore a permanently banned account" } };
+          }
+          update.accountStatus = "active";
+          update.isProfileVisible = target.profileVisibilityBeforeSuspension === true;
+        }
+      }
       if (Object.keys(update).length === 0) return { status: 400, body: { message: "No supported fields to update" } };
       if (update.role !== undefined) {
         if (!["user", "contributor", "admin", "superadmin"].includes(update.role)) return { status: 400, body: { message: "Invalid role" } };
@@ -3897,10 +3948,49 @@ export class MongoDBConnection {
       }
       if (update.interests !== undefined && (!Array.isArray(update.interests) || update.interests.length > 100 || update.interests.some(x => typeof x !== "string" || x.length > 100))) return { status: 400, body: { message: "Invalid interests" } };
       update.updatedAt = new Date();
+      const unset = lifecycleRequested && payload.accountStatus === "active"
+        ? { suspendedUntil: "", bannedAt: "", bannedBy: "", moderationReason: "", profileVisibilityBeforeSuspension: "", suspendedBy: "" }
+        : undefined;
+      const updateDocument = { $set: update, ...(unset ? { $unset: unset } : {}) };
       const result = await users.findOneAndUpdate(
-        { _id: targetId }, { $set: update }, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } }
+        { _id: targetId }, updateDocument, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } }
       );
       if (!result) return { status: 404, body: { message: "User not found" } };
+      if (revokeChatAccess && typeof target.uid === "string" && target.uid) {
+        try {
+          const revocation = await revokeFirebaseChatMemberships(this.env, target.uid);
+          if (revocation.configured) {
+            await Promise.all([
+              db.collection("chatTyping").deleteMany({ uid: target.uid }),
+              db.collection("callSessions").updateMany(
+                { $or: [{ callerUid: target.uid }, { receiverUid: target.uid }], status: { $in: ["ringing", "accepted"] } },
+                { $set: { status: "cancelled", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+              ),
+              db.collection("videoRooms").updateMany(
+                { hostUid: target.uid, status: "active" },
+                { $set: { status: "ended", endedAt: new Date(), updatedAt: new Date(), endReason: "account_suspension" } }
+              )
+            ]);
+            await users.updateOne({ _id: targetId }, { $set: {
+              chatAccessRevocationStatus: "completed",
+              chatAccessRevokedRoomCount: revocation.revoked,
+              chatAccessRevokedAt: new Date(),
+              updatedAt: new Date()
+            } });
+          }
+        } catch {
+          await users.updateOne({ _id: targetId }, { $set: {
+            chatAccessRevocationStatus: "retry_pending",
+            chatAccessRevocationLastAttemptAt: new Date(),
+            updatedAt: new Date()
+          } });
+          return { status: 202, body: {
+            message: "Account is restricted, but realtime chat access revocation is pending.",
+            accountStatus: payload.accountStatus,
+            chatAccessRevocationStatus: "retry_pending"
+          } };
+        }
+      }
       const safeResult = { ...result };
       if (access.role !== "superadmin") stripPrivateContactFields(safeResult);
       return { status: 200, body: safeResult };
