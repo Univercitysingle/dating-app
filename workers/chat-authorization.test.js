@@ -13,7 +13,8 @@ test("chat delivery and read receipts constrain updates to the authenticated rec
         async updateMany(filter, update) {
           calls.push({ filter, update });
           return { modifiedCount: 1 };
-        }
+        },
+        find() { return { toArray: async () => [{ _id: "abcdef0123456789abcdef01" }] }; }
       };
       if (name === "users") return { async findOne() { return { blocked: [] }; } };
       if (name === "matches") return { async findOne() { return null; } };
@@ -64,7 +65,8 @@ test("opaque chat room IDs are authorized by persisted participant membership, n
         async updateMany(filter) {
           calls.push({ collection: name, filter });
           return { modifiedCount: 1 };
-        }
+        },
+        find() { return { toArray: async () => [{ _id: "abcdef0123456789abcdef01" }] }; }
       };
       if (name === "users") return {
         async findOne(filter) {
