@@ -3907,6 +3907,8 @@ export class MongoDBConnection {
   }
 
   async updateAdminUser(uid, userId, payload = {}) {
+    let lifecycleAuditId = null;
+    let lifecycleAuditCollection = null;
     const access = await this.requireAdmin(uid);
     if (access.status !== 200) return access;
     if (typeof userId !== "string" || !/^[a-fA-F0-9]{24}$/.test(userId)) return { status: 400, body: { message: "Invalid user ID" } };
@@ -4005,11 +4007,37 @@ export class MongoDBConnection {
       const unset = lifecycleRequested && payload.accountStatus === "active"
         ? { suspendedUntil: "", bannedAt: "", bannedBy: "", moderationReason: "", profileVisibilityBeforeSuspension: "", suspendedBy: "" }
         : undefined;
+      if (lifecycleRequested) {
+        lifecycleAuditCollection = db.collection("auditlogs");
+        const action = payload.accountStatus === "temporarily_suspended" ? "suspend_user" :
+          payload.accountStatus === "permanently_banned" ? "ban_user" : "restore_user";
+        const audit = await lifecycleAuditCollection.insertOne({
+          eventType: "admin_account_lifecycle",
+          actorUid: uid,
+          targetUid: target.uid || null,
+          targetUserId: targetId,
+          action,
+          previousAccountStatus: target.accountStatus || "active",
+          nextAccountStatus: payload.accountStatus,
+          previousProfileVisibility: target.isProfileVisible !== false,
+          nextProfileVisibility: update.isProfileVisible,
+          ...(update.suspendedUntil ? { suspendedUntil: update.suspendedUntil } : {}),
+          outcome: "started",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        lifecycleAuditId = audit.insertedId;
+      }
       const updateDocument = { $set: update, ...(unset ? { $unset: unset } : {}) };
       const result = await users.findOneAndUpdate(
         { _id: targetId }, updateDocument, { returnDocument: "after", projection: { password: 0, lastLoginIp: 0 } }
       );
-      if (!result) return { status: 404, body: { message: "User not found" } };
+      if (!result) {
+        if (lifecycleAuditId) await lifecycleAuditCollection.updateOne(
+          { _id: lifecycleAuditId }, { $set: { outcome: "target_missing", updatedAt: new Date() } }
+        );
+        return { status: 404, body: { message: "User not found" } };
+      }
       if (revokeChatAccess && typeof target.uid === "string" && target.uid) {
         await Promise.all([
           db.collection("chatTyping").deleteMany({ uid: target.uid }),
@@ -4038,6 +4066,12 @@ export class MongoDBConnection {
             chatAccessRevocationLastAttemptAt: new Date(),
             updatedAt: new Date()
           } });
+          if (lifecycleAuditId) await lifecycleAuditCollection.updateOne(
+            { _id: lifecycleAuditId }, { $set: {
+              outcome: "revocation_pending", chatAccessRevocationStatus: "retry_pending",
+              updatedAt: new Date()
+            } }
+          );
           return { status: 202, body: {
             message: "Account is restricted, but realtime chat access revocation is pending.",
             accountStatus: payload.accountStatus,
@@ -4045,10 +4079,25 @@ export class MongoDBConnection {
           } };
         }
       }
+      if (lifecycleAuditId) await lifecycleAuditCollection.updateOne(
+        { _id: lifecycleAuditId }, { $set: {
+          outcome: "completed",
+          chatAccessRevocationStatus: revokeChatAccess ? "completed_or_not_configured" : "not_required",
+          updatedAt: new Date()
+        } }
+      );
       const safeResult = { ...result };
       if (access.role !== "superadmin") stripPrivateContactFields(safeResult);
       return { status: 200, body: safeResult };
     } catch {
+      if (lifecycleAuditId && lifecycleAuditCollection) {
+        try {
+          await lifecycleAuditCollection.updateOne(
+            { _id: lifecycleAuditId, outcome: "started" },
+            { $set: { outcome: "failed_or_interrupted", updatedAt: new Date() } }
+          );
+        } catch {}
+      }
       return { status: 503, body: { message: "Unable to update user" } };
     }
   }
