@@ -5275,3 +5275,28 @@ test("superadmin can restore a temporary suspension and restore prior profile vi
   assert.equal(capturedUpdate.$unset.suspendedUntil, "");
   assert.equal(capturedUpdate.$unset.profileVisibilityBeforeSuspension, "");
 });
+
+
+test("admin account management cannot reactivate an account in the deletion lifecycle", async () => {
+  const { ObjectId } = await import("mongodb");
+  const targetId = new ObjectId("abcdef0123456789abcdef01");
+  let writes = 0;
+  let target = {
+    _id: targetId, uid: "target", role: "user",
+    accountStatus: "deletion_pending", deletionRequestedAt: new Date()
+  };
+  const users = {
+    async findOne() { return target; },
+    async findOneAndUpdate() { writes++; return { _id: targetId }; }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.env = {};
+  connection.requireAdmin = async () => ({ status: 200, role: "superadmin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({ collection: () => users });
+  const result = await connection.updateAdminUser("superadmin-uid", targetId.toHexString(), {
+    accountStatus: "active"
+  });
+  assert.equal(result.status, 409);
+  assert.equal(writes, 0);
+});
