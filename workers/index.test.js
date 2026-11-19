@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
-import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload, enforceCallIceRateLimit } from "./index.js";
+import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload, enforceCallIceRateLimit, enforceCallStartRateLimit } from "./index.js";
 import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
@@ -1102,6 +1102,30 @@ test("call ICE credential limiter fails closed when abuse protection is unavaila
   const response = await enforceCallIceRateLimit({}, { sub: "user-123" });
   assert.equal(response.status, 503);
   assert.match((await response.json()).error, /abuse protection/i);
+});
+
+test("call invitation starts use a generous per-account anti-spam quota", async () => {
+  let observedName = "";
+  let observedPayload = null;
+  const env = {
+    RATE_LIMITER: {
+      idFromName(name) { observedName = name; return name; },
+      get() {
+        return { async fetch(_url, options) {
+          observedPayload = JSON.parse(options.body);
+          return new Response(JSON.stringify({ allowed: true, resetAt: Date.now() + 3600000 }), { status: 200 });
+        }};
+      }
+    }
+  };
+  assert.equal(await enforceCallStartRateLimit(env, { sub: "caller-123" }), null);
+  assert.equal(observedName, "call-start:caller-123");
+  assert.deepEqual(observedPayload, { key: "call-start", limit: 30, windowMs: 3600000 });
+});
+
+test("call invitation quota fails closed when the limiter is unavailable", async () => {
+  const response = await enforceCallStartRateLimit({}, { sub: "caller-123" });
+  assert.equal(response.status, 503);
 });
 
 test("photo upload rate limiting fails closed when the limiter binding is missing", async () => {
