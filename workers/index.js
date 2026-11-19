@@ -530,6 +530,7 @@ export function enforceCallStartRateLimit(env, claims) {
   if (!uid) return json({ error: "Unauthorized" }, 401);
   // Limit invitation spam only. Polling, incoming-call checks and WebRTC
   // signalling remain outside this quota so active calls are not interrupted.
+  // The generous hourly ceiling is intentionally higher than normal personal use.
   return enforceAccountRateLimit(
     env,
     "call-start",
