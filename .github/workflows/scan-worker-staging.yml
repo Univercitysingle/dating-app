@@ -8,6 +8,7 @@ on:
       - "workers/**"
       - "wrangler.jsonc"
       - ".github/workflows/deploy-worker-staging.yml"
+      - ".github/workflows/scan-worker-staging.yml"
   workflow_dispatch:
 
 permissions:
