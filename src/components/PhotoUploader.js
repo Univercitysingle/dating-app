@@ -75,14 +75,16 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       const response = await apiClient.post('/users/photos', formData);
       const photoKey = response?.fileUrl || response?.photo?.url;
       if (typeof photoKey !== 'string' || !photoKey.trim()) {
-        throw new Error('The upload service did not return a usable photo reference. Please try again.');
+        throw Object.assign(new Error('The upload service did not return a usable photo reference.'), { code: 'INVALID_PHOTO_REFERENCE' });
       }
       if (typeof onUploadComplete !== 'function') {
-        throw new Error('The photo upload could not be attached to your profile. Please try again.');
+        throw Object.assign(new Error('The photo upload could not be attached to your profile.'), { code: 'PHOTO_CALLBACK_UNAVAILABLE' });
       }
       onUploadComplete({ ...response, fileUrl: photoKey.trim() });
     } catch (err) {
-      setError(getUserFriendlyError(err, 'Your photo could not be uploaded. Please try again.'));
+      setError(err?.code === 'INVALID_PHOTO_REFERENCE' || err?.code === 'PHOTO_CALLBACK_UNAVAILABLE'
+        ? `${err.message} Please try again.`
+        : getUserFriendlyError(err, 'Your photo could not be uploaded. Please try again.'));
     } finally {
       setIsUploading(false);
       input.value = '';
