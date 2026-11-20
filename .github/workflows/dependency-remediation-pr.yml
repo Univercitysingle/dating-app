@@ -1,0 +1,122 @@
+name: Prepare dependency security remediation PR
+
+on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - ".github/workflows/dependency-remediation-pr.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dating-app-dependency-remediation
+  cancel-in-progress: false
+
+jobs:
+  prepare-remediation:
+    if: github.ref_name == 'migrate-to-serverless'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out migration branch source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact source revision and branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "migrate-to-serverless"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo "Preparing dependency updates from $GITHUB_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply semver-safe frontend lockfile security updates
+        run: npm audit fix --package-lock-only --ignore-scripts
+
+      - name: Install frontend dependencies from updated lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Enforce zero moderate-or-higher frontend production findings
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Validate complete frontend audit report
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > "$RUNNER_TEMP/root-full-audit.json"
+          audit_status=$?
+          set -e
+          node scripts/validate-frontend-audit.js "$RUNNER_TEMP/root-full-audit.json"
+          echo "Full frontend audit exit code: $audit_status"
+
+      - name: Apply semver-safe backend lockfile security updates
+        working-directory: backend
+        run: npm audit fix --package-lock-only --ignore-scripts
+
+      - name: Install backend dependencies from updated lockfile
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+
+      - name: Enforce zero moderate-or-higher backend production findings
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Install Worker dependencies
+        working-directory: workers
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit Cloudflare Worker dependencies
+        working-directory: workers
+        run: npm audit --audit-level=high
+
+      - name: Run application regression tests
+        run: npm test
+
+      - name: Create a reviewed pull request for lockfile changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add package-lock.json backend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No semver-safe lockfile changes were produced."
+            exit 0
+          fi
+
+          branch="security/npm-audit-remediation-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -m "fix(deps): remediate production npm advisories"
+          git push --set-upstream origin "$branch"
+
+          gh pr create \
+            --base migrate-to-serverless \
+            --head "$branch" \
+            --title "fix(deps): remediate production npm advisories" \
+            --body "## Security dependency remediation
+
+          - Updates only npm lockfiles using semver-safe `npm audit fix` resolution.
+          - Requires zero moderate-or-higher findings in frontend and backend production dependency trees.
+          - Audits the Cloudflare Worker dependency tree.
+          - Runs the repository regression test suite.
+          - Does not change application source, Firebase rules, payment configuration, or the CDN Worker.
+
+          Review the complete dependency diff and CI evidence before merging."
