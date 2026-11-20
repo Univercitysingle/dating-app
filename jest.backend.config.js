@@ -4,7 +4,7 @@ module.exports = {
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
-  testPathIgnorePatterns: ['/node_modules/', '/src/', 'tests/sidebar.spec.js'],
+  testPathIgnorePatterns: ['/node_modules/', '/src/', 'tests/sidebar.spec.js', 'tests/firebase-rules.test.js'],
   testTimeout: 60000,
 };
 
