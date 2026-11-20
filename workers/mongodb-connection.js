@@ -1104,9 +1104,18 @@ export class MongoDBConnection {
 
       if (action === "like" || action === "superlike") {
         const likedBy = Array.isArray(match.likedBy) ? match.likedBy : [];
-        const finalStatus = likedBy.includes(match.user1Uid) && likedBy.includes(match.user2Uid) ? "matched" : "pending";
-        await matches.updateOne({ _id: match._id }, { $set: { status: finalStatus, updatedAt: now } });
-        match.status = finalStatus;
+        const isMutual = likedBy.includes(match.user1Uid) && likedBy.includes(match.user2Uid);
+        // Only promote to matched. Writing a stale "pending" value here can
+        // overwrite a reciprocal like committed by the other request between
+        // our read and write. MongoDB evaluates this predicate atomically.
+        if (isMutual) {
+          await matches.updateOne(
+            { _id: match._id, likedBy: { $all: [match.user1Uid, match.user2Uid] } },
+            { $set: { status: "matched", updatedAt: now } }
+          );
+          match.status = "matched";
+        }
+        const finalStatus = isMutual ? "matched" : match.status || "pending";
         const notificationType = finalStatus === "matched" ? "match" : action === "superlike" ? "superlike" : "like";
         await db.collection("notifications").updateOne(
           { recipientUid: targetUid, senderUid: uid, type: notificationType },
