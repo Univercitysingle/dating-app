@@ -4832,13 +4832,36 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const [totalUsers, newUsers, activeUsers, pendingReports] = await Promise.all([
+      const purchases = db.collection("purchases");
+      const subscriptions = db.collection("subscriptions");
+      const [totalUsers, newUsers, activeUsers, pendingReports, openSupportTickets,
+        pendingPayments, pendingRefunds, activeSubscriptions, pendingVerifications] = await Promise.all([
         db.collection("users").countDocuments({}),
         db.collection("users").countDocuments({ createdAt: { $gte: since } }),
         db.collection("users").countDocuments({ lastActiveAt: { $gte: since } }),
-        db.collection("reports").countDocuments({ status: "pending_review" })
+        db.collection("reports").countDocuments({ status: "pending_review" }),
+        db.collection("supporttickets").countDocuments({ status: { $ne: "Closed" } }),
+        Promise.all([
+          purchases.countDocuments({ status: "pending" }),
+          subscriptions.countDocuments({ status: "pending" })
+        ]).then(([storePurchases, subscriptionCheckouts]) => storePurchases + subscriptionCheckouts),
+        Promise.all([
+          purchases.countDocuments({ status: "refund_required" }),
+          subscriptions.countDocuments({ status: "refund_required" })
+        ]).then(([storePurchases, subscriptionRefunds]) => storePurchases + subscriptionRefunds),
+        subscriptions.countDocuments({ status: "active" }),
+        access.role === "superadmin"
+          ? db.collection("photoVerifications").countDocuments({ status: "pending_review" })
+          : Promise.resolve(null)
       ]);
-      return { status: 200, body: { totalUsers, newUsers, activeUsers, pendingReports } };
+      return {
+        status: 200,
+        body: {
+          totalUsers, newUsers, activeUsers, pendingReports, openSupportTickets,
+          pendingPayments, pendingRefunds, activeSubscriptions,
+          ...(access.role === "superadmin" ? { pendingVerifications } : {})
+        }
+      };
     } catch {
       return { status: 503, body: { message: "Unable to load dashboard statistics" } };
     }
