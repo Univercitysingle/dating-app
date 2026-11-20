@@ -27,6 +27,11 @@ const ticketMessageSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  deletedMessage: {
+    type: String,
+    default: null,
+    select: false,
+  },
   deletedAt: {
     type: Date,
     default: null,
