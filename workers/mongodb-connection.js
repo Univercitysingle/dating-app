@@ -1109,13 +1109,21 @@ export class MongoDBConnection {
         // overwrite a reciprocal like committed by the other request between
         // our read and write. MongoDB evaluates this predicate atomically.
         if (isMutual) {
-          await matches.updateOne(
+          const mutualUpdate = await matches.updateOne(
             { _id: match._id, likedBy: { $all: [match.user1Uid, match.user2Uid] } },
             { $set: { status: "matched", updatedAt: now } }
           );
-          match.status = "matched";
+          if (mutualUpdate.matchedCount) {
+            match.status = "matched";
+          } else {
+            // An undo or moderation action may have changed the pair after our
+            // read. Re-read before deciding whether to notify either user.
+            match = await matches.findOne({ _id: match._id }) || match;
+          }
         }
-        const finalStatus = isMutual ? "matched" : match.status || "pending";
+        const latestLikedBy = Array.isArray(match.likedBy) ? match.likedBy : [];
+        const finalStatus = latestLikedBy.includes(match.user1Uid) && latestLikedBy.includes(match.user2Uid)
+          ? "matched" : match.status || "pending";
         const notificationType = finalStatus === "matched" ? "match" : action === "superlike" ? "superlike" : "like";
         await db.collection("notifications").updateOne(
           { recipientUid: targetUid, senderUid: uid, type: notificationType },
