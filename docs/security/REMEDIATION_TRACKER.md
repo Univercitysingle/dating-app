@@ -1,6 +1,6 @@
 # Security Remediation Tracker
 
-**Last reviewed:** 2026-11-19  
+**Last reviewed:** 2026-11-20  
 **Branch:** `migrate-to-serverless`  
 **Status:** Working remediation register. This is not a fresh penetration test or security certification.
 
@@ -269,3 +269,28 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Cloudflare Worker dependencies:** 0 findings in this run.
 - **Artifact:** `cve-dependency-audit-863696e95cceec15ab0a6e16df9eb4524f5920ee`, retained by GitHub Actions for 30 days. It contains root production, root full and Worker npm audit JSON reports.
 - **Disposition:** Audit infrastructure and fail-closed policy are verified. Dependency remediation remains open. Do not interpret a successful high/critical-threshold workflow as zero vulnerabilities: moderate production advisories remain.
+
+
+## Staging passive security scan evidence (2026-11-20)
+
+- **Environment:** Cloudflare Pages staging, `https://dating-app-staging.pages.dev`.
+- **Deployment:** [Pages workflow run 44696206021](https://github.com/Univercitysingle/dating-app/actions/runs/44696206021) completed successfully from source SHA `e3f459f88910482b3f5dc374d0d343a04e0a1de4`. Backend and frontend regression tests, SEO validation, build, deployment, deployed endpoint checks and ZAP passive baseline completed successfully.
+- **ZAP evidence:** The passive baseline crawled 41 URLs and reported 61 PASS checks, 7 warning categories and 0 FAIL alerts. The scan artifact is `zap-pages-after-deploy` in that workflow run.
+- **Warning categories requiring triage:**
+  - Cache-control directives: re-check response headers by route. `public/_headers` already applies private/no-store to authenticated app/API routes and short public caching to public pages.
+  - Cross-domain JavaScript inclusion: the current CSP explicitly allowlists Firebase/Google, Cloudflare Insights and jsDelivr. Confirm every observed script URL is required and trusted.
+  - Non-storable content: expected for authenticated application routes carrying private/no-store cache policy; verify no personalized response is cached publicly.
+  - Timestamp disclosure: inspect the referenced compiled bundle for sensitive build metadata; ordinary build timestamps are informational.
+  - Modern Web Application: informational technology fingerprint, not by itself a vulnerability.
+  - Missing Subresource Integrity: inventory external script references; add SRI only to stable, version-pinned resources where the integrity hash can be maintained safely.
+  - Missing/invalid Cross-Origin-Embedder-Policy: deferred. Do not add `require-corp` or `credentialless` blindly because Firebase popup authentication, third-party identity scripts and WebRTC/media resources require compatibility validation.
+- **Disposition:** No ZAP FAIL alerts were reported. These are passive-scan warnings, not confirmed exploitable findings. No header changes were made solely to silence the scanner. Authenticated DAST, API authorization tests and manual browser/call compatibility checks remain open.
+
+## Dependency remediation automation (2026-11-20)
+
+- **Finding:** The original six moderate production findings were caused by nested `rimraf`/ `glob`/ `minimatch` dependency versions. `npm audit fix --package-lock-only` did not remediate them because the required patched versions cross existing transitive semver ranges; the first automated remediation attempt correctly stopped without changing source.
+- **Patch floors selected for validation:** `glob >=14.0.5`, `minimatch >=11.0.9`, and `rimraf >=6.1.4`. These versions are above the published patched floors for the two relevant glob/minimatch advisories. Cross-major overrides must be tested against all consuming packages before acceptance.
+- **Change:** Added a migration-branch-only workflow that applies explicit overrides in root and backend manifests, regenerates lockfiles, requires zero moderate-or-higher production findings in both dependency trees, audits Worker dependencies, runs the regression suite, and opens a review PR rather than pushing dependency changes directly to the migration branch.
+- **Audit validator:** Removed the obsolete picomatch-specific exception and lockfile assumption. The validator now checks npm report structure and blocks high/critical findings; moderate thresholds are enforced separately by each production audit step. Regression tests cover clean, malformed, registry-error, high-severity and moderate-only reports.
+- **Commits:** `9d97d8737c6d862ab79bab46ecd037f52c67c319` (validator), `6809a66b27a45180f80d1fd691798bcabefd22f4` (tests), `f7f9e3e7135cbdab547316ff3f863d3858eae83e` (initial workflow), `eaadbaf4f2b27194d43bac9fabba97559579084f` (override and PR validation update).
+- **Evidence status:** Initial semver-only remediation run [44701317976](https://github.com/Univercitysingle/dating-app/actions/runs/44701317976) failed at `npm audit fix` and produced no PR. The override-based validation run [44701433985](https://github.com/Univercitysingle/dating-app/actions/runs/44701433985) was still running when this tracker entry was written. Do not mark the dependency findings closed until the run and generated PR both pass review.
