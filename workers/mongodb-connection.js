@@ -17,6 +17,13 @@ export function isValidEmailAddress(value) {
   );
 }
 
+export function normalizeWebXPayReference(value) {
+  if (typeof value !== "string") return null;
+  const reference = value.trim();
+  if (!reference || reference.length > 128 || /[\\u0000-\\u001f\\u007f]/.test(reference)) return null;
+  return reference;
+}
+
 export function isValidWebXPayTransactionDate(value) {
   if (typeof value !== "string") return false;
   const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
@@ -2288,12 +2295,13 @@ export class MongoDBConnection {
   async settleWebXPay(orderId, statusCode, reference = "", gatewayMetadata = {}) {
     if (typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId) ||
         !["0", "00", "15"].includes(String(statusCode)) ||
-        (reference && (typeof reference !== "string" || reference.length > 128)) ||
+        (!normalizeWebXPayReference(reference)) ||
         (gatewayMetadata.transactionDate && (typeof gatewayMetadata.transactionDate !== "string" || !isValidWebXPayTransactionDate(gatewayMetadata.transactionDate))) ||
         (gatewayMetadata.gatewayId && (typeof gatewayMetadata.gatewayId !== "string" || gatewayMetadata.gatewayId.length > 32)) ||
         (gatewayMetadata.gatewayComment && (typeof gatewayMetadata.gatewayComment !== "string" || gatewayMetadata.gatewayComment.length > 256))) {
       return { status: 400, body: { error: "Invalid payment response" } };
     }
+    const normalizedReference = normalizeWebXPayReference(reference);
     let outcome = { status: 503, body: { error: "Payment settlement unavailable" } };
     let session;
     try {
@@ -2326,7 +2334,7 @@ export class MongoDBConnection {
               status: "refund_required",
               refundReviewRequired: true,
               refundReason: "late_success_after_cancelled_checkout",
-              paymentReference: String(reference).slice(0, 128),
+              paymentReference: normalizedReference,
               ...(gatewayMetadata.transactionDate ? { gatewayTransactionDate: gatewayMetadata.transactionDate } : {}),
               ...(gatewayMetadata.gatewayId ? { paymentGatewayId: gatewayMetadata.gatewayId } : {}),
               ...(gatewayMetadata.gatewayComment ? { paymentGatewayComment: gatewayMetadata.gatewayComment } : {}),
@@ -2365,8 +2373,8 @@ export class MongoDBConnection {
         // The WebXPay order reference is the unique provider transaction
         // reference. Its gateway_id field identifies the payment method and is
         // intentionally not used as a uniqueness key.
-        if (typeof reference === "string" && reference.trim()) {
-          const duplicateQuery = { _id: { $ne: record._id }, paymentReference: reference };
+        if (normalizedReference) {
+          const duplicateQuery = { _id: { $ne: record._id }, paymentReference: normalizedReference };
           const [duplicatePurchase, duplicateSubscription] = await Promise.all([
             purchases.findOne(duplicateQuery, { session }),
             subscriptions.findOne(duplicateQuery, { session })
