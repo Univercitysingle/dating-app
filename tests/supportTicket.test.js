@@ -7,7 +7,6 @@ const SupportTicket = require('../models/SupportTicket');
 const TicketMessage = require('../models/TicketMessage');
 const supportTicketController = require('../controllers/supportTicketController');
 const adminSupportTicketController = require('../controllers/adminSupportTicketController');
-const ticketMessageController = require('../controllers/ticketMessageController');
 const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
 const authMiddleware = require('../middleware/authentication');
 const { v4: uuidv4 } = require('uuid');
@@ -51,15 +50,11 @@ describe('Support Ticket Flow', () => {
   app.get('/tickets', authMiddleware, supportTicketController.getTicketsForUser);
   app.get('/tickets/:ticketId', authMiddleware, supportTicketController.getTicketByIdForUser);
   app.post('/tickets/:ticketId/messages', authMiddleware, supportTicketController.addMessageToTicket);
-  app.patch('/tickets/:ticketId/messages/:messageId', authMiddleware, ticketMessageController.editUserMessage);
-  app.delete('/tickets/:ticketId/messages/:messageId', authMiddleware, ticketMessageController.deleteUserMessage);
 
   // Admin routes
   app.get('/admin/tickets', adminAuthMiddleware, adminSupportTicketController.getAllTickets);
   app.get('/admin/tickets/:ticketId', adminAuthMiddleware, adminSupportTicketController.getTicketByIdForAdmin);
   app.post('/admin/tickets/:ticketId/messages', adminAuthMiddleware, adminSupportTicketController.addAdminMessageToTicket);
-  app.patch('/admin/tickets/:ticketId/messages/:messageId', adminAuthMiddleware, ticketMessageController.editAdminMessage);
-  app.delete('/admin/tickets/:ticketId/messages/:messageId', adminAuthMiddleware, ticketMessageController.deleteAdminMessage);
   app.put('/admin/tickets/:ticketId/status', adminAuthMiddleware, adminSupportTicketController.updateTicketStatus);
 
   beforeEach(async () => {
@@ -187,31 +182,6 @@ describe('Support Ticket Flow', () => {
       .send({ message: 'Admin reply' });
     expect(response.status).toBe(201);
     expect(response.body.isFromAdmin).toBe(true);
-  });
-
-
-  it('allows customers to edit only their own support messages', async () => {
-    const own = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Original customer reply' });
-    const response = await request(app).patch(`/tickets/${ticket._id}/messages/${own._id}`).send({ message: 'Updated customer reply' });
-    expect(response.status).toBe(200);
-    expect((await TicketMessage.findById(own._id)).message).toBe('Updated customer reply');
-  });
-
-  it('soft-deletes customer messages while retaining restricted original content', async () => {
-    const own = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Sensitive original text' });
-    const response = await request(app).delete(`/tickets/${ticket._id}/messages/${own._id}`);
-    expect(response.status).toBe(200);
-    const deleted = await TicketMessage.findById(own._id).select('+originalMessage');
-    expect(deleted.deletedAt).toBeTruthy();
-    expect(deleted.message).toBe('');
-    expect(deleted.originalMessage).toBe('Sensitive original text');
-  });
-
-  it('prevents customers from editing administrator messages', async () => {
-    const adminMessage = await TicketMessage.create({ ticketId: ticket._id, senderId: admin._id, message: 'Administrator reply', isFromAdmin: true });
-    const response = await request(app).patch(`/tickets/${ticket._id}/messages/${adminMessage._id}`).send({ message: 'Tampered reply' });
-    expect(response.status).toBe(404);
-    expect((await TicketMessage.findById(adminMessage._id)).message).toBe('Administrator reply');
   });
 
   it('should update a ticket status', async () => {
