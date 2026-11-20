@@ -2343,18 +2343,11 @@ export class MongoDBConnection {
           outcome = { status: 409, body: { error: "Transaction is no longer pending." } };
           return;
         }
-        // Provider references and gateway transaction IDs must not be attached
-        // to a second order. Check both collections inside the same MongoDB
-        // transaction before changing status or granting an entitlement.
-        const duplicatePaymentFields = [];
+        // The WebXPay order reference is the unique provider transaction
+        // reference. Its gateway_id field identifies the payment method and is
+        // intentionally not used as a uniqueness key.
         if (typeof reference === "string" && reference.trim()) {
-          duplicatePaymentFields.push({ paymentReference: reference });
-        }
-        if (typeof gatewayMetadata.gatewayId === "string" && gatewayMetadata.gatewayId.trim()) {
-          duplicatePaymentFields.push({ paymentGatewayId: gatewayMetadata.gatewayId });
-        }
-        if (duplicatePaymentFields.length) {
-          const duplicateQuery = { _id: { $ne: record._id }, $or: duplicatePaymentFields };
+          const duplicateQuery = { _id: { $ne: record._id }, paymentReference: reference };
           const [duplicatePurchase, duplicateSubscription] = await Promise.all([
             purchases.findOne(duplicateQuery, { session }),
             subscriptions.findOne(duplicateQuery, { session })
@@ -2362,7 +2355,7 @@ export class MongoDBConnection {
           if (duplicatePurchase || duplicateSubscription) {
             outcome = {
               status: 409,
-              body: { error: "This provider transaction is already linked to another order." }
+              body: { error: "This provider transaction reference is already linked to another order." }
             };
             return;
           }
@@ -4921,8 +4914,7 @@ export class MongoDBConnection {
       ];
       const anomalies = [];
       const references = new Map();
-      const gatewayIds = new Map();
-      const addDuplicate = (map, value, record, kind) => {
+      const addDuplicate = (map, value, record) => {
         if (typeof value !== "string" || !value.trim()) return;
         const key = value.trim();
         const prior = map.get(key) || [];
@@ -4951,17 +4943,16 @@ export class MongoDBConnection {
           anomalies.push({ ...base, reason: "stale_pending", recommendedAction: "Check provider transaction before cancelling or retrying." });
         }
         const hasPaymentReference = typeof record.paymentReference === "string" && Boolean(record.paymentReference.trim());
-        const hasGatewayId = typeof record.paymentGatewayId === "string" && Boolean(record.paymentGatewayId.trim());
+        const hasPaymentMethod = typeof record.paymentGatewayId === "string" && Boolean(record.paymentGatewayId.trim());
         // Older Stripe/PayHere records may legitimately predate WebXPay metadata.
-        // Flag only partially populated gateway metadata, not legacy records with neither field.
-        if (["completed", "active"].includes(record.status) && hasPaymentReference !== hasGatewayId) {
-          anomalies.push({ ...base, reason: "partial_gateway_metadata", recommendedAction: "Compare the payment reference and gateway transaction ID with the provider merchant statement." });
+        // The WebXPay gateway ID identifies the payment method, not a unique transaction.
+        if (["completed", "active"].includes(record.status) && hasPaymentReference !== hasPaymentMethod) {
+          anomalies.push({ ...base, reason: "partial_gateway_metadata", recommendedAction: "Compare the provider order reference and payment method metadata with the merchant statement." });
         }
         if (record.status === "refund_required") {
           anomalies.push({ ...base, reason: "refund_review_required", recommendedAction: "Verify the captured payment and process the refund through the merchant portal." });
         }
-        addDuplicate(references, record.paymentReference, record, "reference");
-        addDuplicate(gatewayIds, record.paymentGatewayId, record, "gateway");
+        addDuplicate(references, record.paymentReference, record);
       }
       for (const [value, matches] of references) {
         if (matches.length > 1) anomalies.push({
@@ -4969,14 +4960,6 @@ export class MongoDBConnection {
           duplicateValue: value,
           transactions: matches,
           recommendedAction: "Verify whether the provider reference was reused or incorrectly attached."
-        });
-      }
-      for (const [value, matches] of gatewayIds) {
-        if (matches.length > 1) anomalies.push({
-          reason: "duplicate_gateway_transaction_id",
-          duplicateValue: value,
-          transactions: matches,
-          recommendedAction: "Verify gateway transaction identity before changing any entitlement."
         });
       }
       return {
