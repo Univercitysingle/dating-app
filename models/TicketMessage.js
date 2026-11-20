@@ -31,6 +31,12 @@ const ticketMessageSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  attachments: [{
+    key: { type: String, required: true },
+    name: { type: String, required: true },
+    type: { type: String, default: '' },
+    url: { type: String, required: true },
+  }],
   deletedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
