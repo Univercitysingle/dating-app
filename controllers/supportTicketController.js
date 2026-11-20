@@ -67,7 +67,7 @@ const getTicketByIdForUser = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    const messages = await TicketMessage.find({ ticketId, isInternalNote: { $ne: true } }).sort({ createdAt: 'asc' }).populate('senderId', 'name');
+    const messages = await TicketMessage.find({ ticketId, isInternalNote: { $ne: true } }).select('-deletedMessage').sort({ createdAt: 'asc' }).populate('senderId', 'name');
 
     res.json({ ticket, messages });
   } catch (error) {
@@ -154,13 +154,18 @@ const deleteOwnTicketMessage = async (req, res) => {
     const ticket = await SupportTicket.findOne({ _id: ticketId, userId: req.user._id });
     if (!ticket) return res.status(404).json({ message: 'Ticket not found.' });
     const cutoff = new Date(Date.now() - 60 * 60 * 1000);
-    const deleted = await TicketMessage.findOneAndUpdate({
+    const target = await TicketMessage.findOne({
       _id: messageId, ticketId, senderId: req.user._id,
       isFromAdmin: false, isInternalNote: false, deletedAt: null,
       createdAt: { $gte: cutoff },
-    }, { $set: { deletedAt: new Date(), deletedBy: req.user._id, message: 'This message was deleted.' } }, { new: true });
-    if (!deleted) return res.status(403).json({ message: 'This message cannot be deleted. The deletion window may have expired.' });
-    return res.json({ success: true, message: 'Message deleted.', ticketMessage: deleted });
+    }).select('+deletedMessage');
+    if (!target) return res.status(403).json({ message: 'This message cannot be deleted. The deletion window may have expired.' });
+    target.deletedMessage = target.message;
+    target.message = 'This message was deleted.';
+    target.deletedAt = new Date();
+    target.deletedBy = req.user._id;
+    await target.save();
+    return res.json({ success: true, message: 'Message deleted.', ticketMessage: target });
   } catch (error) {
     console.error('Error deleting support message:', error);
     return res.status(500).json({ message: 'Unable to delete this message.' });
