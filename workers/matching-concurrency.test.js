@@ -9,6 +9,7 @@ test("simultaneous reciprocal likes create one canonical matched record", async 
   let releaseInitialReads;
   const bothInitialReads = new Promise(resolve => { releaseInitialReads = resolve; });
   let uniqueIndexOptions = null;
+  const matchStatusWrites = [];
 
   const matches = {
     async createIndex(keys, options) {
@@ -46,7 +47,10 @@ test("simultaneous reciprocal likes create one canonical matched record", async 
         (filter.pairKey && item.pairKey === filter.pairKey)
       );
       if (!match) return { matchedCount: 0 };
-      if (update.$set) Object.assign(match, update.$set);
+      if (update.$set) {
+        if (Object.prototype.hasOwnProperty.call(update.$set, "status")) matchStatusWrites.push(update.$set.status);
+        Object.assign(match, update.$set);
+      }
       if (update.$addToSet) {
         for (const [key, value] of Object.entries(update.$addToSet)) {
           if (!Array.isArray(match[key])) match[key] = [];
@@ -95,6 +99,7 @@ test("simultaneous reciprocal likes create one canonical matched record", async 
   assert.deepEqual([storedMatches[0].user1Uid, storedMatches[0].user2Uid], ["alice", "bob"]);
   assert.deepEqual(new Set(storedMatches[0].likedBy), new Set(["alice", "bob"]));
   assert.equal(storedMatches[0].status, "matched");
+  assert.ok(matchStatusWrites.every(status => status === "matched"), "a concurrent swipe must never write stale pending status over a mutual match");
   assert.equal(aliceResult.status, 200);
   assert.equal(bobResult.status, 200);
   assert.ok([aliceResult.body.status, bobResult.body.status].includes("matched"));
