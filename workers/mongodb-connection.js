@@ -2976,9 +2976,14 @@ export class MongoDBConnection {
       if (!adminAction) Object.assign(messageQuery, { senderId: actor._id, isFromAdmin: { $ne: true }, isInternalNote: { $ne: true } });
       const message = await db.collection("ticketmessages").findOne(messageQuery);
       if (!message) return { status: 404, body: { message: "Message not found" } };
-      if (!adminAction && Date.now() - new Date(message.createdAt).getTime() > 15 * 60 * 1000) {
+      const createdAtMs = new Date(message.createdAt).getTime();
+      if (!adminAction && (!Number.isFinite(createdAtMs) || createdAtMs > Date.now() || Date.now() - createdAtMs > 15 * 60 * 1000)) {
         return { status: 403, body: { message: "Messages can only be edited within 15 minutes of sending." } };
       }
+      // Use optimistic concurrency so simultaneous edits cannot overwrite one
+      // another after both have written separate audit entries.
+      if (message.updatedAt) messageQuery.updatedAt = message.updatedAt;
+      else messageQuery.updatedAt = { $exists: false };
       const now = new Date();
       const auditLogs = db.collection("auditlogs");
       const auditResult = await auditLogs.insertOne({
@@ -3020,9 +3025,13 @@ export class MongoDBConnection {
       if (!adminAction) Object.assign(messageQuery, { senderId: actor._id, isFromAdmin: { $ne: true }, isInternalNote: { $ne: true } });
       const message = await db.collection("ticketmessages").findOne(messageQuery);
       if (!message) return { status: 404, body: { message: "Message not found" } };
-      if (!adminAction && Date.now() - new Date(message.createdAt).getTime() > 60 * 60 * 1000) {
+      const createdAtMs = new Date(message.createdAt).getTime();
+      if (!adminAction && (!Number.isFinite(createdAtMs) || createdAtMs > Date.now() || Date.now() - createdAtMs > 60 * 60 * 1000)) {
         return { status: 403, body: { message: "Messages can only be deleted within one hour of sending." } };
       }
+      // Keep deletion atomic with respect to edits or another deletion.
+      if (message.updatedAt) messageQuery.updatedAt = message.updatedAt;
+      else messageQuery.updatedAt = { $exists: false };
       const now = new Date();
       const auditLogs = db.collection("auditlogs");
       const auditResult = await auditLogs.insertOne({
