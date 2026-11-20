@@ -50,12 +50,16 @@ describe('Support Ticket Flow', () => {
   app.get('/tickets', authMiddleware, supportTicketController.getTicketsForUser);
   app.get('/tickets/:ticketId', authMiddleware, supportTicketController.getTicketByIdForUser);
   app.post('/tickets/:ticketId/messages', authMiddleware, supportTicketController.addMessageToTicket);
+  app.patch('/tickets/:ticketId/messages/:messageId', authMiddleware, supportTicketController.editOwnTicketMessage);
+  app.delete('/tickets/:ticketId/messages/:messageId', authMiddleware, supportTicketController.deleteOwnTicketMessage);
 
   // Admin routes
   app.get('/admin/tickets', adminAuthMiddleware, adminSupportTicketController.getAllTickets);
   app.get('/admin/tickets/:ticketId', adminAuthMiddleware, adminSupportTicketController.getTicketByIdForAdmin);
   app.post('/admin/tickets/:ticketId/messages', adminAuthMiddleware, adminSupportTicketController.addAdminMessageToTicket);
   app.put('/admin/tickets/:ticketId/status', adminAuthMiddleware, adminSupportTicketController.updateTicketStatus);
+  app.patch('/admin/tickets/:ticketId/messages/:messageId', adminAuthMiddleware, adminSupportTicketController.editTicketMessageAsAdmin);
+  app.delete('/admin/tickets/:ticketId/messages/:messageId', adminAuthMiddleware, adminSupportTicketController.deleteTicketMessageAsAdmin);
 
   beforeEach(async () => {
     mockUserId = new mongoose.Types.ObjectId();
@@ -182,6 +186,38 @@ describe('Support Ticket Flow', () => {
       .send({ message: 'Admin reply' });
     expect(response.status).toBe(201);
     expect(response.body.isFromAdmin).toBe(true);
+  });
+
+
+  it('allows customers to edit only their own recent ticket messages', async () => {
+    const message = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Original' });
+    const response = await request(app).patch(`/tickets/${ticket._id}/messages/${message._id}`).send({ message: 'Updated' });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe('Updated');
+    expect(response.body.editedAt).toBeTruthy();
+  });
+
+  it('prevents customers from editing admin messages', async () => {
+    const message = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Staff reply', isFromAdmin: true });
+    const response = await request(app).patch(`/tickets/${ticket._id}/messages/${message._id}`).send({ message: 'Tampered' });
+    expect(response.status).toBe(403);
+    expect((await TicketMessage.findById(message._id)).message).toBe('Staff reply');
+  });
+
+  it('soft deletes customer messages while retaining original text for restricted admin review', async () => {
+    const message = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Sensitive original text' });
+    const response = await request(app).delete(`/tickets/${ticket._id}/messages/${message._id}`);
+    expect(response.status).toBe(200);
+    const stored = await TicketMessage.findById(message._id).select('+deletedMessage');
+    expect(stored.message).toBe('This message was deleted.');
+    expect(stored.deletedMessage).toBe('Sensitive original text');
+    expect(stored.deletedAt).toBeTruthy();
+  });
+
+  it('prevents customers from editing messages after the 15-minute window', async () => {
+    const message = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Old message', createdAt: new Date(Date.now() - 16 * 60 * 1000) });
+    const response = await request(app).patch(`/tickets/${ticket._id}/messages/${message._id}`).send({ message: 'Too late' });
+    expect(response.status).toBe(403);
   });
 
   it('should update a ticket status', async () => {
