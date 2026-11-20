@@ -431,3 +431,71 @@ test("chat message edit and delete enforce their time windows for the original s
   assert.equal(deleted.status, 403);
   assert.match(deleted.body.error, /one hour/);
 });
+
+
+test("a newly matched pair can load an empty chat history before its first message", async () => {
+  const observedQueries = [];
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          return { uid, role: "user", blocked: [], accountStatus: "active" };
+        }
+      };
+      if (name === "matches") return {
+        async findOne() { return { status: "matched" }; }
+      };
+      if (name === "chatmessages") return {
+        async findOne() { return null; },
+        find(query) {
+          observedQueries.push(query);
+          return {
+            sort() { return this; },
+            skip() { return this; },
+            limit() { return this; },
+            maxTimeMS() { return this; },
+            async toArray() { return []; }
+          };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getChatHistory("alice", "alice-bob");
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.messages, []);
+  assert.deepEqual(observedQueries[0].$or, [
+    { senderUid: "alice", receiverUid: "bob" },
+    { senderUid: "bob", receiverUid: "alice" }
+  ]);
+});
+
+test("an empty chat history cannot be opened for a non-match or an unmatched pair", async () => {
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          return { uid, role: "user", blocked: [], accountStatus: "active" };
+        }
+      };
+      if (name === "matches") return {
+        async findOne() { return { status: "unmatched" }; }
+      };
+      if (name === "chatmessages") return {
+        async findOne() { return null; },
+        find() { assert.fail("Unauthorized empty chat must not query message history"); }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getChatHistory("alice", "alice-bob");
+
+  assert.equal(result.status, 403);
+});
