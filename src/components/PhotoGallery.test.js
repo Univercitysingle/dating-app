@@ -39,6 +39,19 @@ describe('PhotoGallery', () => {
     expect(screen.getByAltText('User photo 1')).toBeInTheDocument();
   });
 
+  it('keeps the selected photo index valid when the photo list shrinks', () => {
+    const { rerender } = render(<PhotoGallery photos={photos} />);
+    const image = screen.getByAltText('User photo 1');
+    const rightSide = image.nextSibling.lastChild;
+    fireEvent.click(rightSide);
+    fireEvent.click(rightSide);
+    expect(screen.getByAltText('User photo 3')).toBeInTheDocument();
+
+    rerender(<PhotoGallery photos={photos.slice(0, 2)} />);
+    expect(screen.getByAltText('User photo 2')).toBeInTheDocument();
+    expect(screen.queryByAltText('User photo 3')).not.toBeInTheDocument();
+  });
+
   it('renders the correct number of indicator bars', () => {
     render(<PhotoGallery photos={photos} />);
     const indicators = screen.getByAltText('User photo 1').previousSibling;
