@@ -105,6 +105,7 @@ const SwipeDeck = () => {
   const [error, setError] = useState(null);
   const [swipeError, setSwipeError] = useState(null);
   const [isVoting, setIsVoting] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [newMatchInfo, setNewMatchInfo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState({});
@@ -203,7 +204,7 @@ const SwipeDeck = () => {
   }, [swipeError]);
 
   const handleVote = async (userId, direction) => {
-    if (!userId || isVoting) return;
+    if (!userId || isVoting || isUndoing) return;
     const selectedUser = users.find((candidate) => candidate.uid === userId);
     if (!selectedUser) return;
 
@@ -246,14 +247,14 @@ const SwipeDeck = () => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp') return;
       const target = event.target;
       if (target instanceof HTMLElement && (target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(target.tagName))) return;
-      if (isVoting || newMatchInfo || showFilters || !users[0]) return;
+      if (isVoting || isUndoing || newMatchInfo || showFilters || !users[0]) return;
       event.preventDefault();
       const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : 'superlike';
       handleVote(users[0].uid, direction);
     };
     window.addEventListener('keydown', handleSwipeKeys);
     return () => window.removeEventListener('keydown', handleSwipeKeys);
-  }, [users, isVoting, newMatchInfo, showFilters, handleVote]);
+  }, [users, isVoting, isUndoing, newMatchInfo, showFilters, handleVote]);
 
   const handleSwipe = () => {
     // This function is called when the card animation is complete
@@ -261,6 +262,9 @@ const SwipeDeck = () => {
   };
 
   const handleUndo = async () => {
+    if (isVoting || isUndoing) return;
+    setIsUndoing(true);
+    setSwipeError(null);
     try {
       const response = await apiClient.post('/swipe/undo');
       if (response && response.undoneUser) {
@@ -269,6 +273,8 @@ const SwipeDeck = () => {
     } catch (err) {
       console.error("Error undoing swipe:", err);
       setSwipeError(getUserFriendlyError(err, 'Your last action could not be undone. Please try again.'));
+    } finally {
+      setIsUndoing(false);
     }
   };
 
@@ -395,7 +401,7 @@ const SwipeDeck = () => {
                         onClick={() => handleVote(users[0]?.uid, 'left')}
                         className="discover-action-button discover-action-pass p-4 bg-white rounded-full shadow-lg hover:bg-red-100 transition-all transform hover:scale-110"
                         aria-label="Pass"
-                        disabled={!users[0] || isVoting}
+                        disabled={!users[0] || isVoting || isUndoing}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -429,9 +435,10 @@ const SwipeDeck = () => {
                         type="button"
                         title="Undo last swipe"
                         onClick={handleUndo}
-                        disabled={isVoting}
+                        disabled={isVoting || isUndoing}
+                        aria-busy={isUndoing}
                         className="discover-action-button discover-action-undo p-4 bg-white rounded-full shadow-lg hover:bg-yellow-100 transition-all transform hover:scale-110"
-                        aria-label="Undo"
+                        aria-label={isUndoing ? 'Undoing last swipe' : 'Undo last swipe'}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 002.828 0L18 12.828M3 12l6.414-6.414a2 2 0 012.828 0L18 12.828" />
