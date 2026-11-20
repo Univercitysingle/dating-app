@@ -139,3 +139,36 @@ test("honours a zero-second Firebase signing-key cache lifetime", async () => {
   await verifyFirebaseIdToken(makeToken(), projectId, { now: now * 1000, fetchImpl, jwksCache });
   assert.equal(fetchCount, 2);
 });
+
+
+test("rejects a Firebase user_id claim that does not match the signed subject", async () => {
+  await assert.rejects(
+    verifyFirebaseIdToken(makeToken({ user_id: "different-firebase-user" }), projectId, {
+      now: now * 1000,
+      fetchImpl: mockFetch()
+    }),
+    FirebaseTokenError
+  );
+});
+
+test("rejects authentication timestamps later than token issuance", async () => {
+  await assert.rejects(
+    verifyFirebaseIdToken(makeToken({ iat: now - 120, auth_time: now - 60 }), projectId, {
+      now: now * 1000,
+      fetchImpl: mockFetch()
+    }),
+    FirebaseTokenError
+  );
+});
+
+test("rejects non-numeric Firebase time claims", async () => {
+  for (const overrides of [{ exp: "never" }, { iat: "now" }, { auth_time: null }]) {
+    await assert.rejects(
+      verifyFirebaseIdToken(makeToken(overrides), projectId, {
+        now: now * 1000,
+        fetchImpl: mockFetch()
+      }),
+      FirebaseTokenError
+    );
+  }
+});
