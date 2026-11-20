@@ -19,6 +19,8 @@ on:
       - 'services/**'
       - 'utils/**'
       - 'tests/**'
+      - 'jest.config.js'
+      - 'jest.backend.config.js'
       - 'backend/**'
       - 'server.js'
       - 'tailwind.config.*'
