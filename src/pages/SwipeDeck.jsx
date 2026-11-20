@@ -413,7 +413,7 @@ const SwipeDeck = () => {
                         onClick={() => handleVote(users[0]?.uid, 'superlike')}
                         className="discover-action-button discover-action-superlike p-4 bg-white rounded-full shadow-lg hover:bg-blue-100 transition-all transform hover:scale-110"
                         aria-label="Super Like"
-                        disabled={!users[0] || isVoting}
+                        disabled={!users[0] || isVoting || isUndoing}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
                           <path d="M.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -425,7 +425,7 @@ const SwipeDeck = () => {
                         onClick={() => handleVote(users[0]?.uid, 'right')}
                         className="discover-action-button discover-action-like p-5 bg-white rounded-full shadow-lg hover:bg-green-100 transition-all transform hover:scale-110"
                         aria-label="Like"
-                        disabled={!users[0] || isVoting}
+                        disabled={!users[0] || isVoting || isUndoing}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
