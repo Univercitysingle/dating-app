@@ -5922,12 +5922,44 @@ export class MongoDBConnection {
           participantQuery,
           { projection: { senderUid: 1, receiverUid: 1 } }
         );
-        if (!conversation) return { status: 403, body: { error: "Unauthorized to view this chat history." } };
-        const otherUid = conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid;
-        if (await this.isCallPairUnavailable(db, uid, otherUid)) {
-          return { status: 403, body: { error: "Chat history is unavailable for this conversation." } };
+
+        if (conversation) {
+          const otherUid = conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid;
+          if (await this.isCallPairUnavailable(db, uid, otherUid)) {
+            return { status: 403, body: { error: "Chat history is unavailable for this conversation." } };
+          }
+          query = participantQuery;
+        } else {
+          // A new mutual match has no persisted chat message yet. Resolve the
+          // peer only from an exact authenticated UID boundary, then require
+          // an active match and both accounts to remain eligible. This allows
+          // the first message without granting access to arbitrary room IDs.
+          const prefix = uid + "-";
+          const suffix = "-" + uid;
+          const otherUid = roomId.startsWith(prefix)
+            ? roomId.slice(prefix.length)
+            : roomId.endsWith(suffix) ? roomId.slice(0, -suffix.length) : "";
+          if (!otherUid || otherUid === uid || otherUid.length > 128) {
+            return { status: 403, body: { error: "Unauthorized to view this chat history." } };
+          }
+          const match = await db.collection("matches").findOne({
+            $or: [
+              { user1Uid: uid, user2Uid: otherUid },
+              { user1Uid: otherUid, user2Uid: uid }
+            ]
+          }, { projection: { status: 1 } });
+          if (!match || match.status !== "matched" ||
+              await this.isCallPairUnavailable(db, uid, otherUid)) {
+            return { status: 403, body: { error: "Chat history is unavailable for this conversation." } };
+          }
+          query = {
+            roomId,
+            $or: [
+              { senderUid: uid, receiverUid: otherUid },
+              { senderUid: otherUid, receiverUid: uid }
+            ]
+          };
         }
-        query = participantQuery;
       }
       let messages;
       if (after || before) {
