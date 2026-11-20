@@ -15,6 +15,11 @@ const metricCards = [
   { title: 'New users', key: 'newUsers', description: 'Sign-ups in the last 24 hours', icon: '↗', tone: 'sky' },
   { title: 'Active users', key: 'activeUsers', description: 'Activity in the last 24 hours', icon: '◉', tone: 'emerald' },
   { title: 'Pending reports', key: 'pendingReports', description: 'Awaiting moderation review', icon: '⚑', tone: 'amber' },
+  { title: 'Active subscriptions', key: 'activeSubscriptions', description: 'Currently active paid plans', icon: '◇', tone: 'violet' },
+  { title: 'Pending payments', key: 'pendingPayments', description: 'Awaiting verified gateway callbacks', icon: '◷', tone: 'amber' },
+  { title: 'Refund reviews', key: 'pendingRefunds', description: 'Require payment-provider reconciliation', icon: '↺', tone: 'rose' },
+  { title: 'Open support tickets', key: 'openSupportTickets', description: 'Customer requests not yet closed', icon: '▤', tone: 'sky' },
+  { title: 'Pending verifications', key: 'pendingVerifications', description: 'Awaiting photo verification review', icon: '▧', tone: 'indigo', superadminOnly: true },
 ];
 
 const quickLinks = [
@@ -127,7 +132,7 @@ const AdminDashboardPage = () => {
           {lastUpdated && <p className="text-xs text-slate-400">Last updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-          {metricCards.map((metric) => <StatCard key={metric.key} metric={metric} value={stats?.[metric.key]} loading={isLoading && !stats} />)}
+          {metricCards.filter((metric) => !metric.superadminOnly || adminUser?.role === 'superadmin').map((metric) => <StatCard key={metric.key} metric={metric} value={stats?.[metric.key]} loading={isLoading && !stats} />)}
         </div>
       </section>
 
