@@ -4834,13 +4834,26 @@ export class MongoDBConnection {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const purchases = db.collection("purchases");
       const subscriptions = db.collection("subscriptions");
+      const tickets = db.collection("supporttickets");
+      const activeTicketFilter = { status: { $in: ["Open", "In Progress", "Waiting for Customer"] } };
       const [totalUsers, newUsers, activeUsers, pendingReports, openSupportTickets,
+        overdueSupportTickets, unassignedSupportTickets, urgentSupportTickets,
         pendingPayments, pendingRefunds, activeSubscriptions, pendingVerifications] = await Promise.all([
         db.collection("users").countDocuments({}),
         db.collection("users").countDocuments({ createdAt: { $gte: since } }),
         db.collection("users").countDocuments({ lastActiveAt: { $gte: since } }),
         db.collection("reports").countDocuments({ status: "pending_review" }),
-        db.collection("supporttickets").countDocuments({ status: { $ne: "Closed" } }),
+        tickets.countDocuments(activeTicketFilter),
+        tickets.countDocuments({ ...activeTicketFilter, slaDueAt: { $lt: new Date() } }),
+        tickets.countDocuments({
+          ...activeTicketFilter,
+          $or: [
+            { assignedToUid: { $exists: false } },
+            { assignedToUid: null },
+            { assignedToUid: "" }
+          ]
+        }),
+        tickets.countDocuments({ ...activeTicketFilter, priority: "Urgent" }),
         Promise.all([
           purchases.countDocuments({ status: "pending" }),
           subscriptions.countDocuments({ status: "pending" })
@@ -4858,6 +4871,7 @@ export class MongoDBConnection {
         status: 200,
         body: {
           totalUsers, newUsers, activeUsers, pendingReports, openSupportTickets,
+          overdueSupportTickets, unassignedSupportTickets, urgentSupportTickets,
           pendingPayments, pendingRefunds, activeSubscriptions,
           ...(access.role === "superadmin" ? { pendingVerifications } : {})
         }
