@@ -24,7 +24,7 @@ test("WebXPay provider references are required, trimmed and bounded", () => {
   assert.equal(normalizeWebXPayReference(" provider-ref-123 "), "provider-ref-123");
   assert.equal(normalizeWebXPayReference("   "), null);
   assert.equal(normalizeWebXPayReference("x".repeat(129)), null);
-  assert.equal(normalizeWebXPayReference("ref\\ninvalid"), null);
+  assert.equal(normalizeWebXPayReference("ref\ninvalid"), null);
   assert.equal(normalizeWebXPayReference(null), null);
 });
 
