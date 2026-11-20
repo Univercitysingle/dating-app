@@ -5825,7 +5825,7 @@ test("account data export rejects invalid identity and reports database failures
 });
 
 
-test("superadmin payment reconciliation flags stale, incomplete, refund and duplicate gateway records without mutating payments", async () => {
+test("superadmin payment reconciliation flags stale, incomplete, refund and duplicate references without treating payment methods as unique", async () => {
   const old = new Date(Date.now() - 60 * 60 * 1000);
   const recent = new Date();
   const observed = [];
@@ -5841,14 +5841,14 @@ test("superadmin payment reconciliation flags stale, incomplete, refund and dupl
       if (name === "purchases") return {
         find: () => cursor([
           { _id: "p1", status: "pending", createdAt: old, itemPrice: 100 },
-          { _id: "p2", status: "completed", createdAt: recent, itemPrice: 200, paymentReference: "ref-duplicate", paymentGatewayId: "gateway-duplicate" },
-          { _id: "p3", status: "completed", createdAt: recent, itemPrice: 200, paymentReference: "ref-duplicate", paymentGatewayId: "gateway-duplicate" },
+          { _id: "p2", status: "completed", createdAt: recent, itemPrice: 200, paymentReference: "ref-duplicate", paymentGatewayId: "1" },
+          { _id: "p3", status: "completed", createdAt: recent, itemPrice: 200, paymentReference: "ref-duplicate", paymentGatewayId: "1" },
           { _id: "p4", status: "refund_required", createdAt: recent, paymentReference: "late-ref", paymentGatewayId: "late-gateway" }
         ])
       };
       if (name === "subscriptions") return {
         find: () => cursor([
-          { _id: "s1", status: "active", createdAt: recent, plan: "monthly", paymentReference: "subscription-ref" },
+          { _id: "s1", status: "active", createdAt: recent, plan: "monthly", paymentReference: "subscription-ref", paymentGatewayId: "1" },
           { _id: "s2", status: "pending", createdAt: recent },
           { _id: "s3", status: "active", createdAt: recent, plan: "yearly" }
         ])
@@ -5876,7 +5876,7 @@ test("superadmin payment reconciliation flags stale, incomplete, refund and dupl
   assert.ok(reasons.includes("partial_gateway_metadata"));
   assert.ok(reasons.includes("refund_review_required"));
   assert.ok(reasons.includes("duplicate_payment_reference"));
-  assert.ok(reasons.includes("duplicate_gateway_transaction_id"));
+  assert.equal(reasons.includes("duplicate_gateway_transaction_id"), false);
   assert.deepEqual(observed.sort(), ["purchases", "subscriptions"]);
 });
 
@@ -5983,7 +5983,7 @@ test("customer support message moderation rejects invalid and future creation ti
 });
 
 
-test("WebXPay settlement rejects a provider transaction identifier already linked to another order", async () => {
+test("WebXPay settlement rejects a provider order reference already linked to another order", async () => {
   const { ObjectId } = await import("mongodb");
   const orderId = "3123456789abcdef01234567";
   const purchase = {
@@ -6002,7 +6002,7 @@ test("WebXPay settlement rejects a provider transaction identifier already linke
   const purchases = {
     async findOne(query) {
       if (query._id instanceof ObjectId) return purchase;
-      if (query.$or) return alreadyLinked;
+      if (query.paymentReference) return alreadyLinked;
       return null;
     },
     async updateOne() {
@@ -6013,7 +6013,7 @@ test("WebXPay settlement rejects a provider transaction identifier already linke
   const subscriptions = {
     async findOne(query) {
       if (query._id instanceof ObjectId) return null;
-      if (query.$or) return null;
+      if (query.paymentReference) return null;
       return null;
     }
   };
