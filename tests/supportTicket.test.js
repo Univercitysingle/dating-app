@@ -220,6 +220,33 @@ describe('Support Ticket Flow', () => {
     expect(response.status).toBe(403);
   });
 
+
+  it('hides internal staff notes from customer ticket history', async () => {
+    await TicketMessage.create({ ticketId: ticket._id, senderId: admin._id, message: 'Private staff note', isFromAdmin: true, isInternalNote: true });
+    const response = await request(app).get(`/tickets/${ticket._id}`);
+    expect(response.status).toBe(200);
+    expect(response.body.messages).toHaveLength(0);
+  });
+
+  it('allows admins to edit messages and records an audit entry', async () => {
+    const message = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Customer message' });
+    const response = await request(app).patch(`/admin/tickets/${ticket._id}/messages/${message._id}`).send({ message: 'Admin corrected message' });
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe('Admin corrected message');
+    const AuditLog = require('../models/AuditLog');
+    expect(await AuditLog.countDocuments({ action: 'support_ticket_message_edited', targetId: message._id })).toBe(1);
+  });
+
+  it('allows admins to soft delete messages and records an audit entry', async () => {
+    const message = await TicketMessage.create({ ticketId: ticket._id, senderId: user._id, message: 'Original admin-reviewed text' });
+    const response = await request(app).delete(`/admin/tickets/${ticket._id}/messages/${message._id}`);
+    expect(response.status).toBe(200);
+    const stored = await TicketMessage.findById(message._id).select('+deletedMessage');
+    expect(stored.deletedMessage).toBe('Original admin-reviewed text');
+    const AuditLog = require('../models/AuditLog');
+    expect(await AuditLog.countDocuments({ action: 'support_ticket_message_deleted', targetId: message._id })).toBe(1);
+  });
+
   it('should update a ticket status', async () => {
     const response = await request(app)
       .put(`/admin/tickets/${ticket._id}/status`)
