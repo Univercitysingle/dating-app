@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 import { getUserFriendlyError } from '../utils/apiErrors';
 import PhotoUploader from '../components/PhotoUploader';
+import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { subYears } from 'date-fns';
@@ -99,6 +100,8 @@ const Onboarding = () => {
   const [preference, setPreference] = useState('everyone');
   const [personalityType, setPersonalityType] = useState('');
   const [photo, setPhoto] = useState(null);
+  const [photoPreviewFailed, setPhotoPreviewFailed] = useState(false);
+  const [photoPreviewFallback, setPhotoPreviewFallback] = useState(false);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [countryCode, setCountryCode] = useState('+971');
@@ -154,6 +157,7 @@ const Onboarding = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
     const validationError = validateStep();
     if (validationError) {
       setError(validationError);
@@ -274,11 +278,32 @@ const Onboarding = () => {
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900">Choose your main profile photo</h2>
                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-gray-500">Use a recent, clear photo where people can see you. You can add more photos to your profile later.</p>
+                {photo && (
+                  <div className="mx-auto mt-5 max-w-[220px] overflow-hidden rounded-2xl border border-white bg-white p-2 shadow-sm">
+                    <img
+                      src={photoPreviewFailed ? PLACEHOLDER_IMAGE : photoPreviewFallback ? resolveWorkerPhotoUrl(photo) : resolvePhotoUrl(photo)}
+                      alt="Your uploaded profile photo preview"
+                      className="aspect-[4/5] w-full rounded-xl object-cover"
+                      onError={() => {
+                        if (!photoPreviewFallback && resolveWorkerPhotoUrl(photo)) {
+                          setPhotoPreviewFallback(true);
+                          return;
+                        }
+                        setPhotoPreviewFailed(true);
+                      }}
+                    />
+                    <p className="mt-2 text-center text-xs font-medium text-gray-600">Main profile photo</p>
+                  </div>
+                )}
                 <div className="mt-5 flex justify-center">
-                  <PhotoUploader onUploadComplete={response => setPhoto(response.fileUrl)} />
+                  <PhotoUploader onUploadComplete={response => {
+                    setPhoto(response.fileUrl);
+                    setPhotoPreviewFailed(false);
+                    setPhotoPreviewFallback(false);
+                  }} />
                 </div>
                 {photo && <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700"><span className="h-2 w-2 rounded-full bg-green-500" /> Photo uploaded successfully</div>}
-                <p className="mt-3 text-xs text-gray-400">Your original image quality is preserved during upload.</p>
+                <p className="mt-3 text-xs text-gray-400">Your photo is securely uploaded and previewed before you complete your profile.</p>
               </div>
             )}
 
