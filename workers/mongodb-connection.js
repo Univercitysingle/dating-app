@@ -5531,11 +5531,28 @@ export class MongoDBConnection {
         roomId,
         $or: [{ senderUid: uid }, { receiverUid: uid }]
       }, { projection: { senderUid: 1, receiverUid: 1 } });
+      const prefix = uid + "-";
+      const suffix = "-" + uid;
       const roomPeerUid = conversation
         ? (conversation.senderUid === uid ? conversation.receiverUid : conversation.senderUid)
-        : null;
+        : roomId.startsWith(prefix)
+          ? roomId.slice(prefix.length)
+          : roomId.endsWith(suffix) ? roomId.slice(0, -suffix.length) : null;
       if (roomPeerUid !== receiverUid) {
         return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
+      }
+      if (!conversation) {
+        // A newly matched pair may call before exchanging its first message.
+        // Do not allow a room-shaped string alone to grant calling access.
+        const match = await db.collection("matches").findOne({
+          $or: [
+            { user1Uid: uid, user2Uid: receiverUid },
+            { user1Uid: receiverUid, user2Uid: uid }
+          ]
+        }, { projection: { status: 1 } });
+        if (!match || match.status !== "matched") {
+          return { status: 403, body: { error: "Calling is unavailable for this conversation" } };
+        }
       }
       const call = {
         roomId, callerUid: uid, receiverUid, type, status: "ringing",
