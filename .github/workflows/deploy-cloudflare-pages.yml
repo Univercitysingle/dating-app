@@ -26,6 +26,7 @@ on:
       - 'babel.config.*'
       - 'config/**'
       - 'CLOUDFLARE_PAGES_SETUP.md'
+      - '.zap/pages-rules.tsv'
   workflow_dispatch:
 
 permissions:
@@ -320,10 +321,10 @@ jobs:
 
       - name: Run OWASP ZAP passive baseline against deployed Pages
         timeout-minutes: 5
-        continue-on-error: true
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: https://dating-app-staging.pages.dev
-          fail_action: false
+          rules_file_name: .zap/pages-rules.tsv
+          fail_action: true
           allow_issue_writing: false
           artifact_name: zap-pages-after-deploy
