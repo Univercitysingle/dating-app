@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import apiClient from '../api/apiClient';
 
 const DEFAULTS = {
@@ -39,16 +39,55 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [locationStale, setLocationStale] = useState(false);
   const [locationBusy, setLocationBusy] = useState(false);
   const [locationMessage, setLocationMessage] = useState('');
+  const dialogRef = useRef(null);
 
   useEffect(() => {
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const dialog = dialogRef.current;
+    const focusableSelector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+    const focusable = dialog ? Array.from(dialog.querySelectorAll(focusableSelector)) : [];
+    (focusable[0] || dialog)?.focus();
+
+    const handleDialogKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const currentFocusable = Array.from(dialog.querySelectorAll(focusableSelector));
+      if (!currentFocusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = currentFocusable[0];
+      const last = currentFocusable[currentFocusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleDialogKeyDown);
+
     let active = true;
     apiClient.get('/users/me/location').then(status => {
       if (active) { setLocationEnabled(status?.enabled === true); setLocationStale(status?.stale === true); }
     }).catch(() => {
       if (active) setLocationEnabled(false);
     });
-    return () => { active = false; };
-  }, []);
+    return () => {
+      active = false;
+      document.removeEventListener('keydown', handleDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus && typeof previousFocus.focus === 'function' && previousFocus.isConnected) previousFocus.focus();
+    };
+  }, [onClose]);
 
   const enableLocation = () => {
     if (!navigator.geolocation) {
@@ -152,7 +191,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   ].filter(Boolean).length;
 
   return (
-    <section className="discover-filter-panel" role="dialog" aria-modal="true" aria-labelledby="filter-title">
+    <section ref={dialogRef} className="discover-filter-panel" role="dialog" aria-modal="true" aria-labelledby="filter-title" tabIndex={-1}>
       <header className="discover-filter-header">
         <div>
           <p className="page-eyebrow">MAKE IT YOURS</p>
