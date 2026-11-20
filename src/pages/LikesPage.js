@@ -15,8 +15,10 @@ const LikesPage = () => {
 
     const fetchLikes = useCallback(async ({ silent = false } = {}) => {
         const sequence = ++requestSequence.current;
-        if (!silent) setLoading(true);
-        setError(null);
+        if (!silent) {
+            setLoading(true);
+            setError(null);
+        }
         try {
             const response = await apiClient.get('/users/likes');
             if (sequence !== requestSequence.current) return;
@@ -30,9 +32,12 @@ const LikesPage = () => {
         } catch (err) {
             if (sequence !== requestSequence.current) return;
             // Keep the last successful list visible during a background refresh failure.
-            if (!silent || !hasUsers.current) {
-                setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
-            }
+            setError(getUserFriendlyError(
+                err,
+                hasUsers.current
+                    ? 'Your likes are shown from the last update. We could not refresh them just now.'
+                    : 'We could not load your likes. Please try again.'
+            ));
         } finally {
             if (sequence === requestSequence.current && !silent) setLoading(false);
         }
