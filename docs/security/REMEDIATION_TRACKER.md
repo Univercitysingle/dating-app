@@ -333,3 +333,13 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Worker deployment:** [Run 44703606866](https://github.com/Univercitysingle/dating-app/actions/runs/44703606866) completed successfully. Worker tests, staging deployment, MongoDB readiness, anonymous-access rejection for authentication/support/chat/admin/payment routes, and legacy route inventory checks passed. This was the API Worker deployment; the separate CDN Worker was not changed.
 - **Worker ZAP:** [Run 44702589304](https://github.com/Univercitysingle/dating-app/actions/runs/44702589304) passed using the pinned ZAP v0.15.0 action. The report showed 67 PASS, one documented no-store IGNORE, 0 WARN and 0 FAIL.
 - **Firebase RTDB rules:** [Run 44702809424](https://github.com/Univercitysingle/dating-app/actions/runs/44702809424) passed all 11 emulator authorization tests. This validates the checked-in rules only; the live Firebase project's deployed rules remain unverified.
+
+
+## Final post-merge staging confirmation (2026-11-20)
+
+- **Cloudflare Pages:** [Run 44703606773](https://github.com/Univercitysingle/dating-app/actions/runs/44703606773) completed successfully after the dependency PR merge. The Pages build, backend/frontend tests, deployment, public SEO endpoints, frontend asset/API proxy checks and ZAP passive baseline all passed.
+- **Pages ZAP result:** 61 PASS, 7 documented IGNORE categories, 0 WARN and 0 FAIL. The scan report is retained as artifact `zap-pages-after-deploy` (artifact ID `14613937530`).
+- **CVE audit:** [Run 44703705089](https://github.com/Univercitysingle/dating-app/actions/runs/44703705089) completed successfully. Root production/full, backend production/full and Worker npm audit JSON reports each contain zero vulnerabilities.
+- **Worker staging:** [Run 44703606866](https://github.com/Univercitysingle/dating-app/actions/runs/44703606866) completed successfully with Worker tests, deployment, MongoDB readiness, liveness and anonymous authorization checks passing.
+- **Repository state:** No open dependency remediation PR remains. The active branch is `migrate-to-serverless`; `main` was not changed. The CDN Worker was not modified.
+- **Still outstanding:** Verify that the hardened `database.rules.json` is deployed to Firebase project `it-services-1841`; review the seven documented ZAP exceptions periodically, especially timestamp disclosure and third-party script/SRI assumptions; run authenticated DAST and an independent VAPT. The passive ZAP scan is not a substitute for authenticated or active security testing.
