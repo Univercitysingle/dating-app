@@ -118,9 +118,60 @@ const addMessageToTicket = async (req, res) => {
   }
 };
 
+
+const editOwnTicketMessage = async (req, res) => {
+  const { ticketId, messageId } = req.params;
+  const { message } = req.body || {};
+  if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+    return res.status(400).json({ message: 'Invalid ticket or message ID.' });
+  }
+  if (typeof message !== 'string' || !message.trim() || message.trim().length > 5000) {
+    return res.status(400).json({ message: 'Message must be between 1 and 5000 characters.' });
+  }
+  try {
+    const ticket = await SupportTicket.findOne({ _id: ticketId, userId: req.user._id });
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found.' });
+    const cutoff = new Date(Date.now() - 15 * 60 * 1000);
+    const updated = await TicketMessage.findOneAndUpdate({
+      _id: messageId, ticketId, senderId: req.user._id,
+      isFromAdmin: false, isInternalNote: false, deletedAt: null,
+      createdAt: { $gte: cutoff },
+    }, { $set: { message: message.trim(), editedAt: new Date() } }, { new: true, runValidators: true });
+    if (!updated) return res.status(403).json({ message: 'This message cannot be edited. The edit window may have expired.' });
+    return res.json(updated);
+  } catch (error) {
+    console.error('Error editing support message:', error);
+    return res.status(500).json({ message: 'Unable to edit this message.' });
+  }
+};
+
+const deleteOwnTicketMessage = async (req, res) => {
+  const { ticketId, messageId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+    return res.status(400).json({ message: 'Invalid ticket or message ID.' });
+  }
+  try {
+    const ticket = await SupportTicket.findOne({ _id: ticketId, userId: req.user._id });
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found.' });
+    const cutoff = new Date(Date.now() - 60 * 60 * 1000);
+    const deleted = await TicketMessage.findOneAndUpdate({
+      _id: messageId, ticketId, senderId: req.user._id,
+      isFromAdmin: false, isInternalNote: false, deletedAt: null,
+      createdAt: { $gte: cutoff },
+    }, { $set: { deletedAt: new Date(), deletedBy: req.user._id, message: 'This message was deleted.' } }, { new: true });
+    if (!deleted) return res.status(403).json({ message: 'This message cannot be deleted. The deletion window may have expired.' });
+    return res.json({ success: true, message: 'Message deleted.', ticketMessage: deleted });
+  } catch (error) {
+    console.error('Error deleting support message:', error);
+    return res.status(500).json({ message: 'Unable to delete this message.' });
+  }
+};
+
 module.exports = {
   createTicket,
   getTicketsForUser,
   getTicketByIdForUser,
   addMessageToTicket,
+  editOwnTicketMessage,
+  deleteOwnTicketMessage,
 };
