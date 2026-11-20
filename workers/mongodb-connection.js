@@ -2168,6 +2168,8 @@ export class MongoDBConnection {
       const subscription = {
         userId: user._id,
         plan,
+        amount: prices[plan],
+        currency: "LKR",
         status: "pending",
         checkoutReservationId: reservationId,
         // WebXPay does not issue Stripe or PayHere subscription IDs. Unique
