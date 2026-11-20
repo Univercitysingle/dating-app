@@ -179,6 +179,7 @@ const deleteTicketMessageAsAdmin = async (req, res) => {
       targetType: 'TicketMessage', targetId: target._id,
       changes: { ticketId: ticket._id, previousMessage: target.message, isInternalNote: Boolean(target.isInternalNote) },
     });
+    target.deletedMessage = target.message;
     target.deletedAt = new Date();
     target.deletedBy = req.user._id;
     target.message = 'This message was deleted.';
