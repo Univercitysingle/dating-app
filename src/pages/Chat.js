@@ -9,7 +9,7 @@ import ChatMessage from '../components/ChatMessage';
 import { useCallSession } from '../context/CallSessionContext';
 import { database } from '../firebase';
 import { ref, onChildAdded, off } from 'firebase/database';
-import { collectPendingDeliveryMessages, getVisibleChatMessageIds } from '../utils/chat';
+import { collectPendingDeliveryMessages, getChatPeerUidFromRoomId, getVisibleChatMessageIds } from '../utils/chat';
 
 function Chat() {
   const [input, setInput] = useState('');
@@ -52,7 +52,8 @@ function Chat() {
   // Resolve the peer from persisted message identities. Splitting room IDs is
   // unsafe because Firebase UIDs may themselves contain hyphens.
   const otherUserUid = messages.find(message => message.senderUid === user?.uid)?.receiverUid ||
-    messages.find(message => message.receiverUid === user?.uid)?.senderUid || null;
+    messages.find(message => message.receiverUid === user?.uid)?.senderUid ||
+    getChatPeerUidFromRoomId(chatId, user?.uid);
   const otherProfilePath = otherUser?.uid || otherUserUid ? `/profile/${encodeURIComponent(otherUser?.uid || otherUserUid)}` : '/profile';
 
   const handleUnmatch = async () => {
