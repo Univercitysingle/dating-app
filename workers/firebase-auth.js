@@ -140,7 +140,9 @@ export async function verifyFirebaseIdToken(token, projectId, options = {}) {
     typeof claims.sub !== "string" || claims.sub.length === 0 || claims.sub.length > 128 ||
     !Number.isFinite(claims.exp) || claims.exp <= now ||
     !Number.isFinite(claims.iat) || claims.iat > now ||
-    !Number.isFinite(claims.auth_time) || claims.auth_time > now
+    !Number.isFinite(claims.auth_time) || claims.auth_time > now ||
+    claims.auth_time > claims.iat ||
+    (claims.user_id !== undefined && claims.user_id !== claims.sub)
   ) {
     throw new FirebaseTokenError();
   }
