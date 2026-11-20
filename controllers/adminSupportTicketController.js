@@ -65,7 +65,7 @@ const getTicketByIdForAdmin = async (req, res) => {
 
 const addAdminMessageToTicket = async (req, res) => {
   const { ticketId } = req.params;
-  const { message } = req.body || {};
+  const { message, isInternalNote = false } = req.body || {};
   const adminUserId = req.user._id;
 
   if (!mongoose.Types.ObjectId.isValid(ticketId)) {
@@ -87,13 +87,16 @@ const addAdminMessageToTicket = async (req, res) => {
       senderId: adminUserId,
       message: message.trim(),
       isFromAdmin: true,
+      isInternalNote: isInternalNote === true,
     });
 
     await newMessage.save();
 
-    // Update ticket status
-    ticket.status = 'Waiting for Customer';
-    await ticket.save();
+    // Internal notes never change customer-facing ticket state.
+    if (!newMessage.isInternalNote) {
+      ticket.status = 'Waiting for Customer';
+      await ticket.save();
+    }
 
     res.status(201).json(newMessage);
   } catch (error) {
