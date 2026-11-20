@@ -1693,10 +1693,10 @@ test("successful profile boost payment grants exactly 30 minutes of visibility",
   const userId = new ObjectId("abcdef0123456789abcdef01");
   const purchase = { _id: new ObjectId(orderId), userId, itemId: "profile-boost-1", status: "pending" };
   const purchases = {
-    async findOne() { return purchase; },
+    async findOne(query) { return query?._id?.$ne ? null : purchase; },
     async updateOne(query, update) { Object.assign(purchase, update.$set || {}); return { modifiedCount: 1 }; }
   };
-  const subscriptions = { async findOne() { assert.fail("A store purchase must not be treated as a subscription"); } };
+  const subscriptions = { async findOne(query) { if (query?._id?.$ne) return null; assert.fail("A store purchase must not be treated as a subscription"); } };
   let userUpdate;
   const users = {
     async updateOne(query, update) { userUpdate = update; return { matchedCount: 1 }; }
@@ -1729,10 +1729,10 @@ test("successful Dark Fantasy payment settlement grants a separate 30-day entitl
   let entitlementUpdate;
   const purchase = { _id: new ObjectId(orderId), userId, itemId: "dark-fantasy-monthly", status: "pending" };
   const purchases = {
-    async findOne() { return purchase; },
+    async findOne(query) { return query?._id?.$ne ? null : purchase; },
     async updateOne(query, update) { Object.assign(purchase, update.$set || {}); return { modifiedCount: 1 }; }
   };
-  const subscriptions = { async findOne() { assert.fail("A purchase must not be treated as a subscription"); } };
+  const subscriptions = { async findOne(query) { if (query?._id?.$ne) return null; assert.fail("A purchase must not be treated as a subscription"); } };
   const users = {
     async findOne() { return { darkFantasyAccessUntil: existingExpiry }; },
     async updateOne(query, update) { entitlementUpdate = update; return { matchedCount: 1 }; }
@@ -3803,9 +3803,9 @@ test("successful WebXPay subscription settlement clears its matching checkout re
     checkoutReservationId: reservationId
   };
   const userUpdates = [];
-  const purchases = { async findOne() { return null; } };
+  const purchases = { async findOne(query) { return query?._id?.$ne ? null : null; } };
   const subscriptions = {
-    async findOne() { return subscription; },
+    async findOne(query) { return query?._id?.$ne ? null : subscription; },
     async updateOne(query, update) {
       Object.assign(subscription, update.$set || {});
       return { modifiedCount: 1, matchedCount: 1 };
