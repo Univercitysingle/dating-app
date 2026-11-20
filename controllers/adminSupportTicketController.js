@@ -130,9 +130,69 @@ const updateTicketStatus = async (req, res) => {
   }
 };
 
+
+const editTicketMessageAsAdmin = async (req, res) => {
+  const { ticketId, messageId } = req.params;
+  const { message } = req.body || {};
+  if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+    return res.status(400).json({ message: 'Invalid ticket or message ID.' });
+  }
+  if (typeof message !== 'string' || !message.trim() || message.trim().length > 5000) {
+    return res.status(400).json({ message: 'Message must be between 1 and 5000 characters.' });
+  }
+  try {
+    const ticket = await SupportTicket.findById(ticketId);
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found.' });
+    const target = await TicketMessage.findOne({ _id: messageId, ticketId, deletedAt: null });
+    if (!target) return res.status(404).json({ message: 'Message not found.' });
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      adminId: req.user._id, action: 'support_ticket_message_edited',
+      targetType: 'TicketMessage', targetId: target._id,
+      changes: { ticketId: ticket._id, previousMessage: target.message, nextMessage: message.trim(), isInternalNote: Boolean(target.isInternalNote) },
+    });
+    target.message = message.trim();
+    target.editedAt = new Date();
+    await target.save();
+    return res.json(target);
+  } catch (error) {
+    console.error('Admin support message edit failed:', error);
+    return res.status(500).json({ message: 'Unable to edit this message.' });
+  }
+};
+
+const deleteTicketMessageAsAdmin = async (req, res) => {
+  const { ticketId, messageId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(ticketId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+    return res.status(400).json({ message: 'Invalid ticket or message ID.' });
+  }
+  try {
+    const ticket = await SupportTicket.findById(ticketId);
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found.' });
+    const target = await TicketMessage.findOne({ _id: messageId, ticketId, deletedAt: null });
+    if (!target) return res.status(404).json({ message: 'Message not found.' });
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      adminId: req.user._id, action: 'support_ticket_message_deleted',
+      targetType: 'TicketMessage', targetId: target._id,
+      changes: { ticketId: ticket._id, previousMessage: target.message, isInternalNote: Boolean(target.isInternalNote) },
+    });
+    target.deletedAt = new Date();
+    target.deletedBy = req.user._id;
+    target.message = 'This message was deleted.';
+    await target.save();
+    return res.json({ success: true, message: 'Message deleted.' });
+  } catch (error) {
+    console.error('Admin support message deletion failed:', error);
+    return res.status(500).json({ message: 'Unable to delete this message.' });
+  }
+};
+
 module.exports = {
   getAllTickets,
   getTicketByIdForAdmin,
   addAdminMessageToTicket,
   updateTicketStatus,
+  editTicketMessageAsAdmin,
+  deleteTicketMessageAsAdmin,
 };
