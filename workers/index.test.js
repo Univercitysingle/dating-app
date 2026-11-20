@@ -912,7 +912,17 @@ test("discovery applies the saved gender preference and everyone remains unfilte
 
 test("discovery returns ordered public profiles with super-like metadata", async () => {
   const current = { uid: "current", preference: "everyone", location: { coordinates: [0, 0] } };
-  const candidate = { _id: "candidate-id", uid: "candidate", name: "Candidate", email: "private@example.com", password: "secret", lastLoginIp: "192.0.2.1", photos: [{ url: "photos/a.jpg" }] };
+  const candidate = {
+    _id: "candidate-id", uid: "candidate", name: "Candidate", email: "private@example.com",
+    mobileNumber: "+971501234567", phoneNumber: "+971509876543", password: "secret",
+    lastLoginIp: "192.0.2.1", role: "admin", accountStatus: "active",
+    birthday: new Date("1995-05-10"), location: {
+      city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45],
+      latitude: 24.45, longitude: 54.37, exactLocation: "private-address"
+    },
+    latitude: 24.45, longitude: 54.37, billing: { customerId: "private-customer" },
+    photos: [{ url: "photos/a.jpg", email: "nested@example.com", phoneNumber: "nested-phone", moderationNotes: "private" }]
+  };
   let pipeline;
   const users = {
     findOne: async () => current,
@@ -929,6 +939,18 @@ test("discovery returns ordered public profiles with super-like metadata", async
   assert.equal(result.body[0].email, undefined);
   assert.equal(result.body[0].password, undefined);
   assert.equal(result.body[0].lastLoginIp, undefined);
+  assert.equal(result.body[0].mobileNumber, undefined);
+  assert.equal(result.body[0].phoneNumber, undefined);
+  assert.equal(result.body[0].role, undefined);
+  assert.equal(result.body[0].accountStatus, undefined);
+  assert.equal(result.body[0].birthday, undefined);
+  assert.equal(result.body[0].latitude, undefined);
+  assert.equal(result.body[0].longitude, undefined);
+  assert.equal(result.body[0].billing, undefined);
+  assert.deepEqual(result.body[0].location, { city: "Abu Dhabi", country: "UAE" });
+  assert.equal(result.body[0].photos[0].email, undefined);
+  assert.equal(result.body[0].photos[0].phoneNumber, undefined);
+  assert.equal(result.body[0].photos[0].moderationNotes, undefined);
   assert.equal(result.body[0].superLikedByCurrentUser, true);
   assert.equal(result.body[0].photos[0].url, "https://cdn.example.com/photos/a.jpg");
   assert.ok(pipeline.some(stage => stage.$lookup && stage.$lookup.from === "matches"));
@@ -988,7 +1010,15 @@ test("public profile endpoint rejects anonymous requests", async () => {
 });
 
 test("public profile sanitization hides email and mobile from other users", async () => {
-  const target = { _id: "target-id", uid: "target", email: "private@example.com", mobileNumber: "private-mobile", phoneNumber: "private-phone", contactNumber: "private-contact", name: "Target", photos: [{ url: "photo.jpg" }] };
+  const target = {
+    _id: "target-id", uid: "target", email: "private@example.com",
+    mobileNumber: "private-mobile", phoneNumber: "private-phone", contactNumber: "private-contact",
+    name: "Target", role: "admin", accountStatus: "active", passwordHash: "private-hash",
+    birthday: new Date("1994-03-02"), latitude: 24.45, longitude: 54.37,
+    location: { city: "Abu Dhabi", country: "UAE", coordinates: [54.37, 24.45], latitude: 24.45 },
+    billing: { customerId: "private-customer" },
+    photos: [{ url: "photo.jpg", email: "nested@example.com", phoneNumber: "nested-phone" }]
+  };
   const viewer = { uid: "viewer", role: "user" };
   const users = { findOne: async (query) => query.uid === "target" ? target : viewer };
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
@@ -1000,6 +1030,16 @@ test("public profile sanitization hides email and mobile from other users", asyn
   assert.equal(result.body.mobileNumber, undefined);
   assert.equal(result.body.phoneNumber, undefined);
   assert.equal(result.body.contactNumber, undefined);
+  assert.equal(result.body.role, undefined);
+  assert.equal(result.body.accountStatus, undefined);
+  assert.equal(result.body.passwordHash, undefined);
+  assert.equal(result.body.birthday, undefined);
+  assert.equal(result.body.latitude, undefined);
+  assert.equal(result.body.longitude, undefined);
+  assert.equal(result.body.billing, undefined);
+  assert.deepEqual(result.body.location, { city: "Abu Dhabi", country: "UAE" });
+  assert.equal(result.body.photos[0].email, undefined);
+  assert.equal(result.body.photos[0].phoneNumber, undefined);
   assert.equal(result.body.photos[0].url, "https://cdn.example.com/photo.jpg");
 });
 
