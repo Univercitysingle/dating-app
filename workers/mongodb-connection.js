@@ -4836,25 +4836,22 @@ export class MongoDBConnection {
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
         { $project: { "user.password": 0, "user.lastLoginIp": 0 } }
       ];
-      const purchases = await db.collection("purchases").aggregate([
-        { $match: match }, { $sort: { createdAt: -1 } }, { $limit: 500 },
-        ...lookupUser
-      ]).toArray();
-      let refundSubscriptions = [];
-      // Delayed successful callbacks can flag cancelled subscriptions too.
-      // Include them in the same read-only refund queue so no captured payment
-      // is hidden from administrators.
-      if (status === "refund_required" || status === "refunded") {
-        refundSubscriptions = await db.collection("subscriptions").aggregate([
-          { $match: { status } },
-          { $sort: { paidLateAt: -1, updatedAt: -1 } },
-          { $limit: 500 },
+      const [purchases, subscriptions] = await Promise.all([
+        db.collection("purchases").aggregate([
+          { $match: match }, { $sort: { createdAt: -1 } }, { $limit: 500 },
           ...lookupUser
-        ]).toArray();
-      }
+        ]).toArray(),
+        db.collection("subscriptions").aggregate([
+          { $match: match }, { $sort: { paidLateAt: -1, createdAt: -1 } }, { $limit: 500 },
+          ...lookupUser
+        ]).toArray()
+      ]);
+      // Show the complete gateway transaction history, including subscriptions.
+      // Late successful callbacks can place a cancelled subscription into the
+      // refund queue, so subscription records must be visible for every filter.
       const records = [
         ...purchases.map(record => ({ ...record, transactionType: "store_purchase" })),
-        ...refundSubscriptions.map(record => ({ ...record, transactionType: "subscription" }))
+        ...subscriptions.map(record => ({ ...record, transactionType: "subscription" }))
       ].sort((a, b) => new Date(b.paidLateAt || b.createdAt || 0) - new Date(a.paidLateAt || a.createdAt || 0)).slice(0, 500);
       return { status: 200, body: records.map(p => {
         const safeUser = p.user ? { ...p.user } : null;
