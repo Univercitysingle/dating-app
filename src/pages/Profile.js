@@ -115,6 +115,7 @@ function Profile() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditingPhotos, setIsEditingPhotos] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [profileRetry, setProfileRetry] = useState(0);
   const [activeTab, setActiveTab] = useState('profile');
   const [mobileCountryCode, setMobileCountryCode] = useState('+971');
   const [mobileNationalNumber, setMobileNationalNumber] = useState('');
@@ -150,6 +151,7 @@ function Profile() {
     let cancelled = false;
 
     const fetchProfile = async () => {
+      setFetchError(null);
       try {
         const data = await apiClient.get(`/users/${userId}`);
         if (!cancelled) setProfile(data);
@@ -161,6 +163,7 @@ function Profile() {
     };
 
     const fetchOwnProfile = async () => {
+      setFetchError(null);
       try {
         const data = await apiClient.get('/users/me');
         if (cancelled) return;
@@ -213,7 +216,7 @@ function Profile() {
     return () => {
       cancelled = true;
     };
-  }, [userId, currentUser?.uid]);
+  }, [userId, currentUser?.uid, profileRetry]);
 
   useEffect(() => {
     const profileUid = userId || currentUser?.uid;
@@ -355,7 +358,7 @@ function Profile() {
     }
   };
 
-  if (fetchError) return <div className="mx-auto max-w-xl p-6 text-center" role="alert"><p className="text-red-600">{fetchError}</p><button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-full bg-primary px-5 py-2 text-white">Try again</button></div>;
+  if (fetchError) return <div className="mx-auto max-w-xl p-6 text-center" role="alert"><p className="text-red-600">{fetchError}</p><button type="button" onClick={() => { setFetchError(null); setProfileRetry(value => value + 1); }} className="mt-4 rounded-full bg-primary px-5 py-2 text-white">Try again</button></div>;
   if (!profile) return <LoadingState spinnerOnly />;
 
   const isOwnProfile = !userId || (currentUser && currentUser.uid === userId);
