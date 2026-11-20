@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import { constants, createPublicKey, createSign, generateKeyPairSync, privateEncrypt } from "node:crypto";
 import worker, { RateLimiter, MongoDBConnection, requestCdnObject, isFirebaseDatabaseUrl, enforceAccountRateLimit, buildWebXPayCheckoutForm, buildAnalyticsCsv, normalizeAdminPurchaseActionPayload, enforceCallIceRateLimit, enforceCallStartRateLimit, enforceCallRouteRateLimit } from "./index.js";
-import { deleteFirebaseAuthIdentity, isValidEmailAddress } from "./mongodb-connection.js";
+import { deleteFirebaseAuthIdentity, isValidEmailAddress, isValidWebXPayTransactionDate } from "./mongodb-connection.js";
 
 function request(path, method = "GET") {
   return new Request("https://dating-app.test" + path, { method });
@@ -16,6 +16,19 @@ test("Firebase Realtime Database URL validation requires an actual Firebase host
   assert.equal(isFirebaseDatabaseUrl("https://firebaseio.com.attacker.example"), false);
   assert.equal(isFirebaseDatabaseUrl("http://test-project.firebaseio.com"), false);
   assert.equal(isFirebaseDatabaseUrl("https://user:pass@test-project.firebaseio.com"), false);
+});
+
+
+test("WebXPay transaction timestamps reject impossible calendar dates and invalid clock values", () => {
+  assert.equal(isValidWebXPayTransactionDate("2026-11-20 20:38:00"), true);
+  assert.equal(isValidWebXPayTransactionDate("2024-02-29 23:59:59"), true);
+  assert.equal(isValidWebXPayTransactionDate("2026-02-29 12:00:00"), false);
+  assert.equal(isValidWebXPayTransactionDate("2026-02-31 12:00:00"), false);
+  assert.equal(isValidWebXPayTransactionDate("2026-13-01 12:00:00"), false);
+  assert.equal(isValidWebXPayTransactionDate("2026-11-20 24:00:00"), false);
+  assert.equal(isValidWebXPayTransactionDate("2026-11-20 12:60:00"), false);
+  assert.equal(isValidWebXPayTransactionDate("2026-11-20T12:00:00Z"), false);
+  assert.equal(isValidWebXPayTransactionDate(null), false);
 });
 
 test("admin email validation rejects malformed and oversized values", () => {
