@@ -4,7 +4,7 @@ import apiClient from '../api/apiClient';
 import { getCallIceConfig } from '../utils/videoRoomIce';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 import { shouldBePolitePeer } from '../utils/webrtcNegotiation';
-import { markCallSignalHandled } from '../utils/callSignaling';
+import { markCallSignalHandled, applyRemoteIceCandidate, flushQueuedRemoteCandidates } from '../utils/callSignaling';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
@@ -580,9 +580,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
     if (!peer || !description || remoteReadyRef.current) return;
     await peer.setRemoteDescription(new RTCSessionDescription(description));
     remoteReadyRef.current = true;
-    for (const candidate of queuedRemoteRef.current.splice(0)) {
-      try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
-    }
+    const queued = queuedRemoteRef.current.map(candidate => new RTCIceCandidate(candidate));
+    const pending = queued.slice();
+    await flushQueuedRemoteCandidates(peer, pending);
+    queuedRemoteRef.current = pending.map(candidate => candidate.toJSON ? candidate.toJSON() : candidate);
   }, []);
 
   const startCall = async type => {
@@ -741,9 +742,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
                 await peer.setLocalDescription(answer);
                 await sendDescription(String(next._id), peer.localDescription);
               }
-              for (const candidate of queuedRemoteRef.current.splice(0)) {
-                try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
-              }
+              const queued = queuedRemoteRef.current.map(candidate => new RTCIceCandidate(candidate));
+              const pending = queued.slice();
+              await flushQueuedRemoteCandidates(peer, pending);
+              queuedRemoteRef.current = pending.map(candidate => candidate.toJSON ? candidate.toJSON() : candidate);
               // A signaling message is consumed only after the description and
               // its answer have been applied successfully. If negotiation fails,
               // leave it eligible for the next poll instead of losing the call.
@@ -754,7 +756,9 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
           } else if (signal.candidate) {
             if (!peer || !remoteReadyRef.current) queuedRemoteRef.current.push(signal.candidate);
             else {
-              try { await peer.addIceCandidate(new RTCIceCandidate(signal.candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
+              const applied = await applyRemoteIceCandidate(peer, new RTCIceCandidate(signal.candidate));
+              if (applied) markCallSignalHandled(seenSignalsRef.current, signal.signalId);
+              continue;
             }
             markCallSignalHandled(seenSignalsRef.current, signal.signalId);
           }
