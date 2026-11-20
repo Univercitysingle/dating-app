@@ -182,3 +182,38 @@ test("subscription checkout cancellation never releases a reservation after paym
   assert.equal(result.body.status, "active");
   assert.equal(userReservationReleased, false);
 });
+
+test("new subscription checkouts persist the server-calculated amount and currency", async () => {
+  const userId = new ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa");
+  const orderId = new ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb");
+  let insertedSubscription;
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        findOne: async () => ({ _id: userId, uid: "owner-uid", name: "Test User" }),
+        updateOne: async () => ({ matchedCount: 1, modifiedCount: 1 })
+      };
+      if (name === "subscriptions") return {
+        updateMany: async () => ({ modifiedCount: 0 }),
+        findOne: async () => null,
+        insertOne: async document => {
+          insertedSubscription = document;
+          return { insertedId: orderId };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.createPendingSubscription("owner-uid", "monthly");
+
+  assert.equal(result.status, 201);
+  assert.equal(result.body.price, 3000);
+  assert.equal(insertedSubscription.amount, 3000);
+  assert.equal(insertedSubscription.currency, "LKR");
+  assert.equal(insertedSubscription.plan, "monthly");
+  assert.equal(insertedSubscription.status, "pending");
+});
