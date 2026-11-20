@@ -1638,7 +1638,7 @@ test("admin analytics returns a bounded, privacy-safe recent activity feed", asy
     if (name === "reports") return { distinct: async () => ["reported-1"] };
     if (name === "auditlogs") return {
       find: (query, options) => {
-        assert.deepEqual(query, { actorType: "admin" });
+        assert.deepEqual(query, { $or: [ { actorType: "admin" }, { eventType: { $in: ["moderation_action", "admin_account_lifecycle"] } } ] });
         assert.ok(options.projection.eventType);
         assert.equal(options.projection.previousMessage, 0);
         return { sort() { return this; }, limit(value) { assert.equal(value, 8); return this; }, toArray: async () => events };
