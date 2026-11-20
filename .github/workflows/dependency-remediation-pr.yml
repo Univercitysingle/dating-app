@@ -51,7 +51,7 @@ jobs:
 
       - name: Pin patched frontend transitive dependency versions
         run: |
-          npm pkg set 'overrides.glob=^14.0.5' 'overrides.minimatch=^11.0.9' 'overrides.rimraf=^6.1.4'
+          npm pkg set 'dependencies.multer=^2.5.0' 'dependencies.morgan=^1.12.1' 'overrides.body-parser=^1.20.9' 'overrides.glob=^14.0.5' 'overrides.minimatch=^11.0.9' 'overrides.rimraf=^6.1.4'
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Install frontend dependencies from updated lockfile
@@ -120,7 +120,7 @@ jobs:
             --title "fix(deps): remediate production npm advisories" \
             --body "## Security dependency remediation
 
-          - Pins patched transitive versions of glob, minimatch and rimraf in frontend and backend manifests and lockfiles.
+          - Upgrades Multer to 2.5.0 and Morgan to 1.12.1, and pins patched body-parser, glob, minimatch and rimraf versions in frontend and backend manifests and lockfiles.
           - Requires zero moderate-or-higher findings in frontend and backend production dependency trees.
           - Audits the Cloudflare Worker dependency tree.
           - Runs the repository regression test suite.
