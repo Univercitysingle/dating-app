@@ -112,6 +112,9 @@ jobs:
             INVALID_LOGIN_CREDENTIALS|EMAIL_NOT_FOUND|INVALID_PASSWORD)
               echo "Firebase Authentication API key and Email/Password provider are reachable."
               ;;
+            TOO_MANY_ATTEMPTS_TRY_LATER)
+              echo "::warning::Firebase accepted the authentication probe but rate-limited the invalid test login. Continuing deployment; live sign-in must be verified separately."
+              ;;
             *)
               echo "::error::Firebase Authentication configuration probe failed (HTTP ${status:-unknown}, Firebase error: ${error_code:-no error code})."
               exit 1
