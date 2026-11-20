@@ -19,15 +19,11 @@ export function isValidEmailAddress(value) {
 
 export function isValidWebXPayTransactionDate(value) {
   if (typeof value !== "string") return false;
-  const match = /^(\\d{4})-(\\d{2})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2})$/.exec(value);
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
   if (!match) return false;
   const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  const second = Number(secondText);
+  const year = Number(yearText), month = Number(monthText), day = Number(dayText);
+  const hour = Number(hourText), minute = Number(minuteText), second = Number(secondText);
   if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 ||
       hour > 23 || minute > 59 || second > 59) return false;
   const date = new Date(0);
@@ -2293,7 +2289,7 @@ export class MongoDBConnection {
     if (typeof orderId !== "string" || !/^[a-fA-F0-9]{24}$/.test(orderId) ||
         !["0", "00", "15"].includes(String(statusCode)) ||
         (reference && (typeof reference !== "string" || reference.length > 128)) ||
-        (gatewayMetadata.transactionDate && (typeof gatewayMetadata.transactionDate !== "string" || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(gatewayMetadata.transactionDate) || !Number.isFinite(Date.parse(gatewayMetadata.transactionDate)))) ||
+        (gatewayMetadata.transactionDate && (typeof gatewayMetadata.transactionDate !== "string" || !isValidWebXPayTransactionDate(gatewayMetadata.transactionDate))) ||
         (gatewayMetadata.gatewayId && (typeof gatewayMetadata.gatewayId !== "string" || gatewayMetadata.gatewayId.length > 32)) ||
         (gatewayMetadata.gatewayComment && (typeof gatewayMetadata.gatewayComment !== "string" || gatewayMetadata.gatewayComment.length > 256))) {
       return { status: 400, body: { error: "Invalid payment response" } };
