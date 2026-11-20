@@ -5889,3 +5889,65 @@ test("payment reconciliation is restricted to superadmins", async () => {
   const result = await connection.getAdminPaymentReconciliation("admin-uid");
   assert.equal(result.status, 403);
 });
+
+
+test("customer support message edit and delete windows reject expired messages before auditing", async () => {
+  const { ObjectId } = await import("mongodb");
+  const actorId = new ObjectId();
+  const ticketId = new ObjectId();
+  const messageId = new ObjectId();
+  for (const operation of ["edit", "delete"]) {
+    let auditAttempted = false;
+    const oldMessage = {
+      _id: messageId, ticketId, senderId: actorId, message: "Old customer message",
+      createdAt: new Date(Date.now() - (operation === "edit" ? 16 : 61) * 60 * 1000),
+      isFromAdmin: false
+    };
+    const db = {
+      collection(name) {
+        if (name === "users") return { findOne: async () => ({ _id: actorId }) };
+        if (name === "supporttickets") return { findOne: async () => ({ _id: ticketId, userId: actorId }) };
+        if (name === "ticketmessages") return { findOne: async () => oldMessage };
+        if (name === "auditlogs") return { insertOne: async () => { auditAttempted = true; } };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = Object.create(MongoDBConnection.prototype);
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    const result = operation === "edit"
+      ? await connection.updateSupportTicketMessage("customer-uid", ticketId.toHexString(), messageId.toHexString(), { message: "Too late" })
+      : await connection.deleteSupportTicketMessage("customer-uid", ticketId.toHexString(), messageId.toHexString());
+    assert.equal(result.status, 403);
+    assert.equal(auditAttempted, false);
+  }
+});
+
+test("customer support ticket details never return internal staff notes", async () => {
+  const { ObjectId } = await import("mongodb");
+  const userId = new ObjectId();
+  const ticketId = new ObjectId();
+  let capturedMessageFilter;
+  const db = {
+    collection(name) {
+      if (name === "users") return {
+        findOne: async () => ({ _id: userId }),
+        find: () => ({ toArray: async () => [] })
+      };
+      if (name === "supporttickets") return { findOne: async () => ({ _id: ticketId, userId }) };
+      if (name === "ticketmessages") return {
+        find: query => {
+          capturedMessageFilter = query;
+          return { sort: () => ({ toArray: async () => [] }) };
+        }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+  const result = await connection.getSupportTicket("customer-uid", ticketId.toHexString());
+  assert.equal(result.status, 200);
+  assert.equal(capturedMessageFilter.isInternalNote.$ne, true);
+});
