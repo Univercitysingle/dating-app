@@ -73,7 +73,14 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
       formData.append('photo', uploadFile, uploadFile.name);
 
       const response = await apiClient.post('/users/photos', formData);
-      onUploadComplete(response);
+      const photoKey = response?.fileUrl || response?.photo?.url;
+      if (typeof photoKey !== 'string' || !photoKey.trim()) {
+        throw new Error('The upload service did not return a usable photo reference. Please try again.');
+      }
+      if (typeof onUploadComplete !== 'function') {
+        throw new Error('The photo upload could not be attached to your profile. Please try again.');
+      }
+      onUploadComplete({ ...response, fileUrl: photoKey.trim() });
     } catch (err) {
       setError(getUserFriendlyError(err, 'Your photo could not be uploaded. Please try again.'));
     } finally {
@@ -86,6 +93,7 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
     <div className="my-4">
       <label
         htmlFor="photo-upload"
+        aria-disabled={isDisabled || isUploading}
         className={`block px-4 py-2 text-sm font-medium text-white rounded-md ${
           isDisabled
             ? 'bg-gray-400 cursor-not-allowed'
@@ -102,7 +110,8 @@ const PhotoUploader = ({ onUploadComplete, isDisabled }) => {
         className="hidden"
         disabled={isUploading || isDisabled}
       />
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {isUploading && <p className="mt-2 text-sm text-gray-500" role="status" aria-live="polite">Uploading and securing your photo…</p>}
+      {error && <p className="mt-2 text-sm text-red-600" role="alert">{error}</p>}
       {isDisabled && <p className="mt-2 text-sm text-gray-500">You have reached the maximum of 6 photos.</p>}
     </div>
   );
