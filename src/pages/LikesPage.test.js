@@ -70,11 +70,14 @@ describe('LikesPage synchronization', () => {
     render(<MemoryRouter><LikesPage /></MemoryRouter>);
     expect(await screen.findByText('Alex')).toBeInTheDocument();
 
+    // Trigger the same foreground refresh path used when the user returns
+    // to the tab. This avoids depending on fake-timer interval scheduling.
     await act(async () => {
-      jest.advanceTimersByTime(30000);
+      window.dispatchEvent(new Event('focus'));
       await Promise.resolve();
     });
 
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Alex')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('last update');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
