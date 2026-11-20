@@ -191,4 +191,30 @@ describe('Filter component', () => {
     }));
   });
 
+
+  it('locks background scrolling, traps keyboard focus, and closes on Escape', () => {
+    const onClose = jest.fn();
+    const previousOverflow = document.body.style.overflow;
+    const { unmount } = render(<Filter onApply={() => {}} onClose={onClose} />);
+
+    expect(document.body.style.overflow).toBe('hidden');
+    const closeButton = screen.getByRole('button', { name: 'Close filters' });
+    const applyButton = screen.getByRole('button', { name: /Apply Filters/ });
+    expect(closeButton).toHaveFocus();
+
+    applyButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(closeButton).toHaveFocus();
+
+    closeButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(applyButton).toHaveFocus();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+    expect(document.body.style.overflow).toBe(previousOverflow);
+  });
+
 });
