@@ -1,5 +1,5 @@
 import { authenticateFirebaseRequest, FirebaseTokenError, FirebaseKeyServiceError } from "./firebase-auth.js";
-import { isValidWebXPayTransactionDate } from "./mongodb-connection.js";
+import { isValidWebXPayTransactionDate, normalizeWebXPayReference } from "./mongodb-connection.js";
 import { syncChatMessageStatusToRtdb, syncChatMessageToRtdb, syncChatRoomMembership } from "./firebase-rtdb.js";
 import { Buffer } from "node:buffer";
 import { sendWebPush } from "./push-notifications.js";
@@ -2532,7 +2532,7 @@ export default {
       // Do not search other fields for a status-like value: doing so can turn a
       // malformed response into an approval.
       if (fields.length !== 6 || !/^[a-fA-F0-9]{24}$/.test(fields[0]) ||
-          !fields[1] || fields[1].length > 128 ||
+          !normalizeWebXPayReference(fields[1]) ||
           !isValidWebXPayTransactionDate(fields[2]) ||
           !["0", "00", "15"].includes(fields[3]) ||
           !fields[5] || fields[5].length > 32) {
