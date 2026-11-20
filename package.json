@@ -52,11 +52,11 @@
     "sharp": "^0.35.4",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
+    "uuid": "^11.1.1",
     "wavesurfer.js": "^7.10.1",
     "web-vitals": "^3.3.1",
     "winston": "^3.13.0",
-    "winston-daily-rotate-file": "^5.0.0",
-    "uuid": "^11.1.1"
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.3",
@@ -80,8 +80,8 @@
     "postcss": "^8.4.38",
     "prettier": "^2.0.0",
     "react-refresh": "^0.14.0",
-    "supertest": "^7.1.4",
     "react-scripts": "5.0.1",
+    "supertest": "^7.1.4",
     "tailwindcss": "^3.3.5"
   },
   "browserslist": {
@@ -109,6 +109,9 @@
     "@svgr/plugin-svgo": "^8.1.0",
     "svgo": "^4.0.0",
     "webpack-dev-server": "^5.2.7",
-    "webpack-dev-middleware": "^7.4.5"
+    "webpack-dev-middleware": "^7.4.5",
+    "glob": "^14.0.5",
+    "minimatch": "^11.0.9",
+    "rimraf": "^6.1.4"
   }
 }
