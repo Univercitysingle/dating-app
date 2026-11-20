@@ -719,14 +719,18 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
         if (next.callerUid === currentUser.uid && next.answer && peerRef.current) await setRemoteDescription(next.answer);
         for (const signal of result.signals || []) {
           if (!signal?.signalId || seenSignalsRef.current.has(signal.signalId)) continue;
-          seenSignalsRef.current.add(signal.signalId);
           const peer = peerRef.current;
           if (signal.description && peer) {
             try {
               if (signal.description.type === 'offer' && peer.signalingState !== 'stable') {
                 const active = callRef.current || next;
                 const polite = shouldBePolitePeer(currentUser.uid, active.callerUid, active.receiverUid);
-                if (!polite) continue;
+                if (!polite) {
+                  // This peer intentionally ignores a colliding offer. Mark it
+                  // handled so the same offer is not reconsidered on every poll.
+                  seenSignalsRef.current.add(signal.signalId);
+                  continue;
+                }
                 await peer.setLocalDescription({ type: 'rollback' });
               }
               await peer.setRemoteDescription(new RTCSessionDescription(signal.description));
@@ -739,6 +743,10 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
               for (const candidate of queuedRemoteRef.current.splice(0)) {
                 try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
               }
+              // A signaling message is consumed only after the description and
+              // its answer have been applied successfully. If negotiation fails,
+              // leave it eligible for the next poll instead of losing the call.
+              seenSignalsRef.current.add(signal.signalId);
             } catch (_) {
               setStatus('Unable to negotiate the restored connection. Retrying…');
             }
@@ -747,6 +755,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
             else {
               try { await peer.addIceCandidate(new RTCIceCandidate(signal.candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
             }
+            seenSignalsRef.current.add(signal.signalId);
           }
         }
       } catch (err) {
