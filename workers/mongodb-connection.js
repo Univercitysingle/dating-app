@@ -2292,6 +2292,30 @@ export class MongoDBConnection {
           outcome = { status: 404, body: { error: "Transaction not found." } };
           return;
         }
+        // Provider references and gateway transaction IDs must not be attached
+        // to a second order. Check both collections inside the same MongoDB
+        // transaction before changing status or granting an entitlement.
+        const duplicatePaymentFields = [];
+        if (typeof reference === "string" && reference.trim()) {
+          duplicatePaymentFields.push({ paymentReference: reference });
+        }
+        if (typeof gatewayMetadata.gatewayId === "string" && gatewayMetadata.gatewayId.trim()) {
+          duplicatePaymentFields.push({ paymentGatewayId: gatewayMetadata.gatewayId });
+        }
+        if (duplicatePaymentFields.length) {
+          const duplicateQuery = { _id: { $ne: record._id }, $or: duplicatePaymentFields };
+          const [duplicatePurchase, duplicateSubscription] = await Promise.all([
+            purchases.findOne(duplicateQuery, { session }),
+            subscriptions.findOne(duplicateQuery, { session })
+          ]);
+          if (duplicatePurchase || duplicateSubscription) {
+            outcome = {
+              status: 409,
+              body: { error: "This provider transaction is already linked to another order." }
+            };
+            return;
+          }
+        }
         const success = statusCode === "0" || statusCode === "00";
         const now = new Date();
         // A delayed success callback can arrive after a checkout was cancelled
