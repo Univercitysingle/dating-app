@@ -19,6 +19,23 @@ const ticketMessageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isInternalNote: {
+    type: Boolean,
+    default: false,
+  },
+  editedAt: {
+    type: Date,
+    default: null,
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('TicketMessage', ticketMessageSchema);
