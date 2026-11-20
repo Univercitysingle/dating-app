@@ -76,8 +76,6 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
       }
     };
     document.addEventListener('keydown', handleDialogKeyDown);
-
-    document.addEventListener('keydown', handleDialogKeyDown);
     return () => {
       document.removeEventListener('keydown', handleDialogKeyDown);
       document.body.style.overflow = previousOverflow;
