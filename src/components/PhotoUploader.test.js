@@ -98,4 +98,38 @@ describe('PhotoUploader authenticated API handoff', () => {
     expect(formData.get('photo')).toBeInstanceOf(File);
     expect(formData.get('photo').name).toBe('registration-photo.jpg');
   });
+
+  test('shows a clear error when the upload API omits the photo reference', async () => {
+    const onUploadComplete = jest.fn();
+    apiClient.post.mockResolvedValue({ message: 'Uploaded' });
+    render(React.createElement(PhotoUploader, { onUploadComplete }));
+
+    const file = new File(['synthetic-image-data'], 'registration-photo.jpg', {
+      type: 'image/jpeg'
+    });
+    fireEvent.change(screen.getByLabelText(/upload photo/i), {
+      target: { files: [file] }
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/did not return a usable photo reference/i);
+    expect(onUploadComplete).not.toHaveBeenCalled();
+  });
+
+  test('announces upload progress and disables selection while uploading', async () => {
+    let resolveUpload;
+    apiClient.post.mockReturnValue(new Promise(resolve => { resolveUpload = resolve; }));
+    render(React.createElement(PhotoUploader, { onUploadComplete: jest.fn() }));
+
+    const input = screen.getByLabelText(/upload photo/i);
+    fireEvent.change(input, {
+      target: { files: [new File(['image'], 'photo.jpg', { type: 'image/jpeg' })] }
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/uploading and securing/i);
+    expect(input).toBeDisabled();
+
+    resolveUpload({ fileUrl: 'photos-test-user-123.webp' });
+    await waitFor(() => expect(input).not.toBeDisabled());
+  });
+
 });
