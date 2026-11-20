@@ -33,3 +33,24 @@ export const collectPendingDeliveryMessages = (fetchedMessages, pendingMessages,
 
   return Array.from(pendingMessages.values());
 };
+
+
+/**
+ * Resolve the other participant from a room ID when the authenticated UID is
+ * known. Anchoring the exact UID at either edge avoids unsafe hyphen splitting.
+ */
+export const getChatPeerUidFromRoomId = (roomId, currentUid) => {
+  if (typeof roomId !== 'string' || typeof currentUid !== 'string' ||
+      !currentUid || roomId.length > 260 || roomId.length < currentUid.length + 2) {
+    return null;
+  }
+
+  const prefix = `${currentUid}-`;
+  const suffix = `-${currentUid}`;
+  let peerUid = null;
+  if (roomId.startsWith(prefix)) peerUid = roomId.slice(prefix.length);
+  else if (roomId.endsWith(suffix)) peerUid = roomId.slice(0, -suffix.length);
+
+  if (!peerUid || peerUid === currentUid || peerUid.length > 128) return null;
+  return peerUid;
+};
