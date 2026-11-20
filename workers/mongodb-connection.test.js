@@ -3847,9 +3847,9 @@ test("declined WebXPay subscription settlement clears its matching checkout rese
     checkoutReservationId: reservationId
   };
   let userUpdate;
-  const purchases = { async findOne() { return null; } };
+  const purchases = { async findOne(query) { return query?._id?.$ne ? null : null; } };
   const subscriptions = {
-    async findOne() { return subscription; },
+    async findOne(query) { return query?._id?.$ne ? null : subscription; },
     async updateOne(query, update) {
       Object.assign(subscription, update.$set || {});
       return { modifiedCount: 1, matchedCount: 1 };
