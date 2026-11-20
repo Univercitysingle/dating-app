@@ -343,3 +343,11 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Worker staging:** [Run 44703606866](https://github.com/Univercitysingle/dating-app/actions/runs/44703606866) completed successfully with Worker tests, deployment, MongoDB readiness, liveness and anonymous authorization checks passing.
 - **Repository state:** No open dependency remediation PR remains. The active branch is `migrate-to-serverless`; `main` was not changed. The CDN Worker was not modified.
 - **Still outstanding:** Verify that the hardened `database.rules.json` is deployed to Firebase project `it-services-1841`; review the seven documented ZAP exceptions periodically, especially timestamp disclosure and third-party script/SRI assumptions; run authenticated DAST and an independent VAPT. The passive ZAP scan is not a substitute for authenticated or active security testing.
+
+
+## Static application security testing (2026-11-20)
+
+- **Change:** Added a CodeQL JavaScript/TypeScript SAST workflow for pushes and pull requests targeting `migrate-to-serverless`, plus manual dispatch.
+- **Policy:** Uses the `security-extended` query suite, excludes generated build/dependency output, checks out the exact migration-branch/PR-head revision, and uploads results to GitHub code scanning.
+- **Supply-chain pin:** Both CodeQL action steps use immutable commit `9418214df1f2c4b8128c770156c409013b07d6b9` (the v3 tag target).
+- **Evidence:** Initial analysis [run 44704244467](https://github.com/Univercitysingle/dating-app/actions/runs/44704244467) had initialized successfully and was still running at the time of this entry. Do not report a clean SAST result until the analyze step completes and code-scanning alerts are reviewed.
