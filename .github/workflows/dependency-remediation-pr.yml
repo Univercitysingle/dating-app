@@ -11,6 +11,9 @@ on:
       - "backend/package.json"
       - "backend/package-lock.json"
   workflow_dispatch:
+  pull_request:
+    branches:
+      - migrate-to-serverless
 
 permissions:
   contents: write
@@ -46,8 +49,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Apply semver-safe frontend lockfile security updates
-        run: npm audit fix --package-lock-only --ignore-scripts
+      - name: Pin patched frontend transitive dependency versions
+        run: |
+          npm pkg set 'overrides.glob=^14.0.5' 'overrides.minimatch=^11.0.9' 'overrides.rimraf=^6.1.4'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Install frontend dependencies from updated lockfile
         run: npm ci --no-audit --no-fund
@@ -65,9 +70,11 @@ jobs:
           node scripts/validate-frontend-audit.js "$RUNNER_TEMP/root-full-audit.json"
           echo "Full frontend audit exit code: $audit_status"
 
-      - name: Apply semver-safe backend lockfile security updates
+      - name: Pin patched backend transitive dependency versions
         working-directory: backend
-        run: npm audit fix --package-lock-only --ignore-scripts
+        run: |
+          npm pkg set 'overrides.glob=^14.0.5' 'overrides.minimatch=^11.0.9' 'overrides.rimraf=^6.1.4'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Install backend dependencies from updated lockfile
         working-directory: backend
@@ -94,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git add package-lock.json backend/package-lock.json
+          git add package.json package-lock.json backend/package.json backend/package-lock.json
           if git diff --cached --quiet; then
             echo "No semver-safe lockfile changes were produced."
             exit 0
@@ -113,10 +120,63 @@ jobs:
             --title "fix(deps): remediate production npm advisories" \
             --body "## Security dependency remediation
 
-          - Updates only npm lockfiles using semver-safe `npm audit fix` resolution.
+          - Pins patched transitive versions of glob, minimatch and rimraf in frontend and backend manifests and lockfiles.
           - Requires zero moderate-or-higher findings in frontend and backend production dependency trees.
           - Audits the Cloudflare Worker dependency tree.
           - Runs the repository regression test suite.
           - Does not change application source, Firebase rules, payment configuration, or the CDN Worker.
 
           Review the complete dependency diff and CI evidence before merging."
+
+  validate-remediation-pr:
+    if: github.event_name == 'pull_request' && github.base_ref == 'migrate-to-serverless'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out proposed remediation
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Enforce frontend production advisory threshold
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Validate full frontend audit report
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > "$RUNNER_TEMP/root-full-audit.json"
+          audit_status=$?
+          set -e
+          node scripts/validate-frontend-audit.js "$RUNNER_TEMP/root-full-audit.json"
+          echo "Full frontend audit exit code: $audit_status"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+
+      - name: Enforce backend production advisory threshold
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Install Worker dependencies
+        working-directory: workers
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit Worker dependencies
+        working-directory: workers
+        run: npm audit --audit-level=high
+
+      - name: Run regression tests
+        run: npm test
