@@ -136,3 +136,19 @@ describe('AdminStorePurchasesPage', () => {
 
     expect(screen.queryByRole('button', { name: 'Record completed refund' })).not.toBeInTheDocument();
   });
+
+
+test('allows administrators to filter active subscriptions separately', async () => {
+  render(<AdminStorePurchasesPage />);
+  await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith(
+    '/admin/users/purchases',
+    { params: { status: 'all' } }
+  ));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Active subscriptions' }));
+
+  await waitFor(() => expect(apiClient.get).toHaveBeenLastCalledWith(
+    '/admin/users/purchases',
+    { params: { status: 'active' } }
+  ));
+});
