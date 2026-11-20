@@ -1579,6 +1579,9 @@ test("admin dashboard returns operational queue and subscription metrics", async
             if (name === "users" && filter.createdAt) return 8;
             if (name === "users" && filter.lastActiveAt) return 340;
             if (name === "reports") return 6;
+            if (name === "supporttickets" && filter.slaDueAt) return 3;
+            if (name === "supporttickets" && filter.priority === "Urgent") return 2;
+            if (name === "supporttickets" && filter.$or) return 5;
             if (name === "supporttickets") return 14;
             if (name === "purchases" && filter.status === "pending") return 2;
             if (name === "subscriptions" && filter.status === "pending") return 3;
@@ -1602,6 +1605,9 @@ test("admin dashboard returns operational queue and subscription metrics", async
     activeUsers: 340,
     pendingReports: 6,
     openSupportTickets: 14,
+    overdueSupportTickets: 3,
+    unassignedSupportTickets: 5,
+    urgentSupportTickets: 2,
     pendingPayments: 5,
     pendingRefunds: 3,
     activeSubscriptions: 75
