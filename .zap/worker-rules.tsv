@@ -1,0 +1,4 @@
+# Reviewed ZAP passive-baseline finding from 2026-11-19.
+# The API root and sitemap intentionally return Cache-Control: no-store.
+# Keep this visible as INFO; unexpected WARN/FAIL findings remain blocking.
+10049	INFO	(API root and sitemap are non-storable by design; API responses must not be shared-cacheable.)
