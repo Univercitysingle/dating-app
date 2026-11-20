@@ -10,6 +10,8 @@ const LikesPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const requestSequence = useRef(0);
+    const hasUsers = useRef(false);
+    hasUsers.current = users.length > 0;
 
     const fetchLikes = useCallback(async ({ silent = false } = {}) => {
         const sequence = ++requestSequence.current;
@@ -28,13 +30,13 @@ const LikesPage = () => {
         } catch (err) {
             if (sequence !== requestSequence.current) return;
             // Keep the last successful list visible during a background refresh failure.
-            if (!silent || users.length === 0) {
+            if (!silent || !hasUsers.current) {
                 setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
             }
         } finally {
             if (sequence === requestSequence.current && !silent) setLoading(false);
         }
-    }, [users.length]);
+    }, []);
 
     useEffect(() => {
         fetchLikes();
