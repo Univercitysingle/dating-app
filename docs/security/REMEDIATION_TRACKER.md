@@ -249,3 +249,13 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Commit:** `6e3e35afbf4d4ba233ba985f98d9ada7db8051fe`.
 - **Status:** Workflow committed; first execution and artifact review are pending. Do not mark dependencies clear until the workflow passes and its artifact has been reviewed. Existing deployment audit gates remain in place.
 - **Triage requirements:** For each finding record the identifier (CVE/GHSA), advisory URL, package and installed version, affected range, dependency path (production/development), CVSS vector/score and source, exploitability in this deployment, fixed version or absence of a fix, mitigation, owner, review date, and retest evidence. Never force a breaking upgrade or suppress an advisory without a documented, time-limited risk acceptance.
+
+
+## CVE audit gate hardening (2026-11-20)
+
+- **Finding:** The first version of the full npm audit policy validator did not explicitly reject registry error payloads or malformed reports. This could misclassify an unavailable advisory service as a clean result.
+- **Change:** The validator now fails closed on npm registry/API error objects, missing vulnerability metadata, malformed vulnerability entries, malformed lockfile inventories and invalid severity counts. Unexpected high/critical findings are printed with package, severity and affected range before failing.
+- **Regression coverage:** Added Node.js tests for a clean report, registry failure, missing metadata and unexpected high-severity findings. The CVE workflow executes these tests before dependency installation/auditing.
+- **Commits:** `08f287b78aa9f5eb08979426d453861c9000c412` (validator), `e3f459f88910482b3f5dc374d0d343a04e0a1de4` (tests), `c590fba0246756baa3cdae424ec99b88b957a791` (workflow test step), `863696e95cceec15ab0a6e16df9eb4524f5920ee` (workflow formatting correction).
+- **Evidence:** Initial dependency audit run [44683443746](https://github.com/Univercitysingle/dating-app/actions/runs/44683443746) succeeded before this hardening. The corrected workflow run [44696267084](https://github.com/Univercitysingle/dating-app/actions/runs/44696267084) was queued/in progress at the time of this update. Do not mark this control verified until that run completes successfully and its audit artifact is reviewed.
+- **Scope:** This remains a dependency-advisory gate, not a full SAST, DAST, secret scan, Firebase rules test or penetration test.
