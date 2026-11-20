@@ -5981,3 +5981,68 @@ test("customer support message moderation rejects invalid and future creation ti
     assert.equal(audited, false);
   }
 });
+
+
+test("WebXPay settlement rejects a provider transaction identifier already linked to another order", async () => {
+  const { ObjectId } = await import("mongodb");
+  const orderId = "3123456789abcdef01234567";
+  const purchase = {
+    _id: new ObjectId(orderId),
+    userId: new ObjectId("abcdef0123456789abcdef01"),
+    itemId: "profile-boost-1",
+    status: "pending"
+  };
+  const alreadyLinked = {
+    _id: new ObjectId("4123456789abcdef01234567"),
+    paymentReference: "provider-reference",
+    paymentGatewayId: "gateway-transaction-1"
+  };
+  let purchaseUpdates = 0;
+  let userUpdates = 0;
+  const purchases = {
+    async findOne(query) {
+      if (query._id instanceof ObjectId) return purchase;
+      if (query.$or) return alreadyLinked;
+      return null;
+    },
+    async updateOne() {
+      purchaseUpdates += 1;
+      return { modifiedCount: 1 };
+    }
+  };
+  const subscriptions = {
+    async findOne(query) {
+      if (query._id instanceof ObjectId) return null;
+      if (query.$or) return null;
+      return null;
+    }
+  };
+  const users = {
+    async updateOne() {
+      userUpdates += 1;
+      return { matchedCount: 1 };
+    }
+  };
+  const db = {
+    collection(name) {
+      if (name === "purchases") return purchases;
+      if (name === "subscriptions") return subscriptions;
+      if (name === "users") return users;
+      assert.fail("Unexpected collection: " + name);
+    }
+  };
+  const session = { async withTransaction(callback) { return callback(); }, async endSession() {} };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ startSession: () => session });
+  connection.getDatabase = () => db;
+
+  const result = await connection.settleWebXPay(orderId, "00", "provider-reference", {
+    gatewayId: "gateway-transaction-1"
+  });
+
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /already linked to another order/i);
+  assert.equal(purchase.status, "pending");
+  assert.equal(purchaseUpdates, 0);
+  assert.equal(userUpdates, 0);
+});
