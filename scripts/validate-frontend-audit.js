@@ -22,10 +22,37 @@ try {
   process.exit(2);
 }
 
-const vulnerabilities = Object.values(report.vulnerabilities || {});
+// npm audit can exit non-zero for registry/network failures and still emit JSON.
+// Never interpret an error payload or malformed/empty response as a clean scan.
+if (!report || typeof report !== 'object' || Array.isArray(report)) {
+  console.error('npm audit returned an invalid report object.');
+  process.exit(2);
+}
+if (report.error || report.errors || report.code || report.message && !report.metadata) {
+  console.error('npm audit returned an error response; refusing to treat it as a clean scan.');
+  process.exit(2);
+}
+if (!report.metadata || typeof report.metadata !== 'object' ||
+    !report.metadata.vulnerabilities || typeof report.metadata.vulnerabilities !== 'object' ||
+    !report.vulnerabilities || typeof report.vulnerabilities !== 'object' ||
+    Array.isArray(report.vulnerabilities)) {
+  console.error('npm audit report is missing required vulnerability metadata; refusing to pass.');
+  process.exit(2);
+}
+if (!lock || typeof lock !== 'object' || !lock.packages || typeof lock.packages !== 'object') {
+  console.error('package-lock.json is missing its package inventory.');
+  process.exit(2);
+}
+
+const vulnerabilities = Object.values(report.vulnerabilities);
+if (vulnerabilities.some((item) => !item || typeof item !== 'object' ||
+    !['low', 'moderate', 'high', 'critical'].includes(item.severity))) {
+  console.error('npm audit report contains malformed vulnerability entries.');
+  process.exit(2);
+}
 const blocking = vulnerabilities.filter((item) => ['high', 'critical'].includes(item.severity));
 const allowedAdvisory = 'GHSA-fc5q-39xc-vjpf';
-const packageEntries = Object.entries(lock.packages || {});
+const packageEntries = Object.entries(lock.packages);
 const picomatchEntries = packageEntries.filter(([path]) => path === 'node_modules/picomatch' || path.endsWith('/node_modules/picomatch'));
 
 if (picomatchEntries.length === 0) {
@@ -40,14 +67,14 @@ if (invalidPicomatchEntries.length > 0) {
   process.exit(1);
 }
 
-const picomatchAdvisoryPresent = (report.vulnerabilities?.picomatch?.via || []).some(
+const picomatchAdvisoryPresent = (report.vulnerabilities.picomatch?.via || []).some(
   (via) => typeof via === 'object' && typeof via.url === 'string' && via.url.includes(allowedAdvisory)
 );
 
 function tracesOnlyToAllowedPicomatch(name, visited = new Set()) {
   if (name === 'picomatch') return picomatchAdvisoryPresent;
   if (visited.has(name)) return false;
-  const item = report.vulnerabilities?.[name];
+  const item = report.vulnerabilities[name];
   if (!item || !Array.isArray(item.via) || item.via.length === 0) return false;
 
   const nextVisited = new Set(visited);
@@ -68,7 +95,7 @@ for (const item of blocking) {
   const nodes = item.nodes || [];
   const nodesAreDevelopmentOnly =
     nodes.length > 0 &&
-    nodes.every((path) => lock.packages?.[path]?.dev === true);
+    nodes.every((path) => lock.packages[path]?.dev === true);
   const hasOnlyAllowedAdvisory = tracesOnlyToAllowedPicomatch(item.name);
 
   if (!nodesAreDevelopmentOnly || !hasOnlyAllowedAdvisory) {
@@ -76,11 +103,24 @@ for (const item of blocking) {
   }
 }
 
-const counts = report.metadata?.vulnerabilities || {};
+const counts = report.metadata.vulnerabilities;
+for (const key of ['total', 'low', 'moderate', 'high', 'critical']) {
+  if (!Number.isInteger(counts[key]) || counts[key] < 0) {
+    console.error(`npm audit report has invalid metadata.vulnerabilities.${key}.`);
+    process.exit(2);
+  }
+}
 console.log(
-  `Full dependency audit reviewed: ${counts.total || 0} total findings ` +
-  `(${counts.high || 0} high, ${counts.critical || 0} critical, ${counts.moderate || 0} moderate, ${counts.low || 0} low).`
+  `Full dependency audit reviewed: ${counts.total} total findings ` +
+  `(${counts.high} high, ${counts.critical} critical, ${counts.moderate} moderate, ${counts.low} low).`
 );
+if (unexpected.length > 0) {
+  console.error('Unexpected high or critical vulnerabilities were found:');
+  for (const item of unexpected) {
+    console.error(` - ${item.name}: ${item.severity}; direct=${Boolean(item.isDirect)}; range=${item.range || 'unknown'}`);
+  }
+  process.exit(1);
+}
 if (blocking.length > 0) {
   console.warn(
     `Scoped exception: ${allowedAdvisory} propagates through development-only build/test dependencies to picomatch. ` +
