@@ -5951,3 +5951,33 @@ test("customer support ticket details never return internal staff notes", async 
   assert.equal(result.status, 200);
   assert.equal(capturedMessageFilter.isInternalNote.$ne, true);
 });
+
+
+test("customer support message moderation rejects invalid and future creation timestamps", async () => {
+  const { ObjectId } = await import("mongodb");
+  const actorId = new ObjectId();
+  const ticketId = new ObjectId();
+  const messageId = new ObjectId();
+  for (const createdAt of [new Date("invalid"), new Date(Date.now() + 60_000)]) {
+    let audited = false;
+    const db = {
+      collection(name) {
+        if (name === "users") return { findOne: async () => ({ _id: actorId }) };
+        if (name === "supporttickets") return { findOne: async () => ({ _id: ticketId, userId: actorId }) };
+        if (name === "ticketmessages") return { findOne: async () => ({
+          _id: messageId, ticketId, senderId: actorId, message: "Timestamp edge case", createdAt, isFromAdmin: false
+        }) };
+        if (name === "auditlogs") return { insertOne: async () => { audited = true; } };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = Object.create(MongoDBConnection.prototype);
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    const result = await connection.updateSupportTicketMessage(
+      "customer-uid", ticketId.toHexString(), messageId.toHexString(), { message: "Attempted edit" }
+    );
+    assert.equal(result.status, 403);
+    assert.equal(audited, false);
+  }
+});
