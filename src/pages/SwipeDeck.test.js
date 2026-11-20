@@ -14,7 +14,7 @@ jest.mock('../context/AuthContext', () => ({
 }));
 
 jest.mock('../components/SwipeCard', () => ({ user, onVote }) => (
-  <button type="button" onClick={() => onVote(user.uid, 'right')}>Like {user.name}</button>
+  <button type="button" onClick={() => onVote(user.uid, 'right')} onDoubleClick={() => { onVote(user.uid, 'right'); onVote(user.uid, 'right'); }}>Like {user.name}</button>
 ));
 
 jest.mock('../components/Filter', () => () => null);
@@ -47,8 +47,7 @@ describe('SwipeDeck swipe submission safety', () => {
     expect(await screen.findByRole('button', { name: 'Like Alex' })).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Like Alex' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Like Alex' }));
+      fireEvent.doubleClick(screen.getByRole('button', { name: 'Like Alex' }));
     });
 
     expect(apiClient.post).toHaveBeenCalledTimes(1);
