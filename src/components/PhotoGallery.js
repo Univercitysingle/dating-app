@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 
 const PhotoGallery = ({ photos, onEdit }) => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [useWorkerFallback, setUseWorkerFallback] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    const photoCount = Array.isArray(photos) ? photos.length : 0;
+    setCurrentPhotoIndex(index => Math.min(index, Math.max(0, photoCount - 1)));
+    setUseWorkerFallback(false);
+    setImageFailed(false);
+  }, [photos]);
 
   const handleNext = () => {
     setCurrentPhotoIndex((prevIndex) => (prevIndex + 1) % photos.length);
