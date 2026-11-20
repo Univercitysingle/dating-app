@@ -40,6 +40,8 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
   const [locationBusy, setLocationBusy] = useState(false);
   const [locationMessage, setLocationMessage] = useState('');
   const dialogRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -53,7 +55,7 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     const handleDialogKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || !dialog) return;
@@ -75,19 +77,23 @@ const Filter = ({ onApply, onClose = () => {}, initialFilters = {} }) => {
     };
     document.addEventListener('keydown', handleDialogKeyDown);
 
+    document.addEventListener('keydown', handleDialogKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus && typeof previousFocus.focus === 'function' && previousFocus.isConnected) previousFocus.focus();
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
     apiClient.get('/users/me/location').then(status => {
       if (active) { setLocationEnabled(status?.enabled === true); setLocationStale(status?.stale === true); }
     }).catch(() => {
       if (active) setLocationEnabled(false);
     });
-    return () => {
-      active = false;
-      document.removeEventListener('keydown', handleDialogKeyDown);
-      document.body.style.overflow = previousOverflow;
-      if (previousFocus && typeof previousFocus.focus === 'function' && previousFocus.isConnected) previousFocus.focus();
-    };
-  }, [onClose]);
+    return () => { active = false; };
+  }, []);
 
   const enableLocation = () => {
     if (!navigator.geolocation) {
