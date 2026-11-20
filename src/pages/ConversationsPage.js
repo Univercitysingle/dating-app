@@ -67,9 +67,23 @@ function ConversationsPage() {
         setConversations(nextConversations);
       }
     };
+    const refreshWhenActive = () => {
+      if (document.visibilityState === 'visible') fetchConversations({ silent: true });
+    };
+
+    // Firebase remains the live message transport. The inbox also refreshes
+    // this lightweight conversation summary while visible because RTDB chat
+    // events are room-scoped and do not update the inbox's unread aggregates.
+    // This never reloads message history and pauses completely in background tabs.
+    const refreshInterval = window.setInterval(refreshWhenActive, 30000);
+    window.addEventListener('focus', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
     window.addEventListener('dating-app-conversations-updated', onConversationsUpdated);
     return () => {
       mountedRef.current = false;
+      window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
       window.removeEventListener('dating-app-conversations-updated', onConversationsUpdated);
     };
   }, [currentUser?.uid, fetchConversations]);
