@@ -6046,3 +6046,36 @@ test("WebXPay settlement rejects a provider transaction identifier already linke
   assert.equal(purchaseUpdates, 0);
   assert.equal(userUpdates, 0);
 });
+
+
+test("admin payment monitoring includes store purchases and subscriptions in every status filter", async () => {
+  const recent = new Date();
+  const observed = [];
+  const records = {
+    purchases: [{ _id: "purchase-1", status: "completed", createdAt: recent, user: { name: "Store buyer" } }],
+    subscriptions: [{ _id: "subscription-1", status: "active", createdAt: recent, plan: "monthly", user: { name: "Subscriber" } }]
+  };
+  const db = {
+    collection(name) {
+      assert.ok(name === "purchases" || name === "subscriptions", "Unexpected collection: " + name);
+      return {
+        aggregate(pipeline) {
+          observed.push({ name, pipeline });
+          return { async toArray() { return records[name]; } };
+        }
+      };
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.getAdminPurchases("admin-uid", "all");
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.map(item => item.transactionType).sort(), ["store_purchase", "subscription"]);
+  assert.equal(result.body.find(item => item.transactionType === "subscription").plan, "monthly");
+  assert.deepEqual(observed.map(item => item.name).sort(), ["purchases", "subscriptions"]);
+  assert.ok(observed.every(item => item.pipeline[0].$match && Object.keys(item.pipeline[0].$match).length === 0));
+});
