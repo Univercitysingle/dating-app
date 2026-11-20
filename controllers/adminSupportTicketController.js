@@ -65,7 +65,7 @@ const getTicketByIdForAdmin = async (req, res) => {
 
 const addAdminMessageToTicket = async (req, res) => {
   const { ticketId } = req.params;
-  const { message } = req.body || {};
+  const { message, isInternalNote = false, attachments = [] } = req.body || {};
   const adminUserId = req.user._id;
 
   if (!mongoose.Types.ObjectId.isValid(ticketId)) {
@@ -87,6 +87,8 @@ const addAdminMessageToTicket = async (req, res) => {
       senderId: adminUserId,
       message: message.trim(),
       isFromAdmin: true,
+      isInternalNote: isInternalNote === true,
+      attachments: Array.isArray(attachments) ? attachments.slice(0, 5) : [],
     });
 
     await newMessage.save();
