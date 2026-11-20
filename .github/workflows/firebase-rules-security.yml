@@ -1,0 +1,62 @@
+name: Firebase Realtime Database security rules tests
+
+on:
+  push:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - "database.rules.json"
+      - "firebase.json"
+      - "tests/firebase-rules.test.js"
+      - ".github/workflows/firebase-rules-security.yml"
+  pull_request:
+    branches:
+      - migrate-to-serverless
+    paths:
+      - "database.rules.json"
+      - "firebase.json"
+      - "tests/firebase-rules.test.js"
+      - ".github/workflows/firebase-rules-security.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dating-app-firebase-rules-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  realtime-database-rules:
+    if: ${{ (github.event_name == 'push' && github.ref_name == 'migrate-to-serverless') || (github.event_name == 'pull_request' && github.base_ref == 'migrate-to-serverless') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out migration branch rules source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify isolated demo project and source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            test "$GITHUB_REF_NAME" = "migrate-to-serverless"
+          fi
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "Rules tests use demo project demo-dating-app and local emulator only."
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install pinned Firebase rules test harness
+        run: npm install --no-save --package-lock=false @firebase/rules-unit-testing@6.0.0
+
+      - name: Run Realtime Database rules tests in the local emulator
+        run: npx --yes firebase-tools@15.35.0 emulators:exec --only database --project demo-dating-app --non-interactive "node --test tests/firebase-rules.test.js"
