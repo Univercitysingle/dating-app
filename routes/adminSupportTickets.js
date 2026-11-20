@@ -5,6 +5,8 @@ const {
   getTicketByIdForAdmin,
   addAdminMessageToTicket,
   updateTicketStatus,
+  editTicketMessageAsAdmin,
+  deleteTicketMessageAsAdmin,
 } = require('../controllers/adminSupportTicketController');
 const { requireRole } = require('../middleware/adminAuthMiddleware');
 const authMiddleware = require('../middleware/authentication');
@@ -17,5 +19,7 @@ router.get('/', getAllTickets);
 router.get('/:ticketId', getTicketByIdForAdmin);
 router.post('/:ticketId/messages', addAdminMessageToTicket);
 router.put('/:ticketId/status', updateTicketStatus);
+router.patch('/:ticketId/messages/:messageId', editTicketMessageAsAdmin);
+router.delete('/:ticketId/messages/:messageId', deleteTicketMessageAsAdmin);
 
 module.exports = router;
