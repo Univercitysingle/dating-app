@@ -58,7 +58,7 @@ const LikesPage = () => {
         return <LoadingState spinnerOnly />;
     }
 
-    if (error) {
+    if (error && users.length === 0) {
         return <div className="state-panel state-error mx-4 my-8 text-center" role="alert"><p>{error}</p><button type="button" onClick={fetchLikes} className="app-primary-button mt-4 rounded-full px-5 py-2.5 text-sm font-semibold text-white">Try again</button></div>;
     }
 
