@@ -1,4 +1,4 @@
-import { markCallSignalHandled } from "./callSignaling";
+import { markCallSignalHandled, applyRemoteIceCandidate, flushQueuedRemoteCandidates } from "./callSignaling";
 
 describe("markCallSignalHandled", () => {
   test("does not consume a signaling message when negotiation fails", () => {
@@ -30,7 +30,6 @@ describe("remote ICE candidate delivery", () => {
         .mockResolvedValueOnce(undefined),
     };
 
-    const { flushQueuedRemoteCandidates } = await import("./callSignaling");
     expect(await flushQueuedRemoteCandidates(peer, queue)).toBe(0);
     expect(queue).toEqual([candidate]);
     expect(await flushQueuedRemoteCandidates(peer, queue)).toBe(1);
@@ -39,7 +38,6 @@ describe("remote ICE candidate delivery", () => {
   });
 
   test("does not report an ICE candidate as applied when the peer rejects it", async () => {
-    const { applyRemoteIceCandidate } = await import("./callSignaling");
     const peer = { addIceCandidate: jest.fn().mockRejectedValue(new Error("ICE failure")) };
     expect(await applyRemoteIceCandidate(peer, { candidate: "candidate:2" })).toBe(false);
   });
