@@ -5115,7 +5115,10 @@ export class MongoDBConnection {
         ]).toArray(),
         db.collection("reports").distinct("reportedUserUid"),
         db.collection("auditlogs").find(
-          { actorType: "admin" },
+          { $or: [
+            { actorType: "admin" },
+            { eventType: { $in: ["moderation_action", "admin_account_lifecycle"] } }
+          ] },
           { projection: {
             eventType: 1, actorUid: 1, actorType: 1, targetUid: 1, ticketId: 1,
             reportId: 1, action: 1, outcome: 1, status: 1, category: 1,
