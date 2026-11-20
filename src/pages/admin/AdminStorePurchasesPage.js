@@ -60,7 +60,11 @@ const AdminStorePurchasesPage = () => {
       case 'pending':
         return 'bg-yellow-200 text-yellow-800';
       case 'completed':
+      case 'active':
         return 'bg-green-200 text-green-800';
+      case 'cancelled':
+      case 'expired':
+        return 'bg-gray-200 text-gray-800';
       case 'rejected':
         return 'bg-red-200 text-red-800';
       case 'refund_required':
@@ -101,6 +105,9 @@ const AdminStorePurchasesPage = () => {
             <FilterButton status="all">All</FilterButton>
             <FilterButton status="pending">Pending</FilterButton>
             <FilterButton status="completed">Completed</FilterButton>
+            <FilterButton status="active">Active subscriptions</FilterButton>
+            <FilterButton status="cancelled">Cancelled</FilterButton>
+            <FilterButton status="expired">Expired</FilterButton>
             <FilterButton status="rejected">Rejected</FilterButton>
             <FilterButton status="refund_required">Refund review</FilterButton>
             <FilterButton status="refunded">Refunded</FilterButton>
