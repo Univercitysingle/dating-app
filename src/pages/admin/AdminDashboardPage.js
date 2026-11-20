@@ -18,7 +18,10 @@ const metricCards = [
   { title: 'Active subscriptions', key: 'activeSubscriptions', description: 'Currently active paid plans', icon: '◇', tone: 'violet' },
   { title: 'Pending payments', key: 'pendingPayments', description: 'Awaiting verified gateway callbacks', icon: '◷', tone: 'amber' },
   { title: 'Refund reviews', key: 'pendingRefunds', description: 'Require payment-provider reconciliation', icon: '↺', tone: 'rose' },
-  { title: 'Open support tickets', key: 'openSupportTickets', description: 'Customer requests not yet closed', icon: '▤', tone: 'sky' },
+  { title: 'Open support tickets', key: 'openSupportTickets', description: 'Open, in progress, and awaiting customer', icon: '▤', tone: 'sky' },
+  { title: 'Overdue support tickets', key: 'overdueSupportTickets', description: 'Past their response SLA', icon: '◷', tone: 'rose' },
+  { title: 'Unassigned tickets', key: 'unassignedSupportTickets', description: 'Active tickets without an owner', icon: '♧', tone: 'amber' },
+  { title: 'Urgent tickets', key: 'urgentSupportTickets', description: 'Active tickets marked urgent', icon: '!', tone: 'rose' },
   { title: 'Pending verifications', key: 'pendingVerifications', description: 'Awaiting photo verification review', icon: '▧', tone: 'indigo', superadminOnly: true },
 ];
 
