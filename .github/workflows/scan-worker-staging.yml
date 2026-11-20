@@ -9,6 +9,7 @@ on:
       - "wrangler.jsonc"
       - ".github/workflows/deploy-worker-staging.yml"
       - ".github/workflows/scan-worker-staging.yml"
+      - ".zap/worker-rules.tsv"
   workflow_dispatch:
 
 permissions:
@@ -24,6 +25,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Check out migration branch scan policy
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify exact scan source revision and branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "migrate-to-serverless"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
       - name: Allow staging deployment to finish
         run: sleep 120
 
@@ -43,10 +56,10 @@ jobs:
 
       - name: Run OWASP ZAP passive baseline against deployed API Worker
         timeout-minutes: 5
-        continue-on-error: true
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: https://dating-app-api-staging.enadoctemp.workers.dev
-          fail_action: false
+          rules_file_name: .zap/worker-rules.tsv
+          fail_action: true
           allow_issue_writing: false
           artifact_name: zap-worker-after-deploy
