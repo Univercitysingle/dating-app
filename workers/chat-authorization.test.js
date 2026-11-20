@@ -499,3 +499,83 @@ test("an empty chat history cannot be opened for a non-match or an unmatched pai
 
   assert.equal(result.status, 403);
 });
+
+
+test("newly matched participants can start voice and video calls before their first message", async () => {
+  for (const type of ["audio", "video"]) {
+    let insertedCall = null;
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => ({
+      collection(name) {
+        if (name === "users") return {
+          async findOne({ uid }) {
+            return { uid, blocked: [], accountStatus: "active" };
+          }
+        };
+        if (name === "matches") return {
+          async findOne() { return { status: "matched" }; }
+        };
+        if (name === "chatmessages") return {
+          async findOne() { return null; }
+        };
+        if (name === "callSessions") return {
+          async findOne() { return null; },
+          async insertOne(call) {
+            insertedCall = call;
+            return { insertedId: type + "-call-id" };
+          }
+        };
+        assert.fail("Unexpected collection: " + name);
+      }
+    });
+
+    const result = await connection.createCall("alice", {
+      roomId: "alice-bob",
+      receiverUid: "bob",
+      type,
+      offer: { type: "offer", sdp: "valid-offer" }
+    });
+
+    assert.equal(result.status, 201);
+    assert.equal(result.body.type, type);
+    assert.equal(result.body.receiverUid, "bob");
+    assert.equal(insertedCall.roomId, "alice-bob");
+  }
+});
+
+test("a room ID alone cannot authorize a call without an active match or persisted conversation", async () => {
+  let callInsertAttempted = false;
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne({ uid }) {
+          return { uid, blocked: [], accountStatus: "active" };
+        }
+      };
+      if (name === "matches") return {
+        async findOne() { return null; }
+      };
+      if (name === "chatmessages") return {
+        async findOne() { return null; }
+      };
+      if (name === "callSessions") return {
+        async findOne() { return null; },
+        async insertOne() { callInsertAttempted = true; }
+      };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.createCall("alice", {
+    roomId: "alice-bob",
+    receiverUid: "bob",
+    type: "audio",
+    offer: { type: "offer", sdp: "valid-offer" }
+  });
+
+  assert.equal(result.status, 403);
+  assert.equal(callInsertAttempted, false);
+});
