@@ -279,7 +279,7 @@ const AdminAnalyticsPage = () => {
                         {event.ticketId ? ` · Ticket ${event.ticketId.slice(-6)}` : ''}
                       </p>
                     </div>
-                    <time className="shrink-0 text-xs text-gray-400" dateTime={event.createdAt ? new Date(event.createdAt).toISOString() : undefined}>
+                    <time className="shrink-0 text-xs text-gray-400" dateTime={event.createdAt && !Number.isNaN(new Date(event.createdAt).getTime()) ? new Date(event.createdAt).toISOString() : undefined}>
                       {event.createdAt && !Number.isNaN(new Date(event.createdAt).getTime())
                         ? new Date(event.createdAt).toLocaleString()
                         : 'Time unavailable'}
