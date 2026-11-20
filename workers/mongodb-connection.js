@@ -5105,7 +5105,7 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const dateFilter = { createdAt: { $gte: startDate, $lte: endDate } };
-      const [totalUsers, paidUserIds, signups, reportedUsers] = await Promise.all([
+      const [totalUsers, paidUserIds, signups, reportedUsers, recentAdminActivity] = await Promise.all([
         db.collection("users").countDocuments({}),
         db.collection("subscriptions").distinct("userId", { status: "active" }),
         db.collection("users").aggregate([
@@ -5113,14 +5113,25 @@ export class MongoDBConnection {
           { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } },
           { $sort: { _id: 1 } }
         ]).toArray(),
-        db.collection("reports").distinct("reportedUserUid")
+        db.collection("reports").distinct("reportedUserUid"),
+        db.collection("auditlogs").find(
+          { actorType: "admin" },
+          { projection: {
+            eventType: 1, actorUid: 1, actorType: 1, targetUid: 1, ticketId: 1,
+            reportId: 1, action: 1, outcome: 1, status: 1, category: 1,
+            createdAt: 1, updatedAt: 1
+          } }
+        ).sort({ createdAt: -1 }).limit(8).toArray()
       ]);
       const paidUsers = Array.isArray(paidUserIds) ? paidUserIds.length : 0;
       return { status: 200, body: {
         userStats: { total: totalUsers, paid: paidUsers, unpaid: Math.max(0, totalUsers - paidUsers) },
         signupsPerDay: signups,
-        locations: [],
-        reportedUsersCount: reportedUsers.length
+        reportedUsersCount: reportedUsers.length,
+        recentAdminActivity: recentAdminActivity.map(({ _id, eventType, actorUid, actorType, targetUid, ticketId, reportId, action, outcome, status, category, createdAt, updatedAt }) => ({
+          id: _id ? String(_id) : null, eventType, actorUid, actorType, targetUid, ticketId: ticketId ? String(ticketId) : null,
+          reportId: reportId ? String(reportId) : null, action, outcome, status, category, createdAt, updatedAt
+        }))
       } };
     } catch {
       return { status: 503, body: { message: "Unable to load analytics summary" } };
