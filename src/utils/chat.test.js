@@ -1,4 +1,4 @@
-import { collectPendingDeliveryMessages, getVisibleChatMessageIds } from './chat';
+import { collectPendingDeliveryMessages, getChatPeerUidFromRoomId, getVisibleChatMessageIds } from './chat';
 
 const entry = (id, ratio, isIntersecting = true) => ({
   isIntersecting,
@@ -70,5 +70,26 @@ describe('collectPendingDeliveryMessages', () => {
       { ...message('6729a0000000000000000002'), receiverUid: 'someone-else' },
     ], pending, 'recipient-uid')).toEqual([]);
     expect(pending.size).toBe(0);
+  });
+});
+
+
+describe('getChatPeerUidFromRoomId', () => {
+  test('resolves a peer when the authenticated UID is at either room boundary', () => {
+    expect(getChatPeerUidFromRoomId('alice-bob', 'alice')).toBe('bob');
+    expect(getChatPeerUidFromRoomId('alice-bob', 'bob')).toBe('alice');
+  });
+
+  test('handles hyphens inside either participant UID without splitting ambiguously', () => {
+    expect(getChatPeerUidFromRoomId('user-with-hyphens-peer-id', 'user-with-hyphens')).toBe('peer-id');
+    expect(getChatPeerUidFromRoomId('peer-id-user-with-hyphens', 'user-with-hyphens')).toBe('peer-id');
+  });
+
+  test('rejects unrelated, empty, self, and oversized room identities', () => {
+    expect(getChatPeerUidFromRoomId('alice-bob', 'charlie')).toBeNull();
+    expect(getChatPeerUidFromRoomId('alice-alice', 'alice')).toBeNull();
+    expect(getChatPeerUidFromRoomId('alice-', 'alice')).toBeNull();
+    expect(getChatPeerUidFromRoomId('x'.repeat(261), 'alice')).toBeNull();
+    expect(getChatPeerUidFromRoomId(null, 'alice')).toBeNull();
   });
 });
