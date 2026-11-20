@@ -112,6 +112,7 @@ const SwipeDeck = () => {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const discoverRequestSequence = useRef(0);
+  const swipeInFlight = useRef(false);
 
   const fetchUsersToSwipe = useCallback(async (filters = {}) => {
     // The API only accepts maxDistance for an explicitly selected Nearby
@@ -204,10 +205,13 @@ const SwipeDeck = () => {
   }, [swipeError]);
 
   const handleVote = async (userId, direction) => {
-    if (!userId || isVoting || isUndoing) return;
+    // React state updates are asynchronous. A ref closes the small window in
+    // which two rapid taps or a tap plus a keyboard shortcut can submit twice.
+    if (!userId || swipeInFlight.current || isVoting || isUndoing) return;
     const selectedUser = users.find((candidate) => candidate.uid === userId);
     if (!selectedUser) return;
 
+    swipeInFlight.current = true;
     setIsVoting(true);
     setSwipeError(null);
     // Remove the active card immediately, then restore it if the API rejects the action.
@@ -217,14 +221,12 @@ const SwipeDeck = () => {
       if (direction === 'right') {
         const response = await apiClient.post('/swipe/like', { userId });
         if (response && response.status === 'matched') {
-          const matchedUser = users.find(u => u.uid === userId);
-          setNewMatchInfo(matchedUser);
+          setNewMatchInfo(selectedUser);
         }
       } else if (direction === 'superlike') {
         const response = await apiClient.post('/swipe/superlike', { userId });
         if (response && response.status === 'matched') {
-          const matchedUser = users.find(u => u.uid === userId);
-          setNewMatchInfo(matchedUser);
+          setNewMatchInfo(selectedUser);
         }
       } else {
         await apiClient.post('/swipe/pass', { userId });
@@ -238,6 +240,7 @@ const SwipeDeck = () => {
           : [selectedUser, ...prevUsers]
       ));
     } finally {
+      swipeInFlight.current = false;
       setIsVoting(false);
     }
   };
