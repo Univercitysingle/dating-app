@@ -580,10 +580,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
     if (!peer || !description || remoteReadyRef.current) return;
     await peer.setRemoteDescription(new RTCSessionDescription(description));
     remoteReadyRef.current = true;
-    const queued = queuedRemoteRef.current.map(candidate => new RTCIceCandidate(candidate));
-    const pending = queued.slice();
-    await flushQueuedRemoteCandidates(peer, pending);
-    queuedRemoteRef.current = pending.map(candidate => candidate.toJSON ? candidate.toJSON() : candidate);
+    await flushQueuedRemoteCandidates(peer, queuedRemoteRef.current);
   }, []);
 
   const startCall = async type => {
@@ -742,10 +739,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
                 await peer.setLocalDescription(answer);
                 await sendDescription(String(next._id), peer.localDescription);
               }
-              const queued = queuedRemoteRef.current.map(candidate => new RTCIceCandidate(candidate));
-              const pending = queued.slice();
-              await flushQueuedRemoteCandidates(peer, pending);
-              queuedRemoteRef.current = pending.map(candidate => candidate.toJSON ? candidate.toJSON() : candidate);
+              await flushQueuedRemoteCandidates(peer, queuedRemoteRef.current);
               // A signaling message is consumed only after the description and
               // its answer have been applied successfully. If negotiation fails,
               // leave it eligible for the next poll instead of losing the call.
@@ -756,7 +750,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
           } else if (signal.candidate) {
             if (!peer || !remoteReadyRef.current) queuedRemoteRef.current.push(signal.candidate);
             else {
-              const applied = await applyRemoteIceCandidate(peer, new RTCIceCandidate(signal.candidate));
+              const applied = await applyRemoteIceCandidate(peer, signal.candidate);
               if (applied) markCallSignalHandled(seenSignalsRef.current, signal.signalId);
               continue;
             }
