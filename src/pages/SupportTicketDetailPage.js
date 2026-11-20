@@ -18,6 +18,9 @@ const SupportTicketDetailPage = () => {
   const [feedbackComment, setFeedbackComment] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const fetchTicketDetails = async () => {
     setIsLoading(true);
@@ -72,15 +75,27 @@ const SupportTicketDetailPage = () => {
     }
   };
 
-  const handleEditMessage = async (msg) => {
-    const nextMessage = window.prompt('Edit your message', msg.message || '');
-    if (nextMessage === null || !nextMessage.trim() || nextMessage.trim() === msg.message) return;
+  const handleEditMessage = (msg) => {
+    setEditingMessageId(msg._id);
+    setEditDraft(msg.message || '');
+    setActionError(null);
+  };
+
+  const handleSaveEdit = async (event, msg) => {
+    event.preventDefault();
+    const nextMessage = editDraft.trim();
+    if (!nextMessage || nextMessage === msg.message || isSavingEdit) return;
+    setIsSavingEdit(true);
+    setActionError(null);
     try {
-      await apiClient.patch('/support-tickets/' + ticketId + '/messages/' + msg._id, { message: nextMessage.trim() });
-      await fetchTicketDetails();
-      setActionError(null);
+      const updated = await apiClient.patch('/support-tickets/' + ticketId + '/messages/' + msg._id, { message: nextMessage });
+      setMessages(current => current.map(item => item._id === msg._id ? { ...item, ...(updated || {}), message: nextMessage, editedAt: updated?.editedAt || new Date().toISOString() } : item));
+      setEditingMessageId(null);
+      setEditDraft('');
     } catch (err) {
       setActionError(getUserFriendlyError(err, 'Your message could not be edited.'));
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -179,9 +194,17 @@ const SupportTicketDetailPage = () => {
             <div key={msg._id} className={`flex ${msg.isFromAdmin ? 'justify-start' : 'justify-end'}`}>
               <div className={`p-4 rounded-lg max-w-lg ${msg.isFromAdmin ? 'bg-gray-200' : 'bg-primary text-white'}`}>
                 <p className="font-bold">{msg.isFromAdmin ? 'Admin' : 'You'}</p>
-                <p>{msg.deletedAt ? 'This message was deleted.' : msg.message}</p>
+                {editingMessageId === msg._id && !msg.deletedAt ? (
+                  <form onSubmit={(event) => handleSaveEdit(event, msg)} className="mt-2 space-y-2" aria-label="Edit support message">
+                    <textarea autoFocus rows="3" maxLength={5000} value={editDraft} onChange={event => setEditDraft(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200" aria-label="Message text" />
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button type="button" onClick={() => { setEditingMessageId(null); setEditDraft(''); }} className="rounded-lg px-3 py-2 text-xs font-semibold text-current underline">Cancel</button>
+                      <button type="submit" disabled={!editDraft.trim() || isSavingEdit} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{isSavingEdit ? 'Saving…' : 'Save changes'}</button>
+                    </div>
+                  </form>
+                ) : <p>{msg.deletedAt ? 'This message was deleted.' : msg.message}</p>}
                 {msg.editedAt && !msg.deletedAt && <span className="mt-1 block text-xs opacity-70">Edited</span>}
-                {!msg.isFromAdmin && !msg.deletedAt && <div className="mt-2 flex gap-3 text-xs">
+                {!msg.isFromAdmin && !msg.deletedAt && editingMessageId !== msg._id && <div className="mt-2 flex gap-3 text-xs">
                   {Date.now() - new Date(msg.createdAt).getTime() <= 15 * 60 * 1000 && <button type="button" onClick={() => handleEditMessage(msg)} className="underline">Edit</button>}
                   {Date.now() - new Date(msg.createdAt).getTime() <= 60 * 60 * 1000 && <button type="button" onClick={() => handleDeleteMessage(msg)} className="underline">Delete</button>}
                 </div>}
