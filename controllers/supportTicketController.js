@@ -67,7 +67,7 @@ const getTicketByIdForUser = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    const messages = await TicketMessage.find({ ticketId }).sort({ createdAt: 'asc' }).populate('senderId', 'name');
+    const messages = await TicketMessage.find({ ticketId, isInternalNote: { $ne: true } }).sort({ createdAt: 'asc' }).populate('senderId', 'name');
 
     res.json({ ticket, messages });
   } catch (error) {
