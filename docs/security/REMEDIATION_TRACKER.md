@@ -351,3 +351,6 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Policy:** Uses the `security-extended` query suite, excludes generated build/dependency output, checks out the exact migration-branch/PR-head revision, and uploads results to GitHub code scanning.
 - **Supply-chain pin:** Both CodeQL action steps use immutable commit `9418214df1f2c4b8128c770156c409013b07d6b9` (the v3 tag target).
 - **Evidence:** Initial analysis [run 44704244467](https://github.com/Univercitysingle/dating-app/actions/runs/44704244467) had initialized successfully and was still running at the time of this entry. Do not report a clean SAST result until the analyze step completes and code-scanning alerts are reviewed.
+
+
+- **CodeQL execution update:** [Run 44704244467](https://github.com/Univercitysingle/dating-app/actions/runs/44704244467) completed successfully. JavaScript/TypeScript analysis and SARIF upload completed. Workflow success confirms analysis/upload, not zero findings. Review open CodeQL alerts in the repository Security tab and triage them before marking SAST clean.
