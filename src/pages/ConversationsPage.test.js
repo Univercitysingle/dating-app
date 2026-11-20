@@ -55,8 +55,8 @@ describe('ConversationsPage inbox synchronization', () => {
     expect(screen.getByRole('link', { name: 'Alex, 3 unread messages' })).toHaveClass('bg-rose-50/70');
   });
 
-  it('updates the inbox from activity events without periodic API polling', async () => {
-    apiClient.get.mockResolvedValueOnce([
+  it('updates from activity events and refreshes unread summaries while visible', async () => {
+    apiClient.get.mockResolvedValue([
       conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
       conversation('room-b', 'Sam', '2026-11-04T07:00:00.000Z', 0),
     ]);
@@ -85,8 +85,34 @@ describe('ConversationsPage inbox synchronization', () => {
     expect(alexIndex).toBeGreaterThan(samIndex);
 
     await act(async () => {
-      jest.advanceTimersByTime(60000);
+      jest.advanceTimersByTime(30000);
+      await Promise.resolve();
+    });
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('pauses inbox refreshes while the document is hidden', async () => {
+    apiClient.get.mockResolvedValue([
+      conversation('room-a', 'Alex', '2026-11-04T08:00:00.000Z', 0),
+    ]);
+    const visibility = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+
+    render(
+      <MemoryRouter>
+        <ConversationsPage />
+      </MemoryRouter>
+    );
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      jest.advanceTimersByTime(90000);
+      await Promise.resolve();
     });
     expect(apiClient.get).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: visibility?.get ? visibility.get.call(document) : 'visible',
+    });
   });
 });
