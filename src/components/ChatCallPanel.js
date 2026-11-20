@@ -4,6 +4,7 @@ import apiClient from '../api/apiClient';
 import { getCallIceConfig } from '../utils/videoRoomIce';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
 import { shouldBePolitePeer } from '../utils/webrtcNegotiation';
+import { markCallSignalHandled } from '../utils/callSignaling';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
 const messageFor = (error, fallback) => error?.data?.error || error?.data?.message || error?.message || fallback;
@@ -728,7 +729,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
                 if (!polite) {
                   // This peer intentionally ignores a colliding offer. Mark it
                   // handled so the same offer is not reconsidered on every poll.
-                  seenSignalsRef.current.add(signal.signalId);
+                  markCallSignalHandled(seenSignalsRef.current, signal.signalId);
                   continue;
                 }
                 await peer.setLocalDescription({ type: 'rollback' });
@@ -746,7 +747,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
               // A signaling message is consumed only after the description and
               // its answer have been applied successfully. If negotiation fails,
               // leave it eligible for the next poll instead of losing the call.
-              seenSignalsRef.current.add(signal.signalId);
+              markCallSignalHandled(seenSignalsRef.current, signal.signalId);
             } catch (_) {
               setStatus('Unable to negotiate the restored connection. Retrying…');
             }
@@ -755,7 +756,7 @@ export default function ChatCallPanel({ roomId, currentUser, otherUser, onCallSt
             else {
               try { await peer.addIceCandidate(new RTCIceCandidate(signal.candidate)); } catch (_) { /* Ignore stale ICE candidates. */ }
             }
-            seenSignalsRef.current.add(signal.signalId);
+            markCallSignalHandled(seenSignalsRef.current, signal.signalId);
           }
         }
       } catch (err) {
