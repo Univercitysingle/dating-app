@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../api/apiClient';
 import { Link } from 'react-router-dom';
 import { resolvePhotoUrl, resolveWorkerPhotoUrl, PLACEHOLDER_IMAGE } from '../utils/media';
@@ -9,27 +9,47 @@ const LikesPage = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const requestSequence = useRef(0);
 
-    const fetchLikes = useCallback(async () => {
-        setLoading(true);
+    const fetchLikes = useCallback(async ({ silent = false } = {}) => {
+        const sequence = ++requestSequence.current;
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const response = await apiClient.get('/users/likes');
+            if (sequence !== requestSequence.current) return;
             if (response?.forbidden) {
+                setUsers([]);
                 setError('This feature is available with an eligible premium plan.');
             } else {
                 const usersArray = response?.data || response;
                 setUsers(Array.isArray(usersArray) ? usersArray : []);
             }
         } catch (err) {
-            setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
+            if (sequence !== requestSequence.current) return;
+            // Keep the last successful list visible during a background refresh failure.
+            if (!silent || users.length === 0) {
+                setError(getUserFriendlyError(err, 'We could not load your likes. Please try again.'));
+            }
         } finally {
-            setLoading(false);
+            if (sequence === requestSequence.current && !silent) setLoading(false);
         }
-    }, []);
+    }, [users.length]);
 
     useEffect(() => {
         fetchLikes();
+        const refreshIfVisible = () => {
+            if (document.visibilityState === 'visible') fetchLikes({ silent: true });
+        };
+        const intervalId = window.setInterval(refreshIfVisible, 30000);
+        document.addEventListener('visibilitychange', refreshIfVisible);
+        window.addEventListener('focus', refreshIfVisible);
+        return () => {
+            requestSequence.current += 1;
+            window.clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', refreshIfVisible);
+            window.removeEventListener('focus', refreshIfVisible);
+        };
     }, [fetchLikes]);
 
     if (loading) {
@@ -43,6 +63,11 @@ const LikesPage = () => {
     return (
         <div className="page-container likes-page mx-auto w-full max-w-4xl p-4 sm:p-6">
             <header className="likes-heading mb-7 sm:mb-9"><p className="page-eyebrow">A LITTLE SPARK</p><div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">People who like you</h1><p className="mt-2 text-sm text-gray-500">A little interest can be the beginning of something lovely.</p></div><span className="likes-total">{users.length} {users.length === 1 ? "like" : "likes"}</span></div></header>
+            {error && users.length > 0 && (
+                <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
+                    Your likes are shown from the last update. We could not refresh them just now.
+                </p>
+            )}
             {users.length > 0 ? (
                 <ul className="space-y-4">
                     {users.map((user, index) => (
