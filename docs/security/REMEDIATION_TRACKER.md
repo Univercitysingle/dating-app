@@ -259,3 +259,13 @@ Findings and operational statements remain open until a named owner supplies rep
 - **Commits:** `08f287b78aa9f5eb08979426d453861c9000c412` (validator), `e3f459f88910482b3f5dc374d0d343a04e0a1de4` (tests), `c590fba0246756baa3cdae424ec99b88b957a791` (workflow test step), `863696e95cceec15ab0a6e16df9eb4524f5920ee` (workflow formatting correction).
 - **Evidence:** Initial dependency audit run [44683443746](https://github.com/Univercitysingle/dating-app/actions/runs/44683443746) succeeded before this hardening. The corrected workflow run [44696267084](https://github.com/Univercitysingle/dating-app/actions/runs/44696267084) was queued/in progress at the time of this update. Do not mark this control verified until that run completes successfully and its audit artifact is reviewed.
 - **Scope:** This remains a dependency-advisory gate, not a full SAST, DAST, secret scan, Firebase rules test or penetration test.
+
+
+## CVE audit execution and dependency findings (2026-11-20)
+
+- **Verified run:** [44696267084](https://github.com/Univercitysingle/dating-app/actions/runs/44696267084) completed successfully on source SHA `863696e95cceec15ab0a6e16df9eb4524f5920ee`. The fail-closed policy regression tests, root production audit, root full audit, Worker audit and artifact upload all passed.
+- **Root production dependency findings:** 6 moderate advisories, 0 high, 0 critical. Affected transitive packages: `gaxios`, `gcp-metadata`, `glob`, `google-gax`, `minimatch`, and `rimraf`. npm reports fixes available for these six production-tree findings. They remain open until the lockfile is updated and the audit is rerun.
+- **Root development dependency findings:** 7 moderate findings total, including the production-tree findings and direct development dependency `depcheck`. The existing scoped high/critical exception remains restricted to the development-only `picomatch` advisory.
+- **Cloudflare Worker dependencies:** 0 findings in this run.
+- **Artifact:** `cve-dependency-audit-863696e95cceec15ab0a6e16df9eb4524f5920ee`, retained by GitHub Actions for 30 days. It contains root production, root full and Worker npm audit JSON reports.
+- **Disposition:** Audit infrastructure and fail-closed policy are verified. Dependency remediation remains open. Do not interpret a successful high/critical-threshold workflow as zero vulnerabilities: moderate production advisories remain.
