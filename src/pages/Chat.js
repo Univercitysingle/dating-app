@@ -604,6 +604,8 @@ function Chat() {
             className="chat-message-input flex-grow"
             placeholder={!isRoomJoined ? "Connecting to chat…" : isSending ? "Sending message…" : "Write a message…"}
             aria-label="Message"
+            aria-describedby="chat-message-limit"
+            maxLength={5000}
             autoComplete="off"
             disabled={!isRoomJoined || isSending}
           />
@@ -616,6 +618,7 @@ function Chat() {
           >
             {isSending ? <span className="chat-send-spinner" aria-hidden="true" /> : <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 3-7.2 18-3.7-7.1L3 10.2 21 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M10.1 13.9 15 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>}
           </button>
+          <span id="chat-message-limit" className="sr-only">Messages can contain up to 5,000 characters.</span>
         </form>
       </footer>
     </div>
