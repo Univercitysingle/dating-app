@@ -20,7 +20,7 @@ export function isValidEmailAddress(value) {
 export function normalizeWebXPayReference(value) {
   if (typeof value !== "string") return null;
   const reference = value.trim();
-  if (!reference || reference.length > 128 || /[\\u0000-\\u001f\\u007f]/.test(reference)) return null;
+  if (!reference || reference.length > 128 || /[\x00-\x1F\x7F]/.test(reference)) return null;
   return reference;
 }
 
