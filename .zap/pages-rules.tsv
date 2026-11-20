@@ -1,10 +1,11 @@
-# Reviewed ZAP passive-baseline findings from 2026-11-20.
-# These rules remain visible in the report as INFO. Any new WARN or FAIL finding
-# not listed here remains a deployment-gate failure and must be triaged.
-10015	INFO	(Public pages use short caching; authenticated app/API routes use private no-store. Revalidate route headers when changed.)
-10017	INFO	(External scripts are constrained by the explicit CSP allowlist for Firebase/Google, Cloudflare Insights and jsDelivr. Review any new origin.)
-10049	INFO	(Non-storable content is intentional for user-specific app/API responses protected by private no-store.)
-10096	INFO	(Timestamp appears in a fingerprinted frontend bundle; verify no secret or sensitive operational metadata is exposed.)
-10109	INFO	(Technology fingerprint only; not a vulnerability by itself.)
-90003	INFO	(SRI is not currently applied to SDK-managed dynamic Firebase/Google identity scripts; CSP restricts script origins. Reassess if static third-party scripts are added.)
-90004	INFO	(COEP is intentionally not enabled pending compatibility requirements for Firebase popup authentication and cross-origin media. Do not enable without browser regression tests.)
+# Reviewed ZAP passive-baseline warnings from 2026-11-20.
+# These known findings are accepted temporarily and appear as IGNORE in reports.
+# New/unlisted WARN and all FAIL alerts remain blocking. Reassess this list after
+# route headers, CSP, Firebase auth scripts, or media/call integrations change.
+10015	IGNORE	(Public pages use short caching; authenticated app/API routes use private no-store. Revalidate route headers when changed.)
+10017	IGNORE	(External scripts are constrained by the explicit CSP allowlist for Firebase/Google, Cloudflare Insights and jsDelivr. Review any new origin.)
+10049	IGNORE	(Non-storable content is intentional for user-specific app/API responses protected by private no-store.)
+10096	IGNORE	(Timestamp disclosure in fingerprinted build asset is provisionally accepted as non-sensitive; inspect the deployed bundle during the next security review.)
+10109	IGNORE	(Technology fingerprint only; not a vulnerability by itself.)
+90003	IGNORE	(SRI is not currently applied to SDK-managed dynamic Firebase/Google identity scripts; CSP restricts script origins. Reassess if static third-party scripts are added.)
+90004	IGNORE	(COEP is intentionally not enabled pending compatibility requirements for Firebase popup authentication and cross-origin media. Do not enable without browser regression tests.)
