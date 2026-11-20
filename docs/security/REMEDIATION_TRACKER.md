@@ -354,3 +354,14 @@ Findings and operational statements remain open until a named owner supplies rep
 
 
 - **CodeQL execution update:** [Run 44704244467](https://github.com/Univercitysingle/dating-app/actions/runs/44704244467) completed successfully. JavaScript/TypeScript analysis and SARIF upload completed. Workflow success confirms analysis/upload, not zero findings. Review open CodeQL alerts in the repository Security tab and triage them before marking SAST clean.
+
+
+## Security verification refresh (2026-11-20)
+
+- **Dependency audit closure:** The migration-branch dependency audit [run 44703705089](https://github.com/Univercitysingle/dating-app/actions/runs/44703705089) completed successfully. Root production, root full, backend production, backend full and Worker audit reports each show zero vulnerabilities. Root, backend and Worker clean installs completed. Full evidence and closure checklist are in [DEPENDENCY_AUDIT_2026-11-19.md](./DEPENDENCY_AUDIT_2026-11-19.md).
+- **Regression validation:** Dependency remediation validation [run 44703606851](https://github.com/Univercitysingle/dating-app/actions/runs/44703606851) completed successfully, including the repository `npm test` command.
+- **Cloudflare staging:** Pages deployment [run 44703606773](https://github.com/Univercitysingle/dating-app/actions/runs/44703606773) and Worker deployment [run 44703606866](https://github.com/Univercitysingle/dating-app/actions/runs/44703606866) completed successfully after the dependency remediation merge. CDN Worker was not modified.
+- **CodeQL:** [Run 44704244467](https://github.com/Univercitysingle/dating-app/actions/runs/44704244467) completed successfully, including JavaScript/TypeScript analysis and SARIF upload. This does not establish zero findings. Code-scanning alert triage still requires review in the repository Security tab; the available GitHub connection did not expose the alert list.
+- **Firebase emulator:** [Run 44702809424](https://github.com/Univercitysingle/dating-app/actions/runs/44702809424) passed all 11 RTDB rules tests against the demo emulator. Live Firebase project `it-services-1841` deployment and read-back remain open.
+- **Branch safety:** The active work remains on `migrate-to-serverless`. No merge to `main` was performed. Keep the migration PR unmerged until the product owner explicitly authorizes a migration.
+- **Still external / acceptance-gated:** live Firebase rules and IAM validation, isolated MongoDB/Firebase restore drills, WebXPay provider settlement/refund verification, authenticated DAST and independent VAPT, physical two-device/TURN testing, measured 1,000-user capacity testing, production cutover/rollback acceptance, and Vercel GitHub-app disconnection in the external Vercel account.
