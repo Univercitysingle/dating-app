@@ -119,9 +119,20 @@ const AdminAnalyticsPage = () => {
     ? analyticsData.signupsPerDay
     : [];
   const userStats = analyticsData?.userStats || {};
-  const locations = Array.isArray(analyticsData?.locations)
-    ? analyticsData.locations
+  const recentAdminActivity = Array.isArray(analyticsData?.recentAdminActivity)
+    ? analyticsData.recentAdminActivity
     : [];
+  const activityLabel = event => {
+    const labels = {
+      moderation_action: "Moderation action",
+      support_ticket_updated: "Support ticket updated",
+      support_ticket_message_edited: "Support message edited",
+      support_ticket_message_deleted: "Support message deleted",
+      admin_account_lifecycle: "Account status changed",
+      support_ticket_feedback_submitted: "Support feedback submitted"
+    };
+    return labels[event] || "Administrative action";
+  };
 
   const lineChartData = {
     labels: signups.map(day => day?._id || ''),
@@ -249,28 +260,35 @@ const AdminAnalyticsPage = () => {
           </section>
 
           <section className="rounded-lg bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-lg font-semibold">User locations</h2>
-            {locations.length ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Country</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">User count</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {locations.map(location => (
-                      <tr key={location?._id || 'unknown'}>
-                        <td className="px-4 py-3 text-sm text-gray-700">{location?._id || 'Unknown'}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{Number(location?.count) || 0}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Recent administrator activity</h2>
+                <p className="mt-1 text-sm text-gray-500">Latest recorded administrative actions. Sensitive message content and private payloads are excluded.</p>
               </div>
+              <span className="shrink-0 text-xs text-gray-500">Latest 8</span>
+            </div>
+            {recentAdminActivity.length ? (
+              <ol className="divide-y divide-gray-100">
+                {recentAdminActivity.map((event, index) => (
+                  <li key={event.id || `${event.eventType || 'event'}-${index}`} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{activityLabel(event.eventType)}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {event.action ? event.action.replace(/_/g, ' ') : event.category || event.status || 'Recorded'}
+                        {event.outcome ? ` · ${event.outcome.replace(/_/g, ' ')}` : ''}
+                        {event.ticketId ? ` · Ticket ${event.ticketId.slice(-6)}` : ''}
+                      </p>
+                    </div>
+                    <time className="shrink-0 text-xs text-gray-400" dateTime={event.createdAt ? new Date(event.createdAt).toISOString() : undefined}>
+                      {event.createdAt && !Number.isNaN(new Date(event.createdAt).getTime())
+                        ? new Date(event.createdAt).toLocaleString()
+                        : 'Time unavailable'}
+                    </time>
+                  </li>
+                ))}
+              </ol>
             ) : (
-              <p className="text-sm text-gray-500">Location breakdown is not currently available from the analytics API.</p>
+              <p className="py-8 text-center text-sm text-gray-500">No administrator activity has been recorded yet.</p>
             )}
           </section>
         </>
