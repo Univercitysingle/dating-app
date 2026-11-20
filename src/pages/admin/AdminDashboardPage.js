@@ -25,6 +25,7 @@ const metricCards = [
 const quickLinks = [
   { title: 'User management', description: 'Search accounts, review profiles, and manage access.', to: '/admin/users', icon: '◎', tone: 'indigo' },
   { title: 'Reports & safety', description: 'Review reports and take action on safety concerns.', to: '/admin/reports', icon: '⚑', tone: 'rose' },
+  { title: 'Photo verification', description: 'Review pending identity and photo checks.', to: '/admin/verifications', icon: '▧', tone: 'violet', superadminOnly: true },
   { title: 'Analytics', description: 'Understand sign-ups and platform activity.', to: '/admin/analytics', icon: '▥', tone: 'sky' },
   { title: 'Payment review', description: 'Review pending purchases and refund cases.', to: '/admin/purchases', icon: '◇', tone: 'violet' },
   { title: 'Transactions', description: 'Inspect subscription and purchase records.', to: '/admin/transactions', icon: '⇄', tone: 'emerald' },
@@ -143,7 +144,7 @@ const AdminDashboardPage = () => {
           <p className="mt-1 text-sm text-slate-500">The tools you need to manage the DateMe platform.</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
-          {quickLinks.map((item) => (
+          {quickLinks.filter((item) => !item.superadminOnly || adminUser?.role === 'superadmin').map((item) => (
             <Link key={item.to} to={item.to} className="group flex min-h-[142px] items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ring-1 transition group-hover:scale-105 ${toneClasses[item.tone]}`} aria-hidden="true">{item.icon}</span>
               <span className="min-w-0 flex-1">
