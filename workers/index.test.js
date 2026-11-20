@@ -1565,6 +1565,56 @@ test("admin user deletion runs CDN cleanup after the account deletion route", as
   }
 });
 
+test("admin dashboard returns operational queue and subscription metrics", async () => {
+  const calls = [];
+  const makeConnection = role => {
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({
+      db: () => ({
+        collection: name => ({
+          findOne: async () => name === "users" ? { role } : null,
+          countDocuments: async filter => {
+            calls.push({ name, filter });
+            if (name === "users" && Object.keys(filter).length === 0) return 1200;
+            if (name === "users" && filter.createdAt) return 8;
+            if (name === "users" && filter.lastActiveAt) return 340;
+            if (name === "reports") return 6;
+            if (name === "supporttickets") return 14;
+            if (name === "purchases" && filter.status === "pending") return 2;
+            if (name === "subscriptions" && filter.status === "pending") return 3;
+            if (name === "purchases" && filter.status === "refund_required") return 1;
+            if (name === "subscriptions" && filter.status === "refund_required") return 2;
+            if (name === "subscriptions" && filter.status === "active") return 75;
+            if (name === "photoVerifications") return 4;
+            return 0;
+          }
+        })
+      })
+    });
+    return connection;
+  };
+
+  const adminResult = await makeConnection("admin").getAdminDashboardStats("admin-uid");
+  assert.equal(adminResult.status, 200);
+  assert.deepEqual(adminResult.body, {
+    totalUsers: 1200,
+    newUsers: 8,
+    activeUsers: 340,
+    pendingReports: 6,
+    openSupportTickets: 14,
+    pendingPayments: 5,
+    pendingRefunds: 3,
+    activeSubscriptions: 75
+  });
+  assert.equal(calls.some(call => call.name === "photoVerifications"), false);
+
+  calls.length = 0;
+  const superadminResult = await makeConnection("superadmin").getAdminDashboardStats("superadmin-uid");
+  assert.equal(superadminResult.status, 200);
+  assert.equal(superadminResult.body.pendingVerifications, 4);
+  assert.equal(calls.some(call => call.name === "photoVerifications"), true);
+});
+
 test("admin read methods deny users without an admin role", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({
