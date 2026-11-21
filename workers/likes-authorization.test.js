@@ -61,3 +61,75 @@ test("likes omit hidden profiles and either side of a blocked relationship", asy
   });
   assert.ok(calls.find(call => call.collection === "users" && call.options)?.options.projection.blocked);
 });
+
+
+test("expired legacy premium plan does not reveal incoming liker identities", async () => {
+  const uid = "viewer-uid";
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne(filter) {
+          if (filter.uid === uid) return { _id: "viewer-id", uid, plan: "premium", role: "user", blocked: [] };
+          return null;
+        },
+        find() {
+          return { async toArray() { return [{ uid: "liker-uid", name: "Liker", isProfileVisible: true }]; } };
+        }
+      };
+      if (name === "matches") return {
+        find() {
+          return { async toArray() { return [{ user1Uid: "liker-uid", user2Uid: uid, status: "pending" }]; } };
+        }
+      };
+      if (name === "subscriptions") return { async findOne() { return null; } };
+      throw new Error("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getLikes(uid);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.length, 1);
+  assert.equal(result.body[0].isBlurred, true);
+  assert.equal(result.body[0].uid, undefined);
+});
+
+test("active Gold subscription reveals incoming liker identity", async () => {
+  const uid = "viewer-uid";
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return {
+        async findOne(filter) {
+          if (filter.uid === uid) return { _id: "viewer-id", uid, plan: "basic", role: "user", blocked: [] };
+          return null;
+        },
+        find() {
+          return { async toArray() { return [{ uid: "liker-uid", name: "Liker", isProfileVisible: true }]; } };
+        }
+      };
+      if (name === "matches") return {
+        find() {
+          return { async toArray() { return [{ user1Uid: "liker-uid", user2Uid: uid, status: "pending" }]; } };
+        }
+      };
+      if (name === "subscriptions") return {
+        async findOne(filter) {
+          assert.equal(filter.status, "active");
+          assert.ok(filter.endDate.$gt instanceof Date);
+          return { plan: "gold", currency: "USD", endDate: new Date(Date.now() + 86400000) };
+        }
+      };
+      throw new Error("Unexpected collection: " + name);
+    }
+  });
+
+  const result = await connection.getLikes(uid);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body[0].isBlurred, false);
+  assert.equal(result.body[0].uid, "liker-uid");
+});
