@@ -5105,7 +5105,21 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const dateFilter = { createdAt: { $gte: startDate, $lte: endDate } };
-      const [totalUsers, paidUserIds, signups, reportedUsers, recentAdminActivity] = await Promise.all([
+      const paymentRevenuePipeline = (amountField, allowedStatuses) => [
+        { $match: {
+          ...dateFilter,
+          status: { $in: allowedStatuses },
+          paymentReference: { $type: "string", $nin: ["", null] }
+        } },
+        { $project: {
+          currency: { $toUpper: { $ifNull: ["$currency", "LKR"] } },
+          amount: { $convert: { input: "$" + amountField, to: "double", onError: 0, onNull: 0 } }
+        } },
+        { $match: { amount: { $gt: 0 }, currency: { $regex: "^[A-Z]{3}$" } } },
+        { $group: { _id: "$currency", amount: { $sum: "$amount" }, payments: { $sum: 1 } } },
+        { $sort: { _id: 1 } }
+      ];
+      const [totalUsers, paidUserIds, signups, reportedUsers, recentAdminActivity, purchaseRevenue, subscriptionRevenue] = await Promise.all([
         db.collection("users").countDocuments({}),
         db.collection("subscriptions").distinct("userId", { status: "active" }),
         db.collection("users").aggregate([
@@ -5124,13 +5138,25 @@ export class MongoDBConnection {
             reportId: 1, action: 1, outcome: 1, status: 1, category: 1,
             createdAt: 1, updatedAt: 1
           } }
-        ).sort({ createdAt: -1 }).limit(8).toArray()
+        ).sort({ createdAt: -1 }).limit(8).toArray(),
+        db.collection("purchases").aggregate(paymentRevenuePipeline("itemPrice", ["completed"])).toArray(),
+        db.collection("subscriptions").aggregate(paymentRevenuePipeline("amount", ["active"])).toArray()
       ]);
       const paidUsers = Array.isArray(paidUserIds) ? paidUserIds.length : 0;
+      const revenue = new Map();
+      for (const entry of [...purchaseRevenue, ...subscriptionRevenue]) {
+        const currency = String(entry?._id || "");
+        if (!/^[A-Z]{3}$/.test(currency)) continue;
+        const current = revenue.get(currency) || { currency, amount: 0, payments: 0 };
+        current.amount += Number(entry.amount) || 0;
+        current.payments += Number(entry.payments) || 0;
+        revenue.set(currency, current);
+      }
       return { status: 200, body: {
         userStats: { total: totalUsers, paid: paidUsers, unpaid: Math.max(0, totalUsers - paidUsers) },
         signupsPerDay: signups,
         reportedUsersCount: reportedUsers.length,
+        revenueByCurrency: [...revenue.values()].sort((a, b) => a.currency.localeCompare(b.currency)),
         recentAdminActivity: recentAdminActivity.map(({ _id, eventType, actorUid, actorType, targetUid, ticketId, reportId, action, outcome, status, category, createdAt, updatedAt }) => ({
           id: _id ? String(_id) : null, eventType, actorUid, actorType, targetUid, ticketId: ticketId ? String(ticketId) : null,
           reportId: reportId ? String(reportId) : null, action, outcome, status, category, createdAt, updatedAt
