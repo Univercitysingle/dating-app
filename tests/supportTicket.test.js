@@ -5,6 +5,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const User = require('../models/User');
 const SupportTicket = require('../models/SupportTicket');
 const TicketMessage = require('../models/TicketMessage');
+const AuditLogForSupportTest = require('../models/AuditLog');
 const supportTicketController = require('../controllers/supportTicketController');
 const adminSupportTicketController = require('../controllers/adminSupportTicketController');
 const adminAuthMiddleware = require('../middleware/adminAuthMiddleware');
@@ -245,6 +246,63 @@ describe('Support Ticket Flow', () => {
     expect(stored.deletedMessage).toBe('Original admin-reviewed text');
     const AuditLog = require('../models/AuditLog');
     expect(await AuditLog.countDocuments({ action: 'support_ticket_message_deleted', targetId: message._id })).toBe(1);
+  });
+
+  it('persists ticket priority, category, assignment and resolution metadata with audit history', async () => {
+    const response = await request(app)
+      .put(`/admin/tickets/${ticket._id}/status`)
+      .send({
+        status: 'Closed',
+        priority: 'Urgent',
+        category: 'Payments',
+        assignedToUid: 'admin-uid',
+        resolutionSummary: 'Gateway settlement was verified and the issue was resolved.',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'Closed',
+      priority: 'Urgent',
+      category: 'Payments',
+      assignedToUid: 'admin-uid',
+      resolutionSummary: 'Gateway settlement was verified and the issue was resolved.',
+    });
+    expect(response.body.resolvedAt).toBeTruthy();
+    const AuditLog = require('../models/AuditLog');
+    expect(await AuditLog.countDocuments({ action: 'support_ticket_updated', targetId: ticket._id })).toBe(1);
+  });
+
+  it('rejects invalid ticket metadata and unknown update fields', async () => {
+    const invalidPriority = await request(app)
+      .put(`/admin/tickets/${ticket._id}/status`)
+      .send({ priority: 'Critical' });
+    const unknownField = await request(app)
+      .put(`/admin/tickets/${ticket._id}/status`)
+      .send({ isAdmin: true });
+    expect(invalidPriority.status).toBe(400);
+    expect(unknownField.status).toBe(400);
+  });
+
+  it('does not change ticket status when an administrator adds a private note', async () => {
+    const response = await request(app)
+      .post(`/admin/tickets/${ticket._id}/messages`)
+      .send({ message: 'Internal investigation note', isInternalNote: true });
+    expect(response.status).toBe(201);
+    expect((await SupportTicket.findById(ticket._id)).status).toBe('Open');
+  });
+
+  it('returns staff, metadata and audit history for the admin detail view', async () => {
+    await AuditLogForSupportTest.create({
+      adminId: admin._id,
+      action: 'support_ticket_updated',
+      targetType: 'SupportTicket',
+      targetId: ticket._id,
+      changes: { priority: { from: 'Normal', to: 'High' } },
+    });
+    const response = await request(app).get(`/admin/tickets/${ticket._id}`);
+    expect(response.status).toBe(200);
+    expect(response.body.staff.some(person => person.uid === 'admin-uid')).toBe(true);
+    expect(response.body.history.some(entry => entry.eventType === 'support_ticket_updated')).toBe(true);
   });
 
   it('should update a ticket status', async () => {
