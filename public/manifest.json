@@ -11,6 +11,29 @@
   "background_color": "#24172d",
   "categories": ["lifestyle", "social"],
   "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Discover",
+      "short_name": "Discover",
+      "description": "Discover profiles and make new connections.",
+      "url": "/discover?source=pwa-shortcut",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Conversations",
+      "short_name": "Chats",
+      "description": "Open your conversations.",
+      "url": "/conversations?source=pwa-shortcut",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Likes",
+      "short_name": "Likes",
+      "description": "See people who liked your profile.",
+      "url": "/likes?source=pwa-shortcut",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ],
   "icons": [
     {
       "src": "/icon.svg",
