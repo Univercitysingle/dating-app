@@ -339,7 +339,7 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
       weeklySuperLikes: usdTier && ["gold", "platinum"].includes(plan),
       monthlyBoosts: false,
       readReceipts: isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive,
-      priorityLikes: false,
+      priorityLikes: usdTier && plan === "platinum",
       incognitoDiscovery: false,
       profileInsights: false,
       prioritySupport: false
@@ -1112,6 +1112,7 @@ export class MongoDBConnection {
         return { status: 403, body: { error: "This user has blocked you." } };
       }
 
+      let swipeEntitlements = null;
       if (action === "like") {
         const now = new Date();
         let activeSubscription = null;
@@ -1123,8 +1124,8 @@ export class MongoDBConnection {
         } catch {
           // Treat an unavailable entitlement lookup as Free, never as paid.
         }
-        const entitlements = buildMembershipEntitlements(currentUser, activeSubscription, now);
-        if (!entitlements.features.unlimitedLikes) {
+        swipeEntitlements = buildMembershipEntitlements(currentUser, activeSubscription, now);
+        if (!swipeEntitlements.features.unlimitedLikes) {
           const day = now.toISOString().slice(0, 10);
           if (currentUser.dailyLikeDate !== day) {
             await users.updateOne(
@@ -1257,6 +1258,7 @@ export class MongoDBConnection {
       if (action === "like" || action === "superlike") {
         const update = { $addToSet: { likedBy: uid }, $set: { updatedAt: now } };
         if (action === "superlike") update.$set.superLike = true;
+        if (action === "like" && swipeEntitlements?.features.priorityLikes) update.$set.priorityLike = true;
         await matches.updateOne({ _id: match._id }, update);
         match = await matches.findOne({ _id: match._id }) || {
           ...match,
@@ -2742,6 +2744,10 @@ export class MongoDBConnection {
         return likedUid ? [{ likedUid, match }] : [];
       });
       if (incomingMatches.length === 0) return { status: 200, body: [] };
+      incomingMatches.sort((a, b) =>
+        Number(Boolean(b.match?.superLike)) - Number(Boolean(a.match?.superLike)) ||
+        Number(Boolean(b.match?.priorityLike)) - Number(Boolean(a.match?.priorityLike))
+      );
       const likedUids = [...new Set(incomingMatches.map(item => item.likedUid))];
       const users = await db.collection("users").find({ uid: { $in: likedUids } }).toArray();
       const usersByUid = new Map(users.map(user => [user.uid, user]));
@@ -2775,7 +2781,7 @@ export class MongoDBConnection {
         if (isBlurred) {
           result.push({
             likeId: match?._id === undefined ? undefined : String(match._id),
-            likeType: match && match.superLike ? "superlike" : "like",
+            likeType: match && match.superLike ? "superlike" : match && match.priorityLike ? "priority" : "like",
             isBlurred: true
           });
           continue;
