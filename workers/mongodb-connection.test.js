@@ -3955,6 +3955,21 @@ test("admin analytics counts unique active subscribers rather than subscription 
       assert.equal(field, "userId");
       assert.deepEqual(query, { status: "active" });
       return ["subscriber-a", "subscriber-b"];
+    },
+    aggregate(pipeline) {
+      assert.deepEqual(pipeline[0].$match.status, { $in: ["active"] });
+      assert.deepEqual(pipeline[0].$match.paymentReference, { $type: "string", $nin: ["", null] });
+      return { toArray: async () => [{ _id: "USD", amount: 29.99, payments: 1 }] };
+    }
+  };
+  const purchases = {
+    aggregate(pipeline) {
+      assert.deepEqual(pipeline[0].$match.status, { $in: ["completed"] });
+      assert.deepEqual(pipeline[0].$match.paymentReference, { $type: "string", $nin: ["", null] });
+      return { toArray: async () => [
+        { _id: "LKR", amount: 3000, payments: 2 },
+        { _id: "USD", amount: 10, payments: 1 }
+      ] };
     }
   };
   const reports = { async distinct() { return ["reported-a"]; } };
@@ -3968,6 +3983,7 @@ test("admin analytics counts unique active subscribers rather than subscription 
     collection(name) {
       if (name === "users") return users;
       if (name === "subscriptions") return subscriptions;
+      if (name === "purchases") return purchases;
       if (name === "reports") return reports;
       if (name === "auditlogs") return auditlogs;
       assert.fail("Unexpected collection: " + name);
@@ -3982,6 +3998,10 @@ test("admin analytics counts unique active subscribers rather than subscription 
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.userStats, { total: 12, paid: 2, unpaid: 10 });
   assert.equal(result.body.reportedUsersCount, 1);
+  assert.deepEqual(result.body.revenueByCurrency, [
+    { currency: "LKR", amount: 3000, payments: 2 },
+    { currency: "USD", amount: 39.99, payments: 2 }
+  ]);
 });
 
 
