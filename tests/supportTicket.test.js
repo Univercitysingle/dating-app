@@ -308,7 +308,7 @@ describe('Support Ticket Flow', () => {
   it('should update a ticket status', async () => {
     const response = await request(app)
       .put(`/admin/tickets/${ticket._id}/status`)
-      .send({ status: 'Closed' });
+      .send({ status: 'Closed', resolutionSummary: 'Issue resolved after investigation.' });
     expect(response.status).toBe(200);
     expect(response.body.status).toBe('Closed');
   });
