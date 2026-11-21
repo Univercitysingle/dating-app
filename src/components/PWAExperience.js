@@ -6,6 +6,14 @@ function isIOSFamily() {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+function isMacSafari() {
+  if (typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || '';
+  return /Macintosh|Mac OS X/.test(userAgent) &&
+    /Safari/.test(userAgent) &&
+    !/(Chrome|Chromium|CriOS|Edg)/.test(userAgent);
+}
+
 function isStandalone() {
   if (typeof window === 'undefined') return false;
   return window.matchMedia?.('(display-mode: standalone)').matches ||
@@ -88,7 +96,7 @@ export default function PWAExperience() {
     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
   };
 
-  const canExplainIOSInstall = isIOSFamily() && !isInstalled;
+  const canExplainManualInstall = (isIOSFamily() || isMacSafari()) && !isInstalled;
 
   return (
     <>
@@ -106,19 +114,21 @@ export default function PWAExperience() {
         </div>
       )}
 
-      {!isInstalled && (installEvent || canExplainIOSInstall) && (
+      {!isInstalled && (installEvent || canExplainManualInstall) && (
         <div className="pwa-install-card" role="region" aria-label="Install Hart2Hart">
           <div className="pwa-install-copy">
             <strong>Take Hart2Hart with you</strong>
             <span>Install the app for a convenient, full-screen experience.</span>
             {showIOSHelp && (
               <span className="pwa-ios-help">
-                In Safari, tap Share, then choose “Add to Home Screen”. Open Hart2Hart from the new home-screen icon.
+                {isIOSFamily()
+                  ? 'In your browser, tap Share, then choose “Add to Home Screen”. Open Hart2Hart from the new home-screen icon.'
+                  : 'In Safari on macOS, open the File menu and choose “Add to Dock”.'}
               </span>
             )}
           </div>
           <button type="button" onClick={install}>
-            {canExplainIOSInstall && !installEvent ? 'How to install' : 'Install'}
+            {canExplainManualInstall && !installEvent ? 'How to install' : 'Install'}
           </button>
           <button
             type="button"
