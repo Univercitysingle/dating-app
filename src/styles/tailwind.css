@@ -6140,3 +6140,23 @@ html.dark .member-app-main .store-card { border-color: var(--app-border); backgr
 @media (prefers-reduced-motion: reduce) {
   .discover-page .discover-action-button { transition: none; }
 }
+
+
+/* Cross-platform PWA install, connectivity and safe-area presentation. */
+html { min-height: 100%; min-height: 100dvh; }
+body { min-height: 100%; min-height: 100dvh; overscroll-behavior-y: none; }
+#root { min-height: 100%; min-height: 100dvh; }
+.pwa-status-banner { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%; z-index: 220; display: flex; align-items: center; justify-content: center; gap: 12px; width: min(calc(100% - 24px), 620px); padding: 11px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; color: #fff; font-size: 13px; line-height: 1.4; text-align: center; box-shadow: 0 12px 34px rgba(20,12,26,.2); transform: translateX(-50%); }
+.pwa-offline-banner { background: #39283f; }
+.pwa-update-banner { background: #24172d; }
+.pwa-status-banner button { flex: 0 0 auto; min-height: 34px; padding: 6px 12px; border: 0; border-radius: 999px; background: #e94b78; color: #fff; font-size: 12px; font-weight: 750; }
+.pwa-status-banner .pwa-banner-dismiss { min-width: 28px; padding: 2px 6px; background: transparent; font-size: 20px; }
+.pwa-install-card { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 76px); z-index: 180; display: flex; align-items: center; gap: 12px; width: min(440px, calc(100% - 28px)); padding: 14px; border: 1px solid rgba(233,75,120,.18); border-radius: 18px; background: #fff; color: #24172d; box-shadow: 0 16px 50px rgba(32,20,42,.18); }
+.pwa-install-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.pwa-install-copy strong { font-size: 13px; font-weight: 800; }
+.pwa-install-copy span { color: #777184; font-size: 11px; line-height: 1.45; }
+.pwa-install-copy .pwa-ios-help { margin-top: 5px; color: #4c4052; }
+.pwa-install-card > button:not(.pwa-install-dismiss) { min-height: 38px; padding: 0 14px; border: 0; border-radius: 999px; background: #e94b78; color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.pwa-install-card .pwa-install-dismiss { align-self: flex-start; padding: 0 4px; border: 0; background: transparent; color: #817887; font-size: 20px; line-height: 1; }
+@media (max-width: 420px) { .pwa-install-card { gap: 8px; padding: 11px; } .pwa-install-card > button:not(.pwa-install-dismiss) { padding: 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .pwa-install-card, .pwa-status-banner { transition: none !important; } }
