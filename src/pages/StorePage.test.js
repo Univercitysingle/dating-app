@@ -11,6 +11,28 @@ jest.mock('../api/apiClient', () => ({
   default: { get: jest.fn(), post: jest.fn() }
 }));
 
+describe('StorePage USD pricing safety', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useAuth.mockReturnValue({ user: { uid: 'test-user' } });
+    apiClient.get.mockResolvedValue([]);
+  });
+
+  test('does not display legacy LKR prices and keeps checkout disabled until USD pricing is configured', async () => {
+    render(
+      <MemoryRouter initialEntries={['/store']}>
+        <StorePage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findAllByText('USD pricing coming soon')).toHaveLength(6);
+    expect(screen.queryByText(/LKR/i)).not.toBeInTheDocument();
+    const checkoutButtons = screen.getAllByRole('button', { name: 'USD pricing coming soon' });
+    expect(checkoutButtons).toHaveLength(6);
+    expect(checkoutButtons.every((button) => button.disabled)).toBe(true);
+  });
+});
+
 describe('StorePage payment return handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
