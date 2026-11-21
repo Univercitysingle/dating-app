@@ -7504,6 +7504,15 @@ export class MongoDBConnection {
       return json(result.body, result.status);
     }
 
+    if (url.pathname === "/internal/profile-boost") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.activateMembershipBoost(body.claims.sub);
+      return json(result.body, result.status);
+    }
+
     if (url.pathname === "/internal/membership-entitlements") {
       const body = await request.json().catch(() => null);
       if (!body || !body.claims || typeof body.claims.sub !== "string") {
