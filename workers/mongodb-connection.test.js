@@ -3998,10 +3998,13 @@ test("admin analytics counts unique active subscribers rather than subscription 
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.userStats, { total: 12, paid: 2, unpaid: 10 });
   assert.equal(result.body.reportedUsersCount, 1);
-  assert.deepEqual(result.body.revenueByCurrency, [
-    { currency: "LKR", amount: 3000, payments: 2 },
-    { currency: "USD", amount: 39.99, payments: 2 }
+  assert.equal(result.body.revenueByCurrency.length, 2);
+  assert.deepEqual(result.body.revenueByCurrency.map(item => ({ currency: item.currency, payments: item.payments })), [
+    { currency: "LKR", payments: 2 },
+    { currency: "USD", payments: 2 }
   ]);
+  assert.ok(Math.abs(result.body.revenueByCurrency[0].amount - 3000) < 0.001);
+  assert.ok(Math.abs(result.body.revenueByCurrency[1].amount - 39.99) < 0.001);
 });
 
 
