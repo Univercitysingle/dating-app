@@ -11,9 +11,34 @@ const storeItems = [
 ];
 
 const subscriptionPlans = [
-  { name: 'Weekly', plan: 'weekly', duration: '1 week', description: 'A full week of premium features.', price: 1.49, features: ['Unlimited Swipes', 'See who likes you', '5 Super Likes per week'] },
-  { name: 'Monthly', plan: 'monthly', duration: '1 month', description: 'More time to make meaningful connections.', price: 7.99, features: ['All Weekly features', '1 Free Boost per month', 'Advanced Filters'] },
-  { name: 'Annual', plan: 'yearly', duration: '1 year', description: 'Best value for long-term premium access.', price: 59.99, features: ['All Monthly features', 'Profile highlighted', 'Read receipts'] },
+  {
+    name: 'Free', plan: 'free', monthlyPrice: 0, annualPrice: 0, description: 'The essentials to meet people and start conversations.',
+    features: ['Daily like allowance', 'Basic discovery filters', 'Matching and messaging', 'Profile and safety controls'],
+  },
+  {
+    name: 'Plus', plan: 'plus', monthlyPrice: 3.99, annualPrice: 28.99, description: 'More freedom and control over your discovery experience.',
+    features: ['Everything in Free', 'Unlimited likes', 'Unlimited undo swipes', 'Ad-free experience', 'Travel mode', 'Additional discovery filters'],
+  },
+  {
+    name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
+    features: ['Everything in Plus', 'See everyone who likes you', 'Advanced filters', '5 Super Likes each week', '1 Profile Boost each month', 'Read receipts'],
+  },
+  {
+    name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'More visibility, privacy and control.',
+    features: ['Everything in Gold', 'Priority Likes', 'Incognito discovery', 'Profile insights', '2 Profile Boosts each month', 'Priority customer support'],
+  },
+];
+
+const optionalPasses = [
+  { id: 'travel-pass-7d', name: 'Travel Pass', description: 'Explore matches in another city for 7 days.', price: 2.99, duration: '7 days' },
+  { id: 'privacy-pass-30d', name: 'Privacy Pass', description: 'Additional profile visibility and online-status controls for 30 days.', price: 2.99, duration: '30 days' },
+  { id: 'visibility-pass-7d', name: 'Visibility Pass', description: 'A time-limited profile visibility enhancement for 7 days.', price: 4.99, duration: '7 days' },
+];
+
+const storeItems = [
+  { id: 'super-like-5', name: '5 Super Likes', description: 'Get noticed with 5 Super Likes.', price: 2.49 },
+  { id: 'undo-swipes-5', name: '5 Undo Swipes', description: 'Go back and reconsider your last swipe.', price: 1.49 },
+  { id: 'profile-boost-1', name: 'Profile Boost', description: 'Increase your profile visibility for 30 minutes.', price: 1.99 },
 ];
 
 const StorePage = () => {
@@ -194,7 +219,7 @@ const StorePage = () => {
     }
   };
 
-  const formatPrice = (price) => `${price.toFixed(2)} USD`;
+  const formatPrice = (price) => price === 0 ? 'Free' : `${price.toFixed(2)} USD`;
 
   return (
     <div className="page-container store-page mx-auto w-full max-w-6xl p-4 sm:p-6">
@@ -212,34 +237,54 @@ const StorePage = () => {
 
       <section aria-labelledby="subscription-plans-heading" className="mb-12">
         <div className="mb-5">
-          <h2 id="subscription-plans-heading" className="text-2xl font-bold text-gray-900">Premium subscriptions</h2>
-          <p className="mt-1 text-sm text-gray-500">Choose weekly, monthly, or annual access. Launch pricing is benchmarked at approximately half the comparable premium-app price. Checkout will open once USD settlement is verified.</p>
+          <h2 id="subscription-plans-heading" className="text-2xl font-bold text-gray-900">Choose your membership</h2>
+          <p className="mt-1 text-sm text-gray-500">Four clear membership levels. Gold is our recommended balance of features and value. Prices are proposed USD launch prices; checkout remains disabled until gateway settlement and feature entitlements are verified.</p>
         </div>
         {currentSubscription?.status === 'active' && (
           <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
             Your {currentSubscription.plan} subscription is active{currentSubscription.endDate ? ` until ${new Date(currentSubscription.endDate).toLocaleDateString()}` : ''}.
           </div>
         )}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           {subscriptionPlans.map((plan) => (
-            <article key={plan.plan} className="store-card flex flex-col rounded-2xl p-6">
+            <article key={plan.plan} className={`store-card relative flex flex-col rounded-2xl p-6 ${plan.popular ? 'border-2 border-primary' : ''}`}>
+              {plan.popular && <span className="mb-3 inline-flex w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-dark">Most popular</span>}
               <div className="flex-1">
-                <p className="text-sm font-semibold uppercase tracking-wide text-primary-dark">{plan.duration}</p>
-                <h3 className="mt-2 text-2xl font-bold text-gray-900">{plan.name}</h3>
-                <p className="mt-2 text-sm text-gray-500">{plan.description}</p>
-                <p className="my-5 text-3xl font-extrabold text-gray-900">{formatPrice(plan.price)}</p>
+                <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
+                <p className="mt-2 min-h-10 text-sm text-gray-500">{plan.description}</p>
+                <p className="my-5 text-3xl font-extrabold text-gray-900">{formatPrice(plan.monthlyPrice)}<span className="ml-1 text-sm font-normal text-gray-500">{plan.monthlyPrice > 0 ? '/ month' : ''}</span></p>
+                {plan.annualPrice > 0 && <p className="mb-4 text-xs text-gray-500">Annual option: {formatPrice(plan.annualPrice)} / year, approximately 40% less than monthly billing.</p>}
                 <ul className="space-y-2 text-sm text-gray-700">
                   {plan.features.map((feature) => <li key={feature} className="flex gap-2"><span aria-hidden="true" className="text-green-600">✓</span><span>{feature}</span></li>)}
                 </ul>
               </div>
               <button
                 type="button"
-                onClick={() => startCheckout({ kind: 'subscription', plan })}
                 disabled={true}
                 className="app-primary-button mt-6 w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {currentSubscription?.status === 'active' ? 'Subscription active' : 'Checkout coming soon'}
+                {plan.plan === 'free' ? 'Included' : 'Coming soon'}
               </button>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="passes-heading" className="mb-12">
+        <div className="mb-5">
+          <h2 id="passes-heading" className="text-2xl font-bold text-gray-900">Optional passes</h2>
+          <p className="mt-1 text-sm text-gray-500">One-off add-ons for specific needs. These are separate from membership and do not renew automatically.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          {optionalPasses.map((pass) => (
+            <article key={pass.id} className="store-card flex flex-col rounded-2xl p-6">
+              <div className="flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary-dark">{pass.duration}</p>
+                <h3 className="mt-2 text-xl font-bold text-gray-900">{pass.name}</h3>
+                <p className="mt-2 text-sm text-gray-500">{pass.description}</p>
+                <p className="my-5 text-2xl font-extrabold text-gray-900">{formatPrice(pass.price)}</p>
+              </div>
+              <button type="button" disabled={true} className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Coming soon</button>
             </article>
           ))}
         </div>
@@ -247,8 +292,8 @@ const StorePage = () => {
 
       <section aria-labelledby="store-items-heading">
         <div className="mb-5">
-          <h2 id="store-items-heading" className="text-2xl font-bold text-gray-900">Store items</h2>
-          <p className="mt-1 text-sm text-gray-500">One-time extras priced below comparable dating-app add-ons. Checkout will be enabled after USD settlement verification.</p>
+          <h2 id="store-items-heading" className="text-2xl font-bold text-gray-900">One-time extras</h2>
+          <p className="mt-1 text-sm text-gray-500">Top up selected features without changing your membership.</p>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {storeItems.map((item) => (
@@ -258,19 +303,11 @@ const StorePage = () => {
                 <p className="mb-4 text-sm leading-6 text-gray-500">{item.description}</p>
                 <p className="mb-4 text-lg font-bold text-gray-900">{formatPrice(item.price)}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => startCheckout({ kind: 'purchase', item })}
-                disabled={true}
-                className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Checkout coming soon
-              </button>
+              <button type="button" disabled={true} className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Coming soon</button>
             </article>
           ))}
         </div>
       </section>
-
    </div>
   );
 };
