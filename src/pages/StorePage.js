@@ -11,7 +11,7 @@ const subscriptionPlans = [
   },
   {
     name: 'Plus', plan: 'plus', monthlyPrice: 3.99, annualPrice: 28.99, description: 'More freedom and control over your discovery experience.',
-    features: ['Everything in Free', 'Unlimited likes', 'Unlimited undo swipes'],
+    features: ['Everything in Free', 'Unlimited likes', 'Unlimited undo swipes', 'Advanced discovery filters'],
   },
   {
     name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
