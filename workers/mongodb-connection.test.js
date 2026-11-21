@@ -6134,6 +6134,7 @@ test("membership entitlements distinguish Free, paid tiers, legacy subscriptions
 
   const gold = buildMembershipEntitlements({}, { ...active, plan: "gold", currency: "USD" }, now);
   assert.equal(gold.features.seeLikes, true);
+  assert.equal(gold.features.readReceipts, true);
 
   const platinum = buildMembershipEntitlements({}, { ...active, plan: "platinum", currency: "USD" }, now);
   assert.equal(platinum.features.seeLikes, true);
@@ -6218,5 +6219,68 @@ test("Free membership cannot use paid advanced discovery filters", async () => {
   const result = await connection.discoverUsers("free-user", { relationshipGoals: "Long-term" });
   assert.equal(result.status, 403);
   assert.equal(result.body.code, "ADVANCED_FILTERS_REQUIRED");
+});
+
+
+
+test("chat read receipts are hidden from Free senders and visible to Gold senders", async () => {
+  const { ObjectId } = await import("mongodb");
+  const viewerId = new ObjectId();
+  const messageId = new ObjectId();
+  const message = {
+    _id: messageId, roomId: "viewer-peer", senderUid: "viewer", receiverUid: "peer",
+    messageContent: "Hello", timestamp: new Date(), status: "read",
+    deliveredAt: new Date(), readAt: new Date()
+  };
+
+  const run = async subscription => {
+    const users = {
+      async findOne(query) {
+        if (query.uid === "viewer") return {
+          _id: viewerId, uid: "viewer", role: "user", plan: "basic",
+          blocked: [], accountStatus: "active"
+        };
+        return { uid: "peer", blocked: [], accountStatus: "active" };
+      }
+    };
+    const chatmessages = {
+      async findOne() { return { senderUid: "viewer", receiverUid: "peer" }; },
+      find() {
+        return {
+          sort() { return this; },
+          skip() { return this; },
+          limit() { return this; },
+          maxTimeMS() { return this; },
+          async toArray() { return [message]; }
+        };
+      }
+    };
+    const db = {
+      collection(name) {
+        if (name === "users") return users;
+        if (name === "chatmessages") return chatmessages;
+        if (name === "matches") return { async findOne() { return null; } };
+        if (name === "subscriptions") return { async findOne() { return subscription; } };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    return connection.getChatHistory("viewer", "viewer-peer");
+  };
+
+  const free = await run(null);
+  assert.equal(free.status, 200);
+  assert.equal(free.body.messages[0].status, "delivered");
+  assert.equal("readAt" in free.body.messages[0], false);
+
+  const gold = await run({
+    plan: "gold", currency: "USD", status: "active",
+    endDate: new Date(Date.now() + 86400000)
+  });
+  assert.equal(gold.status, 200);
+  assert.equal(gold.body.messages[0].status, "read");
+  assert.ok(gold.body.messages[0].readAt);
 });
 
