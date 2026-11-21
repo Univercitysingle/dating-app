@@ -6386,6 +6386,11 @@ test("Gold profile boost allowance is one per month and expires after 30 minutes
   assert.ok(new Date(first.body.boostExpiresAt).getTime() > Date.now());
   assert.ok(new Date(first.body.boostExpiresAt).getTime() <= Date.now() + 30 * 60 * 1000);
 
+  const duplicate = await connection.activateMembershipBoost("gold-user");
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.alreadyActive, true);
+  assert.equal(user.membershipBoostCount, 1);
+
   user.boostExpiresAt = new Date(Date.now() - 1000);
   const second = await connection.activateMembershipBoost("gold-user");
   assert.equal(second.status, 429);
