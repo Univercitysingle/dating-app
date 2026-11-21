@@ -74,11 +74,17 @@ export default function PWAExperience() {
       return;
     }
 
+    const serviceWorkerContainer = navigator.serviceWorker;
+    if (!serviceWorkerContainer?.addEventListener) {
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      return;
+    }
+
     const onControllerChange = () => {
-      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      serviceWorkerContainer.removeEventListener('controllerchange', onControllerChange);
       window.location.reload();
     };
-    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    serviceWorkerContainer.addEventListener('controllerchange', onControllerChange);
     waitingWorker.postMessage({ type: 'SKIP_WAITING' });
   };
 
