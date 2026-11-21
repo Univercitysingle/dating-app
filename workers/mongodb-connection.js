@@ -5298,7 +5298,7 @@ export class MongoDBConnection {
           paymentReference: record.paymentReference || null,
           gatewayId: record.paymentGatewayId || null,
           amount: record.itemPrice ?? record.amount ?? null,
-          currency: record.currency || "LKR"
+          currency: record.currency || (record.transactionType === "subscription" && ["plus", "gold", "platinum"].includes(record.plan) ? "USD" : "LKR")
         };
         if (record.status === "pending" && record.createdAt &&
             new Date(record.createdAt).getTime() < now.getTime() - 30 * 60 * 1000) {
@@ -5369,7 +5369,7 @@ export class MongoDBConnection {
       ]);
       const result = [
         ...purchases.map(p => ({ ...p, type: "Store Item", itemName: p.itemName, price: p.itemPrice })),
-        ...subscriptions.map(s => ({ ...s, type: "Subscription", itemName: String(s.plan || "") + " Plan", price: s.amount != null ? `${s.amount} ${s.currency || "LKR"}` : (({ weekly: "800 LKR", monthly: "3000 LKR", yearly: "10000 LKR" })[s.plan] || "N/A") }))
+        ...subscriptions.map(s => ({ ...s, type: "Subscription", itemName: String(s.plan || "") + " Plan", price: s.amount != null ? `${s.amount} ${s.currency || (["plus", "gold", "platinum"].includes(s.plan) ? "USD" : "LKR")}` : (({ weekly: "800 LKR", monthly: "3000 LKR", yearly: "10000 LKR" })[s.plan] || "N/A") }))
       ].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 500);
       const safeResult = result.map(entry => {
         const safeEntry = { ...entry };
@@ -5410,7 +5410,7 @@ export class MongoDBConnection {
           paymentReference: { $type: "string", $nin: ["", null] }
         } },
         { $project: {
-          currency: { $toUpper: { $ifNull: ["$currency", "LKR"] } },
+          currency: { $toUpper: { $ifNull: ["$currency", { $cond: [{ $in: ["$plan", ["plus", "gold", "platinum"]] }, "USD", "LKR"] }] } },
           amount: { $convert: { input: "$" + amountField, to: "double", onError: 0, onNull: 0 } }
         } },
         { $match: { amount: { $gt: 0 }, currency: { $regex: "^[A-Z]{3}$" } } },
