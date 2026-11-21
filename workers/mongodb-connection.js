@@ -1577,9 +1577,8 @@ export class MongoDBConnection {
       if (isAccountRestricted(currentUser)) return { status: 403, body: { error: "Account is suspended or banned." } };
 
       const advancedFilterKeys = [
-        "maxDistance", "sexualOrientation", "familyStatus", "relationshipGoals",
-        "city", "country", "drinking", "smoking", "exercise", "diet",
-        "lookingFor", "pets", "religion", "politicalLeaning"
+        "sexualOrientation", "familyStatus", "relationshipGoals",
+        "drinking", "smoking", "exercise", "diet", "pets", "religion", "politicalLeaning"
       ];
       const requestedAdvancedFilters = advancedFilterKeys.some(key =>
         filters[key] !== undefined && filters[key] !== null && filters[key] !== ""
