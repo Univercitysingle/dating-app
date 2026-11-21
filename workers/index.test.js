@@ -941,7 +941,7 @@ test("discovery applies the saved gender preference and everyone remains unfilte
 });
 
 test("discovery returns ordered public profiles with super-like metadata", async () => {
-  const current = { uid: "current", preference: "everyone", location: { coordinates: [0, 0] } };
+  const current = { _id: "current-id", uid: "current", preference: "everyone", location: { coordinates: [0, 0] } };
   const candidate = {
     _id: "candidate-id", uid: "candidate", name: "Candidate", email: "private@example.com",
     mobileNumber: "+971501234567", phoneNumber: "+971509876543", password: "secret",
@@ -961,7 +961,7 @@ test("discovery returns ordered public profiles with super-like metadata", async
   };
   const matches = { createIndex: async () => "index-created", find: () => ({ project: () => ({ toArray: async () => [{ user1Uid: "candidate" }] }) }) };
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
-  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "subscriptions" ? { findOne: async () => ({ plan: "monthly", currency: "LKR", status: "active", endDate: new Date(Date.now() + 86400000) }) } : matches }) });
   const result = await connection.discoverUsers("current", { relationshipGoals: "Long-term relationship" });
   assert.equal(result.status, 200);
   assert.equal(result.body.length, 1);
