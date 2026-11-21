@@ -336,7 +336,7 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
       seeLikes,
       travelMode: false,
       advancedFilters: paidAccess,
-      weeklySuperLikes: false,
+      weeklySuperLikes: usdTier && ["gold", "platinum"].includes(plan),
       monthlyBoosts: false,
       readReceipts: isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive,
       priorityLikes: false,
@@ -1149,7 +1149,32 @@ export class MongoDBConnection {
       const matches = db.collection("matches");
       let superLikeSpent = null;
       if (action === "superlike") {
-        if (Number(currentUser.purchasedSuperLikes) > 0) {
+        const now = new Date();
+        let activeSubscription = null;
+        try {
+          activeSubscription = await db.collection("subscriptions").findOne(
+            { userId: currentUser._id, status: "active", endDate: { $gt: now } },
+            { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+          );
+        } catch {
+          // A failed subscription lookup cannot create paid Super Like credits.
+        }
+        const entitlements = buildMembershipEntitlements(currentUser, activeSubscription, now);
+        if (entitlements.features.weeklySuperLikes) {
+          const weekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+          weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7));
+          const weekKey = weekStart.toISOString().slice(0, 10);
+          await users.updateOne(
+            { uid, "superLikes.week": { $ne: weekKey } },
+            { $set: { "superLikes.week": weekKey, "superLikes.count": 5, updatedAt: now } }
+          );
+          const membershipCredit = await users.updateOne(
+            { uid, "superLikes.week": weekKey, "superLikes.count": { $gt: 0 } },
+            { $inc: { "superLikes.count": -1 }, $set: { updatedAt: now } }
+          );
+          if (membershipCredit.matchedCount) superLikeSpent = "superLikes.count";
+        }
+        if (!superLikeSpent && Number(currentUser.purchasedSuperLikes) > 0) {
           const consumed = await users.updateOne({ uid, purchasedSuperLikes: { $gt: 0 } }, { $inc: { purchasedSuperLikes: -1 } });
           if (consumed.matchedCount) superLikeSpent = "purchasedSuperLikes";
         }
