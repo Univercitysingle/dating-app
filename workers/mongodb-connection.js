@@ -2744,8 +2744,9 @@ export class MongoDBConnection {
             if (!changedUser.matchedCount) throw new Error("PAYMENT_USER_MISSING");
           }
         } else {
-          const durations = { weekly: 7, monthly: 30, yearly: 365 };
-          const days = durations[subscription.plan];
+          const legacyDurations = { weekly: 7, monthly: 30, yearly: 365 };
+          const usdDurations = { plus: 30, gold: 30, platinum: 30 };
+          const days = usdDurations[subscription.plan] || legacyDurations[subscription.plan];
           if (!days) throw new Error("UNSUPPORTED_SUBSCRIPTION_PLAN");
           await subscriptions.updateOne(
             { _id: subscription._id, status: "active" },
