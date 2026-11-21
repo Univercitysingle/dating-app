@@ -7,7 +7,7 @@ import { getUserFriendlyError } from '../utils/apiErrors';
 const subscriptionPlans = [
   {
     name: 'Free', plan: 'free', monthlyPrice: 0, annualPrice: 0, description: 'The essentials to meet people and start conversations.',
-    features: ['Daily like allowance', 'Basic discovery filters', 'Matching and messaging', 'Profile and safety controls'],
+    features: ['25 likes per UTC day', 'Basic discovery filters', 'Matching and messaging', 'Profile and safety controls'],
   },
   {
     name: 'Plus', plan: 'plus', monthlyPrice: 3.99, annualPrice: 28.99, description: 'More freedom and control over your discovery experience.',
@@ -19,7 +19,7 @@ const subscriptionPlans = [
   },
   {
     name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
-    features: ['Everything in Gold', 'Priority Likes', 'Incognito discovery', 'Profile insights', '2 Profile Boosts each month', 'Priority customer support'],
+    features: ['Everything in Gold'],
   },
 ];
 
