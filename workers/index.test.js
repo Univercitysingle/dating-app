@@ -1741,13 +1741,15 @@ test("WebXPay checkout form includes the documented CMS and encryption mechanism
   const response = buildWebXPayCheckoutForm({
     orderId: "0123456789abcdef01234567",
     price: 800,
+    currency: "USD",
     user: { name: "Test User", email: "test@example.com", contactNumber: "+94771234567" }
   }, {
     WEBXPAY_PUBLIC_KEY: publicKey,
     WEBXPAY_SECRET_KEY: "test-secret",
     FRONTEND_URL: "https://dating-app-staging.pages.dev",
     WEBXPAY_CHECKOUT_URL: "https://stagingxpay.info/index.php?route=checkout/billing",
-    MIGRATION_STAGE: "staging"
+    MIGRATION_STAGE: "staging",
+    WEBXPAY_USD_SETTLEMENT_APPROVED: "true"
   }, "/premium", "Monthly Subscription");
   const html = await response.text();
   assert.match(html, /name="cms" value="PHP"/);
@@ -1757,6 +1759,28 @@ test("WebXPay checkout form includes the documented CMS and encryption mechanism
   assert.doesNotMatch(html, /name="items"/);
   assert.match(html, /form action="https:\/\/stagingxpay\.info\/index\.php\?route=checkout\/billing"/);
   assert.match(response.headers.get("content-security-policy"), /form-action https:\/\/stagingxpay\.info/);
+});
+
+test("WebXPay checkout refuses LKR orders and requires explicit USD settlement approval", () => {
+  const { publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 1024,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+  const env = {
+    WEBXPAY_PUBLIC_KEY: publicKey,
+    WEBXPAY_SECRET_KEY: "test-secret",
+    FRONTEND_URL: "https://dating-app-staging.pages.dev",
+    WEBXPAY_CHECKOUT_URL: "https://stagingxpay.info/index.php?route=checkout/billing",
+    MIGRATION_STAGE: "staging",
+    WEBXPAY_USD_SETTLEMENT_APPROVED: "true"
+  };
+  assert.throws(() => buildWebXPayCheckoutForm({
+    orderId: "0123456789abcdef01234567", price: 800, currency: "LKR", user: {}
+  }, env, "/premium"), /USD settlement is not approved/i);
+  assert.throws(() => buildWebXPayCheckoutForm({
+    orderId: "0123456789abcdef01234567", price: 800, currency: "USD", user: {}
+  }, { ...env, WEBXPAY_USD_SETTLEMENT_APPROVED: "false" }, "/premium"), /USD settlement is not approved/i);
 });
 
 test("WebXPay checkout rejects missing or insecure checkout endpoint instead of silently using staging", () => {
@@ -1779,7 +1803,8 @@ test("WebXPay checkout rejects missing or insecure checkout endpoint instead of 
   assert.throws(() => buildWebXPayCheckoutForm(order, {
     ...baseEnv,
     WEBXPAY_CHECKOUT_URL: "https://stagingxpay.info/index.php?route=checkout/billing",
-    MIGRATION_STAGE: "production"
+    MIGRATION_STAGE: "production",
+    WEBXPAY_USD_SETTLEMENT_APPROVED: "true"
   }, "/premium"), /cannot be used outside the staging environment/i);
 });
 
@@ -1792,6 +1817,7 @@ test("WebXPay checkout uses the configured merchant endpoint for production", as
   const response = buildWebXPayCheckoutForm({
     orderId: "0123456789abcdef01234567",
     price: 3000,
+    currency: "USD",
     user: { name: "Production Test", email: "test@example.com" }
   }, {
     WEBXPAY_PUBLIC_KEY: publicKey,
