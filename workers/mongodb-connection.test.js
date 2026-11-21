@@ -6284,3 +6284,57 @@ test("chat read receipts are hidden from Free senders and visible to Gold sender
   assert.ok(gold.body.messages[0].readAt);
 });
 
+
+
+test("conversation previews also respect paid read receipt visibility", async () => {
+  const { ObjectId } = await import("mongodb");
+  const viewerId = new ObjectId();
+  const message = {
+    _id: new ObjectId(), roomId: "viewer-peer", senderUid: "viewer", receiverUid: "peer",
+    messageContent: "Latest message", timestamp: new Date(), status: "read",
+    deliveredAt: new Date(), readAt: new Date()
+  };
+
+  const run = async subscription => {
+    const users = {
+      async findOne() {
+        return { _id: viewerId, uid: "viewer", role: "user", plan: "basic", blocked: [], accountStatus: "active" };
+      },
+      find() { return { async toArray() { return [{ uid: "peer", name: "Peer", blocked: [] }]; } }; }
+    };
+    const chatMessages = {
+      createIndex: async () => "ok",
+      aggregate(pipeline) {
+        const unreadQuery = pipeline[0]?.$match?.receiverUid === "viewer";
+        return { async toArray() { return unreadQuery ? [] : [message]; } };
+      }
+    };
+    const db = {
+      collection(name) {
+        if (name === "users") return users;
+        if (name === "chatmessages") return chatMessages;
+        if (name === "matches") return { async findOne() { return null; } };
+        if (name === "subscriptions") return { async findOne() { return subscription; } };
+        assert.fail("Unexpected collection: " + name);
+      }
+    };
+    const connection = new MongoDBConnection({}, {});
+    connection.getClient = async () => ({});
+    connection.getDatabase = () => db;
+    return connection.getChatConversations("viewer");
+  };
+
+  const free = await run(null);
+  assert.equal(free.status, 200);
+  assert.equal(free.body[0].lastMessage.status, "delivered");
+  assert.equal("readAt" in free.body[0].lastMessage, false);
+
+  const gold = await run({
+    plan: "gold", currency: "USD", status: "active",
+    endDate: new Date(Date.now() + 86400000)
+  });
+  assert.equal(gold.status, 200);
+  assert.equal(gold.body[0].lastMessage.status, "read");
+  assert.ok(gold.body[0].lastMessage.readAt);
+});
+
