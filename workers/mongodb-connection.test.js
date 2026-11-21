@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MongoDBConnection, getMongoPoolSize } from "./mongodb-connection.js";
+import { MongoDBConnection, getMongoPoolSize, buildMembershipEntitlements } from "./mongodb-connection.js";
 import Worker, { getMongoShardName } from "./index.js";
 
 test("chat message edits and deletes enforce sender ownership and preserve audited soft-delete history", async () => {
@@ -6110,4 +6110,60 @@ test("admin payment monitoring includes store purchases and subscriptions in eve
   assert.equal(result.body.find(item => item.transactionType === "subscription").plan, "monthly");
   assert.deepEqual(observed.map(item => item.name).sort(), ["purchases", "subscriptions"]);
   assert.ok(observed.every(item => item.pipeline[0].$match && Object.keys(item.pipeline[0].$match).length === 0));
+});
+
+
+test("membership entitlements distinguish Free, paid tiers, legacy subscriptions and expired subscriptions", () => {
+  const now = new Date("2026-11-21T12:00:00.000Z");
+  const active = { status: "active", endDate: new Date("2026-12-21T12:00:00.000Z") };
+
+  const free = buildMembershipEntitlements({ plan: "basic" }, null, now);
+  assert.equal(free.tier, "free");
+  assert.equal(free.features.unlimitedLikes, false);
+  assert.equal(free.features.unlimitedUndo, false);
+  assert.equal(free.features.seeLikes, false);
+  assert.equal(free.limits.dailyLikes, 25);
+
+  const plus = buildMembershipEntitlements({}, { ...active, plan: "plus", currency: "USD" }, now);
+  assert.equal(plus.tier, "plus");
+  assert.equal(plus.features.unlimitedLikes, true);
+  assert.equal(plus.features.unlimitedUndo, true);
+  assert.equal(plus.features.seeLikes, false);
+
+  const gold = buildMembershipEntitlements({}, { ...active, plan: "gold", currency: "USD" }, now);
+  assert.equal(gold.features.seeLikes, true);
+
+  const platinum = buildMembershipEntitlements({}, { ...active, plan: "platinum", currency: "USD" }, now);
+  assert.equal(platinum.features.seeLikes, true);
+
+  const legacy = buildMembershipEntitlements({}, { ...active, plan: "monthly", currency: "LKR" }, now);
+  assert.equal(legacy.tier, "legacy-premium");
+  assert.equal(legacy.features.unlimitedLikes, true);
+  assert.equal(legacy.features.seeLikes, true);
+
+  const expired = buildMembershipEntitlements({}, {
+    ...active, plan: "gold", currency: "USD", endDate: new Date("2026-11-20T12:00:00.000Z")
+  }, now);
+  assert.equal(expired.tier, "free");
+  assert.equal(expired.features.seeLikes, false);
+});
+
+test("membership entitlements preserve valid legacy premium trials", () => {
+  const now = new Date("2026-11-21T12:00:00.000Z");
+  const trial = buildMembershipEntitlements(
+    { plan: "premium", trialExpires: "2026-11-22T12:00:00.000Z" },
+    null,
+    now
+  );
+  assert.equal(trial.tier, "legacy-premium");
+  assert.equal(trial.status, "trial");
+  assert.equal(trial.features.unlimitedLikes, true);
+  assert.equal(trial.features.seeLikes, true);
+
+  const expiredTrial = buildMembershipEntitlements(
+    { plan: "premium", trialExpires: "2026-11-20T12:00:00.000Z" },
+    null,
+    now
+  );
+  assert.equal(expiredTrial.tier, "free");
 });
