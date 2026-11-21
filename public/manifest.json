@@ -1,18 +1,27 @@
 {
-  "short_name": "Hart2Hart",
+  "id": "/",
   "name": "Hart2Hart | Online Dating and Genuine Connections",
-  "start_url": "/",
+  "short_name": "Hart2Hart",
+  "description": "Discover profiles and build genuine connections on Hart2Hart, an online dating platform for adults aged 18 and over.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "theme_color": "#24172d",
   "background_color": "#24172d",
-  "orientation": "portrait",
-  "scope": "/",
-  "description": "Discover profiles and build genuine connections on Hart2Hart, an online dating platform for adults aged 18 and over.",
+  "categories": ["lifestyle", "social"],
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/logo.jpg",
-      "type": "image/jpeg",
+      "src": "/icon.svg",
       "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.jpg",
+      "sizes": "any",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ]
