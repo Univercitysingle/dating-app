@@ -2576,7 +2576,23 @@ export class MongoDBConnection {
       const users = await db.collection("users").find({ uid: { $in: likedUids } }).toArray();
       const usersByUid = new Map(users.map(user => [user.uid, user]));
       const matchByUid = new Map(incomingMatches.map(item => [item.likedUid, item.match]));
-      const isBlurred = currentUser.role !== "superadmin" && currentUser.plan !== "premium";
+      // Paid access is evaluated against an unexpired authoritative subscription,
+      // not the denormalized users.plan field alone. Legacy time-limited trials
+      // remain supported. New Gold/Platinum records can unlock this feature only
+      // when their subscription is active and has not expired.
+      const now = new Date();
+      const activeSubscription = await db.collection("subscriptions").findOne(
+        { userId: currentUser._id, status: "active", endDate: { $gt: now } },
+        { projection: { plan: 1, currency: 1, endDate: 1 } }
+      );
+      const activeTier = ["gold", "platinum"].includes(String(activeSubscription?.plan || "").toLowerCase()) &&
+        activeSubscription.currency === "USD";
+      const activeLegacyPremium = Boolean(activeSubscription) &&
+        ["weekly", "monthly", "yearly", "premium"].includes(String(activeSubscription.plan || "").toLowerCase());
+      const activeTrial = currentUser.plan === "premium" && currentUser.trialExpires &&
+        new Date(currentUser.trialExpires) > now;
+      const canSeeLikes = currentUser.role === "superadmin" || activeTier || activeLegacyPremium || activeTrial;
+      const isBlurred = !canSeeLikes;
       const result = [];
       for (const likedUid of likedUids) {
         const user = usersByUid.get(likedUid);
@@ -3880,9 +3896,10 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(user)) return { status: 403, body: { error: "This account is unavailable." } };
 
+      const entitlementNow = new Date();
       const activeSubscription = await db.collection("subscriptions").findOne(
-        { userId: user._id, status: "active" },
-        { projection: { _id: 1 } }
+        { userId: user._id, status: "active", endDate: { $gt: entitlementNow } },
+        { projection: { _id: 1, plan: 1, currency: 1, endDate: 1 } }
       );
 
       if (user.birthday) {
