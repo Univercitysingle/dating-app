@@ -296,14 +296,19 @@ const StorePage = () => {
                 <button
                   type="button"
                   onClick={activateProfileBoost}
-                  disabled={isBoosting || (currentEntitlements.limits?.monthlyBoostsRemaining ?? 0) < 1}
+                  disabled={isBoosting || (currentEntitlements.boostExpiresAt && new Date(currentEntitlements.boostExpiresAt) > new Date()) || (currentEntitlements.limits?.monthlyBoostsRemaining ?? 0) < 1}
                   className="app-primary-button rounded-full px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isBoosting ? 'Activating boost…' : 'Activate profile boost'}
+                  {isBoosting ? 'Activating boost…' : currentEntitlements.boostExpiresAt && new Date(currentEntitlements.boostExpiresAt) > new Date() ? 'Profile boost active' : 'Activate profile boost'}
                 </button>
                 <span className="text-xs text-gray-500">
                   {currentEntitlements.limits?.monthlyBoostsRemaining ?? 0} boosts remaining this month
                 </span>
+                {currentEntitlements.boostExpiresAt && new Date(currentEntitlements.boostExpiresAt) > new Date() && (
+                  <span className="text-xs text-gray-500">
+                    Active until {new Date(currentEntitlements.boostExpiresAt).toLocaleTimeString()}.
+                  </span>
+                )}
               </div>
             )}
           </div>
