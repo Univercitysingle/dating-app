@@ -6130,11 +6130,13 @@ test("membership entitlements distinguish Free, paid tiers, legacy subscriptions
   assert.equal(plus.features.unlimitedLikes, true);
   assert.equal(plus.features.unlimitedUndo, true);
   assert.equal(plus.features.advancedFilters, true);
+  assert.equal(plus.features.weeklySuperLikes, false);
   assert.equal(plus.features.seeLikes, false);
 
   const gold = buildMembershipEntitlements({}, { ...active, plan: "gold", currency: "USD" }, now);
   assert.equal(gold.features.seeLikes, true);
   assert.equal(gold.features.readReceipts, true);
+  assert.equal(gold.features.weeklySuperLikes, true);
 
   const platinum = buildMembershipEntitlements({}, { ...active, plan: "platinum", currency: "USD" }, now);
   assert.equal(platinum.features.seeLikes, true);
