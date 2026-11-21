@@ -322,7 +322,9 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
   const paidAccess = usdTier || legacyPaid || trialActive || isSuperadmin;
   const tier = usdTier ? plan : legacyPaid || trialActive ? "legacy-premium" : isSuperadmin ? "superadmin" : "free";
   const unlimitedLikes = paidAccess;
-  const unlimitedUndo = paidAccess;
+  // Undo remains a separately metered legacy credit. Only the new USD Plus+
+  // plans and superadmins receive unlimited undo.
+  const unlimitedUndo = usdTier || isSuperadmin;
   const seeLikes = isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive;
   return {
     tier,
