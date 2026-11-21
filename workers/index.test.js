@@ -618,7 +618,10 @@ test("Gold membership receives and consumes five weekly Super Likes", async () =
     async findOne() { return storedMatch; },
     async insertOne(document) { storedMatch = { _id: "gold-match-id", ...document }; return { insertedId: "gold-match-id" }; },
     async updateOne(_query, update) {
-      if (update.$addToSet?.likedBy) storedMatch.likedBy = [...new Set([...(storedMatch.likedBy || []), ...update.$addToSet.likedBy.$each || update.$addToSet.likedBy])];
+      if (update.$addToSet?.likedBy) {
+        const values = Array.isArray(update.$addToSet.likedBy) ? update.$addToSet.likedBy : [update.$addToSet.likedBy];
+        storedMatch.likedBy = [...new Set([...(storedMatch.likedBy || []), ...values])];
+      }
       if (update.$set) Object.assign(storedMatch, update.$set);
       return { matchedCount: 1 };
     }
