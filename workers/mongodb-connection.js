@@ -335,7 +335,7 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
       unlimitedUndo,
       seeLikes,
       travelMode: false,
-      advancedFilters: false,
+      advancedFilters: paidAccess,
       weeklySuperLikes: false,
       monthlyBoosts: false,
       readReceipts: false,
@@ -1575,6 +1575,33 @@ export class MongoDBConnection {
       const currentUser = await db.collection("users").findOne({ uid });
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(currentUser)) return { status: 403, body: { error: "Account is suspended or banned." } };
+
+      const advancedFilterKeys = [
+        "maxDistance", "sexualOrientation", "familyStatus", "relationshipGoals",
+        "city", "country", "drinking", "smoking", "exercise", "diet",
+        "lookingFor", "pets", "religion", "politicalLeaning"
+      ];
+      const requestedAdvancedFilters = advancedFilterKeys.some(key =>
+        filters[key] !== undefined && filters[key] !== null && filters[key] !== ""
+      );
+      if (requestedAdvancedFilters) {
+        let activeSubscription = null;
+        try {
+          activeSubscription = await db.collection("subscriptions").findOne(
+            { userId: currentUser._id, status: "active", endDate: { $gt: new Date() } },
+            { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+          );
+        } catch {
+          // A failed entitlement lookup must not grant premium discovery filters.
+        }
+        const entitlements = buildMembershipEntitlements(currentUser, activeSubscription);
+        if (!entitlements.features.advancedFilters) {
+          return { status: 403, body: {
+            error: "Advanced discovery filters require an active Plus membership or above.",
+            code: "ADVANCED_FILTERS_REQUIRED"
+          } };
+        }
+      }
 
       const minAge = filters.minAge === undefined ? null : Number.parseInt(filters.minAge, 10);
       const maxAge = filters.maxAge === undefined ? null : Number.parseInt(filters.maxAge, 10);
