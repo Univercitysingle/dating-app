@@ -1824,7 +1824,8 @@ test("WebXPay checkout uses the configured merchant endpoint for production", as
     WEBXPAY_SECRET_KEY: "test-secret",
     FRONTEND_URL: "https://dating-app.example",
     WEBXPAY_CHECKOUT_URL: "https://merchant.example/checkout",
-    MIGRATION_STAGE: "production"
+    MIGRATION_STAGE: "production",
+    WEBXPAY_USD_SETTLEMENT_APPROVED: "true"
   }, "/premium", "Monthly Subscription");
   const html = await response.text();
   assert.match(html, /form action="https:\/\/merchant\.example\/checkout"/);
