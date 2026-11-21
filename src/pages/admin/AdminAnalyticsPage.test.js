@@ -22,7 +22,7 @@ describe('AdminAnalyticsPage', () => {
       userStats: { total: 10, paid: 3, unpaid: 7 },
       signupsPerDay: [{ _id: '2026-11-07', count: 2 }],
       reportedUsersCount: 1,
-      locations: []
+      revenueByCurrency: [{ currency: 'USD', amount: 39.99, payments: 2 }]
     });
   });
 
@@ -32,7 +32,9 @@ describe('AdminAnalyticsPage', () => {
     expect(await screen.findByText('10')).toBeInTheDocument();
     expect(screen.getByText('line chart')).toBeInTheDocument();
     expect(screen.getByText('pie chart')).toBeInTheDocument();
-    expect(screen.getByText(/Location breakdown is not currently available/i)).toBeInTheDocument();
+    expect(screen.getByText('Verified payment revenue')).toBeInTheDocument();
+    expect(screen.getByText('$39.99')).toBeInTheDocument();
+    expect(screen.getByText('2 verified payments')).toBeInTheDocument();
     expect(apiClient.get).toHaveBeenCalledWith(
       expect.stringMatching(/^\/admin\/analytics\/summary\?/),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -44,7 +46,7 @@ describe('AdminAnalyticsPage', () => {
     render(<AdminAnalyticsPage />);
 
     expect(await screen.findByText('No sign-ups recorded in this date range.')).toBeInTheDocument();
-    expect(screen.getByText(/Location breakdown is not currently available/i)).toBeInTheDocument();
+    expect(screen.getByText(/No verified payment revenue was recorded/i)).toBeInTheDocument();
   });
 
   test('downloads CSV through apiClient so the Firebase token is attached', async () => {
@@ -57,7 +59,7 @@ describe('AdminAnalyticsPage', () => {
       userStats: { total: 1, paid: 0, unpaid: 1 },
       signupsPerDay: [],
       reportedUsersCount: 0,
-      locations: []
+      revenueByCurrency: []
     }).mockResolvedValueOnce('date,new_signups\n2026-11-07,1');
 
     render(<AdminAnalyticsPage />);
