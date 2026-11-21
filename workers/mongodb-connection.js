@@ -326,6 +326,13 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
   // plans and superadmins receive unlimited undo.
   const unlimitedUndo = usdTier || isSuperadmin;
   const seeLikes = isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive;
+  const monthKey = currentTime.toISOString().slice(0, 7);
+  const monthlyBoostLimit = usdTier && ["gold", "platinum"].includes(plan)
+    ? plan === "platinum" ? 2 : 1
+    : 0;
+  const usedMonthlyBoosts = user?.membershipBoostMonth === monthKey
+    ? Math.max(0, Number(user.membershipBoostCount) || 0)
+    : 0;
   return {
     tier,
     status: subscriptionActive ? "active" : trialActive ? "trial" : "inactive",
@@ -337,14 +344,18 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
       travelMode: false,
       advancedFilters: paidAccess,
       weeklySuperLikes: usdTier && ["gold", "platinum"].includes(plan),
-      monthlyBoosts: false,
+      monthlyBoosts: usdTier && ["gold", "platinum"].includes(plan),
       readReceipts: isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive,
       priorityLikes: usdTier && plan === "platinum",
       incognitoDiscovery: false,
       profileInsights: false,
       prioritySupport: false
     },
-    limits: { dailyLikes: unlimitedLikes ? null : 25 }
+    limits: {
+      dailyLikes: unlimitedLikes ? null : 25,
+      monthlyBoosts: monthlyBoostLimit,
+      monthlyBoostsRemaining: Math.max(0, monthlyBoostLimit - usedMonthlyBoosts)
+    }
   };
 }
 
@@ -987,7 +998,10 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne(
         { uid },
-        { projection: { _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1 } }
+        { projection: {
+          _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1,
+          membershipBoostMonth: 1, membershipBoostCount: 1
+        } }
       );
       if (!user) return { status: 404, body: { error: "User not found" } };
       let subscription = null;
@@ -1002,6 +1016,69 @@ export class MongoDBConnection {
       return { status: 200, body: buildMembershipEntitlements(user, subscription) };
     } catch {
       return { status: 503, body: { error: "Membership entitlements unavailable" } };
+    }
+  }
+
+
+  async activateMembershipBoost(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const users = db.collection("users");
+      const user = await users.findOne({ uid }, { projection: {
+        _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1,
+        membershipBoostMonth: 1, membershipBoostCount: 1
+      } });
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      const now = new Date();
+      let subscription = null;
+      try {
+        subscription = await db.collection("subscriptions").findOne(
+          { userId: user._id, status: "active", endDate: { $gt: now } },
+          { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+        );
+      } catch {
+        // Never grant boosts when the subscription cannot be verified.
+      }
+      const entitlements = buildMembershipEntitlements(user, subscription, now);
+      const limit = entitlements.limits.monthlyBoosts;
+      if (!entitlements.features.monthlyBoosts || limit < 1) {
+        return { status: 403, body: { error: "A Gold or Platinum membership is required for monthly profile boosts.", code: "PROFILE_BOOST_MEMBERSHIP_REQUIRED" } };
+      }
+      const monthKey = now.toISOString().slice(0, 7);
+      if (user.membershipBoostMonth !== monthKey) {
+        await users.updateOne(
+          { uid, membershipBoostMonth: { $ne: monthKey } },
+          { $set: { membershipBoostMonth: monthKey, membershipBoostCount: 0 } }
+        );
+      }
+      const boostExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+      const consumed = await users.updateOne(
+        {
+          uid,
+          membershipBoostMonth: monthKey,
+          $or: [
+            { membershipBoostCount: { $lt: limit } },
+            { membershipBoostCount: { $exists: false } }
+          ]
+        },
+        { $inc: { membershipBoostCount: 1 }, $set: { boostExpiresAt, updatedAt: now } }
+      );
+      if (!consumed.matchedCount) {
+        return { status: 429, body: { error: "Your monthly profile boost allowance has been used.", code: "PROFILE_BOOST_LIMIT_REACHED" } };
+      }
+      return {
+        status: 200,
+        body: {
+          boosted: true,
+          boostExpiresAt,
+          remaining: Math.max(0, limit - (entitlements.limits.monthlyBoosts - entitlements.limits.monthlyBoostsRemaining + 1))
+        }
+      };
+    } catch {
+      return { status: 503, body: { error: "Profile boost service unavailable" } };
     }
   }
 
