@@ -516,7 +516,7 @@ test("Likes responses expose only sanitized public profile fields", async () => 
     }
   };
   const db = { collection(name) {
-    if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) };
+    if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", status: "active", endDate: new Date(Date.now() + 86400000) }) };
     if (name === "users") return users;
     if (name === "matches") return matches;
     assert.fail("Unexpected collection: " + name);
@@ -629,7 +629,7 @@ test("Likes finds incoming likes when a legacy match stores canonical UID orderi
     }
   };
   const db = { collection(name) {
-    if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) };
+    if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", status: "active", endDate: new Date(Date.now() + 86400000) }) };
     if (name === "users") return users;
     if (name === "matches") return matches;
     assert.fail("Unexpected collection: " + name);
