@@ -122,6 +122,20 @@ const AdminAnalyticsPage = () => {
   const recentAdminActivity = Array.isArray(analyticsData?.recentAdminActivity)
     ? analyticsData.recentAdminActivity
     : [];
+  const revenueByCurrency = Array.isArray(analyticsData?.revenueByCurrency)
+    ? analyticsData.revenueByCurrency.filter(item => /^[A-Z]{3}$/.test(item?.currency || ""))
+    : [];
+  const formatRevenue = item => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: item.currency,
+        maximumFractionDigits: 2
+      }).format(Number(item.amount) || 0);
+    } catch {
+      return `${(Number(item.amount) || 0).toLocaleString()} ${item.currency}`;
+    }
+  };
   const activityLabel = event => {
     const labels = {
       moderation_action: "Moderation action",
@@ -244,6 +258,26 @@ const AdminAnalyticsPage = () => {
                 </p>
               </article>
             ))}
+          </section>
+
+          <section aria-label="Verified payment revenue" className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Verified payment revenue</h2>
+              <p className="mt-1 text-sm text-gray-500">Settled purchases and active subscriptions with a recorded provider reference. Amounts remain separated by currency.</p>
+            </div>
+            {revenueByCurrency.length ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {revenueByCurrency.map(item => (
+                  <article key={item.currency} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{item.currency} revenue</h3>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">{formatRevenue(item)}</p>
+                    <p className="mt-1 text-xs text-gray-500">{Number(item.payments) || 0} verified payments</p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-500">No verified payment revenue was recorded in this date range.</p>
+            )}
           </section>
 
           <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
