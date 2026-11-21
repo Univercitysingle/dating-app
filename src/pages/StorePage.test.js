@@ -25,9 +25,8 @@ describe('StorePage USD pricing safety', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findAllByText('USD pricing coming soon')).toHaveLength(6);
     expect(screen.queryByText(/LKR/i)).not.toBeInTheDocument();
-    const checkoutButtons = screen.getAllByRole('button', { name: 'USD pricing coming soon' });
+    const checkoutButtons = await screen.findAllByRole('button', { name: 'USD pricing coming soon' });
     expect(checkoutButtons).toHaveLength(6);
     expect(checkoutButtons.every((button) => button.disabled)).toBe(true);
   });
