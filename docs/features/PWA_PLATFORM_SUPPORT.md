@@ -22,7 +22,8 @@ The application must remain fully usable as a website when PWA installation or s
 - Safe cache policy for versioned static assets and the offline fallback only.
 - Navigation requests fall back to a static offline explanation when the network is unavailable.
 - API responses, authenticated HTML, chat content, profile data, payment responses and other user-specific data are never cached by the service worker.
-- Browser installation prompt when the browser exposes the beforeinstallprompt event.
+- Browser installation prompt when the browser exposes the beforeinstallprompt event, with a seven-day dismissal cooldown.
+- Manifest shortcuts to Discover, Conversations and Likes where the operating system surfaces app shortcuts.
 - iOS-family installation guidance for Add to Home Screen.
 - Online/offline state feedback.
 - Push notification display and same-origin notification navigation retained in the service worker.
