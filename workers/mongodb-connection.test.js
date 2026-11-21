@@ -6167,3 +6167,34 @@ test("membership entitlements preserve valid legacy premium trials", () => {
   );
   assert.equal(expiredTrial.tier, "free");
 });
+
+
+test("Free membership cannot exceed the atomic daily like allowance", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const current = {
+    _id: "free-user-id", uid: "free-user", plan: "basic", role: "user",
+    dailyLikeDate: today, dailyLikeCount: 25, blocked: [], accountStatus: "active"
+  };
+  const target = { uid: "target-user", blocked: [], accountStatus: "active" };
+  const users = {
+    async findOne(query) { return query.uid === "free-user" ? current : target; },
+    async updateOne(query) {
+      if (query.dailyLikeCount) return { matchedCount: 0 };
+      return { matchedCount: 1 };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "subscriptions") return { async findOne() { return null; } };
+      assert.fail("No match or notification writes should occur after the allowance is exhausted: " + name);
+    }
+  });
+
+  const result = await connection.recordSwipe("free-user", "target-user", "like");
+  assert.equal(result.status, 429);
+  assert.equal(result.body.code, "DAILY_LIKE_LIMIT");
+});
+
