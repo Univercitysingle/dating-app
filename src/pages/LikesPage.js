@@ -106,6 +106,11 @@ const LikesPage = () => {
                                     <p className="truncate font-semibold text-gray-900">
                                         {user.isBlurred ? 'Someone likes you' : `${user.name}${user.age ? `, ${user.age}` : ''}`}
                                     </p>
+                                    {['superlike', 'priority'].includes(user.likeType) && (
+                                        <span className="mt-1 inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary-dark">
+                                            {user.likeType === 'superlike' ? 'Super Like' : 'Priority Like'}
+                                        </span>
+                                    )}
                                     {!user.isBlurred && <p className="line-clamp-2 text-gray-600 text-sm">{user.bio || 'Someone would love to connect with you.'}</p>}
                                     {user.isBlurred && <p className="mt-1 text-xs font-medium text-gray-500">Unlock Premium to reveal this profile</p>}
                                 </div>
