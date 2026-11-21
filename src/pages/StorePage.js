@@ -262,6 +262,7 @@ const StorePage = () => {
               {currentEntitlements.features?.unlimitedUndo ? ' Unlimited undo is enabled.' : ''}
               {currentEntitlements.features?.seeLikes ? ' See Who Likes You is enabled.' : ''}
               {currentEntitlements.features?.advancedFilters ? ' Advanced discovery filters are enabled.' : ''}
+              {currentEntitlements.features?.readReceipts ? ' Read receipts are enabled.' : ''}
             </p>
             {currentEntitlements.expiresAt && <p className="mt-1 text-xs text-gray-500">Access ends {new Date(currentEntitlements.expiresAt).toLocaleDateString()}.</p>}
           </div>
