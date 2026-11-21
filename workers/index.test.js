@@ -495,7 +495,7 @@ test("undo swipe restores a prior like and consumes an undo credit", async () =>
     updateOne: async (_query, update) => { matchUpdate = update; return { matchedCount: 1 }; }
   };
   const connection = new MongoDBConnection({}, {});
-  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "subscriptions" ? { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) } : matches }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "subscriptions" ? { findOne: async () => ({ plan: "monthly", currency: "LKR", status: "active", endDate: new Date(Date.now() + 86400000) }) } : matches }) });
   const result = await connection.undoSwipe("current");
   assert.equal(result.status, 200);
   assert.equal(result.body.undoneUser.uid, "target");
@@ -1000,7 +1000,7 @@ test("likes query returns pending likers with privacy filtering and premium blur
     return { toArray: async () => [{ user1Uid: "liker", user2Uid: "current", status: "pending", superLike: true }] };
   }};
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
-  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "subscriptions" ? { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) } : matches }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "subscriptions" ? { findOne: async () => ({ plan: "monthly", currency: "LKR", status: "active", endDate: new Date(Date.now() + 86400000) }) } : matches }) });
   const result = await connection.getLikes("current");
   assert.equal(result.status, 200);
   assert.equal(result.body.length, 1);
@@ -1354,7 +1354,7 @@ test("support ticket internal route validates request structure", async () => {
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({
     collection(name) {
-      if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) };
+      if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", status: "active", endDate: new Date(Date.now() + 86400000) }) };
       assert.equal(name, "users");
       return { findOne: async () => null };
     }
