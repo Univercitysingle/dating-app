@@ -1061,8 +1061,14 @@ test("pending WebXPay subscriptions avoid null collisions with legacy Stripe and
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
   connection.ensureSubscriptionIndexes = async () => { assert.fail("Request-time subscription creation must not require index permissions"); };
-  const result = await connection.createPendingSubscription("user-1", "monthly");
+  const result = await connection.createPendingSubscription("user-1", "gold");
   assert.equal(result.status, 201);
+  assert.equal(insertedSubscription.plan, "gold");
+  assert.equal(insertedSubscription.amount, 7.99);
+  assert.equal(insertedSubscription.currency, "USD");
+  assert.equal(insertedSubscription.durationDays, 30);
+  assert.equal(result.body.price, 7.99);
+  assert.equal(result.body.currency, "USD");
   assert.deepEqual(order, ["find-user", "expire-stale", "check-active", "check-pending", "reserve-checkout", "insert"]);
   assert.ok(insertedSubscription.checkoutReservationId);
   assert.equal(user.pendingSubscriptionCheckout.reservationId, insertedSubscription.checkoutReservationId);
@@ -2066,7 +2072,7 @@ test("concurrent subscription checkout loses safely when the per-user reservatio
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
-  const result = await connection.createPendingSubscription("user-1", "monthly");
+  const result = await connection.createPendingSubscription("user-1", "gold");
   assert.equal(result.status, 409);
   assert.match(result.body.error, /already pending/i);
 });
@@ -2149,7 +2155,7 @@ test("pending WebXPay subscription checkout blocks a second checkout and expires
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
 
-  const result = await connection.createPendingSubscription("user-1", "monthly");
+  const result = await connection.createPendingSubscription("user-1", "gold");
 
   assert.equal(result.status, 409);
   assert.match(result.body.error, /already pending/i);
