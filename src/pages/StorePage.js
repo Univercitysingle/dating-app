@@ -4,12 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 import { getUserFriendlyError } from '../utils/apiErrors';
 
-const storeItems = [
-  { id: 'super-like-5', name: '5 Super Likes', description: 'Get noticed with 5 Super Likes.', price: 2.49 },
-  { id: 'undo-swipes-5', name: '5 Undo Swipes', description: 'Go back and reconsider your last swipe.', price: 1.49 },
-  { id: 'profile-boost-1', name: 'Profile Boost', description: 'Increase your profile visibility for 30 minutes.', price: 1.99 },
-];
-
 const subscriptionPlans = [
   {
     name: 'Free', plan: 'free', monthlyPrice: 0, annualPrice: 0, description: 'The essentials to meet people and start conversations.',
