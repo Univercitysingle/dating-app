@@ -41,17 +41,26 @@ const StorePage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [currentEntitlements, setCurrentEntitlements] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     const loadSubscription = async () => {
       if (!user) {
         setCurrentSubscription(null);
+        setCurrentEntitlements(null);
         return;
       }
       try {
-        const subscriptions = await apiClient.get('/users/me/subscriptions');
-        if (!cancelled) setCurrentSubscription(subscriptions.find((s) => s.status === 'active') || null);
+        const [subscriptionsResult, entitlementsResult] = await Promise.allSettled([
+          apiClient.get('/users/me/subscriptions'),
+          apiClient.get('/users/me/entitlements')
+        ]);
+        if (cancelled) return;
+        if (subscriptionsResult.status === 'fulfilled') {
+          setCurrentSubscription(subscriptionsResult.value.find((s) => s.status === 'active') || null);
+        }
+        if (entitlementsResult.status === 'fulfilled') setCurrentEntitlements(entitlementsResult.value);
       } catch (error) {
         if (!cancelled) {
           setNotification({ show: true, message: 'Could not fetch subscription status. You can still browse the store.', type: 'error' });
@@ -234,10 +243,24 @@ const StorePage = () => {
           <h2 id="subscription-plans-heading" className="text-2xl font-bold text-gray-900">Choose your membership</h2>
           <p className="mt-1 text-sm text-gray-500">Four clear membership levels. Gold is our recommended balance of features and value. Prices are proposed USD launch prices; checkout remains disabled until gateway settlement and feature entitlements are verified.</p>
         </div>
-        {currentSubscription?.status === 'active' && (
-          <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-            Your {currentSubscription.plan} subscription is active{currentSubscription.endDate ? ` until ${new Date(currentSubscription.endDate).toLocaleDateString()}` : ''}.
+        {currentEntitlements && (
+          <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold text-gray-900">Your current membership: <span className="capitalize">{currentEntitlements.tier || 'free'}</span></p>
+              <span className="text-xs text-gray-500">Status: {currentEntitlements.status || 'inactive'}</span>
+            </div>
+            <p className="mt-2 text-gray-600">
+              {currentEntitlements.features?.unlimitedLikes
+                ? 'Unlimited likes are enabled.'
+                : `${currentEntitlements.limits?.dailyLikes ?? 25} likes per UTC day on Free.`}
+              {currentEntitlements.features?.unlimitedUndo ? ' Unlimited undo is enabled.' : ''}
+              {currentEntitlements.features?.seeLikes ? ' See Who Likes You is enabled.' : ''}
+            </p>
+            {currentEntitlements.expiresAt && <p className="mt-1 text-xs text-gray-500">Access ends {new Date(currentEntitlements.expiresAt).toLocaleDateString()}.</p>}
           </div>
+        )}
+        {currentSubscription?.status === 'active' && (
+          <p className="mb-4 text-xs text-gray-500">Subscription record: {currentSubscription.plan}{currentSubscription.endDate ? ` · renews or ends ${new Date(currentSubscription.endDate).toLocaleDateString()}` : ''}</p>
         )}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           {subscriptionPlans.map((plan) => (
