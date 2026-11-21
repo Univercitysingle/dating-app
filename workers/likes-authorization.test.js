@@ -22,13 +22,20 @@ test("likes omit hidden profiles and either side of a blocked relationship", asy
           async findOne(filter, options) {
             calls.push({ collection: name, filter, options });
             if (filter.uid === uid) {
-              return { uid, plan: "premium", role: "user", blocked: ["viewer-blocked-uid"] };
+              return { _id: "viewer-id", uid, plan: "premium", role: "user", blocked: ["viewer-blocked-uid"] };
             }
             return null;
           },
           find(filter) {
             calls.push({ collection: name, filter });
             return { async toArray() { return users; } };
+          }
+        };
+      }
+      if (name === "subscriptions") {
+        return {
+          async findOne() {
+            return { plan: "monthly", currency: "LKR", endDate: new Date("2027-01-01T00:00:00.000Z") };
           }
         };
       }
