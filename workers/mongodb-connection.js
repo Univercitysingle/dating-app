@@ -2648,18 +2648,17 @@ export class MongoDBConnection {
       // remain supported. New Gold/Platinum records can unlock this feature only
       // when their subscription is active and has not expired.
       const now = new Date();
-      const activeSubscription = await db.collection("subscriptions").findOne(
-        { userId: currentUser._id, status: "active", endDate: { $gt: now } },
-        { projection: { plan: 1, currency: 1, endDate: 1 } }
-      );
-      const activeTier = ["gold", "platinum"].includes(String(activeSubscription?.plan || "").toLowerCase()) &&
-        activeSubscription.currency === "USD";
-      const activeLegacyPremium = Boolean(activeSubscription) &&
-        ["weekly", "monthly", "yearly", "premium"].includes(String(activeSubscription.plan || "").toLowerCase());
-      const activeTrial = currentUser.plan === "premium" && currentUser.trialExpires &&
-        new Date(currentUser.trialExpires) > now;
-      const canSeeLikes = currentUser.role === "superadmin" || activeTier || activeLegacyPremium || activeTrial;
-      const isBlurred = !canSeeLikes;
+      let activeSubscription = null;
+      try {
+        activeSubscription = await db.collection("subscriptions").findOne(
+          { userId: currentUser._id, status: "active", endDate: { $gt: now } },
+          { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+        );
+      } catch {
+        // Subscription lookup failure must never reveal paid-only liker identities.
+      }
+      const entitlements = buildMembershipEntitlements(currentUser, activeSubscription, now);
+      const isBlurred = !entitlements.features.seeLikes;
       const result = [];
       for (const likedUid of likedUids) {
         const user = usersByUid.get(likedUid);
@@ -7284,6 +7283,15 @@ export class MongoDBConnection {
         return json({ error: "Invalid request" }, 400);
       }
       const result = await this.discoverUsers(body.claims.sub, body.filters);
+      return json(result.body, result.status);
+    }
+
+    if (url.pathname === "/internal/membership-entitlements") {
+      const body = await request.json().catch(() => null);
+      if (!body || !body.claims || typeof body.claims.sub !== "string") {
+        return json({ error: "Invalid request" }, 400);
+      }
+      const result = await this.getMembershipEntitlements(body.claims.sub);
       return json(result.body, result.status);
     }
 
