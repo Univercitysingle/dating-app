@@ -18,6 +18,26 @@ describe('StorePage membership catalogue safety', () => {
     apiClient.get.mockResolvedValue([]);
   });
 
+  test('shows the effective backend membership and its active entitlements', async () => {
+    apiClient.get.mockImplementation((path) => {
+      if (path === '/users/me/subscriptions') return Promise.resolve([]);
+      if (path === '/users/me/entitlements') return Promise.resolve({
+        tier: 'gold',
+        status: 'active',
+        expiresAt: '2026-12-21T12:00:00.000Z',
+        features: { unlimitedLikes: true, unlimitedUndo: true, seeLikes: true },
+        limits: { dailyLikes: null }
+      });
+      return Promise.reject(new Error('Unexpected request'));
+    });
+
+    render(<MemoryRouter initialEntries={['/store']}><StorePage /></MemoryRouter>);
+
+    expect(await screen.findByText(/Your current membership:/i)).toHaveTextContent('gold');
+    expect(screen.getByText(/Unlimited likes are enabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/See Who Likes You is enabled/i)).toBeInTheDocument();
+  });
+
   test('shows Free, Plus, Gold and Platinum with proposed USD prices and keeps paid checkout disabled', async () => {
     render(<MemoryRouter initialEntries={['/store']}><StorePage /></MemoryRouter>);
 
