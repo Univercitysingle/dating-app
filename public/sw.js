@@ -1,11 +1,10 @@
 const CACHE_PREFIX = 'hart2hart-pwa-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 const PRECACHE_URLS = ['/offline.html', '/offline.css', '/icon.svg'];
 const STATIC_PATHS = new Set([
   '/icon.svg',
   '/logo.jpg',
-  '/favicon.ico',
-  '/manifest.json'
+  '/favicon.ico'
 ]);
 
 self.addEventListener('install', event => {
@@ -44,6 +43,24 @@ self.addEventListener('fetch', event => {
       const offlinePage = await caches.match('/offline.html');
       return offlinePage || Response.error();
     }));
+    return;
+  }
+
+  // The manifest changes independently of the worker. Revalidate it on every
+  // request so installed clients do not remain stuck on stale app metadata.
+  if (url.pathname === '/manifest.json') {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(request);
+        if (response.ok && response.type === 'basic') {
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        return (await cache.match(request)) || Response.error();
+      }
+    })());
     return;
   }
 
