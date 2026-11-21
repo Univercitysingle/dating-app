@@ -248,9 +248,14 @@ export default function IncomingCallMonitor() {
       if (activityInFlight || document.visibilityState !== 'visible') return;
       activityInFlight = true;
       try {
+        // The inbox owns its own 30-second summary refresh while it is open.
+        // Avoid issuing a second conversations request from this global monitor
+        // on the same route. Other routes still receive lightweight inbox
+        // summaries here so unread activity can surface without loading history.
+        const shouldFetchConversations = !window.location.pathname.startsWith('/conversations');
         const [notifications, conversations] = await Promise.all([
           apiClient.get('/notifications').catch(() => []),
-          apiClient.get('/chat/conversations').catch(() => null)
+          shouldFetchConversations ? apiClient.get('/chat/conversations').catch(() => null) : Promise.resolve(null)
         ]);
         if (!mounted) return;
 
