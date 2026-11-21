@@ -2548,7 +2548,7 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const currentUser = await db.collection("users").findOne(
-        { uid }, { projection: { _id: 1, plan: 1, role: 1, blocked: 1 } }
+        { uid }, { projection: { _id: 1, plan: 1, role: 1, blocked: 1, trialExpires: 1 } }
       );
       if (!currentUser) return { status: 404, body: { error: "User not found" } };
       // Match documents are normally directional (user1 = liker, user2 = target),
