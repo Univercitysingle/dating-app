@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +36,35 @@ describe('StorePage membership catalogue safety', () => {
     expect(await screen.findByText(/Your current membership:/i)).toHaveTextContent('gold');
     expect(screen.getByText(/Unlimited likes are enabled/i)).toBeInTheDocument();
     expect(screen.getByText(/See Who Likes You is enabled/i)).toBeInTheDocument();
+  });
+
+  test('activates a monthly profile boost and refreshes remaining allowance', async () => {
+    const activeEntitlements = {
+      tier: 'gold',
+      status: 'active',
+      features: { monthlyBoosts: true },
+      limits: { monthlyBoosts: 1, monthlyBoostsRemaining: 1 }
+    };
+    const exhaustedEntitlements = {
+      ...activeEntitlements,
+      limits: { monthlyBoosts: 1, monthlyBoostsRemaining: 0 }
+    };
+    apiClient.get.mockImplementation((path) => {
+      if (path === '/users/me/subscriptions') return Promise.resolve([]);
+      if (path === '/users/me/entitlements') {
+        return Promise.resolve(apiClient.post.mock.calls.length ? exhaustedEntitlements : activeEntitlements);
+      }
+      return Promise.reject(new Error('Unexpected request'));
+    });
+    apiClient.post.mockResolvedValue({ boosted: true, boostExpiresAt: '2026-11-21T20:30:00.000Z' });
+
+    render(<MemoryRouter initialEntries={['/store']}><StorePage /></MemoryRouter>);
+    const boostButton = await screen.findByRole('button', { name: /activate profile boost/i });
+    fireEvent.click(boostButton);
+
+    expect(await screen.findByText(/your profile boost is active until/i)).toBeInTheDocument();
+    expect(apiClient.post).toHaveBeenCalledWith('/profile/boost', {});
+    expect(await screen.findByText(/0 boosts remaining this month/i)).toBeInTheDocument();
   });
 
   test('shows Free, Plus, Gold and Platinum with proposed USD prices and keeps paid checkout disabled', async () => {
