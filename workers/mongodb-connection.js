@@ -2816,7 +2816,7 @@ export class MongoDBConnection {
         }
         result.push({
           ...responseProfile,
-          likeType: match && match.superLike ? "superlike" : "like",
+          likeType: match && match.superLike ? "superlike" : match && match.priorityLike ? "priority" : "like",
           isBlurred
         });
       }
