@@ -2421,6 +2421,9 @@ export default {
 
     if (url.pathname === "/api/purchase/store-item") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      // Fail closed: the legacy catalogue and settlement path are LKR-based.
+      // Do not create an order until USD prices and verified USD settlement are implemented.
+      return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
@@ -2450,6 +2453,9 @@ export default {
 
     if (url.pathname === "/api/subscription") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      // Fail closed: the legacy catalogue and settlement path are LKR-based.
+      // Do not create an order until USD prices and verified USD settlement are implemented.
+      return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
       if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
       try {
         if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
