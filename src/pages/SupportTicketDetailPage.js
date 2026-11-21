@@ -44,6 +44,28 @@ const SupportTicketDetailPage = () => {
     fetchTicketDetails();
   }, [ticketId]);
 
+  const handleAttachmentChange = (event) => {
+    const selected = Array.from(event.target.files || []);
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+    if (selected.length > 5) {
+      setActionError('You can attach up to 5 files per message.');
+      setAttachments([]);
+      event.target.value = '';
+      return;
+    }
+    const invalid = selected.find(file =>
+      !allowedTypes.includes(file.type) || file.size < 1 || file.size > 10 * 1024 * 1024
+    );
+    if (invalid) {
+      setActionError('Attachments must be JPEG, PNG, GIF, WebP or PDF files no larger than 10 MB each.');
+      setAttachments([]);
+      event.target.value = '';
+      return;
+    }
+    setActionError(null);
+    setAttachments(selected);
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() && !attachments.length) return;
@@ -60,7 +82,7 @@ const SupportTicketDetailPage = () => {
         uploaded.push(result.attachment);
       }
       const response = await apiClient.post('/support-tickets/' + ticketId + '/messages', {
-        message: newMessage || 'Attachments added.',
+        message: newMessage.trim() || 'Attachments added.',
         attachments: uploaded
       });
       const refreshed = await apiClient.get(`/support-tickets/${ticketId}`);
@@ -68,6 +90,8 @@ const SupportTicketDetailPage = () => {
       setMessages(Array.isArray(refreshed.messages) ? refreshed.messages : []);
       setNewMessage('');
       setAttachments([]);
+      const attachmentInput = document.getElementById('ticket-reply-attachments');
+      if (attachmentInput) attachmentInput.value = '';
     } catch (err) {
       setActionError(getUserFriendlyError(err, 'Your reply could not be sent. Please try again.'));
     } finally {
@@ -230,11 +254,11 @@ const SupportTicketDetailPage = () => {
               className="w-full p-2 border border-gray-300 rounded-md"
             ></textarea>
             <label htmlFor="ticket-reply-attachments" className="block mt-3 text-sm font-medium text-gray-700">Attach images or PDF (up to 5 files, 10 MB each)</label>
-            <input id="ticket-reply-attachments" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" onChange={(e) => setAttachments(Array.from(e.target.files || []).slice(0, 5))} className="mt-1 block w-full text-sm" />
+            <input id="ticket-reply-attachments" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" onChange={handleAttachmentChange} className="mt-1 block w-full text-sm" />
             {attachments.length > 0 && <p className="text-sm text-gray-500 mt-1">{attachments.map(file => file.name).join(', ')}</p>}
             <button
               type="submit"
-              disabled={isSending}
+              disabled={isSending || (!newMessage.trim() && attachments.length === 0)}
               className="mt-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-60"
             >
               {isSending ? "Sending..." : ticket.status === 'Closed' ? "Reply and reopen ticket" : "Send"}
