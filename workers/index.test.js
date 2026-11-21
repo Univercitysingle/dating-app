@@ -1354,6 +1354,7 @@ test("support ticket internal route validates request structure", async () => {
   connection.getClient = async () => ({});
   connection.getDatabase = () => ({
     collection(name) {
+      if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) };
       assert.equal(name, "users");
       return { findOne: async () => null };
     }
