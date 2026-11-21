@@ -3969,6 +3969,7 @@ test("admin analytics counts unique active subscribers rather than subscription 
     aggregate(pipeline) {
       assert.deepEqual(pipeline[0].$match.status, { $in: ["active"] });
       assert.deepEqual(pipeline[0].$match.paymentReference, { $type: "string", $nin: ["", null] });
+      assert.deepEqual(pipeline[1].$project.currency, { $toUpper: { $ifNull: ["$currency", { $cond: [{ $in: ["$plan", ["plus", "gold", "platinum"]] }, "USD", "LKR"] }] } });
       return { toArray: async () => [{ _id: "USD", amount: 29.99, payments: 1 }] };
     }
   };
@@ -3976,6 +3977,7 @@ test("admin analytics counts unique active subscribers rather than subscription 
     aggregate(pipeline) {
       assert.deepEqual(pipeline[0].$match.status, { $in: ["completed"] });
       assert.deepEqual(pipeline[0].$match.paymentReference, { $type: "string", $nin: ["", null] });
+      assert.deepEqual(pipeline[1].$project.currency, { $toUpper: { $ifNull: ["$currency", { $cond: [{ $in: ["$plan", ["plus", "gold", "platinum"]] }, "USD", "LKR"] }] } });
       return { toArray: async () => [
         { _id: "LKR", amount: 3000, payments: 2 },
         { _id: "USD", amount: 10, payments: 1 }
