@@ -6179,7 +6179,7 @@ test("Free membership cannot exceed the atomic daily like allowance", async () =
   const users = {
     async findOne(query) { return query.uid === "free-user" ? current : target; },
     async updateOne(query) {
-      if (query.dailyLikeCount) return { matchedCount: 0 };
+      if (Array.isArray(query.$or) && query.dailyLikeDate === today) return { matchedCount: 0 };
       return { matchedCount: 1 };
     }
   };
