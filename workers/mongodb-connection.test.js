@@ -3923,6 +3923,7 @@ test("admin report search supports user names without exposing email search to o
     collection(name) {
       if (name === "users") return users;
       if (name === "reports") return reports;
+      if (name === "auditlogs") return auditlogs;
       assert.fail("Unexpected collection: " + name);
     }
   });
@@ -3957,6 +3958,9 @@ test("admin analytics counts unique active subscribers rather than subscription 
     }
   };
   const reports = { async distinct() { return ["reported-a"]; } };
+  const auditlogs = {
+    find() { return { sort() { return this; }, limit() { return this; }, async toArray() { return []; } }; }
+  };
   const connection = Object.create(MongoDBConnection.prototype);
   connection.env = {};
   connection.getClient = async () => ({});
