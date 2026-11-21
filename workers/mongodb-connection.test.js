@@ -6137,10 +6137,13 @@ test("membership entitlements distinguish Free, paid tiers, legacy subscriptions
   assert.equal(gold.features.seeLikes, true);
   assert.equal(gold.features.readReceipts, true);
   assert.equal(gold.features.weeklySuperLikes, true);
+  assert.equal(gold.features.monthlyBoosts, true);
+  assert.equal(gold.limits.monthlyBoosts, 1);
 
   const platinum = buildMembershipEntitlements({}, { ...active, plan: "platinum", currency: "USD" }, now);
   assert.equal(platinum.features.seeLikes, true);
   assert.equal(platinum.features.priorityLikes, true);
+  assert.equal(platinum.limits.monthlyBoosts, 2);
 
   const legacy = buildMembershipEntitlements({}, { ...active, plan: "monthly", currency: "LKR" }, now);
   assert.equal(legacy.tier, "legacy-premium");
@@ -6339,5 +6342,68 @@ test("conversation previews also respect paid read receipt visibility", async ()
   assert.equal(gold.status, 200);
   assert.equal(gold.body[0].lastMessage.status, "read");
   assert.ok(gold.body[0].lastMessage.readAt);
+});
+
+
+
+test("Gold profile boost allowance is one per month and expires after 30 minutes", async () => {
+  const month = new Date().toISOString().slice(0, 7);
+  const user = {
+    _id: "gold-user-id", uid: "gold-user", role: "user", plan: "basic",
+    membershipBoostMonth: month, membershipBoostCount: 0
+  };
+  const users = {
+    async findOne() { return user; },
+    async updateOne(filter, update) {
+      if (filter.$or && user.membershipBoostCount >= 1) return { matchedCount: 0 };
+      if (update.$inc?.membershipBoostCount) user.membershipBoostCount += update.$inc.membershipBoostCount;
+      if (update.$set) Object.assign(user, update.$set);
+      return { matchedCount: 1 };
+    }
+  };
+  const subscriptions = {
+    async findOne() {
+      return {
+        plan: "gold", currency: "USD", status: "active",
+        endDate: new Date(Date.now() + 86400000)
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return users;
+      if (name === "subscriptions") return subscriptions;
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+
+  const first = await connection.activateMembershipBoost("gold-user");
+  assert.equal(first.status, 200);
+  assert.equal(first.body.boosted, true);
+  assert.equal(first.body.remaining, 0);
+  assert.ok(new Date(first.body.boostExpiresAt).getTime() > Date.now());
+  assert.ok(new Date(first.body.boostExpiresAt).getTime() <= Date.now() + 30 * 60 * 1000);
+
+  const second = await connection.activateMembershipBoost("gold-user");
+  assert.equal(second.status, 429);
+  assert.equal(second.body.code, "PROFILE_BOOST_LIMIT_REACHED");
+});
+
+test("Free membership cannot activate a profile boost", async () => {
+  const user = { _id: "free-user-id", uid: "free-user", role: "user", plan: "basic" };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => ({
+    collection(name) {
+      if (name === "users") return { async findOne() { return user; }, async updateOne() { assert.fail("Free users must not consume boosts"); } };
+      if (name === "subscriptions") return { async findOne() { return null; } };
+      assert.fail("Unexpected collection: " + name);
+    }
+  });
+  const result = await connection.activateMembershipBoost("free-user");
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, "PROFILE_BOOST_MEMBERSHIP_REQUIRED");
 });
 
