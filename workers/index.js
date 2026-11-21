@@ -2684,7 +2684,7 @@ export default {
       }
     }
 
-    const videoRoomTicketMatch = url.pathname.match(/^\\/api\\/video-rooms\\/([^/]+)\\/ticket$/);
+    const videoRoomTicketMatch = url.pathname.match(/^\/api\/video-rooms\/([^/]+)\/ticket$/);
     if (videoRoomTicketMatch) {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
