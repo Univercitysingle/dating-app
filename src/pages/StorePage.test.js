@@ -75,6 +75,10 @@ describe('StorePage membership catalogue safety', () => {
     expect(screen.getByRole('heading', { name: 'Plus' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Gold' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Platinum' })).toBeInTheDocument();
+    expect(screen.getByText('5 Super Likes each week')).toBeInTheDocument();
+    expect(screen.getByText('1 Profile Boost each month')).toBeInTheDocument();
+    expect(screen.getByText('2 Profile Boosts each month')).toBeInTheDocument();
+    expect(screen.getByText('Priority Likes')).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === 'P' && element.className.includes('text-3xl') && element.textContent.includes('3.99 USD'))).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === 'P' && element.className.includes('text-3xl') && element.textContent.includes('7.99 USD'))).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === 'P' && element.className.includes('text-3xl') && element.textContent.includes('11.99 USD'))).toBeInTheDocument();
