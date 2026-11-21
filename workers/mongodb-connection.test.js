@@ -6122,12 +6122,14 @@ test("membership entitlements distinguish Free, paid tiers, legacy subscriptions
   assert.equal(free.features.unlimitedLikes, false);
   assert.equal(free.features.unlimitedUndo, false);
   assert.equal(free.features.seeLikes, false);
+  assert.equal(free.features.advancedFilters, false);
   assert.equal(free.limits.dailyLikes, 25);
 
   const plus = buildMembershipEntitlements({}, { ...active, plan: "plus", currency: "USD" }, now);
   assert.equal(plus.tier, "plus");
   assert.equal(plus.features.unlimitedLikes, true);
   assert.equal(plus.features.unlimitedUndo, true);
+  assert.equal(plus.features.advancedFilters, true);
   assert.equal(plus.features.seeLikes, false);
 
   const gold = buildMembershipEntitlements({}, { ...active, plan: "gold", currency: "USD" }, now);
@@ -6196,5 +6198,25 @@ test("Free membership cannot exceed the atomic daily like allowance", async () =
   const result = await connection.recordSwipe("free-user", "target-user", "like");
   assert.equal(result.status, 429);
   assert.equal(result.body.code, "DAILY_LIKE_LIMIT");
+});
+
+
+
+test("Free membership cannot use paid advanced discovery filters", async () => {
+  const currentUser = { _id: "free-user-id", uid: "free-user", plan: "basic", role: "user", blocked: [] };
+  const db = {
+    collection(name) {
+      if (name === "users") return { async findOne() { return currentUser; } };
+      if (name === "subscriptions") return { async findOne() { return null; } };
+      assert.fail("Discovery aggregation must not run for an unauthorized advanced filter: " + name);
+    }
+  };
+  const connection = Object.create(MongoDBConnection.prototype);
+  connection.getClient = async () => ({});
+  connection.getDatabase = () => db;
+
+  const result = await connection.discoverUsers("free-user", { relationshipGoals: "Long-term" });
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, "ADVANCED_FILTERS_REQUIRED");
 });
 
