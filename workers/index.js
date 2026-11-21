@@ -2371,6 +2371,9 @@ export default {
       try {
         const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
         if (route === "/api/dark-fantasy/purchase") {
+          // All legacy WebXPay purchase records are LKR-denominated. Keep this
+          // endpoint closed until a USD catalogue and verified USD settlement exist.
+          return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
           if (String(env.DARK_FANTASY_PAYMENTS_APPROVED || "").toLowerCase() !== "true") {
             return json({ error: "Dark Fantasy payments are not approved for this deployment." }, 503);
           }
@@ -2739,6 +2742,9 @@ export default {
 
     const videoRoomTicketMatch = url.pathname.match(/^\/api\/video-rooms\/([^/]+)\/ticket$/);
     if (videoRoomTicketMatch) {
+      // Video-room ticket prices are currently persisted in LKR. Do not accept
+      // new charges until USD pricing and settlement verification are complete.
+      return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
       const regionBlock = darkFantasyRegionGate(request, env);
       if (regionBlock) return regionBlock;
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
