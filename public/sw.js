@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'hart2hart-pwa-';
 const CACHE_NAME = `${CACHE_PREFIX}v2`;
-const PRECACHE_URLS = ['/offline.html', '/icon.svg'];
+const PRECACHE_URLS = ['/offline.html', '/offline.css', '/icon.svg'];
 const STATIC_PATHS = new Set([
   '/icon.svg',
   '/logo.jpg',
