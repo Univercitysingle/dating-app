@@ -3913,7 +3913,9 @@ export class MongoDBConnection {
         }
       }
       if (user.isOnboardingComplete === undefined) user.isOnboardingComplete = true;
-      user.isPremium = Boolean(activeSubscription);
+      const activeTrial = user.plan === "premium" && user.trialExpires &&
+        new Date(user.trialExpires) > entitlementNow;
+      user.isPremium = Boolean(activeSubscription || activeTrial);
       user.id = String(user._id);
       delete user.password;
       delete user.lastLoginIp;
