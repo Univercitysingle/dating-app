@@ -15,11 +15,11 @@ const subscriptionPlans = [
   },
   {
     name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
-    features: ['Everything in Plus', 'See everyone who likes you', '5 Super Likes each week', 'Read receipts'],
+    features: ['Everything in Plus', 'See everyone who likes you', '5 Super Likes each week', '1 Profile Boost each month', 'Read receipts'],
   },
   {
     name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
-    features: ['Everything in Gold', 'Priority Likes'],
+    features: ['Everything in Gold', '2 Profile Boosts each month', 'Priority Likes'],
   },
 ];
 
@@ -39,6 +39,7 @@ const StorePage = () => {
   const { user } = useAuth();
   const location = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isBoosting, setIsBoosting] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [currentEntitlements, setCurrentEntitlements] = useState(null);
@@ -228,6 +229,29 @@ const StorePage = () => {
     }
   };
 
+  const activateProfileBoost = async () => {
+    if (isBoosting) return;
+    setIsBoosting(true);
+    try {
+      const result = await apiClient.post('/profile/boost', {});
+      const entitlements = await apiClient.get('/users/me/entitlements');
+      setCurrentEntitlements(entitlements);
+      setNotification({
+        show: true,
+        message: `Your profile boost is active until ${new Date(result.boostExpiresAt).toLocaleTimeString()}.`,
+        type: 'success'
+      });
+    } catch (error) {
+      setNotification({
+        show: true,
+        message: getUserFriendlyError(error, 'We could not activate your profile boost. Please try again.'),
+        type: 'error'
+      });
+    } finally {
+      setIsBoosting(false);
+    }
+  };
+
   const formatPrice = (price) => price === 0 ? 'Free' : `${price.toFixed(2)} USD`;
 
   return (
@@ -267,6 +291,21 @@ const StorePage = () => {
               {currentEntitlements.features?.priorityLikes ? ' Priority Likes are enabled.' : ''}
             </p>
             {currentEntitlements.expiresAt && <p className="mt-1 text-xs text-gray-500">Access ends {new Date(currentEntitlements.expiresAt).toLocaleDateString()}.</p>}
+            {currentEntitlements.features?.monthlyBoosts && (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={activateProfileBoost}
+                  disabled={isBoosting || (currentEntitlements.limits?.monthlyBoostsRemaining ?? 0) < 1}
+                  className="app-primary-button rounded-full px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isBoosting ? 'Activating boost…' : 'Activate profile boost'}
+                </button>
+                <span className="text-xs text-gray-500">
+                  {currentEntitlements.limits?.monthlyBoostsRemaining ?? 0} boosts remaining this month
+                </span>
+              </div>
+            )}
           </div>
         )}
         {currentSubscription?.status === 'active' && (
