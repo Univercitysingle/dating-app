@@ -516,6 +516,7 @@ test("Likes responses expose only sanitized public profile fields", async () => 
     }
   };
   const db = { collection(name) {
+    if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) };
     if (name === "users") return users;
     if (name === "matches") return matches;
     assert.fail("Unexpected collection: " + name);
@@ -574,6 +575,7 @@ test("Basic Likes responses contain no liker identity or profile media", async (
     }
   };
   const db = { collection(name) {
+    if (name === "subscriptions") return { findOne: async () => null };
     if (name === "users") return users;
     if (name === "matches") return matches;
     assert.fail("Unexpected collection: " + name);
@@ -627,6 +629,7 @@ test("Likes finds incoming likes when a legacy match stores canonical UID orderi
     }
   };
   const db = { collection(name) {
+    if (name === "subscriptions") return { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) };
     if (name === "users") return users;
     if (name === "matches") return matches;
     assert.fail("Unexpected collection: " + name);
@@ -673,6 +676,7 @@ test("superadmin Likes retains contact fields without exposing unrestricted prof
     }
   };
   const db = { collection(name) {
+    if (name === "subscriptions") return { findOne: async () => null };
     if (name === "users") return users;
     if (name === "matches") return matches;
     assert.fail("Unexpected collection: " + name);
