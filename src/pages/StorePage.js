@@ -5,15 +5,15 @@ import apiClient from '../api/apiClient';
 import { getUserFriendlyError } from '../utils/apiErrors';
 
 const storeItems = [
-  { id: 'super-like-5', name: '5 Super Likes', description: 'Get noticed with 5 Super Likes.' },
-  { id: 'undo-swipes-5', name: '5 Undo Swipes', description: 'Go back and reconsider your last swipe.' },
-  { id: 'profile-boost-1', name: 'Profile Boost', description: 'Increase your profile visibility for 30 minutes.' },
+  { id: 'super-like-5', name: '5 Super Likes', description: 'Get noticed with 5 Super Likes.', price: 2.49 },
+  { id: 'undo-swipes-5', name: '5 Undo Swipes', description: 'Go back and reconsider your last swipe.', price: 1.49 },
+  { id: 'profile-boost-1', name: 'Profile Boost', description: 'Increase your profile visibility for 30 minutes.', price: 1.99 },
 ];
 
 const subscriptionPlans = [
-  { name: 'Weekly', plan: 'weekly', duration: '1 week', description: 'A full week of premium features.', features: ['Unlimited Swipes', 'See who likes you', '5 Super Likes per week'] },
-  { name: 'Monthly', plan: 'monthly', duration: '1 month', description: 'More time to make meaningful connections.', features: ['All Weekly features', '1 Free Boost per month', 'Advanced Filters'] },
-  { name: 'Annual', plan: 'yearly', duration: '1 year', description: 'Best value for long-term premium access.', features: ['All Monthly features', 'Profile highlighted', 'Read receipts'] },
+  { name: 'Weekly', plan: 'weekly', duration: '1 week', description: 'A full week of premium features.', price: 1.49, features: ['Unlimited Swipes', 'See who likes you', '5 Super Likes per week'] },
+  { name: 'Monthly', plan: 'monthly', duration: '1 month', description: 'More time to make meaningful connections.', price: 7.99, features: ['All Weekly features', '1 Free Boost per month', 'Advanced Filters'] },
+  { name: 'Annual', plan: 'yearly', duration: '1 year', description: 'Best value for long-term premium access.', price: 59.99, features: ['All Monthly features', 'Profile highlighted', 'Read receipts'] },
 ];
 
 const StorePage = () => {
@@ -194,7 +194,7 @@ const StorePage = () => {
     }
   };
 
-  const formatPrice = () => 'USD pricing coming soon';
+  const formatPrice = (price) => `${price.toFixed(2)} USD`;
 
   return (
     <div className="page-container store-page mx-auto w-full max-w-6xl p-4 sm:p-6">
@@ -213,7 +213,7 @@ const StorePage = () => {
       <section aria-labelledby="subscription-plans-heading" className="mb-12">
         <div className="mb-5">
           <h2 id="subscription-plans-heading" className="text-2xl font-bold text-gray-900">Premium subscriptions</h2>
-          <p className="mt-1 text-sm text-gray-500">Choose weekly, monthly, or annual access. USD prices will be published once gateway settlement is configured.</p>
+          <p className="mt-1 text-sm text-gray-500">Choose weekly, monthly, or annual access. Launch pricing is benchmarked at approximately half the comparable premium-app price. Checkout will open once USD settlement is verified.</p>
         </div>
         {currentSubscription?.status === 'active' && (
           <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
@@ -227,7 +227,7 @@ const StorePage = () => {
                 <p className="text-sm font-semibold uppercase tracking-wide text-primary-dark">{plan.duration}</p>
                 <h3 className="mt-2 text-2xl font-bold text-gray-900">{plan.name}</h3>
                 <p className="mt-2 text-sm text-gray-500">{plan.description}</p>
-                <p className="my-5 text-3xl font-extrabold text-gray-900">{formatPrice()}</p>
+                <p className="my-5 text-3xl font-extrabold text-gray-900">{formatPrice(plan.price)}</p>
                 <ul className="space-y-2 text-sm text-gray-700">
                   {plan.features.map((feature) => <li key={feature} className="flex gap-2"><span aria-hidden="true" className="text-green-600">✓</span><span>{feature}</span></li>)}
                 </ul>
@@ -238,7 +238,7 @@ const StorePage = () => {
                 disabled={true}
                 className="app-primary-button mt-6 w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {currentSubscription?.status === 'active' ? 'Subscription active' : 'USD pricing coming soon'}
+                {currentSubscription?.status === 'active' ? 'Subscription active' : 'Checkout coming soon'}
               </button>
             </article>
           ))}
@@ -248,7 +248,7 @@ const StorePage = () => {
       <section aria-labelledby="store-items-heading">
         <div className="mb-5">
           <h2 id="store-items-heading" className="text-2xl font-bold text-gray-900">Store items</h2>
-          <p className="mt-1 text-sm text-gray-500">Purchase extras with USD pricing. Checkout will be enabled once the USD catalogue is configured.</p>
+          <p className="mt-1 text-sm text-gray-500">One-time extras priced below comparable dating-app add-ons. Checkout will be enabled after USD settlement verification.</p>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {storeItems.map((item) => (
@@ -256,7 +256,7 @@ const StorePage = () => {
               <div>
                 <h3 className="mb-2 text-xl font-bold tracking-tight text-gray-900">{item.name}</h3>
                 <p className="mb-4 text-sm leading-6 text-gray-500">{item.description}</p>
-                <p className="mb-4 text-lg font-bold text-gray-900">{formatPrice()}</p>
+                <p className="mb-4 text-lg font-bold text-gray-900">{formatPrice(item.price)}</p>
               </div>
               <button
                 type="button"
@@ -264,7 +264,7 @@ const StorePage = () => {
                 disabled={true}
                 className="app-primary-button w-full rounded-full px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                USD pricing coming soon
+                Checkout coming soon
               </button>
             </article>
           ))}
