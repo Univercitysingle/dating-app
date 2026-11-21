@@ -11,29 +11,33 @@ jest.mock('../api/apiClient', () => ({
   default: { get: jest.fn(), post: jest.fn() }
 }));
 
-describe('StorePage USD pricing safety', () => {
+describe('StorePage membership catalogue safety', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useAuth.mockReturnValue({ user: { uid: 'test-user' } });
     apiClient.get.mockResolvedValue([]);
   });
 
-  test('shows half-market USD launch prices without enabling checkout before settlement approval', async () => {
-    render(
-      <MemoryRouter initialEntries={['/store']}>
-        <StorePage />
-      </MemoryRouter>
-    );
+  test('shows Free, Plus, Gold and Platinum with proposed USD prices and keeps paid checkout disabled', async () => {
+    render(<MemoryRouter initialEntries={['/store']}><StorePage /></MemoryRouter>);
 
     expect(screen.queryByText(/LKR/i)).not.toBeInTheDocument();
-    expect(screen.getAllByText('$1.49 USD')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Free' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Plus' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gold' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Platinum' })).toBeInTheDocument();
+    expect(screen.getByText('$3.99 USD')).toBeInTheDocument();
     expect(screen.getByText('$7.99 USD')).toBeInTheDocument();
-    expect(screen.getByText('$59.99 USD')).toBeInTheDocument();
-    expect(screen.getByText('$2.49 USD')).toBeInTheDocument();
-    expect(screen.getByText('$1.99 USD')).toBeInTheDocument();
-    const checkoutButtons = await screen.findAllByRole('button', { name: /checkout coming soon/i });
-    expect(checkoutButtons).toHaveLength(6);
-    expect(checkoutButtons.every((button) => button.disabled)).toBe(true);
+    expect(screen.getByText('$11.99 USD')).toBeInTheDocument();
+    expect(screen.getByText('$28.99 USD / year, approximately 40% less than monthly billing.')).toBeInTheDocument();
+    expect(screen.getByText('$57.99 USD / year, approximately 40% less than monthly billing.')).toBeInTheDocument();
+    expect(screen.getByText('$86.99 USD / year, approximately 40% less than monthly billing.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Travel Pass' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Privacy Pass' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Visibility Pass' })).toBeInTheDocument();
+    const disabledActions = screen.getAllByRole('button', { name: /coming soon/i });
+    expect(disabledActions.length).toBeGreaterThanOrEqual(9);
+    expect(disabledActions.every((button) => button.disabled)).toBe(true);
   });
 });
 
