@@ -15,7 +15,7 @@ const subscriptionPlans = [
   },
   {
     name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
-    features: ['Everything in Plus', 'See everyone who likes you'],
+    features: ['Everything in Plus', 'See everyone who likes you', 'Read receipts'],
   },
   {
     name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
