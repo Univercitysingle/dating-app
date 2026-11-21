@@ -108,6 +108,12 @@ const StorePage = () => {
           const result = await apiClient.get(`/subscription/status/${encodeURIComponent(purchaseId)}`);
           if (result?.status === 'active') {
             setCurrentSubscription(result);
+            try {
+              const entitlements = await apiClient.get('/users/me/entitlements');
+              setCurrentEntitlements(entitlements);
+            } catch {
+              // The subscription status remains visible if entitlement refresh is delayed.
+            }
             setNotification({ show: true, message: 'Your subscription is now active!', type: 'success' });
             clearReturnParameter();
             return true;
