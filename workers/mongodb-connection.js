@@ -1011,7 +1011,18 @@ export class MongoDBConnection {
       const users = db.collection("users");
       const user = await users.findOne({ uid });
       if (!user) return { status: 404, body: { error: "User not found." } };
-      if ((!user.undoSwipes || user.undoSwipes.count <= 0) && !(user.purchasedUndoSwipes > 0)) {
+      let activeSubscription = null;
+      try {
+        activeSubscription = await db.collection("subscriptions").findOne(
+          { userId: user._id, status: "active", endDate: { $gt: new Date() } },
+          { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+        );
+      } catch {
+        // Fail closed to credit-based undo if subscription lookup is unavailable.
+      }
+      const entitlements = buildMembershipEntitlements(user, activeSubscription);
+      const unlimitedUndo = entitlements.features.unlimitedUndo;
+      if (!unlimitedUndo && (!user.undoSwipes || user.undoSwipes.count <= 0) && !(user.purchasedUndoSwipes > 0)) {
         return { status: 400, body: { error: "No undo swipes remaining." } };
       }
       const lastSwipe = user.lastSwipe;
@@ -1021,16 +1032,16 @@ export class MongoDBConnection {
       const match = await matches.findOne({ _id: lastSwipe.matchId });
       if (!match) return { status: 404, body: { error: "Cannot find the match record for the swipe to undo." } };
 
-      let undoCreditSource = null;
-      if (user.purchasedUndoSwipes > 0) {
+      let undoCreditSource = unlimitedUndo ? "membership" : null;
+      if (!unlimitedUndo && user.purchasedUndoSwipes > 0) {
         const consumed = await users.updateOne({ uid, purchasedUndoSwipes: { $gt: 0 } }, { $inc: { purchasedUndoSwipes: -1 } });
         if (consumed.matchedCount) undoCreditSource = "purchasedUndoSwipes";
       }
-      if (!undoCreditSource) {
+      if (!unlimitedUndo && !undoCreditSource) {
         const consumed = await users.updateOne({ uid, "undoSwipes.count": { $gt: 0 } }, { $inc: { "undoSwipes.count": -1 } });
         if (consumed.matchedCount) undoCreditSource = "undoSwipes.count";
       }
-      if (!undoCreditSource) return { status: 400, body: { error: "No undo swipes remaining." } };
+      if (!unlimitedUndo && !undoCreditSource) return { status: 400, body: { error: "No undo swipes remaining." } };
 
       const update = { $set: { status: "pending", updatedAt: new Date() } };
       if (lastSwipe.action === "like" || lastSwipe.action === "superlike") {
@@ -1085,7 +1096,7 @@ export class MongoDBConnection {
       const db = this.getDatabase(await this.getClient());
       const users = db.collection("users");
       const [currentUser, targetUser] = await Promise.all([
-        users.findOne({ uid }, { projection: { blocked: 1, purchasedSuperLikes: 1, superLikes: 1, accountStatus: 1, suspendedUntil: 1 } }),
+        users.findOne({ uid }, { projection: { _id: 1, blocked: 1, purchasedSuperLikes: 1, superLikes: 1, accountStatus: 1, suspendedUntil: 1, plan: 1, role: 1, trialExpires: 1, dailyLikeDate: 1, dailyLikeCount: 1 } }),
         users.findOne({ uid: targetUid }, { projection: { blocked: 1, accountStatus: 1, suspendedUntil: 1 } })
       ]);
       if (!currentUser) return { status: 404, body: { error: "Current user not found." } };
@@ -1097,6 +1108,40 @@ export class MongoDBConnection {
       }
       if (Array.isArray(targetUser.blocked) && targetUser.blocked.includes(uid)) {
         return { status: 403, body: { error: "This user has blocked you." } };
+      }
+
+      if (action === "like") {
+        const now = new Date();
+        let activeSubscription = null;
+        try {
+          activeSubscription = await db.collection("subscriptions").findOne(
+            { userId: currentUser._id, status: "active", endDate: { $gt: now } },
+            { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+          );
+        } catch {
+          // Treat an unavailable entitlement lookup as Free, never as paid.
+        }
+        const entitlements = buildMembershipEntitlements(currentUser, activeSubscription, now);
+        if (!entitlements.features.unlimitedLikes) {
+          const day = now.toISOString().slice(0, 10);
+          if (currentUser.dailyLikeDate !== day) {
+            await users.updateOne(
+              { uid, dailyLikeDate: { $ne: day } },
+              { $set: { dailyLikeDate: day, dailyLikeCount: 0 } }
+            );
+          }
+          const allowance = await users.updateOne(
+            {
+              uid,
+              dailyLikeDate: day,
+              $or: [{ dailyLikeCount: { $lt: entitlements.limits.dailyLikes } }, { dailyLikeCount: { $exists: false } }]
+            },
+            { $inc: { dailyLikeCount: 1 }, $set: { updatedAt: now } }
+          );
+          if (!allowance.matchedCount) {
+            return { status: 429, body: { error: "Daily like limit reached. Upgrade your membership for unlimited likes.", code: "DAILY_LIKE_LIMIT" } };
+          }
+        }
       }
 
       const matches = db.collection("matches");
