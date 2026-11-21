@@ -507,13 +507,21 @@ test("undo swipe restores a prior like and consumes an undo credit", async () =>
   assert.ok(userUpdates.some(entry => entry.update.$unset?.lastSwipe === ""));
 });
 
-test("swipe endpoints reject anonymous requests and invalid methods", async () => {
+test("swipe and membership entitlement endpoints reject anonymous requests and invalid methods", async () => {
   const anonymous = await worker.fetch(new Request("https://dating-app.test/api/swipe/like", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: "target" })
   }), { FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {} });
   assert.equal(anonymous.status, 401);
+  const entitlementAnonymous = await worker.fetch(request("/api/users/me/entitlements"), {
+    FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {}
+  });
+  assert.equal(entitlementAnonymous.status, 401);
   const wrongMethod = await worker.fetch(request("/api/swipe/pass"), { FIREBASE_PROJECT_ID: "test-project" });
   assert.equal(wrongMethod.status, 405);
+  const entitlementWrongMethod = await worker.fetch(request("/api/users/me/entitlements", "POST"), {
+    FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {}
+  });
+  assert.equal(entitlementWrongMethod.status, 405);
 });
 
 test("swipe persistence rejects self-swipes and blocked targets", async () => {
