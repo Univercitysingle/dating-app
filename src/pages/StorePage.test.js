@@ -26,7 +26,7 @@ describe('StorePage USD pricing safety', () => {
     );
 
     expect(screen.queryByText(/LKR/i)).not.toBeInTheDocument();
-    expect(screen.getByText('$1.49 USD')).toBeInTheDocument();
+    expect(screen.getAllByText('$1.49 USD')).toHaveLength(2);
     expect(screen.getByText('$7.99 USD')).toBeInTheDocument();
     expect(screen.getByText('$59.99 USD')).toBeInTheDocument();
     expect(screen.getByText('$2.49 USD')).toBeInTheDocument();
