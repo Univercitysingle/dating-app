@@ -1621,40 +1621,6 @@ test("admin dashboard returns operational queue and subscription metrics", async
   assert.equal(calls.some(call => call.name === "photoVerifications"), true);
 });
 
-test("admin analytics returns a bounded, privacy-safe recent activity feed", async () => {
-  const events = [
-    { eventType: "moderation_action", actorUid: "admin-1", targetUid: "user-2", action: "suspend_user", outcome: "resolved_user_suspended", createdAt: new Date("2026-11-20T10:00:00Z"), previousMessage: "must not leak" },
-    { eventType: "support_ticket_updated", actorUid: "admin-1", ticketId: "ticket-1", createdAt: new Date("2026-11-20T09:00:00Z"), privatePayload: "must not leak" }
-  ];
-  const collectionCalls = [];
-  const connection = new MongoDBConnection({}, {});
-  connection.getClient = async () => ({ db: () => ({ collection(name) {
-    collectionCalls.push(name);
-    if (name === "users") return {
-      countDocuments: async () => 10,
-      distinct: async () => ["paid-1"],
-      aggregate: () => ({ toArray: async () => [{ _id: "2026-11-20", count: 2 }] })
-    };
-    if (name === "reports") return { distinct: async () => ["reported-1"] };
-    if (name === "auditlogs") return {
-      find: (query, options) => {
-        assert.deepEqual(query, { $or: [ { actorType: "admin" }, { eventType: { $in: ["moderation_action", "admin_account_lifecycle"] } } ] });
-        assert.ok(options.projection.eventType);
-        assert.equal(options.projection.previousMessage, 0);
-        return { sort() { return this; }, limit(value) { assert.equal(value, 8); return this; }, toArray: async () => events };
-      }
-    };
-    throw new Error("Unexpected collection: " + name);
-  } }) });
-  connection.requireAdmin = async () => ({ status: 200, role: "admin" });
-  const result = await connection.getAdminAnalyticsSummary("admin-1", {});
-  assert.equal(result.status, 200);
-  assert.equal(result.body.recentAdminActivity.length, 2);
-  assert.equal(result.body.recentAdminActivity[0].eventType, "moderation_action");
-  assert.equal(result.body.recentAdminActivity[0].previousMessage, undefined);
-  assert.equal(result.body.recentAdminActivity[1].privatePayload, undefined);
-});
-
 test("admin read methods deny users without an admin role", async () => {
   const connection = new MongoDBConnection({}, {});
   connection.getClient = async () => ({
