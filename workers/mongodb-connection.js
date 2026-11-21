@@ -338,7 +338,7 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
       advancedFilters: paidAccess,
       weeklySuperLikes: false,
       monthlyBoosts: false,
-      readReceipts: false,
+      readReceipts: isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive,
       priorityLikes: false,
       incognitoDiscovery: false,
       profileInsights: false,
@@ -6218,7 +6218,8 @@ export class MongoDBConnection {
     try {
       const db = this.getDatabase(await this.getClient());
       const user = await db.collection("users").findOne({ uid }, { projection: {
-        role: 1, blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+        _id: 1, role: 1, plan: 1, trialExpires: 1, blocked: 1,
+        accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
       } });
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (user.role !== "superadmin" && isAccountRestricted(user)) {
@@ -6297,6 +6298,16 @@ export class MongoDBConnection {
           .sort({ timestamp: -1, _id: -1 }).skip(skip).limit(limit).maxTimeMS(10000).toArray();
         messages.reverse();
       }
+      let activeSubscription = null;
+      try {
+        activeSubscription = await db.collection("subscriptions").findOne(
+          { userId: user._id, status: "active", endDate: { $gt: new Date() } },
+          { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+        );
+      } catch {
+        // A missing subscription record keeps read receipts private.
+      }
+      const entitlements = buildMembershipEntitlements(user, activeSubscription);
       // Expose Mongo ObjectIds as stable 24-character hex strings. BSON's
       // JSON representation can vary by driver/serializer, but the public
       // cursor contract must always be a plain string.
@@ -6306,8 +6317,13 @@ export class MongoDBConnection {
       ];
       const serializedMessages = messages.map(message => {
         const safeMessage = {};
+        const hideReadReceipt = message.senderUid === uid &&
+          !entitlements.features.readReceipts && message.status === "read";
         for (const field of publicMessageFields) {
-          if (message[field] !== undefined) safeMessage[field] = message[field];
+          if (hideReadReceipt && field === "readAt") continue;
+          if (message[field] !== undefined) {
+            safeMessage[field] = hideReadReceipt && field === "status" ? "delivered" : message[field];
+          }
         }
         safeMessage._id = typeof message._id?.toHexString === "function"
           ? message._id.toHexString()
