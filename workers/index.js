@@ -299,6 +299,12 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
   if (env.MIGRATION_STAGE !== "staging" && checkoutUrl.hostname.toLowerCase() === "stagingxpay.info") {
     throw new Error("The WebXPay staging endpoint cannot be used outside the staging environment");
   }
+  // The provider payload has historically forced LKR. Require an explicit
+  // USD settlement approval and a USD-denominated server order before any
+  // route can generate a payment form.
+  if (order?.currency !== "USD" || env.WEBXPAY_USD_SETTLEMENT_APPROVED !== "true") {
+    throw new Error("USD settlement is not approved; checkout is disabled");
+  }
   const returnUrl = new URL(returnPath, frontend);
   returnUrl.searchParams.set("purchaseId", order.orderId);
   const encryptedPayment = publicEncrypt({
@@ -313,7 +319,7 @@ function buildWebXPayCheckoutForm(order, env, returnPath, itemDescription = "") 
     ["email", user.email || ""],
     ["contact_number", user.contactNumber || "0711234567"],
     ["address_line_one", "N/A"],
-    ["process_currency", "LKR"],
+    ["process_currency", "USD"],
     ["cms", "PHP"],
     ["enc_method", "JCs3J+6oSz4V0LgE0zi/Bg=="],
     ["secret_key", String(env.WEBXPAY_SECRET_KEY).trim()],
