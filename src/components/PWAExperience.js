@@ -20,8 +20,29 @@ function isStandalone() {
     window.navigator.standalone === true;
 }
 
+const INSTALL_DISMISS_KEY = 'hart2hart:pwa-install-dismissed-at';
+const INSTALL_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function wasInstallPromptDismissed() {
+  try {
+    const dismissedAt = Number(window.localStorage.getItem(INSTALL_DISMISS_KEY));
+    return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < INSTALL_DISMISS_MS;
+  } catch {
+    return false;
+  }
+}
+
+function rememberInstallPromptDismissal() {
+  try {
+    window.localStorage.setItem(INSTALL_DISMISS_KEY, String(Date.now()));
+  } catch {
+    // Installation remains available if browser storage is disabled.
+  }
+}
+
 export default function PWAExperience() {
   const [installEvent, setInstallEvent] = useState(null);
+  const [installDismissed, setInstallDismissed] = useState(wasInstallPromptDismissed);
   const [showIOSHelp, setShowIOSHelp] = useState(false);
   const [offline, setOffline] = useState(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -34,11 +55,12 @@ export default function PWAExperience() {
     const onOffline = () => setOffline(true);
     const onInstallPrompt = event => {
       event.preventDefault();
-      if (!isStandalone()) setInstallEvent(event);
+      if (!isStandalone() && !wasInstallPromptDismissed()) setInstallEvent(event);
     };
     const onInstalled = () => {
       setIsInstalled(true);
       setInstallEvent(null);
+      setInstallDismissed(true);
       setShowIOSHelp(false);
     };
     const onUpdate = event => {
@@ -66,7 +88,14 @@ export default function PWAExperience() {
     if (installEvent) {
       try {
         await installEvent.prompt();
-        await installEvent.userChoice;
+        const choice = await installEvent.userChoice;
+        if (choice?.outcome === 'accepted') {
+          setIsInstalled(true);
+          setInstallDismissed(true);
+        } else {
+          rememberInstallPromptDismissal();
+          setInstallDismissed(true);
+        }
       } finally {
         setInstallEvent(null);
       }
@@ -114,7 +143,7 @@ export default function PWAExperience() {
         </div>
       )}
 
-      {!isInstalled && (installEvent || canExplainManualInstall) && (
+      {!isInstalled && !installDismissed && (installEvent || canExplainManualInstall) && (
         <div className="pwa-install-card" role="region" aria-label="Install Hart2Hart">
           <div className="pwa-install-copy">
             <strong>Take Hart2Hart with you</strong>
@@ -134,6 +163,8 @@ export default function PWAExperience() {
             type="button"
             className="pwa-install-dismiss"
             onClick={() => {
+              rememberInstallPromptDismissal();
+              setInstallDismissed(true);
               setInstallEvent(null);
               setShowIOSHelp(false);
             }}
