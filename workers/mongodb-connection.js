@@ -1214,7 +1214,7 @@ export class MongoDBConnection {
             {
               uid,
               dailyLikeDate: day,
-              $or: [{ dailyLikeCount: { $lt: entitlements.limits.dailyLikes } }, { dailyLikeCount: { $exists: false } }]
+              $or: [{ dailyLikeCount: { $lt: swipeEntitlements.limits.dailyLikes } }, { dailyLikeCount: { $exists: false } }]
             },
             { $inc: { dailyLikeCount: 1 }, $set: { updatedAt: now } }
           );
