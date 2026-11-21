@@ -1755,6 +1755,7 @@ test("WebXPay checkout form includes the documented CMS and encryption mechanism
   assert.match(html, /name="cms" value="PHP"/);
   assert.match(html, /name="enc_method" value="JCs3J\+6oSz4V0LgE0zi\/Bg=="/);
   assert.match(html, /name="secret_key" value="test-secret"/);
+  assert.match(html, /name="process_currency" value="USD"/);
   assert.match(html, /name="payment" value="[A-Za-z0-9+/=]+"/);
   assert.doesNotMatch(html, /name="items"/);
   assert.match(html, /form action="https:\/\/stagingxpay\.info\/index\.php\?route=checkout\/billing"/);
