@@ -208,12 +208,12 @@ test("new subscription checkouts persist the server-calculated amount and curren
   connection.getClient = async () => ({});
   connection.getDatabase = () => db;
 
-  const result = await connection.createPendingSubscription("owner-uid", "monthly");
+  const result = await connection.createPendingSubscription("owner-uid", "gold");
 
   assert.equal(result.status, 201);
-  assert.equal(result.body.price, 3000);
-  assert.equal(insertedSubscription.amount, 3000);
-  assert.equal(insertedSubscription.currency, "LKR");
-  assert.equal(insertedSubscription.plan, "monthly");
+  assert.equal(result.body.price, 7.99);
+  assert.equal(insertedSubscription.amount, 7.99);
+  assert.equal(insertedSubscription.currency, "USD");
+  assert.equal(insertedSubscription.plan, "gold");
   assert.equal(insertedSubscription.status, "pending");
 });
