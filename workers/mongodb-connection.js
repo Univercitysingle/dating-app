@@ -1178,8 +1178,13 @@ export class MongoDBConnection {
           const consumed = await users.updateOne({ uid, purchasedSuperLikes: { $gt: 0 } }, { $inc: { purchasedSuperLikes: -1 } });
           if (consumed.matchedCount) superLikeSpent = "purchasedSuperLikes";
         }
-        if (!superLikeSpent) {
-          const consumed = await users.updateOne({ uid, "superLikes.count": { $gt: 0 } }, { $inc: { "superLikes.count": -1 } });
+        if (!superLikeSpent && !currentUser.superLikes?.week) {
+          // Legacy Super Like credits are separate from membership allowances.
+          // Do not let an expired Gold weekly balance remain spendable.
+          const consumed = await users.updateOne(
+            { uid, "superLikes.week": { $exists: false }, "superLikes.count": { $gt: 0 } },
+            { $inc: { "superLikes.count": -1 } }
+          );
           if (consumed.matchedCount) superLikeSpent = "superLikes.count";
         }
         if (!superLikeSpent) return { status: 400, body: { error: "No super likes remaining." } };
