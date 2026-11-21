@@ -43,6 +43,18 @@ describe('LikesPage synchronization', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('shows Super Like and Platinum Priority Like markers', async () => {
+    apiClient.get.mockResolvedValue([
+      { ...liker('priority-user', 'Alex'), likeType: 'priority' },
+      { ...liker('super-user', 'Sam'), likeType: 'superlike' }
+    ]);
+
+    render(<MemoryRouter><LikesPage /></MemoryRouter>);
+
+    expect(await screen.findByText('Priority Like')).toBeInTheDocument();
+    expect(screen.getByText('Super Like')).toBeInTheDocument();
+  });
+
   it('does not poll while the document is hidden', async () => {
     const originalVisibility = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
