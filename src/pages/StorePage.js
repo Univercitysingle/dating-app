@@ -276,7 +276,7 @@ const StorePage = () => {
         {currentEntitlements && (
           <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700" aria-live="polite">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold text-gray-900">Your current membership: <span className="capitalize">{currentEntitlements.tier || 'free'}</span></p>
+              <p className="font-semibold text-gray-900">Your current membership: <span className="capitalize">{currentEntitlements.tier === 'legacy-premium' ? 'Legacy Premium' : currentEntitlements.tier || 'free'}</span></p>
               <span className="text-xs text-gray-500">Status: {currentEntitlements.status || 'inactive'}</span>
             </div>
             <p className="mt-2 text-gray-600">
