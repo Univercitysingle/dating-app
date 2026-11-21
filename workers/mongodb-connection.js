@@ -1029,9 +1029,11 @@ export class MongoDBConnection {
       const users = db.collection("users");
       const user = await users.findOne({ uid }, { projection: {
         _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1,
+        accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1,
         membershipBoostMonth: 1, membershipBoostCount: 1
       } });
       if (!user) return { status: 404, body: { error: "User not found" } };
+      if (isAccountRestricted(user)) return { status: 403, body: { error: "Profile boosts are unavailable for this account." } };
       const now = new Date();
       let subscription = null;
       try {
