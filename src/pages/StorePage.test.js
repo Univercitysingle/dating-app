@@ -18,7 +18,7 @@ describe('StorePage USD pricing safety', () => {
     apiClient.get.mockResolvedValue([]);
   });
 
-  test('does not display legacy LKR prices and keeps checkout disabled until USD pricing is configured', async () => {
+  test('shows half-market USD launch prices without enabling checkout before settlement approval', async () => {
     render(
       <MemoryRouter initialEntries={['/store']}>
         <StorePage />
@@ -26,7 +26,12 @@ describe('StorePage USD pricing safety', () => {
     );
 
     expect(screen.queryByText(/LKR/i)).not.toBeInTheDocument();
-    const checkoutButtons = await screen.findAllByRole('button', { name: 'USD pricing coming soon' });
+    expect(screen.getByText('$1.49 USD')).toBeInTheDocument();
+    expect(screen.getByText('$7.99 USD')).toBeInTheDocument();
+    expect(screen.getByText('$59.99 USD')).toBeInTheDocument();
+    expect(screen.getByText('$2.49 USD')).toBeInTheDocument();
+    expect(screen.getByText('$1.99 USD')).toBeInTheDocument();
+    const checkoutButtons = await screen.findAllByRole('button', { name: /checkout coming soon/i });
     expect(checkoutButtons).toHaveLength(6);
     expect(checkoutButtons.every((button) => button.disabled)).toBe(true);
   });
