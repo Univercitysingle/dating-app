@@ -72,7 +72,7 @@ export default function PWAExperience() {
       }
       return;
     }
-    if (isIOSFamily() && !isStandalone()) setShowIOSHelp(value => !value);
+    if ((isIOSFamily() || isMacSafari()) && !isStandalone()) setShowIOSHelp(value => !value);
   };
 
   const update = () => {
