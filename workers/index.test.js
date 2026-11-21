@@ -598,6 +598,57 @@ test("super-like consumes a purchased credit and records super-like notification
   assert.ok(userUpdates.some(entry => entry.update.$inc?.purchasedSuperLikes === -1));
 });
 
+test("Gold membership receives and consumes five weekly Super Likes", async () => {
+  const userUpdates = [];
+  const current = {
+    _id: "gold-user-id", uid: "gold-user", blocked: [], accountStatus: "active",
+    purchasedSuperLikes: 0, superLikes: { count: 0 }
+  };
+  const target = { _id: "target-id", uid: "target-user", blocked: [], accountStatus: "active" };
+  const users = {
+    async findOne(query) { return query.uid === "gold-user" ? current : target; },
+    async updateOne(query, update) {
+      userUpdates.push({ query, update });
+      return { matchedCount: 1 };
+    }
+  };
+  let storedMatch;
+  const matches = {
+    createIndex: async () => "index-created",
+    async findOne() { return storedMatch; },
+    async insertOne(document) { storedMatch = { _id: "gold-match-id", ...document }; return { insertedId: "gold-match-id" }; },
+    async updateOne(_query, update) {
+      if (update.$addToSet?.likedBy) storedMatch.likedBy = [...new Set([...(storedMatch.likedBy || []), ...update.$addToSet.likedBy.$each || update.$addToSet.likedBy])];
+      if (update.$set) Object.assign(storedMatch, update.$set);
+      return { matchedCount: 1 };
+    }
+  };
+  const notifications = { async updateOne() { return { upsertedCount: 1 }; }, async deleteOne() { return { deletedCount: 0 }; } };
+  const subscriptions = {
+    async findOne() {
+      return {
+        plan: "gold", currency: "USD", status: "active",
+        endDate: new Date(Date.now() + 86400000)
+      };
+    }
+  };
+  const connection = new MongoDBConnection({}, {});
+  connection.getClient = async () => ({ db: () => ({ collection(name) {
+    if (name === "users") return users;
+    if (name === "matches") return matches;
+    if (name === "notifications") return notifications;
+    if (name === "subscriptions") return subscriptions;
+    throw new Error("Unexpected collection: " + name);
+  } }) });
+
+  const result = await connection.recordSwipe("gold-user", "target-user", "superlike");
+  assert.equal(result.status, 200);
+  assert.equal(result.body.superLike, true);
+  assert.ok(userUpdates.some(entry => entry.update.$set?.["superLikes.count"] === 5));
+  assert.ok(userUpdates.some(entry => entry.update.$inc?.["superLikes.count"] === -1));
+  assert.equal(userUpdates.some(entry => entry.update.$inc?.purchasedSuperLikes === -1), false);
+});
+
 test("legacy match-like route rejects anonymous requests and unsupported methods", async () => {
   const anonymous = await worker.fetch(request("/api/matches/like/target", "POST"), {
     FIREBASE_PROJECT_ID: "test-project",
