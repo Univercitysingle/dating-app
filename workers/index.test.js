@@ -1000,7 +1000,7 @@ test("likes query returns pending likers with privacy filtering and premium blur
     return { toArray: async () => [{ user1Uid: "liker", user2Uid: "current", status: "pending", superLike: true }] };
   }};
   const connection = new MongoDBConnection({}, { CDN_HOSTNAME: "cdn.example.com" });
-  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : matches }) });
+  connection.getClient = async () => ({ db: () => ({ collection: (name) => name === "users" ? users : name === "subscriptions" ? { findOne: async () => ({ plan: "monthly", currency: "LKR", endDate: new Date(Date.now() + 86400000) }) } : matches }) });
   const result = await connection.getLikes("current");
   assert.equal(result.status, 200);
   assert.equal(result.body.length, 1);
