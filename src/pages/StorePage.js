@@ -11,14 +11,14 @@ const subscriptionPlans = [
   },
   {
     name: 'Plus', plan: 'plus', monthlyPrice: 3.99, annualPrice: 28.99, description: 'More freedom and control over your discovery experience.',
-    features: ['Everything in Free', 'Unlimited likes', 'Unlimited undo swipes', 'Ad-free experience', 'Travel mode', 'Additional discovery filters'],
+    features: ['Everything in Free', 'Unlimited likes', 'Unlimited undo swipes'],
   },
   {
     name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
-    features: ['Everything in Plus', 'See everyone who likes you', 'Advanced filters', '5 Super Likes each week', '1 Profile Boost each month', 'Read receipts'],
+    features: ['Everything in Plus', 'See everyone who likes you'],
   },
   {
-    name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'More visibility, privacy and control.',
+    name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
     features: ['Everything in Gold', 'Priority Likes', 'Incognito discovery', 'Profile insights', '2 Profile Boosts each month', 'Priority customer support'],
   },
 ];
@@ -241,7 +241,7 @@ const StorePage = () => {
       <section aria-labelledby="subscription-plans-heading" className="mb-12">
         <div className="mb-5">
           <h2 id="subscription-plans-heading" className="text-2xl font-bold text-gray-900">Choose your membership</h2>
-          <p className="mt-1 text-sm text-gray-500">Four clear membership levels. Gold is our recommended balance of features and value. Prices are proposed USD launch prices; checkout remains disabled until gateway settlement and feature entitlements are verified.</p>
+          <p className="mt-1 text-sm text-gray-500">Four clear membership levels. Gold is our recommended balance of features and value. Only benefits currently enforced by the backend are listed. Prices are proposed USD launch prices; checkout remains disabled until gateway settlement and all advertised features are verified.</p>
         </div>
         {currentEntitlements && (
           <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700" aria-live="polite">
@@ -290,7 +290,7 @@ const StorePage = () => {
       <section aria-labelledby="passes-heading" className="mb-12">
         <div className="mb-5">
           <h2 id="passes-heading" className="text-2xl font-bold text-gray-900">Optional passes</h2>
-          <p className="mt-1 text-sm text-gray-500">One-off add-ons for specific needs. These are separate from membership and do not renew automatically.</p>
+          <p className="mt-1 text-sm text-gray-500">Optional one-off add-ons are planned. They are not active or purchasable yet, and do not renew automatically.</p>
         </div>
         <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
           {optionalPasses.map((pass) => (
