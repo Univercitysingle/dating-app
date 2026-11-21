@@ -10,15 +10,15 @@ const subscriptionPlans = [
     features: ['25 likes per UTC day', 'Basic discovery filters', 'Matching and messaging', 'Profile and safety controls'],
   },
   {
-    name: 'Plus', plan: 'plus', monthlyPrice: 3.99, annualPrice: 28.99, description: 'More freedom and control over your discovery experience.',
+    name: 'Plus', plan: 'plus', monthlyPrice: 3.99, description: 'More freedom and control over your discovery experience.',
     features: ['Everything in Free', 'Unlimited likes', 'Unlimited undo swipes', 'Advanced discovery filters'],
   },
   {
-    name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
+    name: 'Gold', plan: 'gold', monthlyPrice: 7.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
     features: ['Everything in Plus', 'See everyone who likes you', '5 Super Likes each week', '1 Profile Boost each month', 'Read receipts'],
   },
   {
-    name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
+    name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
     features: ['Everything in Gold', '2 Profile Boosts each month', 'Priority Likes'],
   },
 ];
@@ -324,7 +324,6 @@ const StorePage = () => {
                 <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
                 <p className="mt-2 min-h-10 text-sm text-gray-500">{plan.description}</p>
                 <p className="my-5 text-3xl font-extrabold text-gray-900">{formatPrice(plan.monthlyPrice)}<span className="ml-1 text-sm font-normal text-gray-500">{plan.monthlyPrice > 0 ? '/ month' : ''}</span></p>
-                {plan.annualPrice > 0 && <p className="mb-4 text-xs text-gray-500">Annual option: {formatPrice(plan.annualPrice)} / year, approximately 40% less than monthly billing.</p>}
                 <ul className="space-y-2 text-sm text-gray-700">
                   {plan.features.map((feature) => <li key={feature} className="flex gap-2"><span aria-hidden="true" className="text-green-600">✓</span><span>{feature}</span></li>)}
                 </ul>
