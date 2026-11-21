@@ -6140,6 +6140,7 @@ test("membership entitlements distinguish Free, paid tiers, legacy subscriptions
 
   const platinum = buildMembershipEntitlements({}, { ...active, plan: "platinum", currency: "USD" }, now);
   assert.equal(platinum.features.seeLikes, true);
+  assert.equal(platinum.features.priorityLikes, true);
 
   const legacy = buildMembershipEntitlements({}, { ...active, plan: "monthly", currency: "LKR" }, now);
   assert.equal(legacy.tier, "legacy-premium");
