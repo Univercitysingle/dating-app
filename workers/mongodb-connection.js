@@ -339,6 +339,9 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
     expiresAt: usdTier || legacyPaid
       ? subscriptionEnd.toISOString()
       : trialActive ? new Date(user.trialExpires).toISOString() : null,
+    boostExpiresAt: user?.boostExpiresAt && new Date(user.boostExpiresAt) > currentTime
+      ? new Date(user.boostExpiresAt).toISOString()
+      : null,
     features: {
       unlimitedLikes,
       unlimitedUndo,
@@ -1002,7 +1005,7 @@ export class MongoDBConnection {
         { uid },
         { projection: {
           _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1,
-          membershipBoostMonth: 1, membershipBoostCount: 1
+          membershipBoostMonth: 1, membershipBoostCount: 1, boostExpiresAt: 1
         } }
       );
       if (!user) return { status: 404, body: { error: "User not found" } };
