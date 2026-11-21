@@ -3,6 +3,7 @@ import PWAExperience from './PWAExperience';
 
 describe('PWAExperience', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     window.history.replaceState({}, '', '/');
     Object.defineProperty(navigator, 'onLine', {
       configurable: true,
@@ -48,6 +49,25 @@ describe('PWAExperience', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Update now' }));
     expect(postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+  });
+
+  test('remembers a dismissed installation suggestion for subsequent visits', () => {
+    const installEvent = new Event('beforeinstallprompt', { cancelable: true });
+    installEvent.prompt = jest.fn();
+    installEvent.userChoice = Promise.resolve({ outcome: 'dismissed' });
+
+    const firstRender = render(<PWAExperience />);
+    act(() => window.dispatchEvent(installEvent));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss install suggestion' }));
+    firstRender.unmount();
+
+    render(<PWAExperience />);
+    const nextEvent = new Event('beforeinstallprompt', { cancelable: true });
+    nextEvent.prompt = jest.fn();
+    nextEvent.userChoice = Promise.resolve({ outcome: 'accepted' });
+    act(() => window.dispatchEvent(nextEvent));
+
+    expect(screen.queryByRole('region', { name: 'Install Hart2Hart' })).not.toBeInTheDocument();
   });
 
   test('can dismiss the installation suggestion', () => {
