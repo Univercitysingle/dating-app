@@ -1035,17 +1035,6 @@ export class MongoDBConnection {
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(user)) return { status: 403, body: { error: "Profile boosts are unavailable for this account." } };
       const now = new Date();
-      if (user.boostExpiresAt && new Date(user.boostExpiresAt) > now) {
-        return {
-          status: 200,
-          body: {
-            boosted: true,
-            alreadyActive: true,
-            boostExpiresAt: user.boostExpiresAt,
-            remaining: buildMembershipEntitlements(user, null, now).limits.monthlyBoostsRemaining
-          }
-        };
-      }
       let subscription = null;
       try {
         subscription = await db.collection("subscriptions").findOne(
@@ -1059,6 +1048,17 @@ export class MongoDBConnection {
       const limit = entitlements.limits.monthlyBoosts;
       if (!entitlements.features.monthlyBoosts || limit < 1) {
         return { status: 403, body: { error: "A Gold or Platinum membership is required for monthly profile boosts.", code: "PROFILE_BOOST_MEMBERSHIP_REQUIRED" } };
+      }
+      if (user.boostExpiresAt && new Date(user.boostExpiresAt) > now) {
+        return {
+          status: 200,
+          body: {
+            boosted: true,
+            alreadyActive: true,
+            boostExpiresAt: user.boostExpiresAt,
+            remaining: entitlements.limits.monthlyBoostsRemaining
+          }
+        };
       }
       const monthKey = now.toISOString().slice(0, 7);
       if (user.membershipBoostMonth !== monthKey) {
