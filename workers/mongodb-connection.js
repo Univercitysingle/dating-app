@@ -306,6 +306,46 @@ export function getMongoPoolSize(value) {
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 20 ? parsed : 10;
 }
 
+
+export function buildMembershipEntitlements(user, subscription, now = new Date()) {
+  const currentTime = now instanceof Date ? now : new Date(now);
+  const subscriptionEnd = subscription?.endDate ? new Date(subscription.endDate) : null;
+  const subscriptionActive = Boolean(subscription && subscription.status === "active" &&
+    subscriptionEnd && Number.isFinite(subscriptionEnd.getTime()) && subscriptionEnd > currentTime);
+  const plan = String(subscription?.plan || "").toLowerCase();
+  const usdTier = subscriptionActive && subscription.currency === "USD" &&
+    ["plus", "gold", "platinum"].includes(plan);
+  const legacyPaid = subscriptionActive && ["weekly", "monthly", "yearly", "premium"].includes(plan);
+  const trialActive = user?.plan === "premium" && user?.trialExpires &&
+    new Date(user.trialExpires) > currentTime;
+  const isSuperadmin = user?.role === "superadmin";
+  const paidAccess = usdTier || legacyPaid || trialActive || isSuperadmin;
+  const tier = usdTier ? plan : legacyPaid || trialActive ? "legacy-premium" : isSuperadmin ? "superadmin" : "free";
+  const unlimitedLikes = paidAccess;
+  const unlimitedUndo = paidAccess;
+  const seeLikes = isSuperadmin || (usdTier && ["gold", "platinum"].includes(plan)) || legacyPaid || trialActive;
+  return {
+    tier,
+    status: subscriptionActive ? "active" : trialActive ? "trial" : "inactive",
+    expiresAt: subscriptionEnd ? subscriptionEnd.toISOString() : trialActive ? new Date(user.trialExpires).toISOString() : null,
+    features: {
+      unlimitedLikes,
+      unlimitedUndo,
+      seeLikes,
+      travelMode: false,
+      advancedFilters: false,
+      weeklySuperLikes: false,
+      monthlyBoosts: false,
+      readReceipts: false,
+      priorityLikes: false,
+      incognitoDiscovery: false,
+      profileInsights: false,
+      prioritySupport: false
+    },
+    limits: { dailyLikes: unlimitedLikes ? null : 25 }
+  };
+}
+
 export class MongoDBConnection {
   constructor(state, env) {
     this.state = state;
@@ -933,6 +973,33 @@ export class MongoDBConnection {
       return { status: 200, body: { message: "Password set successfully." } };
     } catch {
       return { status: 503, body: { error: "Password setup service unavailable" } };
+    }
+  }
+
+
+  async getMembershipEntitlements(uid) {
+    if (typeof uid !== "string" || !uid || uid.length > 128) {
+      return { status: 400, body: { error: "Invalid user identity" } };
+    }
+    try {
+      const db = this.getDatabase(await this.getClient());
+      const user = await db.collection("users").findOne(
+        { uid },
+        { projection: { _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1 } }
+      );
+      if (!user) return { status: 404, body: { error: "User not found" } };
+      let subscription = null;
+      try {
+        subscription = await db.collection("subscriptions").findOne(
+          { userId: user._id, status: "active", endDate: { $gt: new Date() } },
+          { sort: { endDate: -1 }, projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+        );
+      } catch {
+        // Fail closed to Free entitlements if the subscription collection is unavailable.
+      }
+      return { status: 200, body: buildMembershipEntitlements(user, subscription) };
+    } catch {
+      return { status: 503, body: { error: "Membership entitlements unavailable" } };
     }
   }
 
