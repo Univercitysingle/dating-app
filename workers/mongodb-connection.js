@@ -2399,8 +2399,14 @@ export class MongoDBConnection {
   }
 
   async createPendingSubscription(uid, plan) {
-    const prices = { weekly: 800, monthly: 3000, yearly: 10000 };
-    if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(prices, plan)) {
+    // USD launch pricing mirrors the Store page. Checkout remains gated at the
+    // HTTP layer until WebXPay confirms USD settlement for this merchant account.
+    const plans = {
+      plus: { amount: 3.99, currency: "USD", durationDays: 30 },
+      gold: { amount: 7.99, currency: "USD", durationDays: 30 },
+      platinum: { amount: 11.99, currency: "USD", durationDays: 30 }
+    };
+    if (typeof uid !== "string" || !uid || uid.length > 128 || !Object.hasOwn(plans, plan)) {
       return { status: 400, body: { error: "Invalid subscription plan." } };
     }
     let reservationId = null;
@@ -2459,8 +2465,9 @@ export class MongoDBConnection {
       const subscription = {
         userId: user._id,
         plan,
-        amount: prices[plan],
-        currency: "LKR",
+        amount: plans[plan].amount,
+        currency: plans[plan].currency,
+        durationDays: plans[plan].durationDays,
         status: "pending",
         checkoutReservationId: reservationId,
         // WebXPay does not issue Stripe or PayHere subscription IDs. Unique
@@ -2475,7 +2482,8 @@ export class MongoDBConnection {
         status: 201,
         body: {
           orderId: String(inserted.insertedId),
-          price: prices[plan],
+          price: plans[plan].amount,
+          currency: plans[plan].currency,
           plan,
           user: {
             name: typeof user.name === "string" ? user.name : "User",
