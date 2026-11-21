@@ -6154,6 +6154,8 @@ test("membership entitlements distinguish Free, paid tiers, legacy subscriptions
     ...active, plan: "gold", currency: "USD", endDate: new Date("2026-11-20T12:00:00.000Z")
   }, now);
   assert.equal(expired.tier, "free");
+  assert.equal(expired.status, "free");
+  assert.equal(expired.expiresAt, null);
   assert.equal(expired.features.seeLikes, false);
 });
 
