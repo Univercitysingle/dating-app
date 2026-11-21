@@ -3969,6 +3969,7 @@ test("admin analytics counts unique active subscribers rather than subscription 
       if (name === "users") return users;
       if (name === "subscriptions") return subscriptions;
       if (name === "reports") return reports;
+      if (name === "auditlogs") return auditlogs;
       assert.fail("Unexpected collection: " + name);
     }
   });
