@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function createServiceWorkerHarness() {
+function createServiceWorkerHarness(fetchImpl = jest.fn()) {
   const listeners = new Map();
   const cacheStore = new Map();
   const deletedCaches = [];
@@ -50,10 +50,10 @@ function createServiceWorkerHarness() {
     self,
     caches,
     URL,
-    fetch: jest.fn(),
+    fetch: fetchImpl,
     Response: { error: () => ({ type: 'error' }) }
   });
-  return { listeners, cache, caches, cacheStore, deletedCaches, self };
+  return { listeners, cache, caches, cacheStore, deletedCaches, self, fetchMock: fetchImpl };
 }
 
 function makeResponse(body) {
@@ -99,33 +99,50 @@ describe('service worker cache and offline security policy', () => {
   });
 
   test('revalidates the manifest from the network and stores the latest response', async () => {
-    const { listeners, cache } = createServiceWorkerHarness();
     const latestManifest = makeResponse('manifest-v3');
     const fetchMock = jest.fn(async () => latestManifest);
+    const { listeners, cache } = createServiceWorkerHarness(fetchMock);
     const request = {
       method: 'GET',
       url: 'https://app.example/manifest.json',
       mode: 'cors'
     };
-    const responsePromise = new Promise(resolve => {
-      listeners.get('fetch')({
-        request,
-        respondWith: promise => resolve(promise)
-      });
+    let responsePromise;
+    listeners.get('fetch')({
+      request,
+      respondWith: promise => { responsePromise = promise; }
     });
 
-    const workerFetch = listeners.get('fetch');
-    expect(workerFetch).toBeDefined();
-    const context = createServiceWorkerHarness();
-    // Use the first harness's listener and its injected fetch implementation.
+    const response = await responsePromise;
+
+    expect(response).toBe(latestManifest);
+    expect(fetchMock).toHaveBeenCalledWith(request);
     expect(cache.match).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(responsePromise).toBeDefined();
-    expect(context.listeners.has('fetch')).toBe(true);
+    expect(cache.put).toHaveBeenCalledWith(request, latestManifest);
+  });
+
+  test('uses the cached manifest if network revalidation fails', async () => {
+    const cachedManifest = makeResponse('cached-manifest');
+    const fetchMock = jest.fn(async () => { throw new Error('offline'); });
+    const { listeners, cacheStore } = createServiceWorkerHarness(fetchMock);
+    cacheStore.set('https://app.example/manifest.json', cachedManifest);
+    const request = {
+      method: 'GET',
+      url: 'https://app.example/manifest.json',
+      mode: 'cors'
+    };
+    let responsePromise;
+    listeners.get('fetch')({
+      request,
+      respondWith: promise => { responsePromise = promise; }
+    });
+
+    await expect(responsePromise).resolves.toBe(cachedManifest);
   });
 
   test('uses the cached offline page when a navigation request cannot reach the network', async () => {
-    const { listeners, cacheStore } = createServiceWorkerHarness();
+    const fetchMock = jest.fn(async () => { throw new Error('offline'); });
+    const { listeners, cacheStore } = createServiceWorkerHarness(fetchMock);
     const offlinePage = makeResponse('offline fallback');
     cacheStore.set('/offline.html', offlinePage);
     const request = {
@@ -133,21 +150,13 @@ describe('service worker cache and offline security policy', () => {
       url: 'https://app.example/discover',
       mode: 'navigate'
     };
-    const responsePromise = new Promise(resolve => {
-      listeners.get('fetch')({
-        request,
-        respondWith: promise => resolve(promise)
-      });
+    let responsePromise;
+    listeners.get('fetch')({
+      request,
+      respondWith: promise => { responsePromise = promise; }
     });
 
-    const originalFetch = global.fetch;
-    try {
-      global.fetch = jest.fn(async () => { throw new Error('offline'); });
-      const response = await responsePromise;
-      expect(response).toBe(offlinePage);
-    } finally {
-      global.fetch = originalFetch;
-    }
+    await expect(responsePromise).resolves.toBe(offlinePage);
   });
 
   test('activation deletes only older Hart2Hart caches', async () => {
