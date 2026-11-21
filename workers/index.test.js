@@ -522,6 +522,14 @@ test("swipe and membership entitlement endpoints reject anonymous requests and i
     FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {}
   });
   assert.equal(entitlementWrongMethod.status, 405);
+  const boostAnonymous = await worker.fetch(request("/api/profile/boost", "POST"), {
+    FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {}
+  });
+  assert.equal(boostAnonymous.status, 401);
+  const boostWrongMethod = await worker.fetch(request("/api/profile/boost", "GET"), {
+    FIREBASE_PROJECT_ID: "test-project", MONGODB_CONNECTION: {}
+  });
+  assert.equal(boostWrongMethod.status, 405);
 });
 
 test("swipe persistence rejects self-swipes and blocked targets", async () => {
