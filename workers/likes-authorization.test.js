@@ -35,7 +35,7 @@ test("likes omit hidden profiles and either side of a blocked relationship", asy
       if (name === "subscriptions") {
         return {
           async findOne() {
-            return { plan: "monthly", currency: "LKR", endDate: new Date("2027-01-01T00:00:00.000Z") };
+            return { plan: "monthly", currency: "LKR", status: "active", endDate: new Date("2027-01-01T00:00:00.000Z") };
           }
         };
       }
@@ -120,7 +120,7 @@ test("active Gold subscription reveals incoming liker identity", async () => {
         async findOne(filter) {
           assert.equal(filter.status, "active");
           assert.ok(filter.endDate.$gt instanceof Date);
-          return { plan: "gold", currency: "USD", endDate: new Date(Date.now() + 86400000) };
+          return { plan: "gold", currency: "USD", status: "active", endDate: new Date(Date.now() + 86400000) };
         }
       };
       throw new Error("Unexpected collection: " + name);
