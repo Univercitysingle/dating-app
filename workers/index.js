@@ -2430,74 +2430,12 @@ export default {
 
     if (url.pathname === "/api/purchase/store-item") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-      // Fail closed: the legacy catalogue and settlement path are LKR-based.
-      // Do not create an order until USD prices and verified USD settlement are implemented.
       return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
-      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-      try {
-        if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
-          return json({ error: "Payment gateway is not configured." }, 503);
-        }
-        createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
-        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const payload = await request.json().catch(() => null);
-        if (!payload || typeof payload.itemId !== "string") return json({ error: "Invalid item ID." }, 400);
-        if (!env.MONGODB_CONNECTION) return json({ error: "Purchase service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
-        const connection = env.MONGODB_CONNECTION.get(id);
-        const response = await connection.fetch("https://internal.invalid/internal/create-purchase", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims, itemId: payload.itemId })
-        });
-        const order = await response.json().catch(() => ({ error: "Purchase service unavailable" }));
-        if (!response.ok) return json(order, response.status);
-        try { return buildWebXPayCheckoutForm(order, env, "/store"); }
-        catch { return json({ error: "Payment gateway is not configured." }, 503); }
-      } catch (error) {
-        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
-        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
-        return json({ error: "Purchase service unavailable" }, 503);
-      }
     }
 
     if (url.pathname === "/api/subscription") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-      // Fail closed: the legacy catalogue and settlement path are LKR-based.
-      // Do not create an order until USD prices and verified USD settlement are implemented.
       return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
-      if (!env.FIREBASE_PROJECT_ID) return json({ error: "Authentication is not configured" }, 503);
-      try {
-        if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) {
-          return json({ error: "Payment gateway is not configured." }, 503);
-        }
-        createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
-        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const payload = await request.json().catch(() => null);
-        if (!payload || typeof payload.plan !== "string") return json({ error: "Invalid subscription plan." }, 400);
-        if (!env.MONGODB_CONNECTION) return json({ error: "Subscription service unavailable" }, 503);
-        const id = env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env));
-        const connection = env.MONGODB_CONNECTION.get(id);
-        const response = await connection.fetch("https://internal.invalid/internal/create-subscription", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ claims, plan: payload.plan })
-        });
-        const order = await response.json().catch(() => ({ error: "Subscription service unavailable" }));
-        if (!response.ok) return json(order, response.status);
-        const planLabel = order.plan ? order.plan.charAt(0).toUpperCase() + order.plan.slice(1) + " Subscription" : "Premium Subscription";
-        try { return buildWebXPayCheckoutForm(order, env, "/premium", planLabel); }
-        catch {
-          // A checkout reservation must not survive a form-generation failure.
-          await connection.fetch("https://internal.invalid/internal/subscription-abandon", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ claims, orderId: order.orderId })
-          }).catch(() => null);
-          return json({ error: "Payment gateway is not configured. You can try again." }, 503);
-        }
-      } catch (error) {
-        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
-        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
-        return json({ error: "Subscription service unavailable" }, 503);
-      }
     }
 
     if (url.pathname === "/api/subscription/abandon") {
@@ -2746,43 +2684,10 @@ export default {
       }
     }
 
-    const videoRoomTicketMatch = url.pathname.match(/^\/api\/video-rooms\/([^/]+)\/ticket$/);
+    const videoRoomTicketMatch = url.pathname.match(/^\\/api\\/video-rooms\\/([^/]+)\\/ticket$/);
     if (videoRoomTicketMatch) {
-      // Video-room ticket prices are currently persisted in LKR. Do not accept
-      // new charges until USD pricing and settlement verification are complete.
-      return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
-      const regionBlock = darkFantasyRegionGate(request, env);
-      if (regionBlock) return regionBlock;
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-      if (!env.FIREBASE_PROJECT_ID || !env.MONGODB_CONNECTION) return json({ error: "Video Rooms service unavailable" }, 503);
-      if (String(env.DARK_FANTASY_PAYMENTS_APPROVED || "").toLowerCase() !== "true") return json({ error: "Video Room payments are not approved for this deployment." }, 503);
-      if (!env.WEBXPAY_PUBLIC_KEY || !env.WEBXPAY_SECRET_KEY || !env.FRONTEND_URL) return json({ error: "WebXPay payment gateway is not configured." }, 503);
-      try {
-        createPublicKey(normalizeWebXPayPublicKey(env.WEBXPAY_PUBLIC_KEY));
-        const claims = await authenticateFirebaseRequest(request, env.FIREBASE_PROJECT_ID);
-        const accessConnection = env.MONGODB_CONNECTION.get(env.MONGODB_CONNECTION.idFromName(getMongoShardName(request, env)));
-        const accessResponse = await accessConnection.fetch("https://internal.invalid/internal/dark-fantasy/status", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims })
-        });
-        const access = await accessResponse.json().catch(() => ({}));
-        if (!accessResponse.ok) return json(access, accessResponse.status);
-        if (!access.ageEligible) return json({ error: "Video Rooms are available only to eligible adults." }, 403);
-        if (!access.hasAccess) return json({ error: "An active Video Rooms add-on is required." }, 402);
-        let roomId;
-        try { roomId = decodeURIComponent(videoRoomTicketMatch[1]); } catch { return json({ error: "Invalid room ID." }, 400); }
-        if (!roomId || roomId.length > 64) return json({ error: "Invalid room ID." }, 400);
-        const response = await accessConnection.fetch("https://internal.invalid/internal/create-video-room-ticket", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ claims, roomId })
-        });
-        const order = await response.json().catch(() => ({ error: "Video room ticket checkout unavailable." }));
-        if (!response.ok) return json(order, response.status);
-        try { return buildWebXPayCheckoutForm(order, env, "/dark-fantasy?section=videorooms", order.itemName || "Live video room ticket"); }
-        catch { return json({ error: "WebXPay payment gateway is not configured." }, 503); }
-      } catch (error) {
-        if (error instanceof FirebaseKeyServiceError) return json({ error: "Authentication service unavailable" }, 503);
-        if (error instanceof FirebaseTokenError) return json({ error: "Unauthorized" }, 401);
-        return json({ error: "Video room ticket checkout unavailable." }, 503);
-      }
+      return json({ error: "USD checkout is not available yet. No payment has been created." }, 503);
     }
 
     const videoRoomMatch = url.pathname.match(/^\/api\/video-rooms(?:\/([^/]+)\/(join|leave|end))?$/);
