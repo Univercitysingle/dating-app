@@ -335,7 +335,7 @@ export function buildMembershipEntitlements(user, subscription, now = new Date()
     : 0;
   return {
     tier,
-    status: subscriptionActive ? "active" : trialActive ? "trial" : "inactive",
+    status: usdTier || legacyPaid ? "active" : trialActive ? "trial" : "free",
     expiresAt: subscriptionEnd ? subscriptionEnd.toISOString() : trialActive ? new Date(user.trialExpires).toISOString() : null,
     features: {
       unlimitedLikes,
