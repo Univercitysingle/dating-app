@@ -49,6 +49,7 @@ import PrivacySettingsPage from './pages/legal/PrivacySettingsPage';
 import IncomingCallMonitor from './components/IncomingCallMonitor';
 import LoadingState from './components/LoadingState';
 import PUBLIC_ROUTE_SEO from './config/seoRoutes';
+import PWAExperience from './components/PWAExperience';
 
 function PrivateRoute({ children }) {
   const { user, isLoading } = useAuth();
@@ -180,6 +181,7 @@ function App() {
       <AuthProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <RouteSeoMetadata />
+          <PWAExperience />
           <SocketProvider>
             <IncomingCallMonitor />
             <ToastContainer
