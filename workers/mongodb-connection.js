@@ -6381,7 +6381,8 @@ export class MongoDBConnection {
       }
       const [user, messages, unreadCounts] = await Promise.all([
         db.collection("users").findOne({ uid }, { projection: {
-          _id: 1, uid: 1, blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+          _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1, blocked: 1,
+          accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
         } }),
         chatMessages.aggregate([
           { $match: { $or: [{ senderUid: uid }, { receiverUid: uid }] } },
@@ -6397,6 +6398,16 @@ export class MongoDBConnection {
       ]);
       if (!user) return { status: 404, body: { error: "User not found" } };
       if (isAccountRestricted(user)) return { status: 403, body: { error: "Messaging is unavailable for this account" } };
+      let activeSubscription = null;
+      try {
+        activeSubscription = await db.collection("subscriptions").findOne(
+          { userId: user._id, status: "active", endDate: { $gt: new Date() } },
+          { projection: { plan: 1, currency: 1, status: 1, endDate: 1 } }
+        );
+      } catch {
+        // Hide read receipts unless the paid entitlement can be verified.
+      }
+      const entitlements = buildMembershipEntitlements(user, activeSubscription);
       const unreadCountByRoom = new Map(unreadCounts.map(item => [item._id, item.unreadCount]));
       const latestByRoom = new Map();
       for (const message of messages) {
@@ -6427,11 +6438,16 @@ export class MongoDBConnection {
           otherUser: sanitizePublicProfile(otherUser),
           lastMessage: (() => {
             const safeMessage = {};
+            const hideReadReceipt = item.lastMessage.senderUid === uid &&
+              !entitlements.features.readReceipts && item.lastMessage.status === "read";
             for (const field of [
               "roomId", "senderUid", "receiverUid", "messageContent", "timestamp",
               "status", "deliveredAt", "readAt", "clientMessageId", "editedAt", "deletedAt"
             ]) {
-              if (item.lastMessage[field] !== undefined) safeMessage[field] = item.lastMessage[field];
+              if (hideReadReceipt && field === "readAt") continue;
+              if (item.lastMessage[field] !== undefined) {
+                safeMessage[field] = hideReadReceipt && field === "status" ? "delivered" : item.lastMessage[field];
+              }
             }
             safeMessage._id = typeof item.lastMessage._id?.toHexString === "function"
               ? item.lastMessage._id.toHexString()
