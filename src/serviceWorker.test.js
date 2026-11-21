@@ -21,6 +21,7 @@ function createServiceWorkerHarness(fetchImpl = jest.fn()) {
   };
   const caches = {
     open: jest.fn(async () => cache),
+    match: jest.fn(async request => cache.match(request)),
     keys: jest.fn(async () => [
       'hart2hart-pwa-v1',
       'hart2hart-pwa-v2',
