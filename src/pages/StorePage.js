@@ -19,7 +19,7 @@ const subscriptionPlans = [
   },
   {
     name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
-    features: ['Everything in Gold'],
+    features: ['Everything in Gold', 'Priority Likes'],
   },
 ];
 
@@ -264,6 +264,7 @@ const StorePage = () => {
               {currentEntitlements.features?.advancedFilters ? ' Advanced discovery filters are enabled.' : ''}
               {currentEntitlements.features?.readReceipts ? ' Read receipts are enabled.' : ''}
               {currentEntitlements.features?.weeklySuperLikes ? ' Five weekly Super Likes are enabled.' : ''}
+              {currentEntitlements.features?.priorityLikes ? ' Priority Likes are enabled.' : ''}
             </p>
             {currentEntitlements.expiresAt && <p className="mt-1 text-xs text-gray-500">Access ends {new Date(currentEntitlements.expiresAt).toLocaleDateString()}.</p>}
           </div>
