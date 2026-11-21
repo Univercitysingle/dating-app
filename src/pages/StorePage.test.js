@@ -82,9 +82,7 @@ describe('StorePage membership catalogue safety', () => {
     expect(screen.getByText((_, element) => element?.tagName === 'P' && element.className.includes('text-3xl') && element.textContent.includes('3.99 USD'))).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === 'P' && element.className.includes('text-3xl') && element.textContent.includes('7.99 USD'))).toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.tagName === 'P' && element.className.includes('text-3xl') && element.textContent.includes('11.99 USD'))).toBeInTheDocument();
-    expect(screen.getByText(/Annual option:.*28.99 USD.*40% less/i)).toBeInTheDocument();
-    expect(screen.getByText(/Annual option:.*57.99 USD.*40% less/i)).toBeInTheDocument();
-    expect(screen.getByText(/Annual option:.*86.99 USD.*40% less/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Annual option:/i)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Travel Pass' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Privacy Pass' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Visibility Pass' })).toBeInTheDocument();
