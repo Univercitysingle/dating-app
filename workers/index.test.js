@@ -2270,7 +2270,8 @@ test("chat conversations use a valid inclusion projection and return successfull
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, []);
   assert.deepEqual(userProjection, {
-    _id: 1, uid: 1, blocked: 1, accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
+    _id: 1, uid: 1, role: 1, plan: 1, trialExpires: 1, blocked: 1,
+    accountStatus: 1, suspendedUntil: 1, deletionRequestedAt: 1
   });
 });
 
