@@ -29,9 +29,9 @@ describe('StorePage membership catalogue safety', () => {
     expect(screen.getByText('$3.99 USD')).toBeInTheDocument();
     expect(screen.getByText('$7.99 USD')).toBeInTheDocument();
     expect(screen.getByText('$11.99 USD')).toBeInTheDocument();
-    expect(screen.getByText('$28.99 USD / year, approximately 40% less than monthly billing.')).toBeInTheDocument();
-    expect(screen.getByText('$57.99 USD / year, approximately 40% less than monthly billing.')).toBeInTheDocument();
-    expect(screen.getByText('$86.99 USD / year, approximately 40% less than monthly billing.')).toBeInTheDocument();
+    expect(screen.getByText(/Annual option:.*28.99 USD.*40% less/i)).toBeInTheDocument();
+    expect(screen.getByText(/Annual option:.*57.99 USD.*40% less/i)).toBeInTheDocument();
+    expect(screen.getByText(/Annual option:.*86.99 USD.*40% less/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Travel Pass' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Privacy Pass' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Visibility Pass' })).toBeInTheDocument();
