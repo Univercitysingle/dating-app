@@ -15,7 +15,7 @@ const subscriptionPlans = [
   },
   {
     name: 'Gold', plan: 'gold', monthlyPrice: 7.99, annualPrice: 57.99, popular: true, description: 'The complete experience for people serious about meeting someone.',
-    features: ['Everything in Plus', 'See everyone who likes you', 'Read receipts'],
+    features: ['Everything in Plus', 'See everyone who likes you', '5 Super Likes each week', 'Read receipts'],
   },
   {
     name: 'Platinum', plan: 'platinum', monthlyPrice: 11.99, annualPrice: 86.99, description: 'Gold benefits, with additional priority and privacy features planned for a future release.',
@@ -263,6 +263,7 @@ const StorePage = () => {
               {currentEntitlements.features?.seeLikes ? ' See Who Likes You is enabled.' : ''}
               {currentEntitlements.features?.advancedFilters ? ' Advanced discovery filters are enabled.' : ''}
               {currentEntitlements.features?.readReceipts ? ' Read receipts are enabled.' : ''}
+              {currentEntitlements.features?.weeklySuperLikes ? ' Five weekly Super Likes are enabled.' : ''}
             </p>
             {currentEntitlements.expiresAt && <p className="mt-1 text-xs text-gray-500">Access ends {new Date(currentEntitlements.expiresAt).toLocaleDateString()}.</p>}
           </div>
